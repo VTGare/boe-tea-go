@@ -50,6 +50,8 @@ func messageCreated(s *discordgo.Session, m *discordgo.MessageCreate) {
 		return
 	}
 
+	isGuild := m.GuildID != ""
+
 	var content string
 	if strings.HasPrefix(m.Content, botMention) {
 		content = strings.TrimPrefix(m.Content, botMention)
@@ -57,6 +59,14 @@ func messageCreated(s *discordgo.Session, m *discordgo.MessageCreate) {
 		content = strings.TrimPrefix(m.Content, database.GuildCache[m.GuildID].Prefix)
 	} else {
 		//no prefix functionality
+		in := ""
+		if isGuild {
+			g, _ := s.Guild(m.GuildID)
+			in = g.Name
+		} else {
+			in = "DMs"
+		}
+		log.Println(fmt.Sprintf("Reposting Pixiv images in %v, requested by %v", in, m.Author.String()))
 		utils.PostPixiv(s, m, m.Content)
 	}
 
@@ -66,11 +76,20 @@ func messageCreated(s *discordgo.Session, m *discordgo.MessageCreate) {
 	}
 
 	if command, ok := commands.Commands[fields[0]]; ok {
-		if m.GuildID == "" && command.GuildOnly {
+		if !isGuild && command.GuildOnly {
 			s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("%v command can't be executed in DMs or group chats", command.Name))
 			return
 		}
 		go func() {
+			in := ""
+			if isGuild {
+				g, _ := s.Guild(m.GuildID)
+				in = g.Name
+			} else {
+				in = "DMs"
+			}
+
+			log.Println(fmt.Sprintf("Executing %v, requested by %v in %v", command.Name, m.Author.String(), in))
 			err := command.Exec(s, m, fields[1:])
 			if err != nil {
 				s.ChannelMessageSend(m.ChannelID, "Oops, something went wrong. Error message:\n``"+err.Error()+"``")
