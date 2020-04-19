@@ -38,7 +38,11 @@ func init() {
 		ExtendedHelp: []*discordgo.MessageEmbedField{
 			{
 				Name:  "Usage",
-				Value: "bt!sauce <image link>. Link must have either jpg, jpeg, png, gif, or webp suffix. URL parameters after the image are accepted (e.g. link.jpg***?width=441&height=441***)",
+				Value: "bt!sauce <image link>",
+			},
+			{
+				Name:  "image link",
+				Value: "Link must have one of the following suffixes:  *jpg*, *jpeg*, *png*, *gif*, *webp*.\nURL parameters after the link are accepted (e.g. <link>.jpg***?width=441&height=441***)",
 			},
 		},
 	}

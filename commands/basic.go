@@ -37,7 +37,6 @@ func ping(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error
 
 func help(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
 	embed := &discordgo.MessageEmbed{
-		Title:       "Help",
 		Description: "Boe Tea's command documentation",
 		Color:       utils.EmbedColor,
 		Timestamp:   utils.EmbedTimestamp(),
@@ -48,6 +47,7 @@ func help(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error
 
 	if len(args) == 0 {
 		for _, command := range Commands {
+			embed.Title = "Help"
 			field := &discordgo.MessageEmbedField{
 				Name:  command.Name,
 				Value: command.Description,
@@ -57,6 +57,7 @@ func help(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error
 	} else {
 		if command, ok := Commands[args[0]]; ok && command.AdvancedCommand {
 			embed.Fields = command.ExtendedHelp
+			embed.Title = command.Name + " command help"
 		} else {
 			s.ChannelMessageSend(m.ChannelID, "The command either doesn't exist or has no extended help.")
 			return nil
