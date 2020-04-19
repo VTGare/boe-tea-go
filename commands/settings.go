@@ -16,27 +16,27 @@ import (
 
 func init() {
 	Commands["set"] = Command{
-		Name:         "set",
-		Description:  "Show current guild settings or change them.",
-		GuildOnly:    true,
-		Exec:         set,
-		GroupCommand: true,
+		Name:            "set",
+		Description:     "Show current guild settings or change them.",
+		GuildOnly:       true,
+		Exec:            set,
+		AdvancedCommand: true,
 		ExtendedHelp: []*discordgo.MessageEmbedField{
 			{
 				Name:  "prefix",
-				Value: "Changes server's prefix. Maximum 5 characters. If last character is a letter whitespace is assumed (takes one character).",
+				Value: "Changes bot's prefix. Maximum ***5 characters***. If last character is a letter whitespace is assumed (takes one character).",
 			},
 			{
 				Name:  "largeset",
-				Value: "Amount of pictures considered a large set and procs a prompt. Must be an integer. Set to 0 to ask every time",
+				Value: "Amount of pictures considered a large set and procs a prompt. Must be an ***integer***. Set to 0 to ask every time",
 			},
 			{
 				Name:  "pixiv",
-				Value: "Whether to repost pixiv or not, accepts [0, F, f, false, False, FALSE] as false and [1, T, t, true, True, TRUE] as true.",
+				Value: "Whether to repost pixiv or not, accepts ***[0, F, f, false, False, FALSE]*** as ***false*** and ***[1, T, t, true, True, TRUE]*** as ***true***.",
 			},
 			{
 				Name:  "twitter",
-				Value: "Whether to repost twitter or not, accepts [0, F, f, false, False, FALSE] as false and [1, T, t, true, True, TRUE] as true.",
+				Value: "Whether to repost twitter or not, accepts ***[0, F, f, false, False, FALSE]*** as ***false*** and ***[1, T, t, true, True, TRUE]*** as ***true***.",
 			},
 			{
 				Name:  "repost_as",

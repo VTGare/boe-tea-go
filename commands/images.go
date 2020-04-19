@@ -11,16 +11,16 @@ import (
 
 var (
 	//ImageURLRegex is a regex for image URLs
-	ImageURLRegex = regexp.MustCompile(`(http(s?):)([/|.|\w|\s|-])*\.(?:jpg|gif|png|webp)`)
+	ImageURLRegex = regexp.MustCompile(`(http(s?):)([/|.|\w|\s|-])*\.(?:jpg|jpeg|gif|png|webp)`)
 )
 
 func init() {
 	Commands["pixiv"] = Command{
-		Name:         "pixiv",
-		Description:  "Advanced pixiv reposting, not implemented",
-		GuildOnly:    false,
-		Exec:         pixiv,
-		GroupCommand: true,
+		Name:            "pixiv",
+		Description:     "Advanced pixiv reposting, not implemented",
+		GuildOnly:       false,
+		Exec:            pixiv,
+		AdvancedCommand: true,
 		ExtendedHelp: []*discordgo.MessageEmbedField{
 			{
 				Name:  "TODO",
@@ -30,15 +30,15 @@ func init() {
 	}
 
 	Commands["sauce"] = Command{
-		Name:         "sauce",
-		Description:  "Finds sauce on SauceNAO.",
-		GuildOnly:    false,
-		Exec:         sauce,
-		GroupCommand: true,
+		Name:            "sauce",
+		Description:     "Finds sauce on SauceNAO.",
+		GuildOnly:       false,
+		Exec:            sauce,
+		AdvancedCommand: true,
 		ExtendedHelp: []*discordgo.MessageEmbedField{
 			{
-				Name:  "TODO",
-				Value: "TODO",
+				Name:  "Usage",
+				Value: "bt!sauce <image link>. Link must have either jpg, jpeg, png, gif, or webp suffix. URL parameters after the image are accepted (e.g. link.jpg***?width=441&height=441***)",
 			},
 		},
 	}

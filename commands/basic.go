@@ -10,20 +10,20 @@ import (
 
 func init() {
 	Commands["ping"] = Command{
-		Name:         "ping",
-		Description:  "Checks if Boe Tea is online and sends response time.",
-		GuildOnly:    false,
-		Exec:         ping,
-		GroupCommand: false,
-		ExtendedHelp: nil,
+		Name:            "ping",
+		Description:     "Checks if Boe Tea is online and sends response time.",
+		GuildOnly:       false,
+		Exec:            ping,
+		AdvancedCommand: false,
+		ExtendedHelp:    nil,
 	}
 	Commands["help"] = Command{
-		Name:         "help",
-		Description:  "Sends Boe Tea's command documentation",
-		GuildOnly:    false,
-		Exec:         help,
-		GroupCommand: false,
-		ExtendedHelp: nil,
+		Name:            "help",
+		Description:     "Sends Boe Tea's command documentation",
+		GuildOnly:       false,
+		Exec:            help,
+		AdvancedCommand: false,
+		ExtendedHelp:    nil,
 	}
 }
 
@@ -55,7 +55,7 @@ func help(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error
 			embed.Fields = append(embed.Fields, field)
 		}
 	} else {
-		if command, ok := Commands[args[0]]; ok && command.GroupCommand {
+		if command, ok := Commands[args[0]]; ok && command.AdvancedCommand {
 			embed.Fields = command.ExtendedHelp
 		} else {
 			s.ChannelMessageSend(m.ChannelID, "The command either doesn't exist or has no extended help.")
