@@ -17,7 +17,7 @@ var (
 func init() {
 	Commands["pixiv"] = Command{
 		Name:         "pixiv",
-		Description:  "",
+		Description:  "Advanced pixiv reposting, not implemented",
 		GuildOnly:    false,
 		Exec:         pixiv,
 		GroupCommand: true,
@@ -31,7 +31,7 @@ func init() {
 
 	Commands["sauce"] = Command{
 		Name:         "sauce",
-		Description:  "",
+		Description:  "Finds sauce on SauceNAO.",
 		GuildOnly:    false,
 		Exec:         sauce,
 		GroupCommand: true,
