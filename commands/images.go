@@ -16,17 +16,31 @@ var (
 
 func init() {
 	Commands["pixiv"] = Command{
-		Name:        "pixiv",
-		Description: "",
-		GuildOnly:   false,
-		Exec:        pixiv,
+		Name:         "pixiv",
+		Description:  "",
+		GuildOnly:    false,
+		Exec:         pixiv,
+		GroupCommand: true,
+		ExtendedHelp: []*discordgo.MessageEmbedField{
+			{
+				Name:  "TODO",
+				Value: "TODO",
+			},
+		},
 	}
 
 	Commands["sauce"] = Command{
-		Name:        "sauce",
-		Description: "",
-		GuildOnly:   false,
-		Exec:        sauce,
+		Name:         "sauce",
+		Description:  "",
+		GuildOnly:    false,
+		Exec:         sauce,
+		GroupCommand: true,
+		ExtendedHelp: []*discordgo.MessageEmbedField{
+			{
+				Name:  "TODO",
+				Value: "TODO",
+			},
+		},
 	}
 }
 

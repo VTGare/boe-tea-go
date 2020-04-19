@@ -9,8 +9,10 @@ var (
 
 //Command is a structure that defines cmmmand behaviour.
 type Command struct {
-	Name        string
-	Description string
-	GuildOnly   bool
-	Exec        func(*discordgo.Session, *discordgo.MessageCreate, []string) error
+	Name         string
+	Description  string
+	GuildOnly    bool
+	Exec         func(*discordgo.Session, *discordgo.MessageCreate, []string) error
+	GroupCommand bool
+	ExtendedHelp []*discordgo.MessageEmbedField
 }

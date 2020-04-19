@@ -60,7 +60,10 @@ func messageCreated(s *discordgo.Session, m *discordgo.MessageCreate) {
 		content = strings.TrimPrefix(m.Content, globalPrefix)
 	} else {
 		//no prefix functionality
-		err := utils.PostPixiv(s, m, m.Content)
+		var err error
+		if isGuild && database.GuildCache[m.GuildID].Pixiv {
+			err = utils.PostPixiv(s, m, m.Content)
+		}
 
 		if err != nil {
 			log.Println(err)

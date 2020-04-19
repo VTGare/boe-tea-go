@@ -2,25 +2,28 @@ package commands
 
 import (
 	"fmt"
-	"log"
 	"time"
 
-	"github.com/VTGare/boe-tea-go/services"
+	"github.com/VTGare/boe-tea-go/utils"
 	"github.com/bwmarrin/discordgo"
 )
 
 func init() {
 	Commands["ping"] = Command{
-		Name:        "ping",
-		Description: "Pong",
-		GuildOnly:   false,
-		Exec:        ping,
+		Name:         "ping",
+		Description:  "Checks if Boe Tea is online and sends response time.",
+		GuildOnly:    false,
+		Exec:         ping,
+		GroupCommand: false,
+		ExtendedHelp: nil,
 	}
-	Commands["test"] = Command{
-		Name:        "test",
-		Description: "Pong",
-		GuildOnly:   false,
-		Exec:        test,
+	Commands["help"] = Command{
+		Name:         "help",
+		Description:  "Sends Boe Tea's command documentation",
+		GuildOnly:    false,
+		Exec:         help,
+		GroupCommand: false,
+		ExtendedHelp: nil,
 	}
 }
 
@@ -32,21 +35,34 @@ func ping(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error
 	return nil
 }
 
-func help(s *discordgo.Session, m *discordgo.MessageCreate) error {
-	return nil
-}
-
-func test(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
-	if m.Author.ID != "244208152776540160" {
-		return nil
+func help(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
+	embed := &discordgo.MessageEmbed{
+		Title:       "Help",
+		Description: "Boe Tea's command documentation",
+		Color:       utils.EmbedColor,
+		Timestamp:   utils.EmbedTimestamp(),
+		Thumbnail: &discordgo.MessageEmbedThumbnail{
+			URL: "https://i.imgur.com/OZ1Al5h.png",
+		},
 	}
 
-	res, err := services.SearchSauceByURL("https://images-ext-1.discordapp.net/external/lPAq5wxKWxDNO358Ea9fDrjBjfW5Kl02BuoFEE8mrZY/https/pbs.twimg.com/media/EVy0c0CVAAAeEgb.jpg%3Alarge?width=291&height=441")
-	if err != nil {
-		log.Println(err)
+	if len(args) == 0 {
+		for _, command := range Commands {
+			field := &discordgo.MessageEmbedField{
+				Name:  command.Name,
+				Value: command.Description,
+			}
+			embed.Fields = append(embed.Fields, field)
+		}
+	} else {
+		if command, ok := Commands[args[0]]; ok && command.GroupCommand {
+			embed.Fields = command.ExtendedHelp
+		} else {
+			s.ChannelMessageSend(m.ChannelID, "The command either doesn't exist or has no extended help.")
+			return nil
+		}
 	}
 
-	log.Println(res.Header.ResultsReturned)
-
+	s.ChannelMessageSendEmbed(m.ChannelID, embed)
 	return nil
 }

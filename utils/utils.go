@@ -23,8 +23,13 @@ type PromptOptions struct {
 }
 
 var (
-	r = regexp.MustCompile(`http(?:s)?:\/\/(?:www\.)?pixiv\.net\/(?:en\/)?artworks\/([0-9]+)`)
+	EmbedColor = 0x439ef1
+	r          = regexp.MustCompile(`http(?:s)?:\/\/(?:www\.)?pixiv\.net\/(?:en\/)?artworks\/([0-9]+)`)
 )
+
+func EmbedTimestamp() string {
+	return time.Now().Format(time.RFC3339)
+}
 
 //FindAuthor is a SauceNAO helper function that finds original source author string.
 func FindAuthor(sauce services.Sauce) string {
@@ -125,6 +130,7 @@ func PostPixiv(s *discordgo.Session, m *discordgo.MessageCreate, text string) er
 					Title:       title,
 					Description: description,
 					URL:         image,
+					Color:       EmbedColor,
 					Timestamp:   time.Now().Format(time.RFC3339),
 				}
 				embed.Image = &discordgo.MessageEmbedImage{

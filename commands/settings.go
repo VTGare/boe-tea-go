@@ -5,10 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
-	"time"
 	"unicode"
 
 	"github.com/VTGare/boe-tea-go/database"
+	"github.com/VTGare/boe-tea-go/utils"
 	"github.com/bwmarrin/discordgo"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -16,10 +16,33 @@ import (
 
 func init() {
 	Commands["set"] = Command{
-		Name:        "set",
-		Description: "Show current guild settings or change them.",
-		GuildOnly:   true,
-		Exec:        set,
+		Name:         "set",
+		Description:  "Show current guild settings or change them.",
+		GuildOnly:    true,
+		Exec:         set,
+		GroupCommand: true,
+		ExtendedHelp: []*discordgo.MessageEmbedField{
+			{
+				Name:  "prefix",
+				Value: "Changes server's prefix. Maximum 5 characters. If last character is a letter whitespace is assumed (takes one character).",
+			},
+			{
+				Name:  "largeset",
+				Value: "Amount of pictures considered a large set and procs a prompt. Must be an integer. Set to 0 to ask every time",
+			},
+			{
+				Name:  "pixiv",
+				Value: "Whether to repost pixiv or not, accepts [0, F, f, false, False, FALSE] as false and [1, T, t, true, True, TRUE] as true.",
+			},
+			{
+				Name:  "twitter",
+				Value: "Whether to repost twitter or not, accepts [0, F, f, false, False, FALSE] as false and [1, T, t, true, True, TRUE] as true.",
+			},
+			{
+				Name:  "repost_as",
+				Value: "Default behaviour when reposting images. Accepts **links**, **embeds**, and **ask** options.",
+			},
+		},
 	}
 }
 
@@ -79,7 +102,7 @@ func showGuildSettings(s *discordgo.Session, m *discordgo.MessageCreate) {
 	s.ChannelMessageSendEmbed(m.ChannelID, &discordgo.MessageEmbed{
 		Title:       "Current settings",
 		Description: guild.Name,
-		Color:       0x439ef1,
+		Color:       utils.EmbedColor,
 		Fields: []*discordgo.MessageEmbedField{
 			{
 				Name:  "Prefix",
@@ -105,7 +128,7 @@ func showGuildSettings(s *discordgo.Session, m *discordgo.MessageCreate) {
 		Thumbnail: &discordgo.MessageEmbedThumbnail{
 			URL: guild.IconURL(),
 		},
-		Timestamp: time.Now().Format(time.RFC3339),
+		Timestamp: utils.EmbedTimestamp(),
 	})
 }
 
