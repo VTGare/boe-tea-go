@@ -10,6 +10,7 @@ import (
 )
 
 var (
+	//ImageURLRegex is a regex for image URLs
 	ImageURLRegex = regexp.MustCompile(`(http(s?):)([/|.|\w|\s|-])*\.(?:jpg|gif|png|webp)`)
 )
 
@@ -43,7 +44,7 @@ func sauce(s *discordgo.Session, m *discordgo.MessageCreate, args []string) erro
 		return errors.New("received a non-image url")
 	}
 
-	saucenao, err := services.SearchByURL(url)
+	saucenao, err := services.SearchSauceByURL(url)
 	if err != nil {
 		return err
 	}

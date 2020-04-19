@@ -9,25 +9,30 @@ import (
 	"github.com/valyala/fasthttp"
 )
 
+//SauceNaoResult is a top-level raw SauceNAO API response
 type SauceNaoResult struct {
 	Header  *TopHeader `json:"header"`
 	Results *[]Sauce   `json:"results"`
 }
 
+//TopHeader is a top-level SauceNAO header
 type TopHeader struct {
 	ResultsReturned int `json:"results_returned"`
 }
 
+//Sauce is a wrap around raw SauceNAO source image result.
 type Sauce struct {
 	Header *SauceHeader `json:"header"`
 	Data   *SauceData   `json:"data"`
 }
 
+//SauceHeader is a source image header
 type SauceHeader struct {
 	Similarity string `json:"similarity"`
 	Thumbnail  string `json:"thumbnail"`
 }
 
+//SauceData is a raw SauceNAO API source image response.
 type SauceData struct {
 	URLs       []string    `json:"ext_urls"`
 	Title      string      `json:"title"`
@@ -38,7 +43,7 @@ type SauceData struct {
 }
 
 var (
-	base_url = "https://saucenao.com/search.php?db=8191&output_type=2&api_key="
+	baseSauceNAO = "https://saucenao.com/search.php?db=8191&output_type=2&api_key="
 )
 
 func init() {
@@ -46,12 +51,13 @@ func init() {
 	if apiKey == "" {
 		log.Fatalln("SAUCENAO_API env does not exist")
 	}
-	base_url += apiKey
+	baseSauceNAO += apiKey
 }
 
-func SearchByURL(image string) (*SauceNaoResult, error) {
+//SearchSauceByURL permorfs a SauceNAO API call and returns its results.
+func SearchSauceByURL(image string) (*SauceNaoResult, error) {
 	image = url.QueryEscape(image)
-	uri := base_url + "&url=" + image
+	uri := baseSauceNAO + "&url=" + image
 
 	body, err := fasthttpGet(uri)
 	if err != nil {

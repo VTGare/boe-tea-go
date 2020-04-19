@@ -41,7 +41,7 @@ func test(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error
 		return nil
 	}
 
-	res, err := services.SearchByURL("https://images-ext-1.discordapp.net/external/lPAq5wxKWxDNO358Ea9fDrjBjfW5Kl02BuoFEE8mrZY/https/pbs.twimg.com/media/EVy0c0CVAAAeEgb.jpg%3Alarge?width=291&height=441")
+	res, err := services.SearchSauceByURL("https://images-ext-1.discordapp.net/external/lPAq5wxKWxDNO358Ea9fDrjBjfW5Kl02BuoFEE8mrZY/https/pbs.twimg.com/media/EVy0c0CVAAAeEgb.jpg%3Alarge?width=291&height=441")
 	if err != nil {
 		log.Println(err)
 	}

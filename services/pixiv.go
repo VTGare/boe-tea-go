@@ -31,6 +31,7 @@ func init() {
 	app = pixiv.NewApp()
 }
 
+//GetPixivImages perfoms a Pixiv API call and returns an array of high-resolution image URLs
 func GetPixivImages(id string) ([]string, error) {
 	var (
 		images = make([]string, 0)

@@ -11,8 +11,10 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
+//ActionFunc is a function type alias for prompt actions
 type ActionFunc = func() bool
 
+//PromptOptions is a struct that defines prompt's behaviour.
 type PromptOptions struct {
 	Actions map[string]ActionFunc
 	Message string
@@ -23,6 +25,7 @@ var (
 	r = regexp.MustCompile(`http(?:s)?:\/\/(?:www\.)?pixiv\.net\/(?:en\/)?artworks\/([0-9]+)`)
 )
 
+//FindAuthor is a SauceNAO helper function that finds original source author string.
 func FindAuthor(sauce services.Sauce) string {
 	if sauce.Data.MemberName != "" {
 		return sauce.Data.MemberName
@@ -35,17 +38,17 @@ func FindAuthor(sauce services.Sauce) string {
 	return "-"
 }
 
-func PostPixiv(s *discordgo.Session, m *discordgo.MessageCreate, text string) {
+//PostPixiv reposts Pixiv images from a link to a discord channel
+func PostPixiv(s *discordgo.Session, m *discordgo.MessageCreate, text string) error {
 	matches := r.FindStringSubmatch(text)
 
 	if matches == nil {
-		return
+		return nil
 	}
 
 	images, err := services.GetPixivImages(matches[1])
 	if err != nil {
-		s.ChannelMessageSend(m.ChannelID, "Error: "+err.Error())
-		return
+		return err
 	}
 
 	flag := true
@@ -61,28 +64,45 @@ func PostPixiv(s *discordgo.Session, m *discordgo.MessageCreate, text string) {
 			Timeout: time.Second * 15,
 		})
 		if prompt == nil {
-			return
+			return nil
 		}
 		flag = prompt()
 	}
 
 	if flag {
-		prompt := CreatePrompt(s, m, &PromptOptions{
-			Message: "Send images as links (✅) or embeds (❎)? ***Warning: embeds sometimes lag!***",
-			Actions: map[string]ActionFunc{
-				"✅": func() bool {
-					return true
-				},
-				"❎": func() bool {
-					return false
-				},
-			},
-			Timeout: time.Second * 15,
-		})
-		if prompt == nil {
-			return
+		var ask bool
+		var links bool
+		if g, ok := database.GuildCache[m.GuildID]; ok {
+			switch g.RepostAs {
+			case "ask":
+				ask = true
+			case "links":
+				ask = false
+				links = true
+			case "embeds":
+				ask = false
+				links = false
+			}
 		}
-		links := prompt()
+
+		if ask {
+			prompt := CreatePrompt(s, m, &PromptOptions{
+				Message: "Send images as links (✅) or embeds (❎)? ***Warning: embeds sometimes lag!***",
+				Actions: map[string]ActionFunc{
+					"✅": func() bool {
+						return true
+					},
+					"❎": func() bool {
+						return false
+					},
+				},
+				Timeout: time.Second * 15,
+			})
+			if prompt == nil {
+				return nil
+			}
+			links = prompt()
+		}
 
 		for ind, image := range images {
 			if links {
@@ -105,8 +125,11 @@ func PostPixiv(s *discordgo.Session, m *discordgo.MessageCreate, text string) {
 			}
 		}
 	}
+
+	return nil
 }
 
+//CreatePrompt sends a prompt message to a discord channel
 func CreatePrompt(s *discordgo.Session, m *discordgo.MessageCreate, opts *PromptOptions) ActionFunc {
 	prompt, _ := s.ChannelMessageSend(m.ChannelID, opts.Message)
 	for emoji := range opts.Actions {
@@ -119,6 +142,7 @@ func CreatePrompt(s *discordgo.Session, m *discordgo.MessageCreate, opts *Prompt
 		case k := <-nextMessageReactionAdd(s):
 			reaction = k.MessageReaction
 		case <-time.After(opts.Timeout):
+			s.ChannelMessageDelete(prompt.ChannelID, prompt.ID)
 			return nil
 		}
 
@@ -130,6 +154,7 @@ func CreatePrompt(s *discordgo.Session, m *discordgo.MessageCreate, opts *Prompt
 			continue
 		}
 
+		s.ChannelMessageDelete(prompt.ChannelID, prompt.ID)
 		return opts.Actions[reaction.Emoji.Name]
 	}
 }

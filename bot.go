@@ -35,7 +35,7 @@ func onReady(s *discordgo.Session, e *discordgo.Ready) {
 		}
 	}
 	if len(guilds) > 0 {
-		err := database.InserManyGuilds(guilds)
+		err := database.InsertManyGuilds(guilds)
 		if err != nil {
 			log.Println("Error adding documents", err)
 		} else {
@@ -49,7 +49,6 @@ func messageCreated(s *discordgo.Session, m *discordgo.MessageCreate) {
 	if m.Author.Bot {
 		return
 	}
-
 	isGuild := m.GuildID != ""
 
 	var content string
@@ -57,6 +56,8 @@ func messageCreated(s *discordgo.Session, m *discordgo.MessageCreate) {
 		content = strings.TrimPrefix(m.Content, botMention)
 	} else if strings.HasPrefix(m.Content, database.GuildCache[m.GuildID].Prefix) {
 		content = strings.TrimPrefix(m.Content, database.GuildCache[m.GuildID].Prefix)
+	} else if !isGuild && strings.HasPrefix(m.Content, globalPrefix) {
+		content = strings.TrimPrefix(m.Content, globalPrefix)
 	} else {
 		//no prefix functionality
 		in := ""
@@ -67,7 +68,13 @@ func messageCreated(s *discordgo.Session, m *discordgo.MessageCreate) {
 			in = "DMs"
 		}
 		log.Println(fmt.Sprintf("Reposting Pixiv images in %v, requested by %v", in, m.Author.String()))
-		utils.PostPixiv(s, m, m.Content)
+		err := utils.PostPixiv(s, m, m.Content)
+
+		if err != nil {
+			log.Println(err)
+			s.ChannelMessageSend(m.ChannelID, "Oops, something went wrong. Error message:\n``"+err.Error()+"``")
+		}
+		return
 	}
 
 	fields := strings.Fields(content)
@@ -92,6 +99,7 @@ func messageCreated(s *discordgo.Session, m *discordgo.MessageCreate) {
 			log.Println(fmt.Sprintf("Executing %v, requested by %v in %v", command.Name, m.Author.String(), in))
 			err := command.Exec(s, m, fields[1:])
 			if err != nil {
+				log.Println(err)
 				s.ChannelMessageSend(m.ChannelID, "Oops, something went wrong. Error message:\n``"+err.Error()+"``")
 			}
 		}()

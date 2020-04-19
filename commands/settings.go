@@ -33,14 +33,27 @@ func set(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error 
 
 		var err error
 		var passedSetting interface{}
-		if setting == "pixiv" || setting == "twitter" {
+		switch setting {
+		case "pixiv":
 			passedSetting, err = strconv.ParseBool(newSetting)
-		} else if setting == "prefix" && unicode.IsLetter(rune(newSetting[len(newSetting)-1])) {
-			passedSetting = newSetting + " "
-		} else if setting == "largeset" {
+		case "twitter":
+			passedSetting, err = strconv.ParseBool(newSetting)
+		case "prefix":
+			if unicode.IsLetter(rune(newSetting[len(newSetting)-1])) {
+				passedSetting = newSetting + " "
+			} else {
+				passedSetting = newSetting
+			}
+		case "largeset":
 			setting = "large_set"
 			passedSetting, err = strconv.Atoi(newSetting)
-		} else {
+		case "repost_as":
+			if newSetting != "ask" && newSetting != "embeds" && newSetting != "links" {
+				return errors.New("unknown option. repost_as only takes ``ask embeds links`` options")
+			}
+
+			passedSetting = newSetting
+		default:
 			return errors.New("unknown setting ``" + setting + "``")
 		}
 
