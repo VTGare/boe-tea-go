@@ -2,6 +2,7 @@ package utils
 
 import (
 	"fmt"
+	"log"
 	"regexp"
 	"strconv"
 	"time"
@@ -46,6 +47,15 @@ func PostPixiv(s *discordgo.Session, m *discordgo.MessageCreate, text string) er
 		return nil
 	}
 
+	in := ""
+	if m.GuildID != "" {
+		g, _ := s.Guild(m.GuildID)
+		in = g.Name
+	} else {
+		in = "DMs"
+	}
+
+	log.Println(fmt.Sprintf("Reposting Pixiv images in %v, requested by %v", in, m.Author.String()))
 	images, err := services.GetPixivImages(matches[1])
 	if err != nil {
 		return err

@@ -97,6 +97,10 @@ func showGuildSettings(s *discordgo.Session, m *discordgo.MessageCreate) {
 				Name:  "Twitter",
 				Value: strconv.FormatBool(settings.Twitter),
 			},
+			{
+				Name:  "Repost as",
+				Value: settings.RepostAs,
+			},
 		},
 		Thumbnail: &discordgo.MessageEmbedThumbnail{
 			URL: guild.IconURL(),

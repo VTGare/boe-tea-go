@@ -60,14 +60,6 @@ func messageCreated(s *discordgo.Session, m *discordgo.MessageCreate) {
 		content = strings.TrimPrefix(m.Content, globalPrefix)
 	} else {
 		//no prefix functionality
-		in := ""
-		if isGuild {
-			g, _ := s.Guild(m.GuildID)
-			in = g.Name
-		} else {
-			in = "DMs"
-		}
-		log.Println(fmt.Sprintf("Reposting Pixiv images in %v, requested by %v", in, m.Author.String()))
 		err := utils.PostPixiv(s, m, m.Content)
 
 		if err != nil {
