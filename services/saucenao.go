@@ -5,8 +5,6 @@ import (
 	"log"
 	"net/url"
 	"os"
-
-	"github.com/valyala/fasthttp"
 )
 
 //SauceNaoResult is a top-level raw SauceNAO API response
@@ -71,19 +69,4 @@ func SearchSauceByURL(image string) (*SauceNaoResult, error) {
 	}
 
 	return &res, nil
-}
-
-func fasthttpGet(uri string) ([]byte, error) {
-	req := fasthttp.AcquireRequest()
-	resp := fasthttp.AcquireResponse()
-	defer fasthttp.ReleaseRequest(req)
-	defer fasthttp.ReleaseResponse(resp)
-
-	req.SetRequestURI(uri)
-	req.Header.SetMethod("GET")
-	err := fasthttp.Do(req, resp)
-	if err != nil {
-		return nil, err
-	}
-	return resp.Body(), nil
 }

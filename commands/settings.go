@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 	"unicode"
 
 	"github.com/VTGare/boe-tea-go/database"
@@ -42,6 +43,10 @@ func init() {
 				Name:  "repost_as",
 				Value: "Default behaviour when reposting images. Accepts **links**, **embeds**, and **ask** options.",
 			},
+			{
+				Name:  "sauce_engine",
+				Value: "Default reverse image search engine. Only SauceNAO or ASCII2D are available as of now.",
+			},
 		},
 	}
 }
@@ -52,7 +57,7 @@ func set(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error 
 		showGuildSettings(s, m)
 	case 2:
 		setting := args[0]
-		newSetting := args[1]
+		newSetting := strings.ToLower(args[1])
 
 		var err error
 		var passedSetting interface{}
@@ -72,7 +77,13 @@ func set(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error 
 			passedSetting, err = strconv.Atoi(newSetting)
 		case "repost_as":
 			if newSetting != "ask" && newSetting != "embeds" && newSetting != "links" {
-				return errors.New("unknown option. repost_as only takes ``ask embeds links`` options")
+				return errors.New("unknown option. repost_as only accepts ``ask``, ``embeds``, and ``links`` options")
+			}
+
+			passedSetting = newSetting
+		case "sauce_engine":
+			if newSetting != "saucenao" && newSetting != "ascii2d" {
+				return errors.New("unknown option. repost_as only accepts ``ascii2d`` and ``saucenao`` options")
 			}
 
 			passedSetting = newSetting
@@ -123,6 +134,10 @@ func showGuildSettings(s *discordgo.Session, m *discordgo.MessageCreate) {
 			{
 				Name:  "Repost as",
 				Value: settings.RepostAs,
+			},
+			{
+				Name:  "Default image search engine",
+				Value: settings.SauceEngine,
 			},
 		},
 		Thumbnail: &discordgo.MessageEmbedThumbnail{

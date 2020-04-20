@@ -14,35 +14,38 @@ var (
 
 //GuildSettings is a database model for per guild bot settings
 type GuildSettings struct {
-	GuildID  string `bson:"guild_id" json:"guild_id"`
-	Prefix   string `bson:"prefix" json:"prefix"`
-	LargeSet int    `bson:"large_set" json:"large_set"`
-	Pixiv    bool   `bson:"pixiv" json:"pixiv"`
-	Twitter  bool   `bson:"twitter" json:"twitter"`
-	RepostAs string `bson:"repost_as" json:"repost_as"`
+	GuildID     string `bson:"guild_id" json:"guild_id"`
+	Prefix      string `bson:"prefix" json:"prefix"`
+	SauceEngine string `bson:"sauce_engine" json:"sauce_engine"`
+	LargeSet    int    `bson:"large_set" json:"large_set"`
+	Pixiv       bool   `bson:"pixiv" json:"pixiv"`
+	Twitter     bool   `bson:"twitter" json:"twitter"`
+	RepostAs    string `bson:"repost_as" json:"repost_as"`
 }
 
 //NewGuildSettings returns a new GuildSettings instance with given parameters.
-func NewGuildSettings(guildID, prefix, repostAs string, largeset int, pixiv, twitter bool) *GuildSettings {
+func NewGuildSettings(guildID, prefix, repostAs, sauceEngine string, largeset int, pixiv, twitter bool) *GuildSettings {
 	return &GuildSettings{
-		GuildID:  guildID,
-		Prefix:   prefix,
-		LargeSet: largeset,
-		Pixiv:    pixiv,
-		Twitter:  twitter,
-		RepostAs: repostAs,
+		GuildID:     guildID,
+		SauceEngine: sauceEngine,
+		Prefix:      prefix,
+		LargeSet:    largeset,
+		Pixiv:       pixiv,
+		Twitter:     twitter,
+		RepostAs:    repostAs,
 	}
 }
 
 //DefaultGuildSettings returns a default GuildSettings struct.
 func DefaultGuildSettings(guildID string) *GuildSettings {
 	return &GuildSettings{
-		GuildID:  guildID,
-		Prefix:   "bt!",
-		LargeSet: 3,
-		Pixiv:    true,
-		Twitter:  false,
-		RepostAs: "ask",
+		GuildID:     guildID,
+		Prefix:      "bt!",
+		SauceEngine: "saucenao",
+		LargeSet:    3,
+		Pixiv:       true,
+		Twitter:     false,
+		RepostAs:    "ask",
 	}
 }
 

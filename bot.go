@@ -19,9 +19,13 @@ var (
 func onReady(s *discordgo.Session, e *discordgo.Ready) {
 	botMention = "<@!" + e.User.ID + ">"
 	fmt.Println(e.User.String(), "is ready.")
+	defaults := database.DefaultGuildSettings("1")
 
 	allGuilds := database.AllGuilds()
 	for _, guild := range *allGuilds {
+		if guild.SauceEngine == "" {
+			guild.SauceEngine = defaults.SauceEngine
+		}
 		database.GuildCache[guild.GuildID] = guild
 	}
 
