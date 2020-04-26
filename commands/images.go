@@ -125,13 +125,11 @@ func sauce(s *discordgo.Session, m *discordgo.MessageCreate, args []string) erro
 		args = append(args, m.Attachments[0].URL)
 	}
 
-	if len(args) == 0 {
-		return utils.ErrorNotEnoughArguments
-	}
-
 	url := ""
 	searchEngine := ""
 	switch len(args) {
+	case 0:
+		return utils.ErrorNotEnoughArguments
 	case 1:
 		searchEngine = database.GuildCache[m.GuildID].ReverseSearch
 		url = ImageURLRegex.FindString(args[0])
@@ -139,8 +137,14 @@ func sauce(s *discordgo.Session, m *discordgo.MessageCreate, args []string) erro
 			return errors.New("received a non-image url")
 		}
 	case 2:
-		searchEngine = args[0]
-		url = ImageURLRegex.FindString(args[1])
+		if f := ImageURLRegex.FindString(args[0]); f != "" {
+			searchEngine = database.GuildCache[m.GuildID].ReverseSearch
+			url = f
+		} else {
+			searchEngine = args[0]
+			url = ImageURLRegex.FindString(args[1])
+		}
+
 		if url == "" {
 			return errors.New("received a non-image url")
 		}
