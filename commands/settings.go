@@ -25,6 +25,10 @@ func init() {
 		AdvancedCommand: true,
 		ExtendedHelp: []*discordgo.MessageEmbedField{
 			{
+				Name:  "Usage",
+				Value: "bt!set ``<setting>`` ``<new setting>``",
+			},
+			{
 				Name:  "prefix",
 				Value: "Changes bot's prefix. Maximum ***5 characters***. If last character is a letter whitespace is assumed (takes one character).",
 			},
