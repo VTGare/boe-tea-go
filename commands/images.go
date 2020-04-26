@@ -121,6 +121,10 @@ func init() {
 }
 
 func sauce(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
+	if len(m.Attachments) > 0 {
+		args = append(args, m.Attachments[0].URL)
+	}
+
 	if len(args) == 0 {
 		return utils.ErrorNotEnoughArguments
 	}
