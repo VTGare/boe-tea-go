@@ -18,35 +18,12 @@ var (
 
 func onReady(s *discordgo.Session, e *discordgo.Ready) {
 	botMention = "<@!" + e.User.ID + ">"
-	fmt.Println(e.User.String(), "is ready.")
-	defaults := database.DefaultGuildSettings("1")
+	log.Println(e.User.String(), "is ready.")
 
-	allGuilds := database.AllGuilds()
-	for _, guild := range *allGuilds {
-		if guild.SauceEngine == "" {
-			guild.SauceEngine = defaults.SauceEngine
-		}
-		database.GuildCache[guild.GuildID] = guild
+	err := utils.CreateDB(e.Guilds)
+	if err != nil {
+		log.Println("Error adding guilds: ", err)
 	}
-
-	guilds := make([]interface{}, 0)
-	for _, guild := range e.Guilds {
-		log.Println("Connected to", guild.Name)
-
-		if _, ok := database.GuildCache[guild.ID]; !ok {
-			log.Println(guild.Name, "not found in database. Adding...")
-			guilds = append(guilds, database.DefaultGuildSettings(guild.ID))
-		}
-	}
-	if len(guilds) > 0 {
-		err := database.InsertManyGuilds(guilds)
-		if err != nil {
-			log.Println("Error adding documents", err)
-		} else {
-			log.Println("Successfully inserted all current guilds.")
-		}
-	}
-
 }
 
 func messageCreated(s *discordgo.Session, m *discordgo.MessageCreate) {

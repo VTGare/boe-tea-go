@@ -14,6 +14,7 @@ func init() {
 		Description:     "Checks if Boe Tea is online and sends response time.",
 		GuildOnly:       false,
 		Exec:            ping,
+		Help:            true,
 		AdvancedCommand: false,
 		ExtendedHelp:    nil,
 	}
@@ -22,6 +23,7 @@ func init() {
 		Description:     "Sends Boe Tea's command documentation",
 		GuildOnly:       false,
 		Exec:            help,
+		Help:            true,
 		AdvancedCommand: false,
 		ExtendedHelp:    nil,
 	}
@@ -46,16 +48,18 @@ func help(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error
 	}
 
 	if len(args) == 0 {
+		embed.Title = "Help"
 		for _, command := range Commands {
-			embed.Title = "Help"
-			field := &discordgo.MessageEmbedField{
-				Name:  command.Name,
-				Value: command.Description,
+			if command.Help {
+				field := &discordgo.MessageEmbedField{
+					Name:  command.Name,
+					Value: command.Description,
+				}
+				embed.Fields = append(embed.Fields, field)
 			}
-			embed.Fields = append(embed.Fields, field)
 		}
 	} else {
-		if command, ok := Commands[args[0]]; ok && command.AdvancedCommand {
+		if command, ok := Commands[args[0]]; ok && command.AdvancedCommand && command.Help {
 			embed.Fields = command.ExtendedHelp
 			embed.Title = command.Name + " command help"
 		} else {

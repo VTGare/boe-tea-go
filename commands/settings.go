@@ -21,6 +21,7 @@ func init() {
 		Description:     "Show current guild settings or change them.",
 		GuildOnly:       true,
 		Exec:            set,
+		Help:            true,
 		AdvancedCommand: true,
 		ExtendedHelp: []*discordgo.MessageEmbedField{
 			{
@@ -33,19 +34,15 @@ func init() {
 			},
 			{
 				Name:  "pixiv",
-				Value: "Whether to repost pixiv or not, accepts ***[0, F, f, false, False, FALSE]*** as ***false*** and ***[1, T, t, true, True, TRUE]*** as ***true***.",
+				Value: "Whether to repost pixiv or not, accepts ***f or false (case-insensitive)*** to disable and ***t or true*** to enable.",
 			},
 			{
-				Name:  "twitter",
-				Value: "Whether to repost twitter or not, accepts ***[0, F, f, false, False, FALSE]*** as ***false*** and ***[1, T, t, true, True, TRUE]*** as ***true***.",
+				Name:  "repost",
+				Value: "Default reposting behaviour. Accepts ***links**, **embeds***, and ***ask*** options.",
 			},
 			{
-				Name:  "repost_as",
-				Value: "Default behaviour when reposting images. Accepts **links**, **embeds**, and **ask** options.",
-			},
-			{
-				Name:  "sauce_engine",
-				Value: "Default reverse image search engine. Only SauceNAO or ASCII2D are available as of now.",
+				Name:  "reversesearch",
+				Value: "Default reverse image search engine. Accepts ***SauceNAO*** or ***ASCII2D*** are available as of now.",
 			},
 		},
 	}
@@ -64,31 +61,32 @@ func set(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error 
 		switch setting {
 		case "pixiv":
 			passedSetting, err = strconv.ParseBool(newSetting)
-		case "twitter":
-			passedSetting, err = strconv.ParseBool(newSetting)
 		case "prefix":
 			if unicode.IsLetter(rune(newSetting[len(newSetting)-1])) {
 				passedSetting = newSetting + " "
 			} else {
 				passedSetting = newSetting
 			}
+
+			if len(passedSetting.(string)) > 5 {
+				return errors.New("new prefix is too long")
+			}
 		case "largeset":
-			setting = "large_set"
 			passedSetting, err = strconv.Atoi(newSetting)
-		case "repost_as":
+		case "repost":
 			if newSetting != "ask" && newSetting != "embeds" && newSetting != "links" {
 				return errors.New("unknown option. repost_as only accepts ``ask``, ``embeds``, and ``links`` options")
 			}
 
 			passedSetting = newSetting
-		case "sauce_engine":
+		case "reversesearch":
 			if newSetting != "saucenao" && newSetting != "ascii2d" {
 				return errors.New("unknown option. repost_as only accepts ``ascii2d`` and ``saucenao`` options")
 			}
 
 			passedSetting = newSetting
 		default:
-			return errors.New("unknown setting ``" + setting + "``")
+			return errors.New("unknown setting " + setting)
 		}
 
 		if err != nil {
@@ -116,28 +114,16 @@ func showGuildSettings(s *discordgo.Session, m *discordgo.MessageCreate) {
 		Color:       utils.EmbedColor,
 		Fields: []*discordgo.MessageEmbedField{
 			{
-				Name:  "Prefix",
-				Value: settings.Prefix,
+				Name:  "Basic",
+				Value: fmt.Sprintf("**Prefix:** %v", settings.Prefix),
 			},
 			{
-				Name:  "Large set",
-				Value: strconv.Itoa(settings.LargeSet),
+				Name:  "Features",
+				Value: fmt.Sprintf("**Pixiv:** %v\n**Reverse search:** %v", utils.FormatBool(settings.Pixiv), settings.ReverseSearch),
 			},
 			{
-				Name:  "Pixiv",
-				Value: strconv.FormatBool(settings.Pixiv),
-			},
-			{
-				Name:  "Twitter",
-				Value: strconv.FormatBool(settings.Twitter),
-			},
-			{
-				Name:  "Repost as",
-				Value: settings.RepostAs,
-			},
-			{
-				Name:  "Default image search engine",
-				Value: settings.SauceEngine,
+				Name:  "Pixiv settings",
+				Value: fmt.Sprintf("**Large set**: %v\n**Repost**: %v", settings.LargeSet, settings.Repost),
 			},
 		},
 		Thumbnail: &discordgo.MessageEmbedThumbnail{

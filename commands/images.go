@@ -96,25 +96,12 @@ var (
 )
 
 func init() {
-	Commands["pixiv"] = Command{
-		Name:            "pixiv",
-		Description:     "Advanced pixiv reposting, not implemented",
-		GuildOnly:       false,
-		Exec:            pixiv,
-		AdvancedCommand: true,
-		ExtendedHelp: []*discordgo.MessageEmbedField{
-			{
-				Name:  "TODO",
-				Value: "TODO",
-			},
-		},
-	}
-
 	Commands["sauce"] = Command{
 		Name:            "sauce",
 		Description:     "Finds sauce of an anime picture on SauceNAO or ascii2d.",
 		GuildOnly:       false,
 		Exec:            sauce,
+		Help:            true,
 		AdvancedCommand: true,
 		ExtendedHelp: []*discordgo.MessageEmbedField{
 			{
@@ -133,20 +120,16 @@ func init() {
 	}
 }
 
-func pixiv(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
-	return nil
-}
-
 func sauce(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
 	if len(args) == 0 {
-		return nil
+		return utils.ErrorNotEnoughArguments
 	}
 
 	url := ""
 	searchEngine := ""
 	switch len(args) {
 	case 1:
-		searchEngine = database.GuildCache[m.GuildID].SauceEngine
+		searchEngine = database.GuildCache[m.GuildID].ReverseSearch
 		url = ImageURLRegex.FindString(args[0])
 		if url == "" {
 			return errors.New("received a non-image url")

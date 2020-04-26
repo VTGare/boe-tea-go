@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"regexp"
@@ -22,9 +23,16 @@ type PromptOptions struct {
 	Timeout time.Duration
 }
 
+type PixivOptions struct {
+	Indexes []int
+	Exclude bool
+}
+
 var (
-	EmbedColor = 0x439ef1
-	r          = regexp.MustCompile(`http(?:s)?:\/\/(?:www\.)?pixiv\.net\/(?:en\/)?artworks\/([0-9]+)`)
+	EmbedColor              = 0x439ef1
+	AuthorID                = "244208152776540160"
+	r                       = regexp.MustCompile(`http(?:s)?:\/\/(?:www\.)?pixiv\.net\/(?:en\/)?artworks\/([0-9]+)`)
+	ErrorNotEnoughArguments = errors.New("not enough arguments")
 )
 
 func EmbedTimestamp() string {
@@ -88,7 +96,7 @@ func PostPixiv(s *discordgo.Session, m *discordgo.MessageCreate, text string) er
 		var ask bool
 		var links bool
 		if g, ok := database.GuildCache[m.GuildID]; ok {
-			switch g.RepostAs {
+			switch g.Repost {
 			case "ask":
 				ask = true
 			case "links":
@@ -181,4 +189,41 @@ func nextMessageReactionAdd(s *discordgo.Session) chan *discordgo.MessageReactio
 		out <- e
 	})
 	return out
+}
+
+func FormatBool(b bool) string {
+	if b {
+		return "enabled"
+	}
+	return "disabled"
+}
+
+func CreateDB(eventGuilds []*discordgo.Guild) error {
+	allGuilds := database.AllGuilds()
+	for _, guild := range *allGuilds {
+		database.GuildCache[guild.GuildID] = guild
+	}
+
+	newGuilds := make([]interface{}, 0)
+	for _, guild := range eventGuilds {
+		log.Println("Connected to", guild.Name)
+
+		if _, ok := database.GuildCache[guild.ID]; !ok {
+			log.Println(guild.Name, "not found in database. Adding...")
+			g := database.DefaultGuildSettings(guild.ID)
+			newGuilds = append(newGuilds, g)
+			database.GuildCache[g.GuildID] = *g
+		}
+	}
+
+	if len(newGuilds) > 0 {
+		err := database.InsertManyGuilds(newGuilds)
+		if err != nil {
+			return err
+		} else {
+			log.Println("Successfully inserted all current guilds.")
+		}
+	}
+
+	return nil
 }

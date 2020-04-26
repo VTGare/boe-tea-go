@@ -13,6 +13,7 @@ type Command struct {
 	Description     string
 	GuildOnly       bool
 	Exec            func(*discordgo.Session, *discordgo.MessageCreate, []string) error
+	Help            bool
 	AdvancedCommand bool
 	ExtendedHelp    []*discordgo.MessageEmbedField
 }
