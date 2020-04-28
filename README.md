@@ -1,12 +1,12 @@
 # boe-tea-go
-[![Invite](https://img.shields.io/badge/Invite%20Link-%40Boe%20Tea-brightgreen)](https://discordapp.com/api/oauth2/authorize?client_id=636468907049353216&permissions=537250880&scope=bot)
+[![Invite](https://img.shields.io/badge/Invite%20Link-%40Boe%20Tea-brightgreen)](https://discordapp.com/api/oauth2/authorize?client_id=636468907049353216&permissions=537185344&scope=bot)
 
 <img align="center" src="https://cdn.discordapp.com/avatars/636468907049353216/f22aa4bf930d9743dd40a10287de8b04.png?size=256">
 
 **Boe Tea** is a source image bot that makes it easier to post your favourite anime art (only Pixiv as of right now) on Discord and find sauce without leaving your Discord window.
 
 ## Getting started
-[![Invite](https://img.shields.io/badge/Invite%20Link-%40Boe%20Tea-brightgreen)](https://discordapp.com/api/oauth2/authorize?client_id=636468907049353216&permissions=537250880&scope=bot)
+[![Invite](https://img.shields.io/badge/Invite%20Link-%40Boe%20Tea-brightgreen)](https://discordapp.com/api/oauth2/authorize?client_id=636468907049353216&permissions=537185344&scope=bot)
 
 To invite him please follow the link above. It requires following permissions to work correctly now and in future *(more fuctionality to come!)*
 * Manage webhooks (for future functionality)
@@ -14,7 +14,6 @@ To invite him please follow the link above. It requires following permissions to
 * Send messages
 * Embed links
 * Attach files
-* Read message history (for future fuctionality)
 * Add reactions
 * Use external Emojis
 
