@@ -31,7 +31,7 @@ type PixivOptions struct {
 var (
 	EmbedColor              = 0x439ef1
 	AuthorID                = "244208152776540160"
-	r                       = regexp.MustCompile(`http(?:s)?:\/\/(?:www\.)?pixiv\.net\/(?:en\/)?artworks\/([0-9]+)`)
+	r                       = regexp.MustCompile(`http(?:s)?:\/\/(?:www\.)?pixiv\.net\/(?:en\/)?(?:artworks\/|member_illust\.php\?illust_id=)([0-9]+)`)
 	ErrorNotEnoughArguments = errors.New("not enough arguments")
 )
 
