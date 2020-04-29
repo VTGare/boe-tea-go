@@ -2,6 +2,7 @@ package commands
 
 import (
 	"context"
+	"strconv"
 
 	"github.com/VTGare/boe-tea-go/database"
 	"github.com/VTGare/boe-tea-go/utils"
@@ -27,8 +28,15 @@ func migrateDB(s *discordgo.Session, m *discordgo.MessageCreate, args []string) 
 	}
 
 	c := database.DB.Collection("guildsettings")
-	c.DeleteMany(context.Background(), bson.M{})
-	database.GuildCache = make(map[string]database.GuildSettings)
-	utils.CreateDB(s.State.Guilds)
+	res, err := c.UpdateMany(context.Background(), bson.M{}, bson.M{
+		"$set": bson.M{
+			"promptemoji": "👌",
+		},
+	})
+	if err != nil {
+		return err
+	}
+
+	s.ChannelMessageSend(m.ChannelID, "Modified: "+strconv.FormatInt(res.ModifiedCount, 10))
 	return nil
 }

@@ -29,6 +29,8 @@ type PixivOptions struct {
 }
 
 var (
+	EmojiRegex              = regexp.MustCompile(`(\x{00a9}|\x{00ae}|[\x{2000}-\x{3300}]|\x{d83c}[\x{d000}-\x{dfff}]|\x{d83d}[\x{d000}-\x{dfff}]|\x{d83e}[\x{d000}-\x{dfff}])`)
+	NumRegex                = regexp.MustCompile(`([0-9]+)`)
 	EmbedColor              = 0x439ef1
 	AuthorID                = "244208152776540160"
 	r                       = regexp.MustCompile(`http(?:s)?:\/\/(?:www\.)?pixiv\.net\/(?:en\/)?(?:artworks\/|member_illust\.php\?illust_id=)([0-9]+)`)
@@ -77,10 +79,11 @@ func PostPixiv(s *discordgo.Session, m *discordgo.MessageCreate, text string) er
 	flag := true
 	if len(images) >= database.GuildCache[m.GuildID].LargeSet {
 		flag = false
+		emoji, _ := GetEmoji(s, m.GuildID, database.GuildCache[m.GuildID].PromptEmoji)
 		prompt := CreatePrompt(s, m, &PromptOptions{
 			Message: "Large image set (" + strconv.Itoa(len(images)) + "), do you want me to post each picture individually?",
 			Actions: map[string]ActionFunc{
-				"👌": func() bool {
+				emoji: func() bool {
 					return true
 				},
 			},
@@ -170,7 +173,7 @@ func CreatePrompt(s *discordgo.Session, m *discordgo.MessageCreate, opts *Prompt
 			return nil
 		}
 
-		if _, ok := opts.Actions[reaction.Emoji.Name]; !ok {
+		if _, ok := opts.Actions[reaction.Emoji.APIName()]; !ok {
 			continue
 		}
 
@@ -179,7 +182,7 @@ func CreatePrompt(s *discordgo.Session, m *discordgo.MessageCreate, opts *Prompt
 		}
 
 		s.ChannelMessageDelete(prompt.ChannelID, prompt.ID)
-		return opts.Actions[reaction.Emoji.Name]
+		return opts.Actions[reaction.Emoji.APIName()]
 	}
 }
 
@@ -226,4 +229,17 @@ func CreateDB(eventGuilds []*discordgo.Guild) error {
 	}
 
 	return nil
+}
+
+func GetEmoji(s *discordgo.Session, guildID, e string) (string, error) {
+	if EmojiRegex.MatchString(e) {
+		return e, nil
+	}
+
+	emojiID := NumRegex.FindString(e)
+	emoji, err := s.State.Emoji(guildID, emojiID)
+	if err != nil {
+		return "", err
+	}
+	return emoji.APIName(), nil
 }

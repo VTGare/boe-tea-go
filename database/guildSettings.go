@@ -20,10 +20,11 @@ type GuildSettings struct {
 	LargeSet      int    `bson:"largeset" json:"largeset"`
 	Pixiv         bool   `bson:"pixiv" json:"pixiv"`
 	Repost        string `bson:"repost" json:"repost"`
+	PromptEmoji   string `bson:"promptemoji" json:"promptemoji"`
 }
 
 //NewGuildSettings returns a new GuildSettings instance with given parameters.
-func NewGuildSettings(guildID, prefix, repost, reverseSearch string, largeset int, pixiv bool) *GuildSettings {
+func NewGuildSettings(guildID, prefix, repost, reverseSearch, promptemoji string, largeset int, pixiv bool) *GuildSettings {
 	return &GuildSettings{
 		GuildID:       guildID,
 		ReverseSearch: reverseSearch,
@@ -31,6 +32,7 @@ func NewGuildSettings(guildID, prefix, repost, reverseSearch string, largeset in
 		LargeSet:      largeset,
 		Pixiv:         pixiv,
 		Repost:        repost,
+		PromptEmoji:   promptemoji,
 	}
 }
 
@@ -43,6 +45,7 @@ func DefaultGuildSettings(guildID string) *GuildSettings {
 		LargeSet:      3,
 		Pixiv:         true,
 		Repost:        "ask",
+		PromptEmoji:   "👌",
 	}
 }
 

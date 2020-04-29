@@ -48,6 +48,10 @@ func init() {
 				Name:  "reversesearch",
 				Value: "Default reverse image search engine. Accepts ***SauceNAO*** or ***ASCII2D*** are available as of now.",
 			},
+			{
+				Name:  "promptemoji",
+				Value: "Confirmation prompt emoji. Only unicode or local server emoji's are allowed.",
+			},
 		},
 	}
 }
@@ -89,6 +93,12 @@ func set(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error 
 			}
 
 			passedSetting = newSetting
+		case "promptemoji":
+			emoji, err := utils.GetEmoji(s, m.GuildID, newSetting)
+			if err != nil {
+				return errors.New("argument's either global emoji or not one at all")
+			}
+			passedSetting = emoji
 		default:
 			return errors.New("unknown setting " + setting)
 		}
@@ -112,6 +122,13 @@ func set(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error 
 func showGuildSettings(s *discordgo.Session, m *discordgo.MessageCreate) {
 	settings := database.GuildCache[m.GuildID]
 	guild, _ := s.Guild(settings.GuildID)
+
+	emoji := ""
+	if utils.EmojiRegex.MatchString(settings.PromptEmoji) {
+		emoji = settings.PromptEmoji
+	} else {
+		emoji = "<:" + settings.PromptEmoji + ">"
+	}
 	s.ChannelMessageSendEmbed(m.ChannelID, &discordgo.MessageEmbed{
 		Title:       "Current settings",
 		Description: guild.Name,
@@ -127,7 +144,7 @@ func showGuildSettings(s *discordgo.Session, m *discordgo.MessageCreate) {
 			},
 			{
 				Name:  "Pixiv settings",
-				Value: fmt.Sprintf("**Large set**: %v\n**Repost**: %v", settings.LargeSet, settings.Repost),
+				Value: fmt.Sprintf("**Large set**: %v\n**Repost**: %v\n**Prompt emoji**: %v", settings.LargeSet, settings.Repost, emoji),
 			},
 		},
 		Thumbnail: &discordgo.MessageEmbedThumbnail{
