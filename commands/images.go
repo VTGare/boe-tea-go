@@ -117,7 +117,7 @@ func init() {
 			},
 			{
 				Name:  "image link",
-				Value: "Required. Link must have one of the following suffixes:  *jpg*, *jpeg*, *png*, *gif*, *webp*.\nURL parameters after the link are accepted (e.g. <link>.jpg***?width=441&height=441***)",
+				Value: "Required. Link must have one of the following suffixes:  *jpg*, *jpeg*, *png*, *gif*, *webp*.\nURL parameters after the link are acceptable (e.g. <link>.jpg***?width=441&height=441***)",
 			},
 		},
 	}
@@ -135,7 +135,7 @@ func init() {
 			},
 			{
 				Name:  "excluded images",
-				Value: "Indexes must be separated with a whitespace (e.g. 1 2 4 6 10 45)",
+				Value: "Indexes must be separated by whitespace (e.g. 1 2 4 6 10 45)",
 			},
 		},
 	}

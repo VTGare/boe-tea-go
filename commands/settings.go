@@ -34,11 +34,11 @@ func init() {
 			},
 			{
 				Name:  "largeset",
-				Value: "Amount of pictures considered a large set and procs a prompt. Must be an ***integer***. Set to 0 to ask every time",
+				Value: "Amount of pictures considered a large set, which invokes a prompt. Must be an ***integer***. Set to 0 to ask every time",
 			},
 			{
 				Name:  "pixiv",
-				Value: "Whether to repost pixiv or not, accepts ***f or false (case-insensitive)*** to disable and ***t or true*** to enable.",
+				Value: "Pixiv reposting switch, accepts ***f or false (case-insensitive)*** to disable and ***t or true*** to enable.",
 			},
 			{
 				Name:  "repost",
