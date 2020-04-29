@@ -14,7 +14,7 @@ To invite him please follow the link above. It requires following permissions to
 * Send messages
 * Embed links
 * Attach files
-* Read message history (for future fuctionality)
+* Read Message History (for future functionality)
 * Add reactions
 * Use external Emojis
 
