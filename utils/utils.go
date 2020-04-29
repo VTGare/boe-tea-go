@@ -33,7 +33,7 @@ var (
 	NumRegex                = regexp.MustCompile(`([0-9]+)`)
 	EmbedColor              = 0x439ef1
 	AuthorID                = "244208152776540160"
-	r                       = regexp.MustCompile(`http(?:s)?:\/\/(?:www\.)?pixiv\.net\/(?:en\/)?(?:artworks\/|member_illust\.php\?illust_id=)([0-9]+)`)
+	PixivRegex              = regexp.MustCompile(`http(?:s)?:\/\/(?:www\.)?pixiv\.net\/(?:en\/)?(?:artworks\/|member_illust\.php\?illust_id=)([0-9]+)`)
 	ErrorNotEnoughArguments = errors.New("not enough arguments")
 )
 
@@ -57,7 +57,7 @@ func FindAuthor(sauce services.Sauce) string {
 //PostPixiv reposts Pixiv images from a link to a discord channel
 func PostPixiv(s *discordgo.Session, m *discordgo.MessageCreate, text string) error {
 	//matches := r.FindStringSubmatch(text)
-	matches := r.FindAllStringSubmatch(text, len(text)+1)
+	matches := PixivRegex.FindAllStringSubmatch(text, len(text)+1)
 
 	if matches == nil {
 		return nil
@@ -82,8 +82,16 @@ func PostPixiv(s *discordgo.Session, m *discordgo.MessageCreate, text string) er
 		if len(images) >= database.GuildCache[m.GuildID].LargeSet {
 			flag = false
 			emoji, _ := GetEmoji(s, m.GuildID, database.GuildCache[m.GuildID].PromptEmoji)
+
+			message := ""
+
+			if len(images) >= 3 {
+				message = "Large image set (" + strconv.Itoa(len(images)) + "), do you want me to post each picture individually?"
+			} else {
+				message = "Do you want me to post each picture individually?"
+			}
 			prompt := CreatePrompt(s, m, &PromptOptions{
-				Message: "Large image set (" + strconv.Itoa(len(images)) + "), do you want me to post each picture individually?",
+				Message: message,
 				Actions: map[string]ActionFunc{
 					emoji: func() bool {
 						return true
@@ -245,4 +253,19 @@ func GetEmoji(s *discordgo.Session, guildID, e string) (string, error) {
 		return "", err
 	}
 	return emoji.APIName(), nil
+}
+
+func RemoveDupsAndNegatives(slice []int) []int {
+	keys := make(map[int]bool)
+	list := []int{}
+	for _, entry := range slice {
+		if entry <= 0 {
+			continue
+		}
+		if _, ok := keys[entry]; !ok {
+			keys[entry] = true
+			list = append(list, entry)
+		}
+	}
+	return list
 }
