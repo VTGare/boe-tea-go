@@ -232,7 +232,7 @@ func CreateDB(eventGuilds []*discordgo.Guild) error {
 }
 
 func GetEmoji(s *discordgo.Session, guildID, e string) (string, error) {
-	if EmojiRegex.MatchString(e) {
+	if EmojiRegex.MatchString(e) || e == "👌" {
 		return e, nil
 	}
 
