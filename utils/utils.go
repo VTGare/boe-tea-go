@@ -56,7 +56,8 @@ func FindAuthor(sauce services.Sauce) string {
 
 //PostPixiv reposts Pixiv images from a link to a discord channel
 func PostPixiv(s *discordgo.Session, m *discordgo.MessageCreate, text string) error {
-	matches := r.FindStringSubmatch(text)
+	//matches := r.FindStringSubmatch(text)
+	matches := r.FindAllStringSubmatch(text, len(text)+1)
 
 	if matches == nil {
 		return nil
@@ -71,55 +72,21 @@ func PostPixiv(s *discordgo.Session, m *discordgo.MessageCreate, text string) er
 	}
 
 	log.Println(fmt.Sprintf("Reposting Pixiv images in %v, requested by %v", in, m.Author.String()))
-	images, err := services.GetPixivImages(matches[1])
-	if err != nil {
-		return err
-	}
-
-	flag := true
-	if len(images) >= database.GuildCache[m.GuildID].LargeSet {
-		flag = false
-		emoji, _ := GetEmoji(s, m.GuildID, database.GuildCache[m.GuildID].PromptEmoji)
-		prompt := CreatePrompt(s, m, &PromptOptions{
-			Message: "Large image set (" + strconv.Itoa(len(images)) + "), do you want me to post each picture individually?",
-			Actions: map[string]ActionFunc{
-				emoji: func() bool {
-					return true
-				},
-			},
-			Timeout: time.Second * 15,
-		})
-		if prompt == nil {
-			return nil
-		}
-		flag = prompt()
-	}
-
-	if flag {
-		var ask bool
-		var links bool
-		if g, ok := database.GuildCache[m.GuildID]; ok {
-			switch g.Repost {
-			case "ask":
-				ask = true
-			case "links":
-				ask = false
-				links = true
-			case "embeds":
-				ask = false
-				links = false
-			}
+	for _, match := range matches {
+		images, err := services.GetPixivImages(match[1])
+		if err != nil {
+			return err
 		}
 
-		if ask {
+		flag := true
+		if len(images) >= database.GuildCache[m.GuildID].LargeSet {
+			flag = false
+			emoji, _ := GetEmoji(s, m.GuildID, database.GuildCache[m.GuildID].PromptEmoji)
 			prompt := CreatePrompt(s, m, &PromptOptions{
-				Message: "Send images as links (✅) or embeds (❎)? ***Warning: embeds sometimes lag!***",
+				Message: "Large image set (" + strconv.Itoa(len(images)) + "), do you want me to post each picture individually?",
 				Actions: map[string]ActionFunc{
-					"✅": func() bool {
+					emoji: func() bool {
 						return true
-					},
-					"❎": func() bool {
-						return false
 					},
 				},
 				Timeout: time.Second * 15,
@@ -127,28 +94,64 @@ func PostPixiv(s *discordgo.Session, m *discordgo.MessageCreate, text string) er
 			if prompt == nil {
 				return nil
 			}
-			links = prompt()
+			flag = prompt()
 		}
 
-		for ind, image := range images {
-			if links {
-				content := fmt.Sprintf("Image %v/%v\n%v", strconv.Itoa(ind+1), strconv.Itoa(len(images)), image)
-				s.ChannelMessageSend(m.ChannelID, content)
-			} else {
-				title := fmt.Sprintf("Image %v/%v", strconv.Itoa(ind+1), strconv.Itoa(len(images)))
-				description := fmt.Sprintf("If embed is empty follow this link to see the image: %v", image)
-				embed := &discordgo.MessageEmbed{
-					Title:       title,
-					Description: description,
-					URL:         image,
-					Color:       EmbedColor,
-					Timestamp:   time.Now().Format(time.RFC3339),
+		if flag {
+			var ask bool
+			var links bool
+			if g, ok := database.GuildCache[m.GuildID]; ok {
+				switch g.Repost {
+				case "ask":
+					ask = true
+				case "links":
+					ask = false
+					links = true
+				case "embeds":
+					ask = false
+					links = false
 				}
-				embed.Image = &discordgo.MessageEmbedImage{
-					URL: image,
-				}
+			}
 
-				s.ChannelMessageSendEmbed(m.ChannelID, embed)
+			if ask {
+				prompt := CreatePrompt(s, m, &PromptOptions{
+					Message: "Send images as links (✅) or embeds (❎)? ***Warning: embeds sometimes lag!***",
+					Actions: map[string]ActionFunc{
+						"✅": func() bool {
+							return true
+						},
+						"❎": func() bool {
+							return false
+						},
+					},
+					Timeout: time.Second * 15,
+				})
+				if prompt == nil {
+					return nil
+				}
+				links = prompt()
+			}
+
+			for ind, image := range images {
+				if links {
+					content := fmt.Sprintf("Image %v/%v\n%v", strconv.Itoa(ind+1), strconv.Itoa(len(images)), image)
+					s.ChannelMessageSend(m.ChannelID, content)
+				} else {
+					title := fmt.Sprintf("Image %v/%v", strconv.Itoa(ind+1), strconv.Itoa(len(images)))
+					description := fmt.Sprintf("If embed is empty follow this link to see the image: %v", image)
+					embed := &discordgo.MessageEmbed{
+						Title:       title,
+						Description: description,
+						URL:         image,
+						Color:       EmbedColor,
+						Timestamp:   time.Now().Format(time.RFC3339),
+					}
+					embed.Image = &discordgo.MessageEmbedImage{
+						URL: image,
+					}
+
+					s.ChannelMessageSendEmbed(m.ChannelID, embed)
+				}
 			}
 		}
 	}
