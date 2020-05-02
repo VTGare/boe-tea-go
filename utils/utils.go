@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"regexp"
-	"strconv"
 	"time"
 
 	"github.com/VTGare/boe-tea-go/database"
@@ -24,17 +23,19 @@ type PromptOptions struct {
 }
 
 type PixivOptions struct {
-	Indexes []int
-	Exclude bool
+	ProcPrompt bool
+	Indexes    map[int]bool
+	Exclude    bool
 }
 
 var (
-	EmojiRegex              = regexp.MustCompile(`(\x{00a9}|\x{00ae}|[\x{2000}-\x{3300}]|\x{d83c}[\x{d000}-\x{dfff}]|\x{d83d}[\x{d000}-\x{dfff}]|\x{d83e}[\x{d000}-\x{dfff}])`)
-	NumRegex                = regexp.MustCompile(`([0-9]+)`)
-	EmbedColor              = 0x439ef1
-	AuthorID                = "244208152776540160"
-	PixivRegex              = regexp.MustCompile(`http(?:s)?:\/\/(?:www\.)?pixiv\.net\/(?:en\/)?(?:artworks\/|member_illust\.php\?illust_id=)([0-9]+)`)
-	ErrorNotEnoughArguments = errors.New("not enough arguments")
+	EmojiRegex            = regexp.MustCompile(`(\x{00a9}|\x{00ae}|[\x{2000}-\x{3300}]|\x{d83c}[\x{d000}-\x{dfff}]|\x{d83d}[\x{d000}-\x{dfff}]|\x{d83e}[\x{d000}-\x{dfff}])`)
+	NumRegex              = regexp.MustCompile(`([0-9]+)`)
+	EmbedColor            = 0x439ef1
+	AuthorID              = "244208152776540160"
+	PixivRegex            = regexp.MustCompile(`http(?:s)?:\/\/(?:www\.)?pixiv\.net\/(?:en\/)?(?:artworks\/|member_illust\.php\?illust_id=)([0-9]+)`)
+	ErrNotEnoughArguments = errors.New("not enough arguments")
+	ErrParsingArgument    = errors.New("error parsing arguments, please make sure all arguments are integers")
 )
 
 func EmbedTimestamp() string {
@@ -55,45 +56,102 @@ func FindAuthor(sauce services.Sauce) string {
 }
 
 //PostPixiv reposts Pixiv images from a link to a discord channel
-func PostPixiv(s *discordgo.Session, m *discordgo.MessageCreate, text string) error {
-	//matches := r.FindStringSubmatch(text)
-	matches := PixivRegex.FindAllStringSubmatch(text, len(text)+1)
-
-	if matches == nil {
-		return nil
+func PostPixiv(s *discordgo.Session, m *discordgo.MessageCreate, pixivIDs []string, opts ...PixivOptions) error {
+	if opts == nil {
+		opts = []PixivOptions{
+			{
+				ProcPrompt: true,
+				Indexes:    map[int]bool{},
+				Exclude:    true,
+			},
+		}
 	}
 
-	in := ""
-	if m.GuildID != "" {
-		g, _ := s.Guild(m.GuildID)
-		in = g.Name
-	} else {
-		in = "DMs"
+	var ask bool
+	var links bool
+	if g, ok := database.GuildCache[m.GuildID]; ok {
+		switch g.Repost {
+		case "ask":
+			ask = true
+		case "links":
+			ask = false
+			links = true
+		case "embeds":
+			ask = false
+			links = false
+		}
 	}
 
-	log.Println(fmt.Sprintf("Reposting Pixiv images in %v, requested by %v", in, m.Author.String()))
-	for _, match := range matches {
-		images, err := services.GetPixivImages(match[1])
+	if ask {
+		prompt := CreatePrompt(s, m, &PromptOptions{
+			Message: "Send images as links (✅) or embeds (❎)?",
+			Actions: map[string]ActionFunc{
+				"✅": func() bool {
+					return true
+				},
+				"❎": func() bool {
+					return false
+				},
+			},
+			Timeout: time.Second * 15,
+		})
+		if prompt == nil {
+			return nil
+		}
+		links = prompt()
+	}
+
+	aggregatedPosts := make([]interface{}, 0)
+	for _, link := range pixivIDs {
+		post, err := services.GetPixivPost(link)
 		if err != nil {
 			return err
 		}
 
-		flag := true
-		if len(images) >= database.GuildCache[m.GuildID].LargeSet {
-			flag = false
-			emoji, _ := GetEmoji(s, m.GuildID, database.GuildCache[m.GuildID].PromptEmoji)
-
-			message := ""
-
-			if len(images) >= 3 {
-				message = "Large image set (" + strconv.Itoa(len(images)) + "), do you want me to post each picture individually?"
+		for ind, image := range post.Images {
+			title := ""
+			if len(post.Images) == 1 {
+				title = fmt.Sprintf("%v by %v", post.Title, post.Author)
 			} else {
-				message = "Do you want me to post each picture individually?"
+				title = fmt.Sprintf("%v by %v. Page %v/%v", post.Title, post.Author, ind+1, len(post.Images))
 			}
+
+			if links {
+				title += fmt.Sprintf("\n%v\n♥ %v", image, post.Likes)
+				aggregatedPosts = append(aggregatedPosts, title)
+			} else {
+				description := fmt.Sprintf("If embed is empty follow this link to see the image: %v", image)
+				aggregatedPosts = append(aggregatedPosts, discordgo.MessageEmbed{
+					Title:       title,
+					Description: description,
+					URL:         image,
+					Color:       EmbedColor,
+					Timestamp:   time.Now().Format(time.RFC3339),
+					Image: &discordgo.MessageEmbedImage{
+						URL: image,
+					},
+					Footer: &discordgo.MessageEmbedFooter{
+						Text: fmt.Sprintf("♥ %v | Tags: %v", post.Likes, post.Tags),
+					},
+				})
+			}
+		}
+	}
+
+	flag := true
+	if guild, ok := database.GuildCache[m.GuildID]; ok && opts[0].ProcPrompt {
+		if len(aggregatedPosts) >= guild.LargeSet {
+			message := ""
+			if len(aggregatedPosts) >= 3 {
+				message = fmt.Sprintf("Large set of images (%v), do you want me to send each image individually?", len(aggregatedPosts))
+			} else {
+				message = "Do you want me to send each image individually?"
+			}
+
 			prompt := CreatePrompt(s, m, &PromptOptions{
 				Message: message,
 				Actions: map[string]ActionFunc{
-					emoji: func() bool {
+					"👌": func() bool {
 						return true
 					},
 				},
@@ -104,66 +162,21 @@ func PostPixiv(s *discordgo.Session, m *discordgo.MessageCreate, text string) er
 			}
 			flag = prompt()
 		}
+	}
 
-		if flag {
-			var ask bool
-			var links bool
-			if g, ok := database.GuildCache[m.GuildID]; ok {
-				switch g.Repost {
-				case "ask":
-					ask = true
-				case "links":
-					ask = false
-					links = true
-				case "embeds":
-					ask = false
-					links = false
-				}
+	if flag {
+		for ind, post := range aggregatedPosts {
+			if _, ok := opts[0].Indexes[ind+1]; ok {
+				continue
 			}
 
-			if ask {
-				prompt := CreatePrompt(s, m, &PromptOptions{
-					Message: "Send images as links (✅) or embeds (❎)? ***Warning: embeds sometimes lag!***",
-					Actions: map[string]ActionFunc{
-						"✅": func() bool {
-							return true
-						},
-						"❎": func() bool {
-							return false
-						},
-					},
-					Timeout: time.Second * 15,
-				})
-				if prompt == nil {
-					return nil
-				}
-				links = prompt()
-			}
-
-			for ind, image := range images {
-				if links {
-					content := fmt.Sprintf("Image %v/%v\n%v", strconv.Itoa(ind+1), strconv.Itoa(len(images)), image)
-					s.ChannelMessageSend(m.ChannelID, content)
-				} else {
-					title := fmt.Sprintf("Image %v/%v", strconv.Itoa(ind+1), strconv.Itoa(len(images)))
-					description := fmt.Sprintf("If embed is empty follow this link to see the image: %v", image)
-					embed := &discordgo.MessageEmbed{
-						Title:       title,
-						Description: description,
-						URL:         image,
-						Color:       EmbedColor,
-						Timestamp:   time.Now().Format(time.RFC3339),
-					}
-					embed.Image = &discordgo.MessageEmbedImage{
-						URL: image,
-					}
-
-					s.ChannelMessageSendEmbed(m.ChannelID, embed)
-				}
+			if p, isEmbed := post.(discordgo.MessageEmbed); isEmbed {
+				s.ChannelMessageSendEmbed(m.ChannelID, &p)
+			} else {
+				s.ChannelMessageSend(m.ChannelID, post.(string))
 			}
 		}
 	}
-
 	return nil
 }
 
@@ -253,19 +266,4 @@ func GetEmoji(s *discordgo.Session, guildID, e string) (string, error) {
 		return "", err
 	}
 	return emoji.APIName(), nil
-}
-
-func RemoveDupsAndNegatives(slice []int) []int {
-	keys := make(map[int]bool)
-	list := []int{}
-	for _, entry := range slice {
-		if entry <= 0 {
-			continue
-		}
-		if _, ok := keys[entry]; !ok {
-			keys[entry] = true
-			list = append(list, entry)
-		}
-	}
-	return list
 }

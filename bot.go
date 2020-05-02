@@ -43,7 +43,14 @@ func messageCreated(s *discordgo.Session, m *discordgo.MessageCreate) {
 		//no prefix functionality
 		var err error
 		if isGuild && database.GuildCache[m.GuildID].Pixiv {
-			err = utils.PostPixiv(s, m, m.Content)
+			matches := utils.PixivRegex.FindAllStringSubmatch(m.Content, len(m.Content)+1)
+			if matches != nil {
+				ids := make([]string, 0)
+				for _, match := range matches {
+					ids = append(ids, match[1])
+				}
+				err = utils.PostPixiv(s, m, ids)
+			}
 		}
 
 		if err != nil {

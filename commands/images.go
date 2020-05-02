@@ -4,9 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
-	"sort"
 	"strconv"
-	"time"
 
 	"github.com/VTGare/boe-tea-go/database"
 	"github.com/VTGare/boe-tea-go/services"
@@ -96,6 +94,8 @@ var (
 			return embed, nil
 		},
 	}
+
+	rangeRegex = regexp.MustCompile(`([0-9]+)\-([0-9]+)`)
 )
 
 func init() {
@@ -150,7 +150,7 @@ func sauce(s *discordgo.Session, m *discordgo.MessageCreate, args []string) erro
 	searchEngine := ""
 	switch len(args) {
 	case 0:
-		return utils.ErrorNotEnoughArguments
+		return utils.ErrNotEnoughArguments
 	case 1:
 		searchEngine = database.GuildCache[m.GuildID].ReverseSearch
 		url = ImageURLRegex.FindString(args[0])
@@ -182,7 +182,7 @@ func sauce(s *discordgo.Session, m *discordgo.MessageCreate, args []string) erro
 
 func pixiv(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
 	if len(args) == 0 {
-		return utils.ErrorNotEnoughArguments
+		return utils.ErrNotEnoughArguments
 	}
 
 	match := utils.PixivRegex.FindStringSubmatch(args[0])
@@ -190,87 +190,40 @@ func pixiv(s *discordgo.Session, m *discordgo.MessageCreate, args []string) erro
 		return errors.New("first arguments must be a pixiv link")
 	}
 
-	excludes := make([]int, 0)
-	for _, arg := range args[1:] {
-		num, err := strconv.Atoi(arg)
-		if err != nil {
-			return errors.New("error parsing arguments, please make sure all arguments are integers")
-		}
-		excludes = append(excludes, num)
-	}
-
-	if !sort.IntsAreSorted(excludes) {
-		sort.Ints(excludes)
-	}
-	excludes = utils.RemoveDupsAndNegatives(excludes)
-
-	images, err := services.GetPixivImages(match[1])
-	if err != nil {
-		return err
-	}
-
-	var ask bool
-	var links bool
-	if g, ok := database.GuildCache[m.GuildID]; ok {
-		switch g.Repost {
-		case "ask":
-			ask = true
-		case "links":
-			ask = false
-			links = true
-		case "embeds":
-			ask = false
-			links = false
-		}
-	}
-	if ask {
-		prompt := utils.CreatePrompt(s, m, &utils.PromptOptions{
-			Message: "Send images as links (✅) or embeds (❎)? ***Warning: embeds sometimes lag!***",
-			Actions: map[string]utils.ActionFunc{
-				"✅": func() bool {
-					return true
-				},
-				"❎": func() bool {
-					return false
-				},
-			},
-			Timeout: time.Second * 15,
-		})
-		if prompt == nil {
-			return nil
-		}
-		links = prompt()
-	}
-
-	exclIndex := 0
-	exclLen := len(excludes)
-	for ind, image := range images {
-		if exclLen > 0 && exclIndex != exclLen {
-			if excludes[exclIndex] == ind+1 {
-				exclIndex++
-				continue
+	args = args[1:]
+	excludes := make(map[int]bool)
+	for _, arg := range args {
+		ran := rangeRegex.FindStringSubmatch(arg)
+		if ran != nil {
+			low, err := strconv.Atoi(ran[1])
+			if err != nil {
+				return utils.ErrParsingArgument
 			}
-		}
+			high, err := strconv.Atoi(ran[2])
+			if err != nil {
+				return utils.ErrParsingArgument
+			}
+			if low > high {
+				return errors.New("low is higher than high, please use ranges correctly")
+			}
 
-		if links {
-			content := fmt.Sprintf("Image %v/%v\n%v", strconv.Itoa(ind+1), strconv.Itoa(len(images)), image)
-			s.ChannelMessageSend(m.ChannelID, content)
+			for i := low; i <= high; i++ {
+				excludes[i] = true
+			}
+
 		} else {
-			title := fmt.Sprintf("Image %v/%v", strconv.Itoa(ind+1), strconv.Itoa(len(images)))
-			description := fmt.Sprintf("If embed is empty follow this link to see the image: %v", image)
-			embed := &discordgo.MessageEmbed{
-				Title:       title,
-				Description: description,
-				URL:         image,
-				Color:       utils.EmbedColor,
-				Timestamp:   time.Now().Format(time.RFC3339),
+			num, err := strconv.Atoi(arg)
+			if err != nil {
+				return utils.ErrParsingArgument
 			}
-			embed.Image = &discordgo.MessageEmbedImage{
-				URL: image,
-			}
-
-			s.ChannelMessageSendEmbed(m.ChannelID, embed)
+			excludes[num] = true
 		}
 	}
+
+	utils.PostPixiv(s, m, []string{match[1]}, utils.PixivOptions{
+		ProcPrompt: false,
+		Indexes:    excludes,
+		Exclude:    true,
+	})
 	return nil
 }

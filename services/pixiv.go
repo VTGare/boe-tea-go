@@ -13,6 +13,14 @@ var (
 	app     *pixiv.AppPixivAPI
 )
 
+type PixivPost struct {
+	Author string
+	Title  string
+	Likes  int
+	Tags   []string
+	Images []string
+}
+
 func init() {
 	pixivEmail := os.Getenv("PIXIV_EMAIL")
 	if pixivEmail == "" {
@@ -31,8 +39,8 @@ func init() {
 	app = pixiv.NewApp()
 }
 
-//GetPixivImages perfoms a Pixiv API call and returns an array of high-resolution image URLs
-func GetPixivImages(id string) ([]string, error) {
+//GetPixivPost perfoms a Pixiv API call and returns an array of high-resolution image URLs
+func GetPixivPost(id string) (*PixivPost, error) {
 	var (
 		images = make([]string, 0)
 	)
@@ -56,7 +64,18 @@ func GetPixivImages(id string) ([]string, error) {
 		images = append(images, baseURL+id+"."+extension)
 	}
 
-	return images, nil
+	tags := make([]string, 0)
+	for _, t := range illust.Tags {
+		tags = append(tags, t.Name)
+	}
+
+	return &PixivPost{
+		Author: illust.User.Name,
+		Title:  illust.Title,
+		Tags:   tags,
+		Images: images,
+		Likes:  illust.TotalBookmarks,
+	}, nil
 }
 
 func getIllust(id uint64) (*pixiv.Illust, error) {
