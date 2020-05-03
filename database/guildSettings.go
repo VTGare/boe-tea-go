@@ -44,7 +44,7 @@ func DefaultGuildSettings(guildID string) *GuildSettings {
 		ReverseSearch: "saucenao",
 		LargeSet:      3,
 		Pixiv:         true,
-		Repost:        "ask",
+		Repost:        "embeds",
 		PromptEmoji:   "👌",
 	}
 }

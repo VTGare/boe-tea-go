@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 	"regexp"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/VTGare/boe-tea-go/database"
@@ -120,18 +122,29 @@ func PostPixiv(s *discordgo.Session, m *discordgo.MessageCreate, pixivIDs []stri
 				title += fmt.Sprintf("\n%v\n♥ %v", image, post.Likes)
 				aggregatedPosts = append(aggregatedPosts, title)
 			} else {
-				description := fmt.Sprintf("If embed is empty follow this link to see the image: %v", image)
+				embedWarning := fmt.Sprintf("If embed is empty follow this link to see the image: %v", image)
 				aggregatedPosts = append(aggregatedPosts, discordgo.MessageEmbed{
-					Title:       title,
-					Description: description,
-					URL:         image,
-					Color:       EmbedColor,
-					Timestamp:   time.Now().Format(time.RFC3339),
+					Title:     title,
+					URL:       image,
+					Color:     EmbedColor,
+					Timestamp: time.Now().Format(time.RFC3339),
+					Fields: []*discordgo.MessageEmbedField{
+						{
+							Name:   "Likes",
+							Value:  strconv.Itoa(post.Likes),
+							Inline: true,
+						},
+						{
+							Name:   "Tags",
+							Value:  strings.Join(post.Tags, " • "),
+							Inline: true,
+						},
+					},
 					Image: &discordgo.MessageEmbedImage{
 						URL: image,
 					},
 					Footer: &discordgo.MessageEmbedFooter{
-						Text: fmt.Sprintf("♥ %v | Tags: %v", post.Likes, post.Tags),
+						Text: embedWarning,
 					},
 				})
 			}
