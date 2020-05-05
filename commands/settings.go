@@ -37,6 +37,10 @@ func init() {
 				Value: "Amount of pictures considered a large set, which invokes a prompt. Must be an ***integer***. Set to 0 to ask every time",
 			},
 			{
+				Name:  "Limit",
+				Value: "Image set size hard limit. If you attempt to repost a post or bulk post more than the limit it'll fail",
+			},
+			{
 				Name:  "pixiv",
 				Value: "Pixiv reposting switch, accepts ***f or false (case-insensitive)*** to disable and ***t or true*** to enable.",
 			},
@@ -80,6 +84,8 @@ func set(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error 
 				return errors.New("new prefix is too long")
 			}
 		case "largeset":
+			passedSetting, err = strconv.Atoi(newSetting)
+		case "limit":
 			passedSetting, err = strconv.Atoi(newSetting)
 		case "repost":
 			if newSetting != "ask" && newSetting != "embeds" && newSetting != "links" {
@@ -144,7 +150,7 @@ func showGuildSettings(s *discordgo.Session, m *discordgo.MessageCreate) {
 			},
 			{
 				Name:  "Pixiv settings",
-				Value: fmt.Sprintf("**Large set**: %v\n**Repost**: %v\n**Prompt emoji**: %v", settings.LargeSet, settings.Repost, emoji),
+				Value: fmt.Sprintf("**Large set**: %v\n**Limit**: %v\n**Repost**: %v\n**Prompt emoji**: %v", settings.LargeSet, settings.Limit, settings.Repost, emoji),
 			},
 		},
 		Thumbnail: &discordgo.MessageEmbedThumbnail{

@@ -28,7 +28,7 @@ func init() {
 	}
 
 	pixivPassword := os.Getenv("PIXIV_PASSWORD")
-	if pixivEmail == "" {
+	if pixivPassword == "" {
 		log.Fatalln("PIXIV_PASSWORD env does not exist")
 	}
 

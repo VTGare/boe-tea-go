@@ -71,17 +71,17 @@ func PostPixiv(s *discordgo.Session, m *discordgo.MessageCreate, pixivIDs []stri
 
 	var ask bool
 	var links bool
-	if g, ok := database.GuildCache[m.GuildID]; ok {
-		switch g.Repost {
-		case "ask":
-			ask = true
-		case "links":
-			ask = false
-			links = true
-		case "embeds":
-			ask = false
-			links = false
-		}
+
+	guild := database.GuildCache[m.GuildID]
+	switch guild.Repost {
+	case "ask":
+		ask = true
+	case "links":
+		ask = false
+		links = true
+	case "embeds":
+		ask = false
+		links = false
 	}
 
 	if ask {
@@ -151,8 +151,12 @@ func PostPixiv(s *discordgo.Session, m *discordgo.MessageCreate, pixivIDs []stri
 		}
 	}
 
+	if len(aggregatedPosts) >= guild.Limit {
+		return errors.New("hold your horses, too many images")
+	}
+
 	flag := true
-	if guild, ok := database.GuildCache[m.GuildID]; ok && opts[0].ProcPrompt {
+	if opts[0].ProcPrompt {
 		if len(aggregatedPosts) >= guild.LargeSet {
 			message := ""
 			if len(aggregatedPosts) >= 3 {

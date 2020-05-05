@@ -30,7 +30,7 @@ func migrateDB(s *discordgo.Session, m *discordgo.MessageCreate, args []string) 
 	c := database.DB.Collection("guildsettings")
 	res, err := c.UpdateMany(context.Background(), bson.M{}, bson.M{
 		"$set": bson.M{
-			"promptemoji": "👌",
+			"limit": 50,
 		},
 	})
 	if err != nil {
