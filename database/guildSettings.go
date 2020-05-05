@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"log"
+	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
 )
@@ -14,14 +15,16 @@ var (
 
 //GuildSettings is a database model for per guild bot settings
 type GuildSettings struct {
-	GuildID       string `bson:"guild_id" json:"guild_id"`
-	Prefix        string `bson:"prefix" json:"prefix"`
-	ReverseSearch string `bson:"reversesearch" json:"reversesearch"`
-	LargeSet      int    `bson:"largeset" json:"largeset"`
-	Limit         int    `bson:"limit" json:"limit"`
-	Pixiv         bool   `bson:"pixiv" json:"pixiv"`
-	Repost        string `bson:"repost" json:"repost"`
-	PromptEmoji   string `bson:"promptemoji" json:"promptemoji"`
+	GuildID       string    `bson:"guild_id" json:"guild_id"`
+	Prefix        string    `bson:"prefix" json:"prefix"`
+	ReverseSearch string    `bson:"reversesearch" json:"reversesearch"`
+	LargeSet      int       `bson:"largeset" json:"largeset"`
+	Limit         int       `bson:"limit" json:"limit"`
+	Pixiv         bool      `bson:"pixiv" json:"pixiv"`
+	Repost        string    `bson:"repost" json:"repost"`
+	PromptEmoji   string    `bson:"promptemoji" json:"promptemoji"`
+	CreatedAt     time.Time `bson:"created_at" json:"created_at"`
+	UpdatedAt     time.Time `bson:"updated_at" json:"updated_at"`
 }
 
 //NewGuildSettings returns a new GuildSettings instance with given parameters.
@@ -35,6 +38,8 @@ func NewGuildSettings(guildID, prefix, repost, reverseSearch, promptemoji string
 		Pixiv:         pixiv,
 		Repost:        repost,
 		PromptEmoji:   promptemoji,
+		CreatedAt:     time.Now(),
+		UpdatedAt:     time.Now(),
 	}
 }
 

@@ -182,6 +182,7 @@ func PostPixiv(s *discordgo.Session, m *discordgo.MessageCreate, pixivIDs []stri
 	}
 
 	if flag {
+		log.Println(fmt.Sprintf("Successfully reposting %v images in %v", len(aggregatedPosts), guild.GuildID))
 		for ind, post := range aggregatedPosts {
 			if _, ok := opts[0].Indexes[ind+1]; ok {
 				continue
@@ -250,10 +251,8 @@ func CreateDB(eventGuilds []*discordgo.Guild) error {
 
 	newGuilds := make([]interface{}, 0)
 	for _, guild := range eventGuilds {
-		log.Println("Connected to", guild.Name)
-
 		if _, ok := database.GuildCache[guild.ID]; !ok {
-			log.Println(guild.Name, "not found in database. Adding...")
+			log.Println(guild.ID, "not found in database. Adding...")
 			g := database.DefaultGuildSettings(guild.ID)
 			newGuilds = append(newGuilds, g)
 			database.GuildCache[g.GuildID] = *g
@@ -269,6 +268,7 @@ func CreateDB(eventGuilds []*discordgo.Guild) error {
 		}
 	}
 
+	log.Println(fmt.Sprintf("Connected to %v guilds", len(eventGuilds)))
 	return nil
 }
 

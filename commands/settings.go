@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 	"unicode"
 
 	"github.com/VTGare/boe-tea-go/database"
@@ -167,7 +168,8 @@ func changeSetting(guildID, setting string, newSetting interface{}) error {
 		"guild_id": guildID,
 	}, bson.M{
 		"$set": bson.M{
-			setting: newSetting,
+			setting:      newSetting,
+			"updated_at": time.Now(),
 		},
 	}, options.FindOneAndUpdate().SetReturnDocument(options.After))
 
