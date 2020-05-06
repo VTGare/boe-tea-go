@@ -4,6 +4,7 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/everpcpc/pixiv"
 )
@@ -54,15 +55,22 @@ func GetPixivPost(id string) (*PixivPost, error) {
 		return nil, err
 	}
 
-	extension := getExtension(illust)
+	//extension := getExtension(illust)
 
-	if illust.PageCount > 1 {
+	firstpage := baseURL + strings.TrimPrefix(illust.MetaSinglePage.OriginalImageURL, "https://")
+	images = append(images, firstpage)
+	for _, page := range illust.MetaPages {
+		link := baseURL + strings.TrimPrefix(page.Images.Original, "https://")
+		images = append(images, link)
+	}
+
+	/*if illust.PageCount > 1 {
 		for i := 1; i <= illust.PageCount; i++ {
 			images = append(images, baseURL+id+"-"+strconv.Itoa(i)+"."+extension)
 		}
 	} else {
 		images = append(images, baseURL+id+"."+extension)
-	}
+	}*/
 
 	tags := make([]string, 0)
 	for _, t := range illust.Tags {

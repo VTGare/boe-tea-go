@@ -189,7 +189,10 @@ func PostPixiv(s *discordgo.Session, m *discordgo.MessageCreate, pixivIDs []stri
 			}
 
 			if p, isEmbed := post.(discordgo.MessageEmbed); isEmbed {
-				s.ChannelMessageSendEmbed(m.ChannelID, &p)
+				_, err := s.ChannelMessageSendEmbed(m.ChannelID, &p)
+				if err != nil {
+					return err
+				}
 			} else {
 				s.ChannelMessageSend(m.ChannelID, post.(string))
 			}
