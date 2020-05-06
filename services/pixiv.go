@@ -44,8 +44,8 @@ func init() {
 //GetPixivPost perfoms a Pixiv API call and returns an array of high-resolution image URLs
 func GetPixivPost(id string) (*PixivPost, error) {
 	var (
-		images   = make([]string, 0)
-		original = make([]string, 0)
+		largeImages    = make([]string, 0)
+		originalImages = make([]string, 0)
 	)
 
 	pid, err := strconv.ParseUint(id, 10, 0)
@@ -57,26 +57,19 @@ func GetPixivPost(id string) (*PixivPost, error) {
 		return nil, err
 	}
 
-	//extension := getExtension(illust)
-
 	if illust.MetaSinglePage.OriginalImageURL != "" {
-		firstpage := baseURL + strings.TrimPrefix(illust.MetaSinglePage.OriginalImageURL, "https://")
-		original = append(original, firstpage)
+		firstPage := baseURL + strings.TrimPrefix(illust.MetaSinglePage.OriginalImageURL, "https://")
+		originalImages = append(originalImages, firstPage)
 	}
+	firstpageLarge := baseURL + strings.TrimPrefix(illust.Images.Large, "https://")
+	largeImages = append(largeImages, firstpageLarge)
+
 	for _, page := range illust.MetaPages {
 		originalLink := baseURL + strings.TrimPrefix(page.Images.Original, "https://")
 		largeLink := baseURL + strings.TrimPrefix(page.Images.Large, "https://")
-		images = append(images, largeLink)
-		original = append(original, originalLink)
+		largeImages = append(largeImages, largeLink)
+		originalImages = append(originalImages, originalLink)
 	}
-
-	/*if illust.PageCount > 1 {
-		for i := 1; i <= illust.PageCount; i++ {
-			images = append(images, baseURL+id+"-"+strconv.Itoa(i)+"."+extension)
-		}
-	} else {
-		images = append(images, baseURL+id+"."+extension)
-	}*/
 
 	tags := make([]string, 0)
 	for _, t := range illust.Tags {
@@ -87,8 +80,8 @@ func GetPixivPost(id string) (*PixivPost, error) {
 		Author:         illust.User.Name,
 		Title:          illust.Title,
 		Tags:           tags,
-		LargeImages:    images,
-		OriginalImages: original,
+		LargeImages:    largeImages,
+		OriginalImages: originalImages,
 		Likes:          illust.TotalBookmarks,
 	}, nil
 }
