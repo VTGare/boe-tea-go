@@ -3,10 +3,12 @@ package commands
 import (
 	"errors"
 	"fmt"
+	"image"
 	"regexp"
 	"strconv"
 
 	"github.com/VTGare/boe-tea-go/database"
+	"github.com/VTGare/boe-tea-go/images"
 	"github.com/VTGare/boe-tea-go/services"
 	"github.com/VTGare/boe-tea-go/utils"
 	"github.com/bwmarrin/discordgo"
@@ -139,6 +141,28 @@ func init() {
 			},
 		},
 	}
+	Commands["deepfry"] = Command{
+		Name:            "deepfry",
+		Description:     "Deepfries an image, cursed as hell",
+		GuildOnly:       false,
+		Exec:            deepfry,
+		Help:            true,
+		AdvancedCommand: true,
+		ExtendedHelp: []*discordgo.MessageEmbedField{
+			{
+				Name:  "Usage",
+				Value: "bt!deepfry <optional times deepfried> <image link>",
+			},
+			{
+				Name:  "times deepfried",
+				Value: "Repeats deepfrying process given amount of times, up to 5.",
+			},
+			{
+				Name:  "image link",
+				Value: "Image link, if not present uses an attachment.",
+			},
+		},
+	}
 }
 
 func sauce(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
@@ -225,5 +249,56 @@ func pixiv(s *discordgo.Session, m *discordgo.MessageCreate, args []string) erro
 		Indexes:    excludes,
 		Exclude:    true,
 	})
+	return nil
+}
+
+func deepfry(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
+	if len(m.Attachments) > 0 {
+		args = append(args, m.Attachments[0].URL)
+	}
+
+	url := ""
+	times := 0
+	switch len(args) {
+	case 2:
+		if f := ImageURLRegex.FindString(args[0]); f != "" {
+			url = f
+		} else {
+			var err error
+			times, err = strconv.Atoi(args[0])
+			if times > 5 {
+				return errors.New("can't deepfry more than 5 times at once")
+			}
+			if err != nil {
+				return err
+			}
+			url = ImageURLRegex.FindString(args[1])
+		}
+
+		if url == "" {
+			return errors.New("received a non-image url")
+		}
+	case 1:
+		if f := ImageURLRegex.FindString(args[0]); f != "" {
+			url = f
+		} else {
+			return errors.New("received a non-image url")
+		}
+	case 0:
+		return utils.ErrNotEnoughArguments
+	}
+
+	img, err := images.DownloadImage(url)
+	if err != nil {
+		return err
+	}
+
+	deepfried := images.Deepfry(img)
+	for i := 0; i < times; i++ {
+		img, _, _ := image.Decode(deepfried)
+		deepfried = images.Deepfry(img)
+	}
+
+	s.ChannelFileSend(m.ChannelID, "deepfried.jpg", deepfried)
 	return nil
 }

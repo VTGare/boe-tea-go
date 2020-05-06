@@ -9,7 +9,7 @@ import (
 )
 
 var (
-	baseURL = "https://pixiv.cat/"
+	baseURL = "https://api.kotori.love/pixiv/image/"
 	app     *pixiv.AppPixivAPI
 )
 

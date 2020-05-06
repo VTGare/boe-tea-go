@@ -8,6 +8,7 @@ require (
 	github.com/antchfx/xmlquery v1.2.3 // indirect
 	github.com/antchfx/xpath v1.1.5 // indirect
 	github.com/bwmarrin/discordgo v0.20.3
+	github.com/disintegration/gift v1.2.1
 	github.com/everpcpc/pixiv v0.0.0-20200407035647-9a31a1508c38
 	github.com/gocolly/colly/v2 v2.0.1
 	github.com/golang/groupcache v0.0.0-20200121045136-8c9f03a8e57e // indirect
