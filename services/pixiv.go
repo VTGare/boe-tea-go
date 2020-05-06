@@ -57,8 +57,10 @@ func GetPixivPost(id string) (*PixivPost, error) {
 
 	//extension := getExtension(illust)
 
-	firstpage := baseURL + strings.TrimPrefix(illust.MetaSinglePage.OriginalImageURL, "https://")
-	images = append(images, firstpage)
+	if illust.MetaSinglePage.OriginalImageURL != "" {
+		firstpage := baseURL + strings.TrimPrefix(illust.MetaSinglePage.OriginalImageURL, "https://")
+		images = append(images, firstpage)
+	}
 	for _, page := range illust.MetaPages {
 		link := baseURL + strings.TrimPrefix(page.Images.Original, "https://")
 		images = append(images, link)
