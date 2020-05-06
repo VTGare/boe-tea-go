@@ -15,11 +15,12 @@ var (
 )
 
 type PixivPost struct {
-	Author string
-	Title  string
-	Likes  int
-	Tags   []string
-	Images []string
+	Author         string
+	Title          string
+	Likes          int
+	Tags           []string
+	LargeImages    []string
+	OriginalImages []string
 }
 
 func init() {
@@ -43,7 +44,8 @@ func init() {
 //GetPixivPost perfoms a Pixiv API call and returns an array of high-resolution image URLs
 func GetPixivPost(id string) (*PixivPost, error) {
 	var (
-		images = make([]string, 0)
+		images   = make([]string, 0)
+		original = make([]string, 0)
 	)
 
 	pid, err := strconv.ParseUint(id, 10, 0)
@@ -58,12 +60,14 @@ func GetPixivPost(id string) (*PixivPost, error) {
 	//extension := getExtension(illust)
 
 	if illust.MetaSinglePage.OriginalImageURL != "" {
-		firstpage := baseURL + strings.TrimPrefix(illust.Images.Large, "https://")
-		images = append(images, firstpage)
+		firstpage := baseURL + strings.TrimPrefix(illust.MetaSinglePage.OriginalImageURL, "https://")
+		original = append(original, firstpage)
 	}
 	for _, page := range illust.MetaPages {
-		link := baseURL + strings.TrimPrefix(page.Images.Large, "https://")
-		images = append(images, link)
+		originalLink := baseURL + strings.TrimPrefix(page.Images.Original, "https://")
+		largeLink := baseURL + strings.TrimPrefix(page.Images.Large, "https://")
+		images = append(images, largeLink)
+		original = append(original, originalLink)
 	}
 
 	/*if illust.PageCount > 1 {
@@ -80,11 +84,12 @@ func GetPixivPost(id string) (*PixivPost, error) {
 	}
 
 	return &PixivPost{
-		Author: illust.User.Name,
-		Title:  illust.Title,
-		Tags:   tags,
-		Images: images,
-		Likes:  illust.TotalBookmarks,
+		Author:         illust.User.Name,
+		Title:          illust.Title,
+		Tags:           tags,
+		LargeImages:    images,
+		OriginalImages: original,
+		Likes:          illust.TotalBookmarks,
 	}, nil
 }
 

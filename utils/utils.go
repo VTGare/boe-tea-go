@@ -110,22 +110,22 @@ func PostPixiv(s *discordgo.Session, m *discordgo.MessageCreate, pixivIDs []stri
 			return err
 		}
 
-		for ind, image := range post.Images {
+		for ind, image := range post.LargeImages {
 			title := ""
-			if len(post.Images) == 1 {
+			if len(post.LargeImages) == 1 {
 				title = fmt.Sprintf("%v by %v", post.Title, post.Author)
 			} else {
-				title = fmt.Sprintf("%v by %v. Page %v/%v", post.Title, post.Author, ind+1, len(post.Images))
+				title = fmt.Sprintf("%v by %v. Page %v/%v", post.Title, post.Author, ind+1, len(post.LargeImages))
 			}
 
 			if links {
 				title += fmt.Sprintf("\n%v\n♥ %v", image, post.Likes)
 				aggregatedPosts = append(aggregatedPosts, title)
 			} else {
-				embedWarning := fmt.Sprintf("If embed is empty follow this link to see the image: %v", image)
+				embedWarning := fmt.Sprintf("‼ Image preview is not original quality, please follow the link in the title to download high-res image")
 				aggregatedPosts = append(aggregatedPosts, discordgo.MessageEmbed{
 					Title:     title,
-					URL:       image,
+					URL:       post.OriginalImages[ind],
 					Color:     EmbedColor,
 					Timestamp: time.Now().Format(time.RFC3339),
 					Fields: []*discordgo.MessageEmbedField{
