@@ -21,6 +21,7 @@ type PixivPost struct {
 	Tags           []string
 	LargeImages    []string
 	OriginalImages []string
+	NSFW           bool
 }
 
 func init() {
@@ -71,8 +72,12 @@ func GetPixivPost(id string) (*PixivPost, error) {
 		originalImages = append(originalImages, originalLink)
 	}
 
+	nsfw := false
 	tags := make([]string, 0)
 	for _, t := range illust.Tags {
+		if t.Name == "R-18" {
+			nsfw = true
+		}
 		tags = append(tags, t.Name)
 	}
 
@@ -83,6 +88,7 @@ func GetPixivPost(id string) (*PixivPost, error) {
 		LargeImages:    largeImages,
 		OriginalImages: originalImages,
 		Likes:          illust.TotalBookmarks,
+		NSFW:           nsfw,
 	}, nil
 }
 

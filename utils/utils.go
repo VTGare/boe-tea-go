@@ -30,6 +30,11 @@ type PixivOptions struct {
 	Exclude    bool
 }
 
+type Range struct {
+	Low  int
+	High int
+}
+
 var (
 	EmojiRegex            = regexp.MustCompile(`(\x{00a9}|\x{00ae}|[\x{2000}-\x{3300}]|\x{d83c}[\x{d000}-\x{dfff}]|\x{d83d}[\x{d000}-\x{dfff}]|\x{d83e}[\x{d000}-\x{dfff}])`)
 	NumRegex              = regexp.MustCompile(`([0-9]+)`)
@@ -39,6 +44,34 @@ var (
 	ErrNotEnoughArguments = errors.New("not enough arguments")
 	ErrParsingArgument    = errors.New("error parsing arguments, please make sure all arguments are integers")
 )
+
+func NewRange(s string) (*Range, error) {
+	hyphen := strings.IndexByte(s, '-')
+	if hyphen == -1 {
+		return nil, errors.New("not a range")
+	}
+	lowStr := s[:hyphen]
+	highStr := s[hyphen+1:]
+
+	low, err := strconv.Atoi(lowStr)
+	if err != nil {
+		return nil, ErrParsingArgument
+	}
+
+	high, err := strconv.Atoi(highStr)
+	if err != nil {
+		return nil, ErrParsingArgument
+	}
+
+	if low > high {
+		return nil, errors.New("low is higher than high")
+	}
+
+	return &Range{
+		Low:  low,
+		High: high,
+	}, nil
+}
 
 func EmbedTimestamp() string {
 	return time.Now().Format(time.RFC3339)
@@ -55,150 +88,6 @@ func FindAuthor(sauce services.Sauce) string {
 	}
 
 	return "-"
-}
-
-//PostPixiv reposts Pixiv images from a link to a discord channel
-func PostPixiv(s *discordgo.Session, m *discordgo.MessageCreate, pixivIDs []string, opts ...PixivOptions) error {
-	if opts == nil {
-		opts = []PixivOptions{
-			{
-				ProcPrompt: true,
-				Indexes:    map[int]bool{},
-				Exclude:    true,
-			},
-		}
-	}
-
-	var ask bool
-	var links bool
-
-	guild := database.GuildCache[m.GuildID]
-	switch guild.Repost {
-	case "ask":
-		ask = true
-	case "links":
-		ask = false
-		links = true
-	case "embeds":
-		ask = false
-		links = false
-	}
-
-	if ask {
-		prompt := CreatePrompt(s, m, &PromptOptions{
-			Message: "Send images as links (✅) or embeds (❎)?",
-			Actions: map[string]ActionFunc{
-				"✅": func() bool {
-					return true
-				},
-				"❎": func() bool {
-					return false
-				},
-			},
-			Timeout: time.Second * 15,
-		})
-		if prompt == nil {
-			return nil
-		}
-		links = prompt()
-	}
-
-	aggregatedPosts := make([]interface{}, 0)
-	for _, link := range pixivIDs {
-		post, err := services.GetPixivPost(link)
-		if err != nil {
-			return err
-		}
-
-		for ind, image := range post.LargeImages {
-			title := ""
-			if len(post.LargeImages) == 1 {
-				title = fmt.Sprintf("%v by %v", post.Title, post.Author)
-			} else {
-				title = fmt.Sprintf("%v by %v. Page %v/%v", post.Title, post.Author, ind+1, len(post.LargeImages))
-			}
-
-			if links {
-				title += fmt.Sprintf("\n%v\n♥ %v", image, post.Likes)
-				aggregatedPosts = append(aggregatedPosts, title)
-			} else {
-				embedWarning := fmt.Sprintf("‼ Image preview is not original quality, please follow the link in the title to download high-res image")
-				aggregatedPosts = append(aggregatedPosts, discordgo.MessageEmbed{
-					Title:     title,
-					URL:       post.OriginalImages[ind],
-					Color:     EmbedColor,
-					Timestamp: time.Now().Format(time.RFC3339),
-					Fields: []*discordgo.MessageEmbedField{
-						{
-							Name:   "Likes",
-							Value:  strconv.Itoa(post.Likes),
-							Inline: true,
-						},
-						{
-							Name:   "Tags",
-							Value:  strings.Join(post.Tags, " • "),
-							Inline: true,
-						},
-					},
-					Image: &discordgo.MessageEmbedImage{
-						URL: image,
-					},
-					Footer: &discordgo.MessageEmbedFooter{
-						Text: embedWarning,
-					},
-				})
-			}
-		}
-	}
-
-	if len(aggregatedPosts) >= guild.Limit {
-		return errors.New("hold your horses, too many images")
-	}
-
-	flag := true
-	if opts[0].ProcPrompt {
-		if len(aggregatedPosts) >= guild.LargeSet {
-			message := ""
-			if len(aggregatedPosts) >= 3 {
-				message = fmt.Sprintf("Large set of images (%v), do you want me to send each image individually?", len(aggregatedPosts))
-			} else {
-				message = "Do you want me to send each image individually?"
-			}
-
-			prompt := CreatePrompt(s, m, &PromptOptions{
-				Message: message,
-				Actions: map[string]ActionFunc{
-					"👌": func() bool {
-						return true
-					},
-				},
-				Timeout: time.Second * 15,
-			})
-			if prompt == nil {
-				return nil
-			}
-			flag = prompt()
-		}
-	}
-
-	if flag {
-		log.Println(fmt.Sprintf("Successfully reposting %v images in %v", len(aggregatedPosts), guild.GuildID))
-		for ind, post := range aggregatedPosts {
-			if _, ok := opts[0].Indexes[ind+1]; ok {
-				continue
-			}
-
-			if p, isEmbed := post.(discordgo.MessageEmbed); isEmbed {
-				_, err := s.ChannelMessageSendEmbed(m.ChannelID, &p)
-				if err != nil {
-					return err
-				}
-			} else {
-				s.ChannelMessageSend(m.ChannelID, post.(string))
-			}
-		}
-	}
-	return nil
 }
 
 //CreatePrompt sends a prompt message to a discord channel

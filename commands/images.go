@@ -4,8 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"image"
+	"net/http"
 	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/VTGare/boe-tea-go/database"
 	"github.com/VTGare/boe-tea-go/images"
@@ -96,8 +98,6 @@ var (
 			return embed, nil
 		},
 	}
-
-	rangeRegex = regexp.MustCompile(`([0-9]+)\-([0-9]+)`)
 )
 
 func init() {
@@ -163,6 +163,24 @@ func init() {
 			},
 		},
 	}
+	Commands["twitter"] = Command{
+		Name:            "twitter",
+		Description:     "Reposts a twitter post",
+		GuildOnly:       false,
+		Exec:            twitter,
+		Help:            true,
+		AdvancedCommand: true,
+		ExtendedHelp: []*discordgo.MessageEmbedField{
+			{
+				Name:  "Usage",
+				Value: "bt!twitter <twitter link>",
+			},
+			{
+				Name:  "Twitter link",
+				Value: "Must look something like this: https://twitter.com/mhy_shima/status/1258684420011069442",
+			},
+		},
+	}
 }
 
 func sauce(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
@@ -217,24 +235,15 @@ func pixiv(s *discordgo.Session, m *discordgo.MessageCreate, args []string) erro
 	args = args[1:]
 	excludes := make(map[int]bool)
 	for _, arg := range args {
-		ran := rangeRegex.FindStringSubmatch(arg)
-		if ran != nil {
-			low, err := strconv.Atoi(ran[1])
+		if strings.Contains(arg, "-") {
+			ran, err := utils.NewRange(arg)
 			if err != nil {
-				return utils.ErrParsingArgument
-			}
-			high, err := strconv.Atoi(ran[2])
-			if err != nil {
-				return utils.ErrParsingArgument
-			}
-			if low > high {
-				return errors.New("low is higher than high, please use ranges correctly")
+				return err
 			}
 
-			for i := low; i <= high; i++ {
+			for i := ran.Low; i <= ran.High; i++ {
 				excludes[i] = true
 			}
-
 		} else {
 			num, err := strconv.Atoi(arg)
 			if err != nil {
@@ -249,6 +258,78 @@ func pixiv(s *discordgo.Session, m *discordgo.MessageCreate, args []string) erro
 		Indexes:    excludes,
 		Exclude:    true,
 	})
+	return nil
+}
+
+func twitter(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
+	if len(args) == 0 {
+		return utils.ErrNotEnoughArguments
+	}
+
+	tweet, err := services.GetTweet(args[0])
+	if err != nil {
+		return err
+	}
+
+	messages := make([]discordgo.MessageSend, 0)
+	for ind, media := range tweet.Gallery {
+		title := ""
+		if len(tweet.Gallery) > 1 {
+			title = fmt.Sprintf("%v's tweet | Page %v/%v", tweet.Author, ind+1, len(tweet.Gallery))
+		} else {
+			title = fmt.Sprintf("%v's tweet", tweet.Author)
+		}
+
+		embed := discordgo.MessageEmbed{
+			Title:     title,
+			Timestamp: tweet.Timestamp,
+			Fields: []*discordgo.MessageEmbedField{
+				{
+					Name:   "Likes",
+					Value:  strconv.Itoa(tweet.Likes),
+					Inline: true,
+				},
+				{
+					Name:   "Retweets",
+					Value:  strconv.Itoa(tweet.Retweets),
+					Inline: true,
+				},
+			},
+		}
+
+		msg := discordgo.MessageSend{}
+		if ind == 0 {
+			embed.Description = tweet.Content
+		}
+
+		if media.Animated {
+			resp, err := http.Get(media.URL)
+			if err != nil {
+				return err
+			}
+			defer resp.Body.Close()
+
+			filename := media.URL[strings.LastIndex(media.URL, "/")+1:]
+			msg.File = &discordgo.File{
+				Name:   filename,
+				Reader: resp.Body,
+			}
+		} else {
+			embed.Image = &discordgo.MessageEmbedImage{
+				URL: media.URL,
+			}
+		}
+		msg.Embed = &embed
+
+		messages = append(messages, msg)
+	}
+
+	for _, message := range messages {
+		_, err := s.ChannelMessageSendComplex(m.ChannelID, &message)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
