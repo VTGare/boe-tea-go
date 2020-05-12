@@ -17,6 +17,11 @@ import (
 //ActionFunc is a function type alias for prompt actions
 type ActionFunc = func() bool
 
+type Range struct {
+	Low  int
+	High int
+}
+
 //PromptOptions is a struct that defines prompt's behaviour.
 type PromptOptions struct {
 	Actions map[string]ActionFunc
@@ -24,23 +29,11 @@ type PromptOptions struct {
 	Timeout time.Duration
 }
 
-type PixivOptions struct {
-	ProcPrompt bool
-	Indexes    map[int]bool
-	Exclude    bool
-}
-
-type Range struct {
-	Low  int
-	High int
-}
-
 var (
 	EmojiRegex            = regexp.MustCompile(`(\x{00a9}|\x{00ae}|[\x{2000}-\x{3300}]|\x{d83c}[\x{d000}-\x{dfff}]|\x{d83d}[\x{d000}-\x{dfff}]|\x{d83e}[\x{d000}-\x{dfff}])`)
 	NumRegex              = regexp.MustCompile(`([0-9]+)`)
 	EmbedColor            = 0x439ef1
 	AuthorID              = "244208152776540160"
-	PixivRegex            = regexp.MustCompile(`http(?:s)?:\/\/(?:www\.)?pixiv\.net\/(?:en\/)?(?:artworks\/|member_illust\.php\?illust_id=)([0-9]+)`)
 	ErrNotEnoughArguments = errors.New("not enough arguments")
 	ErrParsingArgument    = errors.New("error parsing arguments, please make sure all arguments are integers")
 )

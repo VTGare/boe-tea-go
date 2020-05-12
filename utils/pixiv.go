@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -12,6 +13,16 @@ import (
 	"github.com/VTGare/boe-tea-go/services"
 	"github.com/bwmarrin/discordgo"
 )
+
+var (
+	PixivRegex = regexp.MustCompile(`http(?:s)?:\/\/(?:www\.)?pixiv\.net\/(?:en\/)?(?:artworks\/|member_illust\.php\?)(?:mode=medium\&)?(?:illust_id=)?([0-9]+)`)
+)
+
+type PixivOptions struct {
+	ProcPrompt bool
+	Indexes    map[int]bool
+	Exclude    bool
+}
 
 //PostPixiv reposts Pixiv images from a link to a discord channel
 func PostPixiv(s *discordgo.Session, m *discordgo.MessageCreate, pixivIDs []string, opts ...PixivOptions) error {
