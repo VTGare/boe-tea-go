@@ -16,6 +16,7 @@ import (
 
 var (
 	PixivRegex = regexp.MustCompile(`http(?:s)?:\/\/(?:www\.)?pixiv\.net\/(?:en\/)?(?:artworks\/|member_illust\.php\?)(?:mode=medium\&)?(?:illust_id=)?([0-9]+)`)
+	PostCache  = make(map[string]string)
 )
 
 type PixivOptions struct {
@@ -106,13 +107,25 @@ func PostPixiv(s *discordgo.Session, m *discordgo.MessageCreate, pixivIDs []stri
 
 	if flag {
 		log.Println(fmt.Sprintf("Successfully reposting %v images in %v", len(messages), guild.GuildID))
+
+		postIDs := make([]string, 0)
 		for ind, message := range messages {
 			if _, ok := opts[0].Indexes[ind+1]; ok {
 				continue
 			}
 
-			s.ChannelMessageSendComplex(m.ChannelID, &message)
+			post, _ := s.ChannelMessageSendComplex(m.ChannelID, &message)
+			postIDs = append(postIDs, post.ID)
+			PostCache[post.ID] = m.Author.ID
 		}
+
+		go func() {
+			time.Sleep(30 * time.Second)
+
+			for _, id := range postIDs {
+				delete(PostCache, id)
+			}
+		}()
 	}
 	return nil
 }

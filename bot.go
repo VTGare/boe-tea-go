@@ -89,6 +89,12 @@ func messageCreated(s *discordgo.Session, m *discordgo.MessageCreate) {
 	}
 }
 
+func reactCreated(s *discordgo.Session, r *discordgo.MessageReactionAdd) {
+	if author, ok := utils.PostCache[r.MessageID]; ok && author == r.UserID && r.Emoji.APIName() == "❌" {
+		s.ChannelMessageDelete(r.ChannelID, r.MessageID)
+	}
+}
+
 func guildCreated(s *discordgo.Session, g *discordgo.GuildCreate) {
 	if len(database.GuildCache) == 0 {
 		return

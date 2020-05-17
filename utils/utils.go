@@ -148,9 +148,8 @@ func CreateDB(eventGuilds []*discordgo.Guild) error {
 		err := database.InsertManyGuilds(newGuilds)
 		if err != nil {
 			return err
-		} else {
-			log.Println("Successfully inserted all current guilds.")
 		}
+		log.Println("Successfully inserted all current guilds.")
 	}
 
 	log.Println(fmt.Sprintf("Connected to %v guilds", len(eventGuilds)))

@@ -30,6 +30,7 @@ func main() {
 	dg.AddHandler(onReady)
 	dg.AddHandler(messageCreated)
 	dg.AddHandler(guildCreated)
+	dg.AddHandler(reactCreated)
 	dg.AddHandler(guildDeleted)
 
 	if err := dg.Open(); err != nil {
