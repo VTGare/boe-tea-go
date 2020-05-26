@@ -10,7 +10,7 @@ import (
 //SauceNaoResult is a top-level raw SauceNAO API response
 type SauceNaoResult struct {
 	Header  *TopHeader `json:"header"`
-	Results *[]Sauce   `json:"results"`
+	Results []*Sauce   `json:"results"`
 }
 
 //TopHeader is a top-level SauceNAO header

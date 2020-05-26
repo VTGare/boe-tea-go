@@ -168,3 +168,20 @@ func GetEmoji(s *discordgo.Session, guildID, e string) (string, error) {
 	}
 	return emoji.APIName(), nil
 }
+
+func FilterLowSimilarity(sauce []*services.Sauce) ([]*services.Sauce, error) {
+	filtered := make([]*services.Sauce, 0)
+
+	for _, v := range sauce {
+		similarity, err := strconv.ParseFloat(v.Header.Similarity, 64)
+		if err != nil {
+			return nil, err
+		}
+
+		if similarity >= 75.0 {
+			filtered = append(filtered, v)
+		}
+	}
+
+	return filtered, nil
+}

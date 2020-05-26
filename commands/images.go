@@ -30,8 +30,17 @@ var (
 				return nil, errors.New("no sauce, just ketchup")
 			}
 
-			res := (*saucenao.Results)[0]
-			author := utils.FindAuthor(res)
+			results, err := utils.FilterLowSimilarity(saucenao.Results)
+			if err != nil {
+				return nil, err
+			}
+
+			if len(results) == 0 {
+				return nil, errors.New("no sauce, just ketchup")
+			}
+
+			res := results[0]
+			author := utils.FindAuthor(*res)
 
 			embed := &discordgo.MessageEmbed{
 				Title:     "Sauce",
@@ -188,18 +197,35 @@ func sauce(s *discordgo.Session, m *discordgo.MessageCreate, args []string) erro
 		args = append(args, m.Attachments[0].URL)
 	}
 
+	messages, err := s.ChannelMessages(m.ChannelID, 1, m.ID, "", "")
+	if err != nil {
+		return err
+	}
+
+	f := ImageURLRegex.FindString(messages[0].Content)
+	switch {
+	case f != "":
+		args = append(args, f)
+	case len(messages[0].Attachments) > 0:
+		args = append(args, messages[0].Attachments[0].URL)
+	case len(messages[0].Embeds) > 0:
+		if messages[0].Embeds[0].Image != nil {
+			args = append(args, messages[0].Embeds[0].Image.URL)
+		}
+	}
+
 	url := ""
 	searchEngine := ""
-	switch len(args) {
-	case 0:
+
+	if len(args) == 0 {
 		return utils.ErrNotEnoughArguments
-	case 1:
+	} else if len(args) == 1 {
 		searchEngine = database.GuildCache[m.GuildID].ReverseSearch
 		url = ImageURLRegex.FindString(args[0])
 		if url == "" {
 			return errors.New("received a non-image url")
 		}
-	case 2:
+	} else if len(args) >= 2 {
 		if f := ImageURLRegex.FindString(args[0]); f != "" {
 			searchEngine = database.GuildCache[m.GuildID].ReverseSearch
 			url = f
@@ -217,7 +243,6 @@ func sauce(s *discordgo.Session, m *discordgo.MessageCreate, args []string) erro
 	if err != nil {
 		return err
 	}
-
 	s.ChannelMessageSendEmbed(m.ChannelID, embed)
 	return nil
 }

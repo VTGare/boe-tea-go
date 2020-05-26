@@ -73,6 +73,9 @@ func getASCII2DPage(uri string) (*resultA2D, error) {
 	}
 
 	c.Wait()
+
+	res.detailBoxes = res.detailBoxes[1:]
+	res.thumnails = res.thumnails[1:]
 	return res, nil
 }
 
@@ -83,14 +86,16 @@ func resultToSauce(res *resultA2D) []SauceA2D {
 		return sauces
 	}
 
-	for ind, thumbnail := range res.thumnails[1:] {
+	for ind, thumbnail := range res.thumnails {
 		sauce := SauceA2D{}
 		sauce.Thumbnail = "https://ascii2d.net" + thumbnail
-		sauce.From = res.detailBoxes[ind+1].from
-		sauce.Name = res.detailBoxes[ind+1].names[0]
-		sauce.URL = res.detailBoxes[ind+1].links[0]
-		sauce.Author = res.detailBoxes[ind+1].names[1]
-		sauce.AuthorURL = res.detailBoxes[ind+1].links[1]
+		sauce.From = res.detailBoxes[ind].from
+		sauce.Name = res.detailBoxes[ind].names[0]
+		sauce.URL = res.detailBoxes[ind].links[0]
+		if len(res.detailBoxes[ind].names) >= 2 && len(res.detailBoxes[ind].links) >= 2 {
+			sauce.Author = res.detailBoxes[ind].names[1]
+			sauce.AuthorURL = res.detailBoxes[ind].links[1]
+		}
 		sauces = append(sauces, sauce)
 	}
 
