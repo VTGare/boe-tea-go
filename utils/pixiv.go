@@ -1,7 +1,6 @@
 package utils
 
 import (
-	"errors"
 	"fmt"
 	"log"
 	"regexp"
@@ -75,9 +74,6 @@ func PostPixiv(s *discordgo.Session, m *discordgo.MessageCreate, pixivIDs []stri
 	if err != nil {
 		return err
 	}
-	if len(messages) >= guild.Limit {
-		return errors.New("hold your horses, too many images")
-	}
 
 	flag := true
 	if opts[0].ProcPrompt {
@@ -109,6 +105,16 @@ func PostPixiv(s *discordgo.Session, m *discordgo.MessageCreate, pixivIDs []stri
 		log.Println(fmt.Sprintf("Successfully reposting %v images in %v", len(messages), guild.GuildID))
 
 		postIDs := make([]string, 0)
+
+		if len(messages) > guild.Limit {
+			messages[0].Content = fmt.Sprintf("```Album size (%v) is off limits (%v), only first image is reposted.```", len(messages), guild.Limit)
+
+			post, _ := s.ChannelMessageSendComplex(m.ChannelID, &messages[0])
+			postIDs = append(postIDs, post.ID)
+			PostCache[post.ID] = m.Author.ID
+			return nil
+		}
+
 		for ind, message := range messages {
 			if _, ok := opts[0].Indexes[ind+1]; ok {
 				continue

@@ -197,21 +197,13 @@ func sauce(s *discordgo.Session, m *discordgo.MessageCreate, args []string) erro
 		args = append(args, m.Attachments[0].URL)
 	}
 
-	messages, err := s.ChannelMessages(m.ChannelID, 1, m.ID, "", "")
+	messages, err := s.ChannelMessages(m.ChannelID, 5, m.ID, "", "")
 	if err != nil {
 		return err
 	}
 
-	f := ImageURLRegex.FindString(messages[0].Content)
-	switch {
-	case f != "":
-		args = append(args, f)
-	case len(messages[0].Attachments) > 0:
-		args = append(args, messages[0].Attachments[0].URL)
-	case len(messages[0].Embeds) > 0:
-		if messages[0].Embeds[0].Image != nil {
-			args = append(args, messages[0].Embeds[0].Image.URL)
-		}
+	if recent := findRecentImage(messages); recent != "" {
+		args = append(args, recent)
 	}
 
 	url := ""
@@ -245,6 +237,24 @@ func sauce(s *discordgo.Session, m *discordgo.MessageCreate, args []string) erro
 	}
 	s.ChannelMessageSendEmbed(m.ChannelID, embed)
 	return nil
+}
+
+func findRecentImage(messages []*discordgo.Message) string {
+	for _, msg := range messages {
+		f := ImageURLRegex.FindString(msg.Content)
+		switch {
+		case f != "":
+			return f
+		case len(msg.Attachments) > 0:
+			return msg.Attachments[0].URL
+		case len(msg.Embeds) > 0:
+			if msg.Embeds[0].Image != nil {
+				return msg.Embeds[0].Image.URL
+			}
+		}
+	}
+
+	return ""
 }
 
 func pixiv(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
