@@ -107,7 +107,7 @@ func PostPixiv(s *discordgo.Session, m *discordgo.MessageCreate, pixivIDs []stri
 		postIDs := make([]string, 0)
 
 		if len(messages) > guild.Limit {
-			messages[0].Content = fmt.Sprintf("```Album size (%v) is off limits (%v), only first image is reposted.```", len(messages), guild.Limit)
+			messages[0].Content = fmt.Sprintf("```Album size (%v) is larger than limit set on this server (%v), only first image is reposted.```", len(messages), guild.Limit)
 
 			post, _ := s.ChannelMessageSendComplex(m.ChannelID, &messages[0])
 			postIDs = append(postIDs, post.ID)
