@@ -68,7 +68,7 @@ var (
 			return embed, nil
 		},
 		"ascii2d": func(link string) (*discordgo.MessageEmbed, error) {
-			results, err := services.GetSauceA2D(link)
+			/*results, err := services.GetSauceA2D(link)
 			if err != nil {
 				return nil, err
 			}
@@ -105,9 +105,9 @@ var (
 					},
 				}
 				return embed, nil
-			}
+			}*/
 
-			return nil, errors.New("source image has not been found")
+			return nil, errors.New("ascii2d is disabled because of breaking server-side bug. please use saucenao")
 		},
 	}
 )
