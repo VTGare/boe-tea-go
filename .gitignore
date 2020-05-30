@@ -1,3 +1,4 @@
 .vscode
 tmp
 .env
+__debug_bin

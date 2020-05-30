@@ -68,43 +68,46 @@ var (
 			return embed, nil
 		},
 		"ascii2d": func(link string) (*discordgo.MessageEmbed, error) {
-			res, err := services.GetSauceA2D(link)
+			results, err := services.GetSauceA2D(link)
 			if err != nil {
 				return nil, err
 			}
 
-			if len(res) == 0 {
-				return nil, errors.New("no sauce, just ketchup")
+			for _, res := range results {
+				if res.Author == "" || res.AuthorURL == "" || res.From == "" || res.Name == "" || res.Thumbnail == "" || res.URL == "" {
+					continue
+				}
+				embed := &discordgo.MessageEmbed{
+					Title: fmt.Sprintf("%v by %v on %v", res.Name, res.Author, res.From),
+					URL:   res.URL,
+					Thumbnail: &discordgo.MessageEmbedThumbnail{
+						URL: res.Thumbnail,
+					},
+					Color:     utils.EmbedColor,
+					Timestamp: utils.EmbedTimestamp(),
+					Fields: []*discordgo.MessageEmbedField{
+						{
+							Name:  "Name",
+							Value: res.Name,
+						},
+						{
+							Name:  "URL",
+							Value: res.URL,
+						},
+						{
+							Name:  "Author",
+							Value: res.Author,
+						},
+						{
+							Name:  "Author URL",
+							Value: res.AuthorURL,
+						},
+					},
+				}
+				return embed, nil
 			}
 
-			embed := &discordgo.MessageEmbed{
-				Title: fmt.Sprintf("%v by %v on %v", res[0].Name, res[0].Author, res[0].From),
-				URL:   res[0].URL,
-				Thumbnail: &discordgo.MessageEmbedThumbnail{
-					URL: res[0].Thumbnail,
-				},
-				Color:     utils.EmbedColor,
-				Timestamp: utils.EmbedTimestamp(),
-				Fields: []*discordgo.MessageEmbedField{
-					{
-						Name:  "Name",
-						Value: res[0].Name,
-					},
-					{
-						Name:  "URL",
-						Value: res[0].URL,
-					},
-					{
-						Name:  "Author",
-						Value: res[0].Author,
-					},
-					{
-						Name:  "Author URL",
-						Value: res[0].AuthorURL,
-					},
-				},
-			}
-			return embed, nil
+			return nil, errors.New("source image has not been found")
 		},
 	}
 )
