@@ -18,7 +18,7 @@ import (
 
 var (
 	//ImageURLRegex is a regex for image URLs
-	ImageURLRegex = regexp.MustCompile(`(http(s?):)([/|.|\w|\s|-])*\.(?:jpg|jpeg|gif|png|webp)`)
+	ImageURLRegex = regexp.MustCompile(`(?i)(http(s?):)([/|.|\w|\s|-])*\.(?:jpg|jpeg|gif|png|webp)`)
 	searchEngines = map[string]func(link string) (*discordgo.MessageEmbed, error){
 		"saucenao": func(link string) (*discordgo.MessageEmbed, error) {
 			saucenao, err := services.SearchSauceByURL(link)
@@ -221,9 +221,11 @@ func sauce(s *discordgo.Session, m *discordgo.MessageCreate, args []string) erro
 		if f := ImageURLRegex.FindString(args[0]); f != "" {
 			searchEngine = database.GuildCache[m.GuildID].ReverseSearch
 			url = f
-		} else {
+		} else if _, ok := searchEngines[args[0]]; ok {
 			searchEngine = args[0]
 			url = ImageURLRegex.FindString(args[1])
+		} else {
+			return errors.New("incorrect command usage, please use bt!help sauce for more info")
 		}
 
 		if url == "" {
@@ -235,7 +237,11 @@ func sauce(s *discordgo.Session, m *discordgo.MessageCreate, args []string) erro
 	if err != nil {
 		return err
 	}
-	s.ChannelMessageSendEmbed(m.ChannelID, embed)
+	_, err = s.ChannelMessageSendEmbed(m.ChannelID, embed)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
