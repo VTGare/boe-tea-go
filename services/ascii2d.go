@@ -85,32 +85,19 @@ func resultToSauce(res *resultA2D) []SauceA2D {
 		return sauces
 	}
 
-	for ind, thumbnail := range res.thumnails {
+	for ind, box := range res.detailBoxes {
 		sauce := SauceA2D{}
-		sauce.Thumbnail = "https://ascii2d.net" + thumbnail
-		sauce.From = res.detailBoxes[ind].from
-		if len(res.detailBoxes[ind].names) == 0 {
-			continue
+		sauce.Thumbnail = "https://ascii2d.net" + res.thumnails[ind]
+		sauce.From = box.from
+		if len(box.names) >= 2 && len(box.links) >= 2 {
+			sauce.Name = box.names[0]
+			sauce.URL = box.links[0]
+			sauce.Author = box.names[1]
+			sauce.AuthorURL = box.links[1]
 		}
-		sauce.Name = res.detailBoxes[ind].names[0]
-
-		if len(res.detailBoxes[ind].links) == 0 {
-			continue
-		}
-		sauce.URL = res.detailBoxes[ind].links[0]
-
-		if len(res.detailBoxes[ind].names) != 2 {
-			continue
-		}
-		sauce.Author = res.detailBoxes[ind].names[1]
-
-		if len(res.detailBoxes[ind].links) != 2 {
-			continue
-		}
-		sauce.AuthorURL = res.detailBoxes[ind].links[1]
-
 		sauces = append(sauces, sauce)
 	}
 
+	log.Infoln("ASCII2D sauces", sauces)
 	return sauces
 }

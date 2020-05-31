@@ -14,10 +14,9 @@ require (
 	github.com/golang/groupcache v0.0.0-20200121045136-8c9f03a8e57e // indirect
 	github.com/golang/protobuf v1.4.0 // indirect
 	github.com/klauspost/compress v1.10.4 // indirect
-	github.com/sirupsen/logrus v1.6.0 // indirect
+	github.com/sirupsen/logrus v1.6.0
 	github.com/valyala/fasthttp v1.10.0
 	go.mongodb.org/mongo-driver v1.3.2
 	golang.org/x/net v0.0.0-20200324143707-d3edc9973b7e // indirect
-	github.com/sirupsen/logrus v1.4.2
 	google.golang.org/appengine v1.6.5 // indirect
 )

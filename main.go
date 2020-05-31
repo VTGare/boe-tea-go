@@ -15,6 +15,10 @@ var (
 	dg *discordgo.Session
 )
 
+func init() {
+	log.SetFormatter(&log.TextFormatter{})
+}
+
 func main() {
 	token := os.Getenv("BOT_TOKEN")
 	if token == "" {
