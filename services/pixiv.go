@@ -1,12 +1,12 @@
 package services
 
 import (
-	"log"
 	"os"
 	"strconv"
 	"strings"
 
 	"github.com/everpcpc/pixiv"
+	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -37,7 +37,7 @@ func init() {
 
 	_, err := pixiv.Login(pixivEmail, pixivPassword)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalln(err)
 	}
 	app = pixiv.NewApp()
 }
@@ -53,8 +53,11 @@ func GetPixivPost(id string) (*PixivPost, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	log.Infoln("getting a pixiv post with a following ID: ", id)
 	illust, err := getIllust(pid)
 	if err != nil {
+		log.Warnln(err)
 		return nil, err
 	}
 
@@ -81,7 +84,7 @@ func GetPixivPost(id string) (*PixivPost, error) {
 		tags = append(tags, t.Name)
 	}
 
-	return &PixivPost{
+	post := &PixivPost{
 		Author:         illust.User.Name,
 		Title:          illust.Title,
 		Tags:           tags,
@@ -89,7 +92,10 @@ func GetPixivPost(id string) (*PixivPost, error) {
 		OriginalImages: originalImages,
 		Likes:          illust.TotalBookmarks,
 		NSFW:           nsfw,
-	}, nil
+	}
+
+	log.Infoln("resulting post\n", post)
+	return post, nil
 }
 
 func getIllust(id uint64) (*pixiv.Illust, error) {

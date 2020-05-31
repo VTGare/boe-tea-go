@@ -2,7 +2,6 @@ package utils
 
 import (
 	"fmt"
-	"log"
 	"regexp"
 	"strconv"
 	"strings"
@@ -11,6 +10,7 @@ import (
 	"github.com/VTGare/boe-tea-go/database"
 	"github.com/VTGare/boe-tea-go/services"
 	"github.com/bwmarrin/discordgo"
+	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -39,7 +39,6 @@ func PostPixiv(s *discordgo.Session, m *discordgo.MessageCreate, pixivIDs []stri
 	var ask bool
 	var links bool
 	guild := database.GuildCache[m.GuildID]
-
 	switch guild.Repost {
 	case "ask":
 		ask = true
@@ -102,10 +101,8 @@ func PostPixiv(s *discordgo.Session, m *discordgo.MessageCreate, pixivIDs []stri
 	}
 
 	if flag {
-		log.Println(fmt.Sprintf("Successfully reposting %v images in %v", len(messages), guild.GuildID))
-
+		log.Infoln(fmt.Sprintf("Reposting %v images. Guild: %v. Channel: %v", len(messages), guild.GuildID, m.ChannelID))
 		postIDs := make([]string, 0)
-
 		if len(messages) > guild.Limit {
 			messages[0].Content = fmt.Sprintf("```Album size (%v) is larger than limit set on this server (%v), only first image is reposted.```", len(messages), guild.Limit)
 
@@ -137,6 +134,7 @@ func PostPixiv(s *discordgo.Session, m *discordgo.MessageCreate, pixivIDs []stri
 }
 
 func createPosts(s *discordgo.Session, channelID string, pixivIDs []string, links bool) ([]discordgo.MessageSend, error) {
+	log.Infoln("Creating posts for following IDs: ", pixivIDs)
 	messages := make([]discordgo.MessageSend, 0)
 
 	ch, _ := s.Channel(channelID)
@@ -147,10 +145,15 @@ func createPosts(s *discordgo.Session, channelID string, pixivIDs []string, link
 		}
 
 		if post.NSFW && !ch.NSFW {
-			s.ChannelMessageSend(channelID, "⚠ Can't repost NSFW post in SFW channel.")
+			_, err := s.ChannelMessageSend(channelID, "⚠ Can't repost NSFW post in SFW channel.")
+			if err != nil {
+				log.Warnln(err)
+				return nil, err
+			}
 			continue
 		}
 
+		log.Infoln("Aggregating pixiv posts")
 		for ind, image := range post.LargeImages {
 			title := ""
 			if len(post.LargeImages) == 1 {

@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/gocolly/colly/v2"
+	log "github.com/sirupsen/logrus"
 )
 
 type SauceA2D struct {
@@ -34,6 +35,7 @@ var (
 )
 
 func GetSauceA2D(uri string) ([]SauceA2D, error) {
+	log.Infoln("Getting ASCII2D source")
 	page, err := getASCII2DPage(uri)
 	if err != nil {
 		return nil, err
@@ -73,17 +75,6 @@ func getASCII2DPage(uri string) (*resultA2D, error) {
 	}
 
 	c.Wait()
-
-	/*removed := 0
-	for ind, box := range res.detailBoxes {
-		if len(box.links) == 0 || len(box.names) == 0 {
-			res.detailBoxes = append(res.detailBoxes[:ind], res.detailBoxes[ind+1:]...)
-			removed++
-		}
-	}*/
-
-	res.detailBoxes = res.detailBoxes[1:]
-	res.thumnails = res.thumnails[1:]
 	return res, nil
 }
 
@@ -98,16 +89,22 @@ func resultToSauce(res *resultA2D) []SauceA2D {
 		sauce := SauceA2D{}
 		sauce.Thumbnail = "https://ascii2d.net" + thumbnail
 		sauce.From = res.detailBoxes[ind].from
-		if len(res.detailBoxes[ind].names) > 0 {
-			sauce.Name = res.detailBoxes[ind].names[0]
+		if len(res.detailBoxes[ind].names) == 0 {
+			continue
 		}
-		if len(res.detailBoxes[ind].links) > 0 {
-			sauce.URL = res.detailBoxes[ind].links[0]
+		sauce.Name = res.detailBoxes[ind].names[0]
+
+		if len(res.detailBoxes[ind].links) == 0 {
+			continue
 		}
-		if len(res.detailBoxes[ind].names) >= 2 && len(res.detailBoxes[ind].links) >= 2 {
-			sauce.Author = res.detailBoxes[ind].names[1]
-			sauce.AuthorURL = res.detailBoxes[ind].links[1]
+		sauce.URL = res.detailBoxes[ind].links[0]
+
+		if len(res.detailBoxes[ind].names) < 2 && len(res.detailBoxes[ind].links) < 2 {
+			continue
 		}
+		sauce.Author = res.detailBoxes[ind].names[1]
+		sauce.AuthorURL = res.detailBoxes[ind].links[1]
+
 		sauces = append(sauces, sauce)
 	}
 

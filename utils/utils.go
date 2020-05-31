@@ -3,7 +3,6 @@ package utils
 import (
 	"errors"
 	"fmt"
-	"log"
 	"regexp"
 	"strconv"
 	"strings"
@@ -12,6 +11,7 @@ import (
 	"github.com/VTGare/boe-tea-go/database"
 	"github.com/VTGare/boe-tea-go/services"
 	"github.com/bwmarrin/discordgo"
+	log "github.com/sirupsen/logrus"
 )
 
 //ActionFunc is a function type alias for prompt actions
@@ -137,7 +137,7 @@ func CreateDB(eventGuilds []*discordgo.Guild) error {
 	newGuilds := make([]interface{}, 0)
 	for _, guild := range eventGuilds {
 		if _, ok := database.GuildCache[guild.ID]; !ok {
-			log.Println(guild.ID, "not found in database. Adding...")
+			log.Infoln(guild.ID, "not found in database. Adding...")
 			g := database.DefaultGuildSettings(guild.ID)
 			newGuilds = append(newGuilds, g)
 			database.GuildCache[g.GuildID] = *g
@@ -149,10 +149,10 @@ func CreateDB(eventGuilds []*discordgo.Guild) error {
 		if err != nil {
 			return err
 		}
-		log.Println("Successfully inserted all current guilds.")
+		log.Infoln("Successfully inserted all current guilds.")
 	}
 
-	log.Println(fmt.Sprintf("Connected to %v guilds", len(eventGuilds)))
+	log.Infoln(fmt.Sprintf("Connected to %v guilds", len(eventGuilds)))
 	return nil
 }
 

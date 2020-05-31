@@ -2,13 +2,13 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"strings"
 
 	"github.com/VTGare/boe-tea-go/commands"
 	"github.com/VTGare/boe-tea-go/database"
 	"github.com/VTGare/boe-tea-go/utils"
 	"github.com/bwmarrin/discordgo"
+	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -18,11 +18,11 @@ var (
 
 func onReady(s *discordgo.Session, e *discordgo.Ready) {
 	botMention = "<@!" + e.User.ID + ">"
-	log.Println(e.User.String(), "is ready.")
+	log.Infoln(e.User.String(), "is ready.")
 
 	err := utils.CreateDB(e.Guilds)
 	if err != nil {
-		log.Println("Error adding guilds: ", err)
+		log.Warnln("Error adding guilds: ", err)
 	}
 }
 
@@ -54,7 +54,7 @@ func messageCreated(s *discordgo.Session, m *discordgo.MessageCreate) {
 		}
 
 		if err != nil {
-			log.Println(err)
+			log.Warnln(err)
 			s.ChannelMessageSend(m.ChannelID, "Oops, something went wrong. Error message:\n``"+err.Error()+"``")
 		}
 		return
@@ -108,7 +108,7 @@ func guildCreated(s *discordgo.Session, g *discordgo.GuildCreate) {
 		}
 
 		database.GuildCache[g.ID] = *newGuild
-		log.Println("Joined ", g.Name)
+		log.Infoln("Joined ", g.Name)
 	}
 }
 
@@ -119,5 +119,5 @@ func guildDeleted(s *discordgo.Session, g *discordgo.GuildDelete) {
 	}
 
 	delete(database.GuildCache, g.ID)
-	log.Println("Kicked or banned from ", g.Name)
+	log.Infoln("Kicked or banned from ", g.Name)
 }

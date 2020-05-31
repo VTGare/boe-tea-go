@@ -14,33 +14,29 @@ import (
 	"github.com/VTGare/boe-tea-go/services"
 	"github.com/VTGare/boe-tea-go/utils"
 	"github.com/bwmarrin/discordgo"
+	log "github.com/sirupsen/logrus"
 )
 
 var (
 	//ImageURLRegex is a regex for image URLs
 	ImageURLRegex = regexp.MustCompile(`(?i)(http(s?):)([/|.|\w|\s|-])*\.(?:jpg|jpeg|gif|png|webp)`)
+	ErrNoSauce    = errors.New("source image has not been found")
 	searchEngines = map[string]func(link string) (*discordgo.MessageEmbed, error){
 		"saucenao": func(link string) (*discordgo.MessageEmbed, error) {
 			saucenao, err := services.SearchSauceByURL(link)
 			if err != nil {
 				return nil, err
 			}
-
-			if saucenao.Header.ResultsReturned == 0 {
-				return nil, errors.New("no sauce, just ketchup")
-			}
-
 			results, err := utils.FilterLowSimilarity(saucenao.Results)
 			if err != nil {
 				return nil, err
 			}
-
 			if len(results) == 0 {
-				return nil, errors.New("no sauce, just ketchup")
+				return nil, ErrNoSauce
 			}
-
 			res := results[0]
 			author := utils.FindAuthor(*res)
+			log.Infoln("source found", res)
 
 			embed := &discordgo.MessageEmbed{
 				Title:     "Sauce",
@@ -68,15 +64,13 @@ var (
 			return embed, nil
 		},
 		"ascii2d": func(link string) (*discordgo.MessageEmbed, error) {
-			/*results, err := services.GetSauceA2D(link)
+			results, err := services.GetSauceA2D(link)
 			if err != nil {
 				return nil, err
 			}
 
 			for _, res := range results {
-				if res.Author == "" || res.AuthorURL == "" || res.From == "" || res.Name == "" || res.Thumbnail == "" || res.URL == "" {
-					continue
-				}
+				log.Infoln("source found", res)
 				embed := &discordgo.MessageEmbed{
 					Title: fmt.Sprintf("%v by %v on %v", res.Name, res.Author, res.From),
 					URL:   res.URL,
@@ -105,9 +99,9 @@ var (
 					},
 				}
 				return embed, nil
-			}*/
+			}
 
-			return nil, errors.New("ascii2d is disabled because of breaking server-side bug. please use saucenao")
+			return nil, ErrNoSauce
 		},
 	}
 )
