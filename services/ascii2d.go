@@ -99,10 +99,14 @@ func resultToSauce(res *resultA2D) []SauceA2D {
 		}
 		sauce.URL = res.detailBoxes[ind].links[0]
 
-		if len(res.detailBoxes[ind].names) < 2 && len(res.detailBoxes[ind].links) < 2 {
+		if len(res.detailBoxes[ind].names) != 2 {
 			continue
 		}
 		sauce.Author = res.detailBoxes[ind].names[1]
+
+		if len(res.detailBoxes[ind].links) != 2 {
+			continue
+		}
 		sauce.AuthorURL = res.detailBoxes[ind].links[1]
 
 		sauces = append(sauces, sauce)

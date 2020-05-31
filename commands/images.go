@@ -70,6 +70,10 @@ var (
 			}
 
 			for _, res := range results {
+				if res.Author == "" || res.AuthorURL == "" || res.From == "" || res.Name == "" || res.Thumbnail == "" || res.URL == "" {
+					continue
+				}
+
 				log.Infoln("source found", res)
 				embed := &discordgo.MessageEmbed{
 					Title: fmt.Sprintf("%v by %v on %v", res.Name, res.Author, res.From),
