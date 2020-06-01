@@ -69,7 +69,7 @@ func PostPixiv(s *discordgo.Session, m *discordgo.MessageCreate, pixivIDs []stri
 		links = prompt()
 	}
 
-	messages, err := createPosts(s, m.ChannelID, pixivIDs, links)
+	messages, err := createPosts(s, m, pixivIDs, opts[0].Indexes, links)
 	if err != nil {
 		return err
 	}
@@ -112,11 +112,7 @@ func PostPixiv(s *discordgo.Session, m *discordgo.MessageCreate, pixivIDs []stri
 			return nil
 		}
 
-		for ind, message := range messages {
-			if _, ok := opts[0].Indexes[ind+1]; ok {
-				continue
-			}
-
+		for _, message := range messages {
 			post, _ := s.ChannelMessageSendComplex(m.ChannelID, &message)
 			postIDs = append(postIDs, post.ID)
 			PostCache[post.ID] = m.Author.ID
@@ -133,11 +129,11 @@ func PostPixiv(s *discordgo.Session, m *discordgo.MessageCreate, pixivIDs []stri
 	return nil
 }
 
-func createPosts(s *discordgo.Session, channelID string, pixivIDs []string, links bool) ([]discordgo.MessageSend, error) {
+func createPosts(s *discordgo.Session, m *discordgo.MessageCreate, pixivIDs []string, excluded map[int]bool, links bool) ([]discordgo.MessageSend, error) {
 	log.Infoln("Creating posts for following IDs: ", pixivIDs)
 	messages := make([]discordgo.MessageSend, 0)
 
-	ch, _ := s.Channel(channelID)
+	ch, _ := s.Channel(m.ChannelID)
 	for _, link := range pixivIDs {
 		post, err := services.GetPixivPost(link)
 		if err != nil {
@@ -145,16 +141,30 @@ func createPosts(s *discordgo.Session, channelID string, pixivIDs []string, link
 		}
 
 		if post.NSFW && !ch.NSFW {
-			_, err := s.ChannelMessageSend(channelID, "⚠ Can't repost NSFW post in SFW channel.")
+			prompt := CreatePrompt(s, m, &PromptOptions{
+				Actions: map[string]func() bool{
+					"👌": func() bool {
+						return true
+					},
+				},
+				Message: "You're trying to repost a post with an R-18 tag, are you sure about that?",
+				Timeout: 10 * time.Second,
+			})
 			if err != nil {
 				log.Warnln(err)
 				return nil, err
 			}
-			continue
+
+			if prompt == nil {
+				continue
+			}
 		}
 
-		log.Infoln("Aggregating pixiv posts")
 		for ind, image := range post.LargeImages {
+			if _, ok := excluded[ind+1]; ok {
+				continue
+			}
+
 			title := ""
 			if len(post.LargeImages) == 1 {
 				title = fmt.Sprintf("%v by %v", post.Title, post.Author)

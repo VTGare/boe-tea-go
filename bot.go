@@ -32,6 +32,14 @@ func messageCreated(s *discordgo.Session, m *discordgo.MessageCreate) {
 	}
 	isGuild := m.GuildID != ""
 
+	where := func() string {
+		if isGuild {
+			g, _ := s.Guild(m.GuildID)
+			return g.Name
+		}
+		return "DMs"
+	}
+
 	var content string
 	if strings.HasPrefix(m.Content, botMention) {
 		content = strings.TrimPrefix(m.Content, botMention)
@@ -49,6 +57,8 @@ func messageCreated(s *discordgo.Session, m *discordgo.MessageCreate) {
 				for _, match := range matches {
 					ids = append(ids, match[1])
 				}
+
+				log.Infof("Found a pixiv link on %v (%v), channel %v", where(), m.GuildID, m.ChannelID)
 				err = utils.PostPixiv(s, m, ids)
 			}
 		}
@@ -71,15 +81,7 @@ func messageCreated(s *discordgo.Session, m *discordgo.MessageCreate) {
 			return
 		}
 		go func() {
-			in := ""
-			if isGuild {
-				g, _ := s.Guild(m.GuildID)
-				in = g.Name
-			} else {
-				in = "DMs"
-			}
-
-			log.Println(fmt.Sprintf("Executing %v, requested by %v in %v", command.Name, m.Author.String(), in))
+			log.Println(fmt.Sprintf("Executing %v, requested by %v in %v", command.Name, m.Author.String(), where()))
 			err := command.Exec(s, m, fields[1:])
 			if err != nil {
 				log.Println(err)
