@@ -22,91 +22,8 @@ var (
 	ImageURLRegex = regexp.MustCompile(`(?i)(http(s?):)([/|.|\w|\s|-])*\.(?:jpg|jpeg|gif|png|webp)`)
 	ErrNoSauce    = errors.New("source image has not been found")
 	searchEngines = map[string]func(link string) (*discordgo.MessageEmbed, error){
-		"saucenao": func(link string) (*discordgo.MessageEmbed, error) {
-			saucenao, err := services.SearchSauceByURL(link)
-			if err != nil {
-				return nil, err
-			}
-			results, err := utils.FilterLowSimilarity(saucenao.Results)
-			if err != nil {
-				return nil, err
-			}
-			if len(results) == 0 {
-				return nil, ErrNoSauce
-			}
-			res := results[0]
-			author := utils.FindAuthor(*res)
-			log.Infoln("source found", res)
-
-			embed := &discordgo.MessageEmbed{
-				Title:     "Sauce",
-				URL:       res.Data.URLs[0],
-				Timestamp: utils.EmbedTimestamp(),
-				Color:     utils.EmbedColor,
-				Thumbnail: &discordgo.MessageEmbedThumbnail{
-					URL: res.Header.Thumbnail,
-				},
-				Fields: []*discordgo.MessageEmbedField{
-					{
-						Name:  "URL",
-						Value: res.Data.URLs[0],
-					},
-					{
-						Name:  "Similarity",
-						Value: res.Header.Similarity,
-					},
-					{
-						Name:  "Author",
-						Value: author,
-					},
-				},
-			}
-			return embed, nil
-		},
-		"ascii2d": func(link string) (*discordgo.MessageEmbed, error) {
-			results, err := services.GetSauceA2D(link)
-			if err != nil {
-				return nil, err
-			}
-
-			for _, res := range results {
-				if res.Author == "" || res.AuthorURL == "" || res.From == "" || res.Name == "" || res.Thumbnail == "" || res.URL == "" {
-					continue
-				}
-
-				log.Infoln("source found", res)
-				embed := &discordgo.MessageEmbed{
-					Title: fmt.Sprintf("%v by %v on %v", res.Name, res.Author, res.From),
-					URL:   res.URL,
-					Thumbnail: &discordgo.MessageEmbedThumbnail{
-						URL: res.Thumbnail,
-					},
-					Color:     utils.EmbedColor,
-					Timestamp: utils.EmbedTimestamp(),
-					Fields: []*discordgo.MessageEmbedField{
-						{
-							Name:  "Name",
-							Value: res.Name,
-						},
-						{
-							Name:  "URL",
-							Value: res.URL,
-						},
-						{
-							Name:  "Author",
-							Value: res.Author,
-						},
-						{
-							Name:  "Author URL",
-							Value: res.AuthorURL,
-						},
-					},
-				}
-				return embed, nil
-			}
-
-			return nil, ErrNoSauce
-		},
+		"saucenao": saucenao,
+		"ascii2d":  ascii2d,
 	}
 )
 
@@ -244,6 +161,91 @@ func sauce(s *discordgo.Session, m *discordgo.MessageCreate, args []string) erro
 	}
 
 	return nil
+}
+
+func ascii2d(link string) (*discordgo.MessageEmbed, error) {
+	results, err := services.GetSauceA2D(link)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, res := range results {
+		if res.Author == "" || res.AuthorURL == "" || res.From == "" || res.Name == "" || res.Thumbnail == "" || res.URL == "" {
+			continue
+		}
+
+		log.Infoln("source found", res)
+		embed := &discordgo.MessageEmbed{
+			Title: fmt.Sprintf("%v by %v on %v", res.Name, res.Author, res.From),
+			URL:   res.URL,
+			Thumbnail: &discordgo.MessageEmbedThumbnail{
+				URL: res.Thumbnail,
+			},
+			Color:     utils.EmbedColor,
+			Timestamp: utils.EmbedTimestamp(),
+			Fields: []*discordgo.MessageEmbedField{
+				{
+					Name:  "Name",
+					Value: res.Name,
+				},
+				{
+					Name:  "URL",
+					Value: res.URL,
+				},
+				{
+					Name:  "Author",
+					Value: res.Author,
+				},
+				{
+					Name:  "Author URL",
+					Value: res.AuthorURL,
+				},
+			},
+		}
+		return embed, nil
+	}
+	return nil, ErrNoSauce
+}
+
+func saucenao(link string) (*discordgo.MessageEmbed, error) {
+	saucenao, err := services.SearchSauceByURL(link)
+	if err != nil {
+		return nil, err
+	}
+	results, err := utils.FilterLowSimilarity(saucenao.Results)
+	if err != nil {
+		return nil, err
+	}
+	if len(results) == 0 {
+		return nil, ErrNoSauce
+	}
+	res := results[0]
+	author := utils.FindAuthor(*res)
+	log.Infoln("source found", &res)
+	embed := &discordgo.MessageEmbed{
+		Title:     "Sauce",
+		URL:       res.Data.URLs[0],
+		Timestamp: utils.EmbedTimestamp(),
+		Color:     utils.EmbedColor,
+		Thumbnail: &discordgo.MessageEmbedThumbnail{
+			URL: res.Header.Thumbnail,
+		},
+		Fields: []*discordgo.MessageEmbedField{
+			{
+				Name:  "URL",
+				Value: res.Data.URLs[0],
+			},
+			{
+				Name:  "Similarity",
+				Value: res.Header.Similarity,
+			},
+			{
+				Name:  "Author",
+				Value: author,
+			},
+		},
+	}
+	return embed, nil
 }
 
 func findRecentImage(messages []*discordgo.Message) string {

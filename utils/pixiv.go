@@ -36,50 +36,18 @@ func PostPixiv(s *discordgo.Session, m *discordgo.MessageCreate, pixivIDs []stri
 		}
 	}
 
-	var ask bool
-	var links bool
 	guild := database.GuildCache[m.GuildID]
-	switch guild.Repost {
-	case "ask":
-		ask = true
-	case "links":
-		ask = false
-		links = true
-	case "embeds":
-		ask = false
-		links = false
-	}
-
-	if ask {
-		prompt := CreatePrompt(s, m, &PromptOptions{
-			Message: "Send images as links (✅) or embeds (❎)?",
-			Actions: map[string]ActionFunc{
-				"✅": func() bool {
-					return true
-				},
-				"❎": func() bool {
-					return false
-				},
-			},
-			Timeout: time.Second * 15,
-		})
-		if prompt == nil {
-			return nil
-		}
-		links = prompt()
-	}
-
-	messages, err := createPosts(s, m, pixivIDs, opts[0].Indexes, links)
+	posts, err := createPosts(s, m, pixivIDs, opts[0].Indexes)
 	if err != nil {
 		return err
 	}
 
 	flag := true
 	if opts[0].ProcPrompt {
-		if len(messages) >= guild.LargeSet {
+		if len(posts) >= guild.LargeSet {
 			message := ""
-			if len(messages) >= 3 {
-				message = fmt.Sprintf("Large set of images (%v), do you want me to send each image individually?", len(messages))
+			if len(posts) >= 3 {
+				message = fmt.Sprintf("Large set of images (%v), do you want me to send each image individually?", len(posts))
 			} else {
 				message = "Do you want me to send each image individually?"
 			}
@@ -101,18 +69,18 @@ func PostPixiv(s *discordgo.Session, m *discordgo.MessageCreate, pixivIDs []stri
 	}
 
 	if flag {
-		log.Infoln(fmt.Sprintf("Reposting %v images. Guild: %v. Channel: %v", len(messages), guild.GuildID, m.ChannelID))
+		log.Infoln(fmt.Sprintf("Reposting %v images. Guild: %v. Channel: %v", len(posts), guild.GuildID, m.ChannelID))
 		postIDs := make([]string, 0)
-		if len(messages) > guild.Limit {
-			messages[0].Content = fmt.Sprintf("```Album size (%v) is larger than limit set on this server (%v), only first image is reposted.```", len(messages), guild.Limit)
+		if len(posts) > guild.Limit {
+			posts[0].Content = fmt.Sprintf("```Album size (%v) is larger than limit set on this server (%v), only first image is reposted.```", len(posts), guild.Limit)
 
-			post, _ := s.ChannelMessageSendComplex(m.ChannelID, &messages[0])
+			post, _ := s.ChannelMessageSendComplex(m.ChannelID, &posts[0])
 			postIDs = append(postIDs, post.ID)
 			PostCache[post.ID] = m.Author.ID
 			return nil
 		}
 
-		for _, message := range messages {
+		for _, message := range posts {
 			post, _ := s.ChannelMessageSendComplex(m.ChannelID, &message)
 			postIDs = append(postIDs, post.ID)
 			PostCache[post.ID] = m.Author.ID
@@ -129,7 +97,7 @@ func PostPixiv(s *discordgo.Session, m *discordgo.MessageCreate, pixivIDs []stri
 	return nil
 }
 
-func createPosts(s *discordgo.Session, m *discordgo.MessageCreate, pixivIDs []string, excluded map[int]bool, links bool) ([]discordgo.MessageSend, error) {
+func createPosts(s *discordgo.Session, m *discordgo.MessageCreate, pixivIDs []string, excluded map[int]bool) ([]discordgo.MessageSend, error) {
 	log.Infoln("Creating posts for following IDs: ", pixivIDs)
 	messages := make([]discordgo.MessageSend, 0)
 
@@ -139,7 +107,6 @@ func createPosts(s *discordgo.Session, m *discordgo.MessageCreate, pixivIDs []st
 		if err != nil {
 			return nil, err
 		}
-
 		if post.NSFW && !ch.NSFW {
 			prompt := CreatePrompt(s, m, &PromptOptions{
 				Actions: map[string]func() bool{
@@ -154,7 +121,6 @@ func createPosts(s *discordgo.Session, m *discordgo.MessageCreate, pixivIDs []st
 				log.Warnln(err)
 				return nil, err
 			}
-
 			if prompt == nil {
 				continue
 			}
@@ -172,40 +138,33 @@ func createPosts(s *discordgo.Session, m *discordgo.MessageCreate, pixivIDs []st
 				title = fmt.Sprintf("%v by %v. Page %v/%v", post.Title, post.Author, ind+1, len(post.LargeImages))
 			}
 
-			if links {
-				title += fmt.Sprintf("\n%v\n♥ %v", image, post.Likes)
-				messages = append(messages, discordgo.MessageSend{
-					Content: title,
-				})
-			} else {
-				embedWarning := fmt.Sprintf("Please follow the link in the title to download high-res image")
-				messages = append(messages, discordgo.MessageSend{
-					Embed: &discordgo.MessageEmbed{
-						Title:     title,
-						URL:       post.OriginalImages[ind],
-						Color:     EmbedColor,
-						Timestamp: time.Now().Format(time.RFC3339),
-						Fields: []*discordgo.MessageEmbedField{
-							{
-								Name:   "Likes",
-								Value:  strconv.Itoa(post.Likes),
-								Inline: true,
-							},
-							{
-								Name:   "Tags",
-								Value:  strings.Join(post.Tags, " • "),
-								Inline: true,
-							},
+			embedWarning := fmt.Sprintf("Please follow the link in the title to download high-res image")
+			messages = append(messages, discordgo.MessageSend{
+				Embed: &discordgo.MessageEmbed{
+					Title:     title,
+					URL:       post.OriginalImages[ind],
+					Color:     EmbedColor,
+					Timestamp: time.Now().Format(time.RFC3339),
+					Fields: []*discordgo.MessageEmbedField{
+						{
+							Name:   "Likes",
+							Value:  strconv.Itoa(post.Likes),
+							Inline: true,
 						},
-						Image: &discordgo.MessageEmbedImage{
-							URL: image,
-						},
-						Footer: &discordgo.MessageEmbedFooter{
-							Text: embedWarning,
+						{
+							Name:   "Tags",
+							Value:  strings.Join(post.Tags, " • "),
+							Inline: true,
 						},
 					},
-				})
-			}
+					Image: &discordgo.MessageEmbedImage{
+						URL: image,
+					},
+					Footer: &discordgo.MessageEmbedFooter{
+						Text: embedWarning,
+					},
+				},
+			})
 		}
 	}
 

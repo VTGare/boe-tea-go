@@ -151,7 +151,7 @@ func showGuildSettings(s *discordgo.Session, m *discordgo.MessageCreate) {
 			},
 			{
 				Name:  "Pixiv settings",
-				Value: fmt.Sprintf("**Large set**: %v\n**Limit**: %v\n**Repost**: %v\n**Prompt emoji**: %v", settings.LargeSet, settings.Limit, settings.Repost, emoji),
+				Value: fmt.Sprintf("**Large set**: %v\n**Limit**: %v\n**Prompt emoji**: %v", settings.LargeSet, settings.Limit, emoji),
 			},
 		},
 		Thumbnail: &discordgo.MessageEmbedThumbnail{
