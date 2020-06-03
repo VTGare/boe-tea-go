@@ -61,6 +61,7 @@ func getASCII2DPage(uri string) (*resultA2D, error) {
 		b.names = e.ChildTexts("a")
 		b.links = e.ChildAttrs("a", "href")
 
+		log.Infoln("Detail box", b)
 		res.detailBoxes = append(res.detailBoxes, b)
 	})
 
