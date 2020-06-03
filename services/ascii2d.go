@@ -38,6 +38,7 @@ func GetSauceA2D(uri string) ([]SauceA2D, error) {
 	log.Infoln("Getting ASCII2D source")
 	page, err := getASCII2DPage(uri)
 	if err != nil {
+		log.Warnln(err)
 		return nil, err
 	}
 
@@ -46,6 +47,8 @@ func GetSauceA2D(uri string) ([]SauceA2D, error) {
 
 func getASCII2DPage(uri string) (*resultA2D, error) {
 	c := colly.NewCollector()
+	c.Async = true
+
 	res := &resultA2D{
 		thumnails:   make([]string, 0),
 		detailBoxes: make([]*detailBox, 0),
@@ -65,6 +68,7 @@ func getASCII2DPage(uri string) (*resultA2D, error) {
 		res.detailBoxes = append(res.detailBoxes, b)
 	})
 
+	log.Infoln("ASCII2D POST request. URI = ", url.QueryEscape(uri))
 	err := c.Request("POST",
 		baseASCII2D, strings.NewReader("uri="+url.QueryEscape(uri)),
 		nil,
