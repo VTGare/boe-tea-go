@@ -87,7 +87,7 @@ func PostPixiv(s *discordgo.Session, m *discordgo.MessageCreate, pixivIDs []stri
 		}
 
 		go func() {
-			time.Sleep(30 * time.Second)
+			time.Sleep(150 * time.Second)
 
 			for _, id := range postIDs {
 				delete(PostCache, id)
