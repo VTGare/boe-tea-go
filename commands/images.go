@@ -124,20 +124,27 @@ func sauce(s *discordgo.Session, m *discordgo.MessageCreate, args []string) erro
 		args = append(args, recent)
 	}
 
+	findEngine := func() string {
+		if m.GuildID != "" {
+			return database.GuildCache[m.GuildID].ReverseSearch
+		}
+		return "saucenao"
+	}
+
 	url := ""
 	searchEngine := ""
 
 	if len(args) == 0 {
 		return utils.ErrNotEnoughArguments
 	} else if len(args) == 1 {
-		searchEngine = database.GuildCache[m.GuildID].ReverseSearch
+		searchEngine = findEngine()
 		url = ImageURLRegex.FindString(args[0])
 		if url == "" {
 			return errors.New("received a non-image url")
 		}
 	} else if len(args) >= 2 {
 		if f := ImageURLRegex.FindString(args[0]); f != "" {
-			searchEngine = database.GuildCache[m.GuildID].ReverseSearch
+			searchEngine = findEngine()
 			url = f
 		} else if _, ok := searchEngines[args[0]]; ok {
 			searchEngine = args[0]

@@ -85,7 +85,7 @@ func messageCreated(s *discordgo.Session, m *discordgo.MessageCreate) {
 			err := command.Exec(s, m, fields[1:])
 			if err != nil {
 				log.Println(err)
-				s.ChannelMessageSend(m.ChannelID, "Oops, something went wrong. Error message:\n``"+err.Error()+"``")
+				s.ChannelMessageSend(m.ChannelID, "Oops, something went wrong. Error message:\n```"+err.Error()+"```")
 			}
 		}()
 	}
