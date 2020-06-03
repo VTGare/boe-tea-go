@@ -54,6 +54,10 @@ func getASCII2DPage(uri string) (*resultA2D, error) {
 		detailBoxes: make([]*detailBox, 0),
 	}
 
+	c.OnResponse(func(f *colly.Response) {
+		log.Infof("ascii2d response. Status code: %v. Headers: %v. Body: %v", f.StatusCode, f.Headers, f.Body)
+	})
+
 	c.OnHTML(".image-box", func(e *colly.HTMLElement) {
 		res.thumnails = append(res.thumnails, e.ChildAttr("img", "src"))
 	})
