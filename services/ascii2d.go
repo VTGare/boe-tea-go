@@ -55,7 +55,7 @@ func getASCII2DPage(uri string) (*resultA2D, error) {
 	}
 
 	c.OnResponse(func(f *colly.Response) {
-		log.Infof("ascii2d response. Status code: %v. Headers: %v. Body: %v", f.StatusCode, f.Headers, f.Body)
+		log.Infof("ascii2d response. Status code: %v. Headers: %v. Proxy URL: %v", f.StatusCode, f.Headers, f.Request.ProxyURL)
 	})
 
 	c.OnHTML(".image-box", func(e *colly.HTMLElement) {
