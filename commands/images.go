@@ -158,6 +158,7 @@ func sauce(s *discordgo.Session, m *discordgo.MessageCreate, args []string) erro
 		}
 	}
 
+	log.Infoln("Searching sauce for", url, "on", searchEngine)
 	embed, err := searchEngines[searchEngine](url)
 	if err != nil {
 		return err
@@ -228,7 +229,7 @@ func saucenao(link string) (*discordgo.MessageEmbed, error) {
 	}
 	res := results[0]
 	author := utils.FindAuthor(*res)
-	log.Infoln("source found", &res)
+	log.Infoln("source found", res)
 	embed := &discordgo.MessageEmbed{
 		Title:     "Sauce",
 		URL:       res.Data.URLs[0],

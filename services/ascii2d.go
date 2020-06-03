@@ -47,7 +47,7 @@ func GetSauceA2D(uri string) ([]SauceA2D, error) {
 
 func getASCII2DPage(uri string) (*resultA2D, error) {
 	c := colly.NewCollector()
-	c.Async = true
+	c.Async = false
 
 	res := &resultA2D{
 		thumnails:   make([]string, 0),
@@ -79,7 +79,6 @@ func getASCII2DPage(uri string) (*resultA2D, error) {
 		return nil, err
 	}
 
-	c.Wait()
 	log.Infoln("ASCII2D result: ", res)
 	return res, nil
 }

@@ -81,7 +81,7 @@ func messageCreated(s *discordgo.Session, m *discordgo.MessageCreate) {
 			return
 		}
 		go func() {
-			log.Println(fmt.Sprintf("Executing %v, requested by %v in %v", command.Name, m.Author.String(), where()))
+			log.Infof("Executing %v, requested by %v in %v", m.Content, m.Author.String(), where())
 			err := command.Exec(s, m, fields[1:])
 			if err != nil {
 				log.Println(err)
