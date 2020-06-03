@@ -54,6 +54,14 @@ func getASCII2DPage(uri string) (*resultA2D, error) {
 		detailBoxes: make([]*detailBox, 0),
 	}
 
+	c.OnError(func(r *colly.Response, err error) {
+		log.Warnln(err)
+	})
+
+	c.OnScraped(func(r *colly.Response) {
+		log.Infof("Request URL: %v. Response headers: %v. Request depth: %v", r.Request.URL, r.Headers, r.Request.Depth)
+	})
+
 	c.OnRequest(func(r *colly.Request) {
 		log.Infof("URL: %v, depth: %v", r.URL, r.Depth)
 	})
