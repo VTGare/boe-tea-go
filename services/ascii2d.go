@@ -54,8 +54,12 @@ func getASCII2DPage(uri string) (*resultA2D, error) {
 		detailBoxes: make([]*detailBox, 0),
 	}
 
+	c.OnRequest(func(r *colly.Request) {
+		log.Infof("URL: %v, depth: %v", r.URL, r.Depth)
+	})
+
 	c.OnResponse(func(f *colly.Response) {
-		log.Infof("ascii2d response. Status code: %v. Headers: %v. Proxy URL: %v", f.StatusCode, f.Headers, f.Request.ProxyURL)
+		log.Infof("ascii2d response. Status code: %v. Headers: %v. Proxy URL: %v", f.StatusCode, f.Headers)
 	})
 
 	c.OnHTML(".image-box", func(e *colly.HTMLElement) {
