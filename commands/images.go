@@ -227,11 +227,31 @@ func saucenao(link string) (*discordgo.MessageEmbed, error) {
 	if len(results) == 0 {
 		return nil, ErrNoSauce
 	}
-	res := results[0]
+
+	findSauce := func() *services.Sauce {
+		for _, res := range results {
+			if len(res.Data.URLs) == 0 {
+				continue
+			}
+
+			if res.Data.Title == "" {
+				res.Data.Title = "Sauce"
+			}
+
+			return res
+		}
+		return nil
+	}
+
+	res := findSauce()
+	if res == nil {
+		return nil, ErrNoSauce
+	}
+
 	author := utils.FindAuthor(*res)
-	log.Infoln("source found", res)
+	log.Infoln("Source found. URL: %v. Title: %v", res.Data.URLs[0], res.Data.Title)
 	embed := &discordgo.MessageEmbed{
-		Title:     "Sauce",
+		Title:     res.Data.Title,
 		URL:       res.Data.URLs[0],
 		Timestamp: utils.EmbedTimestamp(),
 		Color:     utils.EmbedColor,
