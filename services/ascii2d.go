@@ -76,7 +76,7 @@ func getASCII2DPage(uri string) (*resultA2D, error) {
 	}
 
 	c.Wait()
-	log.Infoln("ASCII2D result: ", &res)
+	log.Infoln("ASCII2D result: ", res)
 	return res, nil
 }
 
