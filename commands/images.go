@@ -488,6 +488,20 @@ func nhentai(s *discordgo.Session, m *discordgo.MessageCreate, args []string) er
 		return err
 	}
 
+	artists := ""
+	tags := ""
+	if str := strings.Join(book.Artists, ", "); str != "" {
+		artists = str
+	} else {
+		artists = "-"
+	}
+
+	if str := strings.Join(book.Tags, ", "); str != "" {
+		tags = str
+	} else {
+		tags = "-"
+	}
+
 	embed := &discordgo.MessageEmbed{
 		URL:   book.URL,
 		Title: book.Titles.Pretty,
@@ -497,10 +511,10 @@ func nhentai(s *discordgo.Session, m *discordgo.MessageCreate, args []string) er
 		Fields: []*discordgo.MessageEmbedField{
 			{
 				Name:  "Artists",
-				Value: strings.Join(book.Artists, ", "),
+				Value: artists,
 			}, {
 				Name:  "Tags",
-				Value: strings.Join(book.Tags, ", "),
+				Value: tags,
 			}, {
 				Name:  "Favourites",
 				Value: fmt.Sprintf("%v", book.Favourites),

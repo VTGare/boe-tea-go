@@ -63,7 +63,7 @@ func sortTags(book *rawNHBook) (artists []string, tags []string) {
 	tags = make([]string, 0)
 
 	for _, tag := range book.Tags {
-		if tag.Type == "artist" {
+		if tag.Type == "artist" || tag.Type == "group" {
 			artists = append(artists, tag.Name)
 		} else {
 			tags = append(tags, tag.Name)
