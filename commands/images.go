@@ -108,6 +108,24 @@ func init() {
 			},
 		},
 	}
+	Commands["nhentai"] = Command{
+		Name:            "nhentai",
+		Description:     "Gives detailed information about an nhentai book",
+		GuildOnly:       false,
+		Exec:            nhentai,
+		Help:            true,
+		AdvancedCommand: true,
+		ExtendedHelp: []*discordgo.MessageEmbedField{
+			{
+				Name:  "Usage",
+				Value: "bt!nhentai <magic number>",
+			},
+			{
+				Name:  "magic number",
+				Value: "Typically, but not always, 6-digit number that only weebs understand.",
+			},
+		},
+	}
 }
 
 func sauce(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
@@ -453,5 +471,52 @@ func deepfry(s *discordgo.Session, m *discordgo.MessageCreate, args []string) er
 	}
 
 	s.ChannelFileSend(m.ChannelID, "deepfried.jpg", deepfried)
+	return nil
+}
+
+func nhentai(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
+	if len(args) == 0 {
+		return utils.ErrNotEnoughArguments
+	}
+
+	if _, err := strconv.Atoi(args[0]); err != nil {
+		return errors.New("invalid nhentai ID")
+	}
+
+	book, err := services.GetNHentai(args[0])
+	if err != nil {
+		return err
+	}
+
+	embed := &discordgo.MessageEmbed{
+		URL:   book.URL,
+		Title: book.Titles.Pretty,
+		Thumbnail: &discordgo.MessageEmbedThumbnail{
+			URL: book.Cover,
+		},
+		Fields: []*discordgo.MessageEmbedField{
+			{
+				Name:  "Artists",
+				Value: strings.Join(book.Artists, ", "),
+			}, {
+				Name:  "Tags",
+				Value: strings.Join(book.Tags, ", "),
+			}, {
+				Name:  "Favourites",
+				Value: fmt.Sprintf("%v", book.Favourites),
+			}, {
+				Name:  "Pages",
+				Value: fmt.Sprintf("%v", book.Pages),
+			},
+		},
+		Color:     utils.EmbedColor,
+		Timestamp: utils.EmbedTimestamp(),
+	}
+
+	_, err = s.ChannelMessageSendEmbed(m.ChannelID, embed)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
