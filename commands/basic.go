@@ -20,7 +20,7 @@ func init() {
 	}
 	Commands["help"] = Command{
 		Name:            "help",
-		Description:     "Sends Boe Tea's command documentation",
+		Description:     "Sends this message. ``bt!help <command name>`` for extended help on other commands.",
 		GuildOnly:       false,
 		Exec:            help,
 		Help:            true,
@@ -39,7 +39,7 @@ func ping(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error
 
 func help(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
 	embed := &discordgo.MessageEmbed{
-		Description: "Sends this message. ``bt!help <command name>`` for extended help on other commands.",
+		Description: "Use ``bt!help <command name> for extended help on specific commands.",
 		Color:       utils.EmbedColor,
 		Timestamp:   utils.EmbedTimestamp(),
 		Thumbnail: &discordgo.MessageEmbedThumbnail{
