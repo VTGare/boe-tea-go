@@ -38,7 +38,7 @@ func init() {
 				Value: "Amount of pictures considered a large set, which invokes a prompt. Must be an ***integer***. Set to 0 to ask every time",
 			},
 			{
-				Name:  "Limit",
+				Name:  "limit",
 				Value: "Image set size hard limit. If you attempt to repost a post or bulk post more than the limit it'll fail",
 			},
 			{
@@ -66,10 +66,17 @@ func set(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error 
 	case 0:
 		showGuildSettings(s, m)
 	case 2:
+		isAdmin, err := utils.MemberHasPermission(s, m.GuildID, m.Author.ID, 8)
+		if err != nil {
+			return err
+		}
+		if !isAdmin {
+			return utils.ErrNoPermission
+		}
+
 		setting := args[0]
 		newSetting := strings.ToLower(args[1])
 
-		var err error
 		var passedSetting interface{}
 		switch setting {
 		case "pixiv":
@@ -120,7 +127,7 @@ func set(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error 
 		}
 		s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Successfully changed ``%v`` to ``%v``", setting, newSetting))
 	default:
-		return errors.New("incorrect command usage. Please use help command for more information")
+		return errors.New("incorrect command usage. Please use bt!help set command for more information")
 	}
 
 	return nil

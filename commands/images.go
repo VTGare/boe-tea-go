@@ -30,7 +30,7 @@ var (
 func init() {
 	Commands["sauce"] = Command{
 		Name:            "sauce",
-		Description:     "Finds sauce of an anime picture on SauceNAO or ascii2d.",
+		Description:     "Looks for source of an anime picture.",
 		GuildOnly:       false,
 		Exec:            sauce,
 		Help:            true,
@@ -52,7 +52,7 @@ func init() {
 	}
 	Commands["pixiv"] = Command{
 		Name:            "pixiv",
-		Description:     "Reposts a single Pixiv post",
+		Description:     "Advanced pixiv command that lets you exclude images from an album",
 		GuildOnly:       false,
 		Exec:            pixiv,
 		Help:            true,

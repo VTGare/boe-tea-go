@@ -39,7 +39,7 @@ func ping(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error
 
 func help(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
 	embed := &discordgo.MessageEmbed{
-		Description: "Boe Tea's command documentation",
+		Description: "Sends this message. ``bt!help <command> for extended help on other commands.",
 		Color:       utils.EmbedColor,
 		Timestamp:   utils.EmbedTimestamp(),
 		Thumbnail: &discordgo.MessageEmbedThumbnail{
