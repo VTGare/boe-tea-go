@@ -96,11 +96,7 @@ func set(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error 
 		case "limit":
 			passedSetting, err = strconv.Atoi(newSetting)
 		case "repost":
-			if newSetting != "ask" && newSetting != "embeds" && newSetting != "links" {
-				return errors.New("unknown option. repost_as only accepts ``ask``, ``embeds``, and ``links`` options")
-			}
-
-			passedSetting = newSetting
+			s.ChannelMessageSend(m.ChannelID, "For now ``repost`` setting is deprecated and will be replaced in the future.")
 		case "reversesearch":
 			if newSetting != "saucenao" && newSetting != "ascii2d" {
 				return errors.New("unknown option. repost_as only accepts ``ascii2d`` and ``saucenao`` options")

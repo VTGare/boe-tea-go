@@ -4,6 +4,14 @@ import (
 	"github.com/valyala/fasthttp"
 )
 
+/*
+TODO:
+- separate services in different packages
+- add iqdb
+- add repost checker
+-
+*/
+
 func fasthttpGet(uri string) ([]byte, error) {
 	req := fasthttp.AcquireRequest()
 	resp := fasthttp.AcquireResponse()
