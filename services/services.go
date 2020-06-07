@@ -9,7 +9,8 @@ TODO:
 - separate services in different packages
 - add iqdb
 - add repost checker
--
+- add feedback command
+- owner only stats command
 */
 
 func fasthttpGet(uri string) ([]byte, error) {

@@ -46,8 +46,8 @@ func init() {
 				Value: "Pixiv reposting switch, accepts ***f or false (case-insensitive)*** to disable and ***t or true*** to enable.",
 			},
 			{
-				Name:  "repost",
-				Value: "Default reposting behaviour. Accepts ***links**, **embeds***, and ***ask*** options.",
+				Name:  "~~repost~~",
+				Value: "Deprecated, being replaced soon tm.",
 			},
 			{
 				Name:  "reversesearch",
