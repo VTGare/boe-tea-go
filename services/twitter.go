@@ -2,7 +2,6 @@ package services
 
 import (
 	"errors"
-	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -13,6 +12,7 @@ import (
 
 var (
 	TwitterRegex = regexp.MustCompile(`https?://twitter.com/(\S+)/status/(\d+)`)
+	nitterURL    = "https://nitter.net"
 )
 
 type Tweet struct {
@@ -31,19 +31,19 @@ type TwitterMedia struct {
 }
 
 func GetTweet(uri string) (*Tweet, error) {
-	if !TwitterRegex.MatchString(uri) {
+	if str := TwitterRegex.FindString(uri); str == "" {
 		return nil, errors.New("invalid twitter url")
+	} else {
+		uri = strings.ReplaceAll(str, "twitter.com", "nitter.net")
 	}
 
-	uri = strings.ReplaceAll(uri, "twitter.com", "nitter.net")
 	c := colly.NewCollector()
 	res := &Tweet{
 		Gallery: make([]TwitterMedia, 0),
 	}
 
 	c.OnHTML(".main-tweet .still-image", func(e *colly.HTMLElement) {
-		escapedLink := strings.TrimPrefix(e.Attr("href"), `/pic/`)
-		imageURL, _ := url.QueryUnescape(escapedLink)
+		imageURL := nitterURL + e.Attr("href")
 		res.Gallery = append(res.Gallery, TwitterMedia{
 			URL:      imageURL,
 			Animated: false,
@@ -51,8 +51,7 @@ func GetTweet(uri string) (*Tweet, error) {
 	})
 
 	c.OnHTML(".main-tweet .gif", func(e *colly.HTMLElement) {
-		escapedLink := strings.TrimPrefix(e.ChildAttr("source", "src"), "/gif/")
-		imageURL, _ := url.QueryUnescape(escapedLink)
+		imageURL := nitterURL + e.ChildAttr("source", "src")
 		res.Gallery = append(res.Gallery, TwitterMedia{
 			URL:      imageURL,
 			Animated: true,

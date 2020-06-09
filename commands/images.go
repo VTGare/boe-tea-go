@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/VTGare/boe-tea-go/database"
 	"github.com/VTGare/boe-tea-go/images"
@@ -483,6 +484,23 @@ func nhentai(s *discordgo.Session, m *discordgo.MessageCreate, args []string) er
 		return errors.New("invalid nhentai ID")
 	}
 
+	ch, err := s.Channel(m.ChannelID)
+	if err != nil {
+		return err
+	}
+
+	if !ch.NSFW {
+		prompt := utils.CreatePrompt(s, m, &utils.PromptOptions{
+			Actions: map[string]func() bool{
+				"👌": func() bool { return true },
+			},
+			Message: "Are you sure you want to use ``nhentai`` in an SFW channel? React 👌 to confirm.",
+			Timeout: 15 * time.Second,
+		})
+		if prompt == nil {
+			return nil
+		}
+	}
 	book, err := services.GetNHentai(args[0])
 	if err != nil {
 		return err
