@@ -3,6 +3,7 @@ package services
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 )
 
 var (
@@ -10,12 +11,12 @@ var (
 )
 
 type rawNHBook struct {
-	ID         int        `json:"id"`
-	MediaID    string     `json:"media_id"`
-	Titles     NHTitle    `json:"title"`
-	Tags       []rawNHTag `json:"tags"`
-	Pages      int        `json:"num_pages"`
-	Favourites int        `json:"num_favorites"`
+	ID         interface{} `json:"id"`
+	MediaID    string      `json:"media_id"`
+	Titles     NHTitle     `json:"title"`
+	Tags       []rawNHTag  `json:"tags"`
+	Pages      int         `json:"num_pages"`
+	Favourites int         `json:"num_favorites"`
 }
 
 type NHTitle struct {
@@ -63,8 +64,10 @@ func sortTags(book *rawNHBook) (artists []string, tags []string) {
 	tags = make([]string, 0)
 
 	for _, tag := range book.Tags {
-		if tag.Type == "artist" || tag.Type == "group" {
+		if tag.Type == "artist" {
 			artists = append(artists, tag.Name)
+		} else if tag.Type == "group" {
+			artists = append(artists, tag.Name+" (group)")
 		} else {
 			tags = append(tags, tag.Name)
 		}
@@ -80,8 +83,15 @@ func GetNHentai(id string) (*NHBook, error) {
 	}
 
 	book := &NHBook{}
+	if id, ok := raw.ID.(int); ok {
+		book.ID = id
+	} else if id, ok := raw.ID.(string); ok {
+		book.ID, _ = strconv.Atoi(id)
+	} else {
+		book.ID = 0
+	}
+
 	book.Titles = raw.Titles
-	book.ID = raw.ID
 	book.Cover = fmt.Sprintf("https://t.nhentai.net/galleries/%v/cover.jpg", raw.MediaID)
 	book.Artists, book.Tags = sortTags(raw)
 	book.Favourites = raw.Favourites
