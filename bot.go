@@ -6,6 +6,7 @@ import (
 
 	"github.com/VTGare/boe-tea-go/commands"
 	"github.com/VTGare/boe-tea-go/database"
+	"github.com/VTGare/boe-tea-go/services"
 	"github.com/VTGare/boe-tea-go/utils"
 	"github.com/bwmarrin/discordgo"
 	log "github.com/sirupsen/logrus"
@@ -60,6 +61,24 @@ func messageCreated(s *discordgo.Session, m *discordgo.MessageCreate) {
 
 				log.Infof("Found a pixiv link on %v (%v), channel %v", where(), m.GuildID, m.ChannelID)
 				err = utils.PostPixiv(s, m, ids)
+			}
+		}
+
+		if twitter := services.TwitterRegex.FindAllString(m.Content, len(m.Content)+1); isGuild && twitter != nil {
+			repostSetting := database.GuildCache[m.GuildID].Repost
+			if repostSetting != "disabled" {
+				for _, tweet := range twitter {
+					if utils.IsRepost(m.GuildID, tweet) {
+						f, _ := utils.MemberHasPermission(s, m.GuildID, s.State.User.ID, discordgo.PermissionManageMessages|discordgo.PermissionAdministrator)
+
+						if f && repostSetting == "strict" {
+							s.ChannelMessageDelete(m.ChannelID, m.ID)
+						}
+						s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Repost detected. This tweet has been posted before in last 24 hours."))
+					} else {
+						utils.NewRepostChecker(m.GuildID, tweet)
+					}
+				}
 			}
 		}
 

@@ -99,14 +99,49 @@ func PostPixiv(s *discordgo.Session, m *discordgo.MessageCreate, pixivIDs []stri
 
 func createPosts(s *discordgo.Session, m *discordgo.MessageCreate, pixivIDs []string, excluded map[int]bool) ([]discordgo.MessageSend, error) {
 	log.Infoln("Creating posts for following IDs: ", pixivIDs)
-	messages := make([]discordgo.MessageSend, 0)
 
-	ch, _ := s.Channel(m.ChannelID)
-	for _, link := range pixivIDs {
-		post, err := services.GetPixivPost(link)
+	var (
+		messages      = make([]discordgo.MessageSend, 0)
+		repostSetting = database.GuildCache[m.GuildID].Repost
+		strictIDs     = make([]string, 0)
+		ch, _         = s.Channel(m.ChannelID)
+	)
+
+	for _, id := range pixivIDs {
+		if IsRepost(m.GuildID, id) {
+			switch repostSetting {
+			case "enabled":
+				prompt := CreatePrompt(s, m, &PromptOptions{
+					Actions: map[string]func() bool{
+						"✅": func() bool {
+							return true
+						},
+						"❎": func() bool {
+							return false
+						},
+					},
+					Message: fmt.Sprintf("Pixiv post %v is a repost, react ✅ if you want to post it anyway or ❎ to skip.", id),
+					Timeout: 10 * time.Second,
+				})
+
+				if prompt == nil {
+					continue
+				}
+
+				if !prompt() {
+					continue
+				}
+			case "strict":
+				strictIDs = append(strictIDs, id)
+				continue
+			}
+		}
+		post, err := services.GetPixivPost(id)
 		if err != nil {
 			return nil, err
 		}
+		NewRepostChecker(m.GuildID, id)
+
 		if post.NSFW && !ch.NSFW {
 			prompt := CreatePrompt(s, m, &PromptOptions{
 				Actions: map[string]func() bool{
@@ -168,5 +203,15 @@ func createPosts(s *discordgo.Session, m *discordgo.MessageCreate, pixivIDs []st
 		}
 	}
 
+	if repostSetting == "strict" {
+		if len(strictIDs) > 1 {
+			s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Pixiv posts with following IDs ``%v`` are reposts and have been skipped.", strictIDs))
+		} else {
+			if f, _ := MemberHasPermission(s, m.GuildID, s.State.User.ID, discordgo.PermissionManageMessages|discordgo.PermissionAdministrator); f {
+				s.ChannelMessageDelete(m.ChannelID, m.ID)
+			}
+			s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Pixiv post ``%v`` is a repost and has been skipped.", strictIDs))
+		}
+	}
 	return messages, nil
 }

@@ -31,11 +31,11 @@ type TwitterMedia struct {
 }
 
 func GetTweet(uri string) (*Tweet, error) {
-	if str := TwitterRegex.FindString(uri); str == "" {
+	str := TwitterRegex.FindString(uri)
+	if str == "" {
 		return nil, errors.New("invalid twitter url")
-	} else {
-		uri = strings.ReplaceAll(str, "twitter.com", "nitter.net")
 	}
+	uri = strings.ReplaceAll(str, "twitter.com", "nitter.net")
 
 	c := colly.NewCollector()
 	res := &Tweet{

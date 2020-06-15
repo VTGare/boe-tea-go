@@ -46,8 +46,8 @@ func init() {
 				Value: "Pixiv reposting switch, accepts ***f or false (case-insensitive)*** to disable and ***t or true*** to enable.",
 			},
 			{
-				Name:  "~~repost~~",
-				Value: "Deprecated, being replaced soon tm.",
+				Name:  "repost",
+				Value: "Repost check setting, accepts ***enabled***, ***disabled***, and ***strict*** settings. Strict mode disables a prompt and removes Twitter reposts (if bot has Manage Messages permission)",
 			},
 			{
 				Name:  "reversesearch",
@@ -66,7 +66,7 @@ func set(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error 
 	case 0:
 		showGuildSettings(s, m)
 	case 2:
-		isAdmin, err := utils.MemberHasPermission(s, m.GuildID, m.Author.ID, 8)
+		isAdmin, err := utils.MemberHasPermission(s, m.GuildID, m.Author.ID, discordgo.PermissionAdministrator)
 		if err != nil {
 			return err
 		}
@@ -96,10 +96,14 @@ func set(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error 
 		case "limit":
 			passedSetting, err = strconv.Atoi(newSetting)
 		case "repost":
-			s.ChannelMessageSend(m.ChannelID, "For now ``repost`` setting is deprecated and will be replaced in the future.")
+			if newSetting != "disabled" && newSetting != "enabled" && newSetting != "strict" {
+				return errors.New("unknown option. repost only accepts enabled, disabled, and strict options")
+			}
+
+			passedSetting = newSetting
 		case "reversesearch":
 			if newSetting != "saucenao" && newSetting != "ascii2d" {
-				return errors.New("unknown option. repost_as only accepts ``ascii2d`` and ``saucenao`` options")
+				return errors.New("unknown option. reversesearch only accepts ascii2d and saucenao options")
 			}
 
 			passedSetting = newSetting
@@ -150,7 +154,7 @@ func showGuildSettings(s *discordgo.Session, m *discordgo.MessageCreate) {
 			},
 			{
 				Name:  "Features",
-				Value: fmt.Sprintf("**Pixiv:** %v\n**Reverse search:** %v", utils.FormatBool(settings.Pixiv), settings.ReverseSearch),
+				Value: fmt.Sprintf("**Pixiv:** %v\n**Reverse search:** %v\n**Repost:** %v", utils.FormatBool(settings.Pixiv), settings.ReverseSearch, settings.Repost),
 			},
 			{
 				Name:  "Pixiv settings",

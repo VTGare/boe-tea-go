@@ -3,7 +3,6 @@ package commands
 import (
 	"context"
 	"strconv"
-	"time"
 
 	"github.com/VTGare/boe-tea-go/database"
 	"github.com/VTGare/boe-tea-go/utils"
@@ -12,8 +11,8 @@ import (
 )
 
 func init() {
-	Commands["migrateDB"] = Command{
-		Name:            "migrateDB",
+	Commands["updateDB"] = Command{
+		Name:            "updateDB",
 		Description:     ".",
 		GuildOnly:       false,
 		Exec:            migrateDB,
@@ -31,8 +30,7 @@ func migrateDB(s *discordgo.Session, m *discordgo.MessageCreate, args []string) 
 	c := database.DB.Collection("guildsettings")
 	res, err := c.UpdateMany(context.Background(), bson.M{}, bson.M{
 		"$set": bson.M{
-			"created_at": time.Now(),
-			"updated_at": time.Now(),
+			"repost": "enabled",
 		},
 	})
 	if err != nil {
