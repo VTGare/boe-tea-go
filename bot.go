@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/VTGare/boe-tea-go/commands"
 	"github.com/VTGare/boe-tea-go/database"
@@ -77,7 +78,11 @@ func messageCreated(s *discordgo.Session, m *discordgo.MessageCreate) {
 								log.Warn(err)
 							}
 						}
-						s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Repost detected. This tweet has been posted before within the last 24 hours."))
+						tweet, _ := s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Repost detected. This tweet has been posted before within the last 24 hours."))
+						go func() {
+							time.Sleep(15 * time.Second)
+							s.ChannelMessageDelete(tweet.ChannelID, tweet.ID)
+						}()
 					} else {
 						utils.NewRepostChecker(m.GuildID, tweet)
 					}

@@ -213,7 +213,12 @@ func createPosts(s *discordgo.Session, m *discordgo.MessageCreate, pixivIDs []st
 					log.Warn(err)
 				}
 			}
-			s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Pixiv post ``%v`` is a repost and has been skipped.", strictIDs))
+			mes, _ := s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Pixiv post ``%v`` is a repost and has been skipped.", strictIDs))
+
+			go func() {
+				time.Sleep(15 * time.Second)
+				s.ChannelMessageDelete(mes.ChannelID, mes.ID)
+			}()
 		}
 	}
 	return messages, nil
