@@ -206,9 +206,12 @@ func createPosts(s *discordgo.Session, m *discordgo.MessageCreate, pixivIDs []st
 	if repostSetting == "strict" {
 		if len(strictIDs) > 1 {
 			s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Pixiv posts with following IDs ``%v`` are reposts and have been skipped.", strictIDs))
-		} else {
+		} else if len(strictIDs) == 1 {
 			if f, _ := MemberHasPermission(s, m.GuildID, s.State.User.ID, discordgo.PermissionManageMessages|discordgo.PermissionAdministrator); f {
-				s.ChannelMessageDelete(m.ChannelID, m.ID)
+				err := s.ChannelMessageDelete(m.ChannelID, m.ID)
+				if err != nil {
+					log.Warn(err)
+				}
 			}
 			s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Pixiv post ``%v`` is a repost and has been skipped.", strictIDs))
 		}

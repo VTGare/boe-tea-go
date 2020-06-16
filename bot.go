@@ -72,9 +72,12 @@ func messageCreated(s *discordgo.Session, m *discordgo.MessageCreate) {
 						f, _ := utils.MemberHasPermission(s, m.GuildID, s.State.User.ID, discordgo.PermissionManageMessages|discordgo.PermissionAdministrator)
 
 						if f && repostSetting == "strict" {
-							s.ChannelMessageDelete(m.ChannelID, m.ID)
+							err := s.ChannelMessageDelete(m.ChannelID, m.ID)
+							if err != nil {
+								log.Warn(err)
+							}
 						}
-						s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Repost detected. This tweet has been posted before in last 24 hours."))
+						s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Repost detected. This tweet has been posted before within the last 24 hours."))
 					} else {
 						utils.NewRepostChecker(m.GuildID, tweet)
 					}
