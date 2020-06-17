@@ -6,19 +6,19 @@ var (
 	RepostCache = make(map[string]map[string]bool)
 )
 
-func IsRepost(guildID, post string) bool {
-	_, ok := RepostCache[guildID][post]
+func IsRepost(channelID, post string) bool {
+	_, ok := RepostCache[channelID][post]
 	return ok
 }
 
-func NewRepostChecker(guildID, post string) {
-	if _, ok := RepostCache[guildID]; !ok {
-		RepostCache[guildID] = map[string]bool{}
+func NewRepostChecker(channelID, post string) {
+	if _, ok := RepostCache[channelID]; !ok {
+		RepostCache[channelID] = map[string]bool{}
 	}
 
-	RepostCache[guildID][post] = true
+	RepostCache[channelID][post] = true
 	go func() {
 		time.Sleep(24 * time.Hour)
-		delete(RepostCache[guildID], post)
+		delete(RepostCache[channelID], post)
 	}()
 }

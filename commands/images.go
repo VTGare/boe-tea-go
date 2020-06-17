@@ -12,6 +12,7 @@ import (
 
 	"github.com/VTGare/boe-tea-go/database"
 	"github.com/VTGare/boe-tea-go/images"
+	"github.com/VTGare/boe-tea-go/pixiv"
 	"github.com/VTGare/boe-tea-go/services"
 	"github.com/VTGare/boe-tea-go/utils"
 	"github.com/bwmarrin/discordgo"
@@ -55,7 +56,7 @@ func init() {
 		Name:            "pixiv",
 		Description:     "Advanced pixiv command that lets you exclude images from an album",
 		GuildOnly:       false,
-		Exec:            pixiv,
+		Exec:            pixivCommand,
 		Help:            true,
 		AdvancedCommand: true,
 		ExtendedHelp: []*discordgo.MessageEmbedField{
@@ -313,12 +314,12 @@ func findRecentImage(messages []*discordgo.Message) string {
 	return ""
 }
 
-func pixiv(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
+func pixivCommand(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
 	if len(args) == 0 {
 		return utils.ErrNotEnoughArguments
 	}
 
-	match := utils.PixivRegex.FindStringSubmatch(args[0])
+	match := pixiv.Regex.FindStringSubmatch(args[0])
 	if match == nil {
 		return errors.New("first arguments must be a pixiv link")
 	}
@@ -344,7 +345,7 @@ func pixiv(s *discordgo.Session, m *discordgo.MessageCreate, args []string) erro
 		}
 	}
 
-	utils.PostPixiv(s, m, []string{match[1]}, utils.PixivOptions{
+	pixiv.PostPixiv(s, m, []string{match[1]}, pixiv.Options{
 		ProcPrompt: false,
 		Indexes:    excludes,
 		Exclude:    true,

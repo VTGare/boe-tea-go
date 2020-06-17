@@ -15,9 +15,11 @@ var (
 )
 
 type PixivPost struct {
+	ID             string
 	Author         string
 	Title          string
 	Likes          int
+	Pages          int
 	Tags           []string
 	LargeImages    []string
 	OriginalImages []string
@@ -85,9 +87,11 @@ func GetPixivPost(id string) (*PixivPost, error) {
 	}
 
 	post := &PixivPost{
+		ID:             id,
 		Author:         illust.User.Name,
 		Title:          illust.Title,
 		Tags:           tags,
+		Pages:          illust.PageCount,
 		LargeImages:    largeImages,
 		OriginalImages: originalImages,
 		Likes:          illust.TotalBookmarks,

@@ -7,6 +7,7 @@ import (
 
 	"github.com/VTGare/boe-tea-go/commands"
 	"github.com/VTGare/boe-tea-go/database"
+	"github.com/VTGare/boe-tea-go/pixiv"
 	"github.com/VTGare/boe-tea-go/services"
 	"github.com/VTGare/boe-tea-go/utils"
 	"github.com/bwmarrin/discordgo"
@@ -53,7 +54,7 @@ func messageCreated(s *discordgo.Session, m *discordgo.MessageCreate) {
 		//no prefix functionality
 		var err error
 		if isGuild && database.GuildCache[m.GuildID].Pixiv {
-			matches := utils.PixivRegex.FindAllStringSubmatch(m.Content, len(m.Content)+1)
+			matches := pixiv.Regex.FindAllStringSubmatch(m.Content, len(m.Content)+1)
 			if matches != nil {
 				ids := make([]string, 0)
 				for _, match := range matches {
@@ -61,7 +62,7 @@ func messageCreated(s *discordgo.Session, m *discordgo.MessageCreate) {
 				}
 
 				log.Infof("Found a pixiv link on %v (%v), channel %v", where(), m.GuildID, m.ChannelID)
-				err = utils.PostPixiv(s, m, ids)
+				err = pixiv.PostPixiv(s, m, ids)
 			}
 		}
 
@@ -69,7 +70,7 @@ func messageCreated(s *discordgo.Session, m *discordgo.MessageCreate) {
 			repostSetting := database.GuildCache[m.GuildID].Repost
 			if repostSetting != "disabled" {
 				for _, tweet := range twitter {
-					if utils.IsRepost(m.GuildID, tweet) {
+					if utils.IsRepost(m.ChannelID, tweet) {
 						f, _ := utils.MemberHasPermission(s, m.GuildID, s.State.User.ID, discordgo.PermissionManageMessages|discordgo.PermissionAdministrator)
 
 						if f && repostSetting == "strict" {
@@ -84,7 +85,7 @@ func messageCreated(s *discordgo.Session, m *discordgo.MessageCreate) {
 							s.ChannelMessageDelete(tweet.ChannelID, tweet.ID)
 						}()
 					} else {
-						utils.NewRepostChecker(m.GuildID, tweet)
+						utils.NewRepostChecker(m.ChannelID, tweet)
 					}
 				}
 			}
@@ -119,7 +120,7 @@ func messageCreated(s *discordgo.Session, m *discordgo.MessageCreate) {
 }
 
 func reactCreated(s *discordgo.Session, r *discordgo.MessageReactionAdd) {
-	if author, ok := utils.PostCache[r.MessageID]; ok && author == r.UserID && r.Emoji.APIName() == "❌" {
+	if author, ok := pixiv.EmbedCache[r.MessageID]; ok && author == r.UserID && r.Emoji.APIName() == "❌" {
 		s.ChannelMessageDelete(r.ChannelID, r.MessageID)
 	}
 }
