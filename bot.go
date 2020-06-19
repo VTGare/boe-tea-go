@@ -34,6 +34,7 @@ func messageCreated(s *discordgo.Session, m *discordgo.MessageCreate) {
 		return
 	}
 	isGuild := m.GuildID != ""
+	m.Content = strings.ToLower(m.Content)
 
 	where := func() string {
 		if isGuild {
