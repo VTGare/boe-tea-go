@@ -1,9 +1,11 @@
-package services
+package nhentai
 
 import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+
+	"github.com/VTGare/boe-tea-go/services"
 )
 
 var (
@@ -45,7 +47,7 @@ type NHBook struct {
 }
 
 func getRawBook(id string) (*rawNHBook, error) {
-	resp, err := fasthttpGet(baseNHentai + "/api/gallery/" + id)
+	resp, err := services.FasthttpGet(baseNHentai + "/api/gallery/" + id)
 	if err != nil {
 		return nil, err
 	}

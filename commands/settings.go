@@ -102,8 +102,8 @@ func set(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error 
 
 			passedSetting = newSetting
 		case "reversesearch":
-			if newSetting != "saucenao" && newSetting != "ascii2d" {
-				return errors.New("unknown option. reversesearch only accepts ascii2d and saucenao options")
+			if newSetting != "saucenao" && newSetting != "wait" {
+				return errors.New("unknown option. reversesearch only accepts wait and saucenao options")
 			}
 
 			passedSetting = newSetting

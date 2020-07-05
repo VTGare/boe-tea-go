@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/VTGare/boe-tea-go/database"
-	"github.com/VTGare/boe-tea-go/services"
+	"github.com/VTGare/boe-tea-go/saucenao"
 	"github.com/bwmarrin/discordgo"
 	log "github.com/sirupsen/logrus"
 )
@@ -95,7 +95,7 @@ func EmbedTimestamp() string {
 }
 
 //FindAuthor is a SauceNAO helper function that finds original source author string.
-func FindAuthor(sauce services.Sauce) string {
+func FindAuthor(sauce saucenao.Sauce) string {
 	if sauce.Data.MemberName != "" {
 		return sauce.Data.MemberName
 	} else if sauce.Data.Author != "" {
@@ -193,8 +193,8 @@ func GetEmoji(s *discordgo.Session, guildID, e string) (string, error) {
 	return emoji.APIName(), nil
 }
 
-func FilterLowSimilarity(sauce []*services.Sauce) ([]*services.Sauce, error) {
-	filtered := make([]*services.Sauce, 0)
+func FilterLowSimilarity(sauce []*saucenao.Sauce) ([]*saucenao.Sauce, error) {
+	filtered := make([]*saucenao.Sauce, 0)
 
 	for _, v := range sauce {
 		similarity, err := strconv.ParseFloat(v.Header.Similarity, 64)

@@ -150,5 +150,5 @@ func guildDeleted(s *discordgo.Session, g *discordgo.GuildDelete) {
 	}
 
 	delete(database.GuildCache, g.ID)
-	log.Infoln("Kicked or banned from ", g.Name)
+	log.Infoln("Kicked or banned from", g.Guild.Name, g.ID)
 }

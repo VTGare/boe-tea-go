@@ -4,16 +4,7 @@ import (
 	"github.com/valyala/fasthttp"
 )
 
-/*
-TODO:
-- separate services in different packages
-- add iqdb
-- add repost checker
-- add feedback command
-- owner only stats command
-*/
-
-func fasthttpGet(uri string) ([]byte, error) {
+func FasthttpGet(uri string) ([]byte, error) {
 	req := fasthttp.AcquireRequest()
 	resp := fasthttp.AcquireResponse()
 	defer fasthttp.ReleaseRequest(req)

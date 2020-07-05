@@ -20,6 +20,16 @@ func init() {
 		AdvancedCommand: false,
 		ExtendedHelp:    nil,
 	}
+
+	Commands["test"] = Command{
+		Name:            "test",
+		Description:     ".",
+		GuildOnly:       false,
+		Exec:            editEmbed,
+		Help:            false,
+		AdvancedCommand: false,
+		ExtendedHelp:    nil,
+	}
 }
 
 func migrateDB(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
@@ -38,5 +48,19 @@ func migrateDB(s *discordgo.Session, m *discordgo.MessageCreate, args []string) 
 	}
 
 	s.ChannelMessageSend(m.ChannelID, "Modified: "+strconv.FormatInt(res.ModifiedCount, 10))
+	return nil
+}
+
+func editEmbed(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
+	if m.Author.ID != utils.AuthorID {
+		return nil
+	}
+
+	embed1 := discordgo.MessageEmbed{
+		Title:       "[named links](https://discordapp.com)",
+		Description: "[named links](https://discordapp.com)",
+	}
+
+	s.ChannelMessageSendEmbed(m.ChannelID, &embed1)
 	return nil
 }

@@ -12,7 +12,9 @@ import (
 
 	"github.com/VTGare/boe-tea-go/database"
 	"github.com/VTGare/boe-tea-go/images"
+	"github.com/VTGare/boe-tea-go/nhentai"
 	"github.com/VTGare/boe-tea-go/pixiv"
+	"github.com/VTGare/boe-tea-go/saucenao"
 	"github.com/VTGare/boe-tea-go/services"
 	"github.com/VTGare/boe-tea-go/utils"
 	"github.com/bwmarrin/discordgo"
@@ -24,8 +26,8 @@ var (
 	ImageURLRegex = regexp.MustCompile(`(?i)(http(s?):)([/|.|\w|\s|-])*\.(?:jpg|jpeg|gif|png|webp)`)
 	ErrNoSauce    = errors.New("source image has not been found")
 	searchEngines = map[string]func(link string) (*discordgo.MessageEmbed, error){
-		"saucenao": saucenao,
-		"ascii2d":  ascii2d,
+		"saucenao": snao,
+		"wait":     wait,
 	}
 )
 
@@ -44,7 +46,7 @@ func init() {
 			},
 			{
 				Name:  "Reverse image search engine",
-				Value: "Not required. ``saucenao`` or ``ascii2d``. If omitted uses server's default option",
+				Value: "Not required. ``saucenao`` or ``wait``. If omitted uses server's default option",
 			},
 			{
 				Name:  "image link",
@@ -114,7 +116,7 @@ func init() {
 		Name:            "nhentai",
 		Description:     "Gives detailed information about an nhentai book",
 		GuildOnly:       false,
-		Exec:            nhentai,
+		Exec:            nhen,
 		Help:            true,
 		AdvancedCommand: true,
 		ExtendedHelp: []*discordgo.MessageEmbedField{
@@ -191,56 +193,12 @@ func sauce(s *discordgo.Session, m *discordgo.MessageCreate, args []string) erro
 	return nil
 }
 
-func ascii2d(link string) (*discordgo.MessageEmbed, error) {
-	results, err := services.GetSauceA2D(link)
+func snao(link string) (*discordgo.MessageEmbed, error) {
+	res, err := saucenao.SearchSauceByURL(link)
 	if err != nil {
 		return nil, err
 	}
-
-	for _, res := range results {
-		if res.Author == "" || res.AuthorURL == "" || res.From == "" || res.Name == "" || res.Thumbnail == "" || res.URL == "" {
-			continue
-		}
-
-		log.Infoln("source found", res)
-		embed := &discordgo.MessageEmbed{
-			Title: fmt.Sprintf("%v by %v on %v", res.Name, res.Author, res.From),
-			URL:   res.URL,
-			Thumbnail: &discordgo.MessageEmbedThumbnail{
-				URL: res.Thumbnail,
-			},
-			Color:     utils.EmbedColor,
-			Timestamp: utils.EmbedTimestamp(),
-			Fields: []*discordgo.MessageEmbedField{
-				{
-					Name:  "Name",
-					Value: res.Name,
-				},
-				{
-					Name:  "URL",
-					Value: res.URL,
-				},
-				{
-					Name:  "Author",
-					Value: res.Author,
-				},
-				{
-					Name:  "Author URL",
-					Value: res.AuthorURL,
-				},
-			},
-		}
-		return embed, nil
-	}
-	return nil, ErrNoSauce
-}
-
-func saucenao(link string) (*discordgo.MessageEmbed, error) {
-	saucenao, err := services.SearchSauceByURL(link)
-	if err != nil {
-		return nil, err
-	}
-	results, err := utils.FilterLowSimilarity(saucenao.Results)
+	results, err := utils.FilterLowSimilarity(res.Results)
 	if err != nil {
 		return nil, err
 	}
@@ -248,7 +206,7 @@ func saucenao(link string) (*discordgo.MessageEmbed, error) {
 		return nil, ErrNoSauce
 	}
 
-	findSauce := func() *services.Sauce {
+	findSauce := func() *saucenao.Sauce {
 		for _, res := range results {
 			if len(res.Data.URLs) == 0 {
 				continue
@@ -263,29 +221,29 @@ func saucenao(link string) (*discordgo.MessageEmbed, error) {
 		return nil
 	}
 
-	res := findSauce()
+	snaoSauce := findSauce()
 	if res == nil {
 		return nil, ErrNoSauce
 	}
 
-	author := utils.FindAuthor(*res)
-	log.Infoln("Source found. URL: %v. Title: %v", res.Data.URLs[0], res.Data.Title)
+	author := utils.FindAuthor(*snaoSauce)
+	log.Infoln("Source found. URL: %v. Title: %v", snaoSauce.Data.URLs[0], snaoSauce.Data.Title)
 	embed := &discordgo.MessageEmbed{
-		Title:     res.Data.Title,
-		URL:       res.Data.URLs[0],
+		Title:     snaoSauce.Data.Title,
+		URL:       snaoSauce.Data.URLs[0],
 		Timestamp: utils.EmbedTimestamp(),
 		Color:     utils.EmbedColor,
 		Thumbnail: &discordgo.MessageEmbedThumbnail{
-			URL: res.Header.Thumbnail,
+			URL: snaoSauce.Header.Thumbnail,
 		},
 		Fields: []*discordgo.MessageEmbedField{
 			{
 				Name:  "URL",
-				Value: res.Data.URLs[0],
+				Value: snaoSauce.Data.URLs[0],
 			},
 			{
 				Name:  "Similarity",
-				Value: res.Header.Similarity,
+				Value: snaoSauce.Header.Similarity,
 			},
 			{
 				Name:  "Author",
@@ -294,6 +252,62 @@ func saucenao(link string) (*discordgo.MessageEmbed, error) {
 		},
 	}
 	return embed, nil
+}
+
+func wait(link string) (*discordgo.MessageEmbed, error) {
+	res, err := services.SearchWait(link)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(res.Documents) == 0 {
+		return nil, errors.New("couldn't find source anime")
+	}
+
+	anime := res.Documents[0]
+
+	description := ""
+	url := ""
+	if anime.AnilistID != 0 && anime.MalID != 0 {
+		description = fmt.Sprintf("[AniList link](https://anilist.co/anime/%v/) | [MyAnimeList link](https://myanimelist.net/anime/%v/)", anime.AnilistID, anime.MalID)
+		url = fmt.Sprintf("https://myanimelist.net/anime/%v/", anime.MalID)
+	} else if anime.AnilistID != 0 {
+		description = fmt.Sprintf("[AniList link](https://anilist.co/anime/%v/)", anime.AnilistID)
+		url = fmt.Sprintf("https://anilist.co/anime/%v/", anime.AnilistID)
+	} else if anime.MalID != 0 {
+		description = fmt.Sprintf("[MyAnimeList link](https://myanimelist.net/anime/%v/)", anime.MalID)
+		url = fmt.Sprintf("https://myanimelist.net/anime/%v/", anime.MalID)
+	} else {
+		description = "No links :shrug:"
+	}
+
+	embed := &discordgo.MessageEmbed{
+		Title:       fmt.Sprintf("%v | %v", anime.TitleEnglish, anime.TitleNative),
+		URL:         url,
+		Description: description,
+		Color:       utils.EmbedColor,
+		Timestamp:   utils.EmbedTimestamp(),
+		Fields: []*discordgo.MessageEmbedField{
+			{
+				Name:  "Similarity",
+				Value: fmt.Sprintf("%v%%", anime.Similarity*100),
+			},
+			{
+				Name:  "Timestamp",
+				Value: fmt.Sprintf("%v", readableSeconds(anime.At)),
+			},
+			{
+				Name:  "Episode",
+				Value: fmt.Sprintf("%v", anime.Episode),
+			},
+		},
+	}
+
+	return embed, nil
+}
+
+func readableSeconds(sec float64) string {
+	return fmt.Sprintf("%v:%v", int(sec)/60, int(sec)%60)
 }
 
 func findRecentImage(messages []*discordgo.Message) string {
@@ -476,7 +490,7 @@ func deepfry(s *discordgo.Session, m *discordgo.MessageCreate, args []string) er
 	return nil
 }
 
-func nhentai(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
+func nhen(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
 	if len(args) == 0 {
 		return utils.ErrNotEnoughArguments
 	}
@@ -502,7 +516,7 @@ func nhentai(s *discordgo.Session, m *discordgo.MessageCreate, args []string) er
 			return nil
 		}
 	}
-	book, err := services.GetNHentai(args[0])
+	book, err := nhentai.GetNHentai(args[0])
 	if err != nil {
 		return err
 	}

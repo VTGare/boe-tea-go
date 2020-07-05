@@ -1,10 +1,12 @@
-package services
+package saucenao
 
 import (
 	"encoding/json"
 	"log"
 	"net/url"
 	"os"
+
+	"github.com/VTGare/boe-tea-go/services"
 )
 
 //SauceNaoResult is a top-level raw SauceNAO API response
@@ -57,7 +59,7 @@ func SearchSauceByURL(image string) (*SauceNaoResult, error) {
 	image = url.QueryEscape(image)
 	uri := baseSauceNAO + "&url=" + image
 
-	body, err := fasthttpGet(uri)
+	body, err := services.FasthttpGet(uri)
 	if err != nil {
 		return nil, err
 	}
