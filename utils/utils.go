@@ -202,7 +202,7 @@ func FilterLowSimilarity(sauce []*saucenao.Sauce) ([]*saucenao.Sauce, error) {
 			return nil, err
 		}
 
-		if similarity >= 75.0 {
+		if similarity >= 60.0 {
 			filtered = append(filtered, v)
 		}
 	}
