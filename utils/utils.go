@@ -17,6 +17,7 @@ import (
 //ActionFunc is a function type alias for prompt actions
 type ActionFunc = func() bool
 
+//Range is a range struct. Low is beginning value and High is end value. High can't be higher than Low.
 type Range struct {
 	Low  int
 	High int
@@ -30,15 +31,23 @@ type PromptOptions struct {
 }
 
 var (
-	EmojiRegex            = regexp.MustCompile(`(\x{00a9}|\x{00ae}|[\x{2000}-\x{3300}]|\x{d83c}[\x{d000}-\x{dfff}]|\x{d83d}[\x{d000}-\x{dfff}]|\x{d83e}[\x{d000}-\x{dfff}])`)
-	NumRegex              = regexp.MustCompile(`([0-9]+)`)
-	EmbedColor            = 0x439ef1
-	AuthorID              = "244208152776540160"
+	//EmojiRegex matches some Unicode emojis, it's not perfect but better than nothing
+	EmojiRegex = regexp.MustCompile(`(\x{00a9}|\x{00ae}|[\x{2000}-\x{3300}]|\x{d83c}[\x{d000}-\x{dfff}]|\x{d83d}[\x{d000}-\x{dfff}]|\x{d83e}[\x{d000}-\x{dfff}])`)
+	//NumRegex is a terrible number regex. Gonna replace it with better code.
+	NumRegex = regexp.MustCompile(`([0-9]+)`)
+	//EmbedColor is a default border colour for Discord embeds
+	EmbedColor = 0x439ef1
+	//AuthorID is author's Discord ID, gonna replace it with an env variable.
+	AuthorID = "244208152776540160"
+	//ErrNotEnoughArguments is a default error when not enough arguments were given
 	ErrNotEnoughArguments = errors.New("not enough arguments")
-	ErrParsingArgument    = errors.New("error parsing arguments, please make sure all arguments are integers")
-	ErrNoPermission       = errors.New("you don't have permissions to execute this command")
+	//ErrParsingArgument is a default error when provided arguments couldn't be parsed
+	ErrParsingArgument = errors.New("error parsing arguments, please make sure all arguments are integers")
+	//ErrNoPermission is a default error when user doesn't have enough permissions to execute a command
+	ErrNoPermission = errors.New("you don't have permissions to execute this command")
 )
 
+//MemberHasPermission checks if guild member has a permission to do something on a server.
 func MemberHasPermission(s *discordgo.Session, guildID string, userID string, permission int) (bool, error) {
 	member, err := s.State.Member(guildID, userID)
 	if err != nil {
@@ -62,6 +71,7 @@ func MemberHasPermission(s *discordgo.Session, guildID string, userID string, pe
 	return false, nil
 }
 
+//NewRange creates a new Range struct from a string. Correct format for a string is first integer-last integer (higher than first)
 func NewRange(s string) (*Range, error) {
 	hyphen := strings.IndexByte(s, '-')
 	if hyphen == -1 {
@@ -90,6 +100,7 @@ func NewRange(s string) (*Range, error) {
 	}, nil
 }
 
+//EmbedTimestamp returns currect time formatted to RFC3339 for Discord Embeds
 func EmbedTimestamp() string {
 	return time.Now().Format(time.RFC3339)
 }
@@ -145,6 +156,7 @@ func nextMessageReactionAdd(s *discordgo.Session) chan *discordgo.MessageReactio
 	return out
 }
 
+//FormatBool returns human-readable representation of boolean
 func FormatBool(b bool) string {
 	if b {
 		return "enabled"
@@ -152,6 +164,7 @@ func FormatBool(b bool) string {
 	return "disabled"
 }
 
+//CreateDB caches all new Guilds bot's connected to in a database.
 func CreateDB(eventGuilds []*discordgo.Guild) error {
 	allGuilds := database.AllGuilds()
 	for _, guild := range *allGuilds {
@@ -180,6 +193,7 @@ func CreateDB(eventGuilds []*discordgo.Guild) error {
 	return nil
 }
 
+//GetEmoji returns a guild emoji API name from Discord state
 func GetEmoji(s *discordgo.Session, guildID, e string) (string, error) {
 	if EmojiRegex.MatchString(e) || e == "👌" {
 		return e, nil
@@ -193,6 +207,7 @@ func GetEmoji(s *discordgo.Session, guildID, e string) (string, error) {
 	return emoji.APIName(), nil
 }
 
+//FilterLowSimilarity filters low similarity results in SauceNAO
 func FilterLowSimilarity(sauce []*saucenao.Sauce) ([]*saucenao.Sauce, error) {
 	filtered := make([]*saucenao.Sauce, 0)
 

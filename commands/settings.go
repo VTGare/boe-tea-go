@@ -95,6 +95,12 @@ func set(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error 
 			passedSetting, err = strconv.Atoi(newSetting)
 		case "limit":
 			passedSetting, err = strconv.Atoi(newSetting)
+			if passedSetting.(int) == 0 {
+				_, err := s.ChannelMessageSend(m.ChannelID, "Why do you even have me here?")
+				if err != nil {
+					return err
+				}
+			}
 		case "repost":
 			if newSetting != "disabled" && newSetting != "enabled" && newSetting != "strict" {
 				return errors.New("unknown option. repost only accepts enabled, disabled, and strict options")
