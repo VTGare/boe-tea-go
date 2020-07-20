@@ -30,7 +30,7 @@ Currently Boe Tea possesses a limited amount of features. All commands can be de
 -   `bt!sauce` - tries to find original image source on SauceNAO or ASCII2D search engine.
     -   _Usage_: `bt!sauce <optional reverse search engine> <optional link>`. If reverse search engine is not present uses guild's default. If link is not present looks up for an attachment.
 -   `bt!pixiv` - advanced pixiv command, let's you exclude certain pictures.
-    -   _Usage_: ``bt!pixiv <pixiv link> [excluded pictures]
+    -   _Usage_: `bt!pixiv <pixiv link> [excluded pictures]`
     -   _pixiv link_: Required link to a pixiv post.
     -   _excluded pictures_: Array of excluded pictures separated by space, supports range syntax (e.g. `1-7` excludes 1 through 7 inclusively)
     -   _Example_: `bt!pixiv https://www.pixiv.net/en/artworks/81893997 2-3` will repost only the first image of the set.
@@ -47,10 +47,13 @@ Currently Boe Tea possesses a limited amount of features. All commands can be de
     -   _largeset_: amount of images considered a large set that procs a confirmation prompt.
     -   _pixiv_: boolean value, switches reposting functionality. Accepts _t, true, f, false_.
     -   _reversesearch_: default reverse image search engine. Accepts **SauceNAO** or **ASCII2D**.
-    -   _repost_: ~~Default reposting behaviour. Accepts **links**, **embeds**, and **ask** options.~~ Deprecated, but being replaced soon tm.
+    -   _repost_: Configures repost checker behaviour. Accepts **enabled**, **disabled**, or **strict** parameters.
     -   _limit_: Hard limit to album size. If you attempt to repost a post/bulk-repost posts with more images it'll fail.
     -   _promptemoji_: Custom prompt emoji. Only local guild and standard emojis are supported as of now.
 -   `bt!ping` - checks if Boe Tea online and sends its ping back
+-   `bt!nhentai` - sends detailed information about an nhentai book.
+    - _Usage_: `bt!nhentai <magic number>`
+    - _magic number_: Typically, but not always, a 6-digit numbers only weebs can understand meaning of.
 
 ## Additional features
 
