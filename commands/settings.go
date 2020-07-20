@@ -16,51 +16,6 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-func init() {
-	Commands["set"] = Command{
-		Name:            "set",
-		Description:     "Show current guild settings or change them.",
-		GuildOnly:       true,
-		Exec:            set,
-		Help:            true,
-		AdvancedCommand: true,
-		ExtendedHelp: []*discordgo.MessageEmbedField{
-			{
-				Name:  "Usage",
-				Value: "bt!set ``<setting>`` ``<new setting>``",
-			},
-			{
-				Name:  "prefix",
-				Value: "Changes bot's prefix. Maximum ***5 characters***. If last character is a letter whitespace is assumed (takes one character).",
-			},
-			{
-				Name:  "largeset",
-				Value: "Amount of pictures considered a large set, which invokes a prompt. Must be an ***integer***. Set to 0 to ask every time",
-			},
-			{
-				Name:  "limit",
-				Value: "Image set size hard limit. If you attempt to repost a post or bulk post more than the limit it'll fail",
-			},
-			{
-				Name:  "pixiv",
-				Value: "Pixiv reposting switch, accepts ***f or false (case-insensitive)*** to disable and ***t or true*** to enable.",
-			},
-			{
-				Name:  "repost",
-				Value: "Repost check setting, accepts ***enabled***, ***disabled***, and ***strict*** settings. Strict mode disables a prompt and removes Twitter reposts (if bot has Manage Messages permission)",
-			},
-			{
-				Name:  "reversesearch",
-				Value: "Default reverse image search engine. Accepts ***SauceNAO*** or ***ASCII2D*** are available as of now.",
-			},
-			{
-				Name:  "promptemoji",
-				Value: "Confirmation prompt emoji. Only unicode or local server emoji's are allowed.",
-			},
-		},
-	}
-}
-
 func set(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
 	switch len(args) {
 	case 0:

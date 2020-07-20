@@ -6,7 +6,21 @@ import (
 )
 
 func init() {
-	Commands["borgar"] = Command{
+	memesGroup := CommandGroup{
+		Name:        "memes",
+		Description: "Useless commands for laughs and giggles",
+		NSFW:        false,
+		Commands:    make(map[string]Command),
+		IsVisible:   true,
+	}
+
+	borgarCommand := newCommand("borgar", "dino eats borgar yummy").setExec(borgar)
+	brainpowerCommand := newCommand("brainpower", "Party time!").setExec(brainpower)
+
+	memesGroup.addCommand(borgarCommand)
+	memesGroup.addCommand(brainpowerCommand)
+	CommandGroups["memes"] = memesGroup
+	/*Commands["borgar"] = Command{
 		Name:            "borgar",
 		Description:     "dino eats borgar",
 		GuildOnly:       false,
@@ -23,7 +37,7 @@ func init() {
 		Help:            false,
 		AdvancedCommand: false,
 		ExtendedHelp:    nil,
-	}
+	}*/
 }
 
 func borgar(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {

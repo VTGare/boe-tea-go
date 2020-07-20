@@ -1,10 +1,11 @@
-package saucenao
+package saucenaoapi
 
 import (
 	"encoding/json"
 	"log"
 	"net/url"
 	"os"
+	"strconv"
 
 	"github.com/VTGare/boe-tea-go/services"
 )
@@ -71,4 +72,42 @@ func SearchSauceByURL(image string) (*SauceNaoResult, error) {
 	}
 
 	return &res, nil
+}
+
+func (s *SauceNaoResult) FilterLowSimilarity(min float64) error {
+	filtered := make([]*Sauce, 0)
+
+	for _, v := range s.Results {
+		similarity, err := strconv.ParseFloat(v.Header.Similarity, 64)
+		if err != nil {
+			return err
+		}
+
+		if similarity >= min {
+			filtered = append(filtered, v)
+		}
+	}
+
+	s.Results = filtered
+	return nil
+}
+
+func (s *Sauce) Author() string {
+	if s.Data.MemberName != "" {
+		return s.Data.MemberName
+	} else if s.Data.Author != "" {
+		return s.Data.Author
+	} else if creator, ok := s.Data.Creator.(string); ok && creator != "" {
+		return creator
+	}
+
+	return "-"
+}
+
+func (s *Sauce) Title() string {
+	if s.Data.Title != "" {
+		return s.Data.Title
+	}
+
+	return "No title"
 }

@@ -8,13 +8,11 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/VTGare/boe-tea-go/database"
 	"github.com/VTGare/boe-tea-go/images"
-	"github.com/VTGare/boe-tea-go/nhentai"
-	"github.com/VTGare/boe-tea-go/pixiv"
-	"github.com/VTGare/boe-tea-go/saucenao"
+	"github.com/VTGare/boe-tea-go/pixivhelper"
+	"github.com/VTGare/boe-tea-go/saucenaoapi"
 	"github.com/VTGare/boe-tea-go/services"
 	"github.com/VTGare/boe-tea-go/utils"
 	"github.com/bwmarrin/discordgo"
@@ -24,21 +22,25 @@ import (
 var (
 	//ImageURLRegex is a regex for image URLs
 	ImageURLRegex = regexp.MustCompile(`(?i)(http(s?):)([/|.|\w|\s|-])*\.(?:jpg|jpeg|gif|png|webp)`)
+	//ErrNoSauce is an error when source couldn't be found.
 	ErrNoSauce    = errors.New("source image has not been found")
 	searchEngines = map[string]func(link string) (*discordgo.MessageEmbed, error){
-		"saucenao": snao,
+		"saucenao": saucenao,
 		"wait":     wait,
 	}
 )
 
 func init() {
-	Commands["sauce"] = Command{
-		Name:            "sauce",
-		Description:     "Looks for source of an anime picture.",
-		GuildOnly:       false,
-		Exec:            sauce,
-		Help:            true,
-		AdvancedCommand: true,
+	imagesGroup := CommandGroup{
+		Name:        "images",
+		Description: "Main bot's functionality, source image commands and magick commands.",
+		NSFW:        false,
+		Commands:    make(map[string]Command),
+		IsVisible:   true,
+	}
+
+	sauceCommand := newCommand("sauce", "Tries to find a source of an anime picture.").setExec(sauce).setAliases("source", "saucenao", "origami").setHelp(&HelpSettings{
+		IsVisible: true,
 		ExtendedHelp: []*discordgo.MessageEmbedField{
 			{
 				Name:  "Usage",
@@ -53,14 +55,9 @@ func init() {
 				Value: "Required. Link must have one of the following suffixes:  *jpg*, *jpeg*, *png*, *gif*, *webp*.\nURL parameters after the link are acceptable (e.g. <link>.jpg***?width=441&height=441***)",
 			},
 		},
-	}
-	Commands["pixiv"] = Command{
-		Name:            "pixiv",
-		Description:     "Advanced pixiv command that lets you exclude images from an album",
-		GuildOnly:       false,
-		Exec:            pixivCommand,
-		Help:            true,
-		AdvancedCommand: true,
+	})
+	pixivCommand := newCommand("pixiv", "Advanced pixiv repost command that lets you exclude images from an album.").setExec(pixiv).setHelp(&HelpSettings{
+		IsVisible: true,
 		ExtendedHelp: []*discordgo.MessageEmbedField{
 			{
 				Name:  "Usage",
@@ -71,14 +68,9 @@ func init() {
 				Value: "Indexes must be separated by whitespace (e.g. 1 2 4 6 10 45)",
 			},
 		},
-	}
-	Commands["deepfry"] = Command{
-		Name:            "deepfry",
-		Description:     "Deepfries an image, cursed as hell",
-		GuildOnly:       false,
-		Exec:            deepfry,
-		Help:            true,
-		AdvancedCommand: true,
+	})
+	deepfryCommand := newCommand("deepfry", "Deepfries an image, itadakimasu.").setExec(deepfry).setHelp(&HelpSettings{
+		IsVisible: true,
 		ExtendedHelp: []*discordgo.MessageEmbedField{
 			{
 				Name:  "Usage",
@@ -93,14 +85,9 @@ func init() {
 				Value: "Image link, if not present uses an attachment.",
 			},
 		},
-	}
-	Commands["twitter"] = Command{
-		Name:            "twitter",
-		Description:     "Reposts a twitter post",
-		GuildOnly:       false,
-		Exec:            twitter,
-		Help:            true,
-		AdvancedCommand: true,
+	})
+	twitterCommand := newCommand("twitter", "Reposts each twitter post's image separately. Useful for mobile.").setExec(twitter).setHelp(&HelpSettings{
+		IsVisible: true,
 		ExtendedHelp: []*discordgo.MessageEmbedField{
 			{
 				Name:  "Usage",
@@ -111,25 +98,13 @@ func init() {
 				Value: "Must look something like this: https://twitter.com/mhy_shima/status/1258684420011069442",
 			},
 		},
-	}
-	Commands["nhentai"] = Command{
-		Name:            "nhentai",
-		Description:     "Gives detailed information about an nhentai book",
-		GuildOnly:       false,
-		Exec:            nhen,
-		Help:            true,
-		AdvancedCommand: true,
-		ExtendedHelp: []*discordgo.MessageEmbedField{
-			{
-				Name:  "Usage",
-				Value: "bt!nhentai <magic number>",
-			},
-			{
-				Name:  "magic number",
-				Value: "Typically, but not always, 6-digit number that only weebs understand.",
-			},
-		},
-	}
+	})
+
+	imagesGroup.addCommand(twitterCommand)
+	imagesGroup.addCommand(pixivCommand)
+	imagesGroup.addCommand(deepfryCommand)
+	imagesGroup.addCommand(sauceCommand)
+	CommandGroups["images"] = imagesGroup
 }
 
 func sauce(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
@@ -193,21 +168,22 @@ func sauce(s *discordgo.Session, m *discordgo.MessageCreate, args []string) erro
 	return nil
 }
 
-func snao(link string) (*discordgo.MessageEmbed, error) {
-	res, err := saucenao.SearchSauceByURL(link)
+func saucenao(link string) (*discordgo.MessageEmbed, error) {
+	res, err := saucenaoapi.SearchSauceByURL(link)
 	if err != nil {
 		return nil, err
 	}
-	results, err := utils.FilterLowSimilarity(res.Results)
 	if err != nil {
 		return nil, err
 	}
-	if len(results) == 0 {
+
+	res.FilterLowSimilarity(60.0)
+	if len(res.Results) == 0 {
 		return nil, ErrNoSauce
 	}
 
-	findSauce := func() *saucenao.Sauce {
-		for _, res := range results {
+	findSauce := func() *saucenaoapi.Sauce {
+		for _, res := range res.Results {
 			if len(res.Data.URLs) == 0 {
 				continue
 			}
@@ -226,10 +202,9 @@ func snao(link string) (*discordgo.MessageEmbed, error) {
 		return nil, ErrNoSauce
 	}
 
-	author := utils.FindAuthor(*snaoSauce)
 	log.Infoln("Source found. URL: %v. Title: %v", snaoSauce.Data.URLs[0], snaoSauce.Data.Title)
 	embed := &discordgo.MessageEmbed{
-		Title:     snaoSauce.Data.Title,
+		Title:     snaoSauce.Title(),
 		URL:       snaoSauce.Data.URLs[0],
 		Timestamp: utils.EmbedTimestamp(),
 		Color:     utils.EmbedColor,
@@ -247,7 +222,7 @@ func snao(link string) (*discordgo.MessageEmbed, error) {
 			},
 			{
 				Name:  "Author",
-				Value: author,
+				Value: snaoSauce.Author(),
 			},
 		},
 	}
@@ -328,12 +303,12 @@ func findRecentImage(messages []*discordgo.Message) string {
 	return ""
 }
 
-func pixivCommand(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
+func pixiv(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
 	if len(args) == 0 {
 		return utils.ErrNotEnoughArguments
 	}
 
-	match := pixiv.Regex.FindStringSubmatch(args[0])
+	match := pixivhelper.Regex.FindStringSubmatch(args[0])
 	if match == nil {
 		return errors.New("first arguments must be a pixiv link")
 	}
@@ -359,7 +334,7 @@ func pixivCommand(s *discordgo.Session, m *discordgo.MessageCreate, args []strin
 		}
 	}
 
-	pixiv.PostPixiv(s, m, []string{match[1]}, pixiv.Options{
+	pixivhelper.PostPixiv(s, m, []string{match[1]}, pixivhelper.Options{
 		ProcPrompt: false,
 		Indexes:    excludes,
 		Exclude:    true,
@@ -487,83 +462,5 @@ func deepfry(s *discordgo.Session, m *discordgo.MessageCreate, args []string) er
 	}
 
 	s.ChannelFileSend(m.ChannelID, "deepfried.jpg", deepfried)
-	return nil
-}
-
-func nhen(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
-	if len(args) == 0 {
-		return utils.ErrNotEnoughArguments
-	}
-
-	if _, err := strconv.Atoi(args[0]); err != nil {
-		return errors.New("invalid nhentai ID")
-	}
-
-	ch, err := s.Channel(m.ChannelID)
-	if err != nil {
-		return err
-	}
-
-	if !ch.NSFW {
-		prompt := utils.CreatePrompt(s, m, &utils.PromptOptions{
-			Actions: map[string]func() bool{
-				"👌": func() bool { return true },
-			},
-			Message: "Are you sure you want to use ``nhentai`` in an SFW channel? React 👌 to confirm.",
-			Timeout: 15 * time.Second,
-		})
-		if prompt == nil {
-			return nil
-		}
-	}
-	book, err := nhentai.GetNHentai(args[0])
-	if err != nil {
-		return err
-	}
-
-	artists := ""
-	tags := ""
-	if str := strings.Join(book.Artists, ", "); str != "" {
-		artists = str
-	} else {
-		artists = "-"
-	}
-
-	if str := strings.Join(book.Tags, ", "); str != "" {
-		tags = str
-	} else {
-		tags = "-"
-	}
-
-	embed := &discordgo.MessageEmbed{
-		URL:   book.URL,
-		Title: book.Titles.Pretty,
-		Thumbnail: &discordgo.MessageEmbedThumbnail{
-			URL: book.Cover,
-		},
-		Fields: []*discordgo.MessageEmbedField{
-			{
-				Name:  "Artists",
-				Value: artists,
-			}, {
-				Name:  "Tags",
-				Value: tags,
-			}, {
-				Name:  "Favourites",
-				Value: fmt.Sprintf("%v", book.Favourites),
-			}, {
-				Name:  "Pages",
-				Value: fmt.Sprintf("%v", book.Pages),
-			},
-		},
-		Color:     utils.EmbedColor,
-		Timestamp: utils.EmbedTimestamp(),
-	}
-
-	_, err = s.ChannelMessageSendEmbed(m.ChannelID, embed)
-	if err != nil {
-		return err
-	}
-
 	return nil
 }

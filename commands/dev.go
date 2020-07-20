@@ -11,25 +11,20 @@ import (
 )
 
 func init() {
-	Commands["updateDB"] = Command{
-		Name:            "updateDB",
-		Description:     ".",
-		GuildOnly:       false,
-		Exec:            migrateDB,
-		Help:            false,
-		AdvancedCommand: false,
-		ExtendedHelp:    nil,
+	devGroup := CommandGroup{
+		Name:        "dev",
+		Description: "-",
+		NSFW:        false,
+		Commands:    make(map[string]Command),
+		IsVisible:   false,
 	}
 
-	Commands["test"] = Command{
-		Name:            "test",
-		Description:     ".",
-		GuildOnly:       false,
-		Exec:            editEmbed,
-		Help:            false,
-		AdvancedCommand: false,
-		ExtendedHelp:    nil,
-	}
+	migrateCommand := newCommand("migrate", "-").setExec(migrateDB)
+	testCommand := newCommand("test", "-").setExec(testCmd)
+
+	devGroup.addCommand(migrateCommand)
+	devGroup.addCommand(testCommand)
+	CommandGroups["dev"] = devGroup
 }
 
 func migrateDB(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
@@ -51,7 +46,7 @@ func migrateDB(s *discordgo.Session, m *discordgo.MessageCreate, args []string) 
 	return nil
 }
 
-func editEmbed(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
+func testCmd(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
 	if m.Author.ID != utils.AuthorID {
 		return nil
 	}

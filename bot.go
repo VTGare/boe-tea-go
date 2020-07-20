@@ -7,7 +7,7 @@ import (
 
 	"github.com/VTGare/boe-tea-go/commands"
 	"github.com/VTGare/boe-tea-go/database"
-	"github.com/VTGare/boe-tea-go/pixiv"
+	"github.com/VTGare/boe-tea-go/pixivhelper"
 	"github.com/VTGare/boe-tea-go/services"
 	"github.com/VTGare/boe-tea-go/utils"
 	"github.com/bwmarrin/discordgo"
@@ -55,7 +55,7 @@ func messageCreated(s *discordgo.Session, m *discordgo.MessageCreate) {
 		//no prefix functionality
 		var err error
 		if isGuild && database.GuildCache[m.GuildID].Pixiv {
-			matches := pixiv.Regex.FindAllStringSubmatch(m.Content, len(m.Content)+1)
+			matches := pixivhelper.Regex.FindAllStringSubmatch(m.Content, len(m.Content)+1)
 			if matches != nil {
 				ids := make([]string, 0)
 				for _, match := range matches {
@@ -63,7 +63,7 @@ func messageCreated(s *discordgo.Session, m *discordgo.MessageCreate) {
 				}
 
 				log.Infof("Found a pixiv link on %v (%v), channel %v", where(), m.GuildID, m.ChannelID)
-				err = pixiv.PostPixiv(s, m, ids)
+				err = pixivhelper.PostPixiv(s, m, ids)
 			}
 		}
 
@@ -104,24 +104,28 @@ func messageCreated(s *discordgo.Session, m *discordgo.MessageCreate) {
 		return
 	}
 
-	if command, ok := commands.Commands[fields[0]]; ok {
-		if !isGuild && command.GuildOnly {
-			s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("%v command can't be executed in DMs or group chats", command.Name))
-			return
-		}
-		go func() {
-			log.Infof("Executing %v, requested by %v in %v", m.Content, m.Author.String(), where())
-			err := command.Exec(s, m, fields[1:])
-			if err != nil {
-				log.Println(err)
-				s.ChannelMessageSend(m.ChannelID, "Oops, something went wrong. Error message:\n```"+err.Error()+"```")
+	for _, group := range commands.CommandGroups {
+		if command, ok := group.Commands[fields[0]]; ok {
+			if !isGuild && command.GuildOnly {
+				s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("%v command can't be executed in DMs or group chats", command.Name))
+				return
 			}
-		}()
+			go func() {
+				log.Infof("Executing %v, requested by %v in %v", m.Content, m.Author.String(), where())
+				err := command.Exec(s, m, fields[1:])
+				if err != nil {
+					log.Println(err)
+					s.ChannelMessageSend(m.ChannelID, "Oops, something went wrong. Error message:\n```"+err.Error()+"```")
+				}
+			}()
+
+			break
+		}
 	}
 }
 
 func reactCreated(s *discordgo.Session, r *discordgo.MessageReactionAdd) {
-	if author, ok := pixiv.EmbedCache[r.MessageID]; ok && author == r.UserID && r.Emoji.APIName() == "❌" {
+	if author, ok := pixivhelper.EmbedCache[r.MessageID]; ok && author == r.UserID && r.Emoji.APIName() == "❌" {
 		s.ChannelMessageDelete(r.ChannelID, r.MessageID)
 	}
 }

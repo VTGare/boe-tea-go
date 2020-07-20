@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/VTGare/boe-tea-go/database"
-	"github.com/VTGare/boe-tea-go/saucenao"
 	"github.com/bwmarrin/discordgo"
 	log "github.com/sirupsen/logrus"
 )
@@ -105,19 +104,6 @@ func EmbedTimestamp() string {
 	return time.Now().Format(time.RFC3339)
 }
 
-//FindAuthor is a SauceNAO helper function that finds original source author string.
-func FindAuthor(sauce saucenao.Sauce) string {
-	if sauce.Data.MemberName != "" {
-		return sauce.Data.MemberName
-	} else if sauce.Data.Author != "" {
-		return sauce.Data.Author
-	} else if creator, ok := sauce.Data.Creator.(string); ok {
-		return creator
-	}
-
-	return "-"
-}
-
 //CreatePrompt sends a prompt message to a discord channel
 func CreatePrompt(s *discordgo.Session, m *discordgo.MessageCreate, opts *PromptOptions) ActionFunc {
 	prompt, _ := s.ChannelMessageSend(m.ChannelID, opts.Message)
@@ -205,22 +191,4 @@ func GetEmoji(s *discordgo.Session, guildID, e string) (string, error) {
 		return "", err
 	}
 	return emoji.APIName(), nil
-}
-
-//FilterLowSimilarity filters low similarity results in SauceNAO
-func FilterLowSimilarity(sauce []*saucenao.Sauce) ([]*saucenao.Sauce, error) {
-	filtered := make([]*saucenao.Sauce, 0)
-
-	for _, v := range sauce {
-		similarity, err := strconv.ParseFloat(v.Header.Similarity, 64)
-		if err != nil {
-			return nil, err
-		}
-
-		if similarity >= 60.0 {
-			filtered = append(filtered, v)
-		}
-	}
-
-	return filtered, nil
 }
