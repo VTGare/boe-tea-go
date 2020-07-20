@@ -163,7 +163,7 @@ func createPosts(s *discordgo.Session, m *discordgo.MessageCreate, pixivIDs []st
 			}
 		}
 
-		pageCount += post.Pages
+		pageCount = post.Pages - len(excluded)
 		pixivPosts = append(pixivPosts, post)
 	}
 
