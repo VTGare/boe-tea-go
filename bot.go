@@ -15,8 +15,8 @@ import (
 )
 
 var (
-	botMention   string
-	globalPrefix = "bt!"
+	botMention      string
+	defaultPrefixes = []string{"bt!", "bt.", "bt "}
 )
 
 func onReady(s *discordgo.Session, e *discordgo.Ready) {
@@ -26,6 +26,55 @@ func onReady(s *discordgo.Session, e *discordgo.Ready) {
 	err := utils.CreateDB(e.Guilds)
 	if err != nil {
 		log.Warnln("Error adding guilds: ", err)
+	}
+}
+
+func trimPrefix(content, guildID string) string {
+	guild, ok := database.GuildCache[guildID]
+	var defaultPrefix bool
+	if ok && guild.Prefix == "bt!" {
+		defaultPrefix = true
+	} else if !ok {
+		defaultPrefix = true
+	} else {
+		defaultPrefix = false
+	}
+
+	switch {
+	case strings.HasPrefix(content, botMention):
+		return strings.TrimPrefix(content, botMention)
+	case defaultPrefix:
+		for _, prefix := range defaultPrefixes {
+			if strings.HasPrefix(content, prefix) {
+				return strings.TrimPrefix(content, prefix)
+			}
+		}
+	case !defaultPrefix && ok:
+		return strings.TrimPrefix(content, guild.Prefix)
+	default:
+		return content
+	}
+
+	return content
+}
+
+func handleError(s *discordgo.Session, m *discordgo.MessageCreate, err error) {
+	if err != nil {
+		log.Errorf("An error occured: %v", err)
+		embed := &discordgo.MessageEmbed{
+			Title: "Oops, something went wrong!",
+			Thumbnail: &discordgo.MessageEmbedThumbnail{
+				URL: "https://i.imgur.com/OZ1Al5h.png",
+			},
+			Description: fmt.Sprintf(`***Error message:***
+			%v
+
+			Please contact bot's author using bt!feedback command or directly at VTGare#3370 if you can't understand the error. 
+			`, err),
+			Color:     utils.EmbedColor,
+			Timestamp: utils.EmbedTimestamp(),
+		}
+		s.ChannelMessageSendEmbed(m.ChannelID, embed)
 	}
 }
 
@@ -44,14 +93,8 @@ func messageCreated(s *discordgo.Session, m *discordgo.MessageCreate) {
 		return "DMs"
 	}
 
-	var content string
-	if strings.HasPrefix(m.Content, botMention) {
-		content = strings.TrimPrefix(m.Content, botMention)
-	} else if strings.HasPrefix(m.Content, database.GuildCache[m.GuildID].Prefix) {
-		content = strings.TrimPrefix(m.Content, database.GuildCache[m.GuildID].Prefix)
-	} else if !isGuild && strings.HasPrefix(m.Content, globalPrefix) {
-		content = strings.TrimPrefix(m.Content, globalPrefix)
-	} else {
+	var content = trimPrefix(m.Content, m.GuildID)
+	if content == m.Content {
 		//no prefix functionality
 		var err error
 		if isGuild && database.GuildCache[m.GuildID].Pixiv {
@@ -113,10 +156,7 @@ func messageCreated(s *discordgo.Session, m *discordgo.MessageCreate) {
 			go func() {
 				log.Infof("Executing %v, requested by %v in %v", m.Content, m.Author.String(), where())
 				err := command.Exec(s, m, fields[1:])
-				if err != nil {
-					log.Println(err)
-					s.ChannelMessageSend(m.ChannelID, "Oops, something went wrong. Error message:\n```"+err.Error()+"```")
-				}
+				handleError(s, m, err)
 			}()
 
 			break

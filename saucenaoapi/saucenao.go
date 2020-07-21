@@ -71,9 +71,22 @@ func SearchSauceByURL(image string) (*SauceNaoResult, error) {
 		return nil, err
 	}
 
+	filter := make([]*Sauce, 0)
+	for _, source := range res.Results {
+		if len(source.Data.URLs) == 0 && source.Data.Source == "" {
+			continue
+		}
+		if source.Data.Title == "" {
+			source.Data.Title = "No title"
+		}
+		filter = append(filter, source)
+	}
+	res.Results = filter
+
 	return &res, nil
 }
 
+//FilterLowSimilarity filters results below min
 func (s *SauceNaoResult) FilterLowSimilarity(min float64) error {
 	filtered := make([]*Sauce, 0)
 
@@ -90,6 +103,14 @@ func (s *SauceNaoResult) FilterLowSimilarity(min float64) error {
 
 	s.Results = filtered
 	return nil
+}
+
+func (s *Sauce) URL() string {
+	if s.Data.Source != "" {
+		return s.Data.Source
+	}
+
+	return s.Data.URLs[0]
 }
 
 func (s *Sauce) Author() string {

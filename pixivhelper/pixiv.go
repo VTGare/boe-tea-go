@@ -220,6 +220,28 @@ func createPosts(s *discordgo.Session, m *discordgo.MessageCreate, pixivIDs []st
 	return messages, nil
 }
 
+func joinTags(elems []string, sep string) string {
+	switch len(elems) {
+	case 0:
+		return ""
+	case 1:
+		return elems[0]
+	}
+	n := len(sep) * (len(elems) - 1)
+	for i := 0; i < len(elems); i++ {
+		n += len(elems[i])
+	}
+
+	var b strings.Builder
+	b.Grow(n)
+	b.WriteString(fmt.Sprintf("[%v](https://www.pixiv.net/en/tags/%v/artworks)", elems[0], elems[0]))
+	for _, s := range elems[1:] {
+		b.WriteString(sep)
+		b.WriteString(fmt.Sprintf("[%v](https://www.pixiv.net/en/tags/%v/artworks)", s, s))
+	}
+	return b.String()
+}
+
 func createEmbed(post *services.PixivPost, thumbnail, original string, ind int) discordgo.MessageSend {
 	title := ""
 	if len(post.LargeImages) == 1 {
@@ -230,10 +252,11 @@ func createEmbed(post *services.PixivPost, thumbnail, original string, ind int) 
 
 	return discordgo.MessageSend{
 		Embed: &discordgo.MessageEmbed{
-			Title:     title,
-			URL:       original,
-			Color:     utils.EmbedColor,
-			Timestamp: utils.EmbedTimestamp(),
+			Title:       title,
+			URL:         original,
+			Color:       utils.EmbedColor,
+			Timestamp:   utils.EmbedTimestamp(),
+			Description: fmt.Sprintf("[Original quality](%v)", original),
 			Fields: []*discordgo.MessageEmbedField{
 				{
 					Name:   "Likes",
@@ -242,7 +265,7 @@ func createEmbed(post *services.PixivPost, thumbnail, original string, ind int) 
 				},
 				{
 					Name:   "Tags",
-					Value:  strings.Join(post.Tags, " • "),
+					Value:  joinTags(post.Tags, " • "),
 					Inline: true,
 				},
 			},

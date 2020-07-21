@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"image"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -23,7 +24,7 @@ var (
 	//ImageURLRegex is a regex for image URLs
 	ImageURLRegex = regexp.MustCompile(`(?i)(http(s?):)([/|.|\w|\s|-])*\.(?:jpg|jpeg|gif|png|webp)`)
 	//ErrNoSauce is an error when source couldn't be found.
-	ErrNoSauce    = errors.New("source image has not been found")
+	ErrNoSauce    = errors.New("seems like sauce couldn't be found. Try using following websites yourself:\nhttps://ascii2d.net/\nhttps://iqdb.org/")
 	searchEngines = map[string]func(link string) (*discordgo.MessageEmbed, error){
 		"saucenao": saucenao,
 		"wait":     wait,
@@ -128,35 +129,35 @@ func sauce(s *discordgo.Session, m *discordgo.MessageCreate, args []string) erro
 		return "saucenao"
 	}
 
-	url := ""
+	uri := ""
 	searchEngine := ""
 
 	if len(args) == 0 {
 		return utils.ErrNotEnoughArguments
 	} else if len(args) == 1 {
 		searchEngine = findEngine()
-		url = ImageURLRegex.FindString(args[0])
-		if url == "" {
+		uri = ImageURLRegex.FindString(args[0])
+		if uri == "" {
 			return errors.New("received a non-image url")
 		}
 	} else if len(args) >= 2 {
 		if f := ImageURLRegex.FindString(args[0]); f != "" {
 			searchEngine = findEngine()
-			url = f
+			uri = f
 		} else if _, ok := searchEngines[args[0]]; ok {
 			searchEngine = args[0]
-			url = ImageURLRegex.FindString(args[1])
+			uri = ImageURLRegex.FindString(args[1])
 		} else {
 			return errors.New("incorrect command usage, please use bt!help sauce for more info")
 		}
 
-		if url == "" {
+		if uri == "" {
 			return errors.New("received a non-image url")
 		}
 	}
 
-	log.Infoln("Searching sauce for", url, "on", searchEngine)
-	embed, err := searchEngines[searchEngine](url)
+	log.Infoln("Searching sauce for", uri, "on", searchEngine)
+	embed, err := searchEngines[searchEngine](uri)
 	if err != nil {
 		return err
 	}
@@ -168,12 +169,41 @@ func sauce(s *discordgo.Session, m *discordgo.MessageCreate, args []string) erro
 	return nil
 }
 
+func namedLink(uri string) string {
+	switch {
+	case strings.Contains(uri, "danbooru"):
+		return fmt.Sprintf("[Danbooru](%v)", uri)
+	case strings.Contains(uri, "gelbooru"):
+		return fmt.Sprintf("[Gelbooru](%v)", uri)
+	case strings.Contains(uri, "sankakucomplex"):
+		return fmt.Sprintf("[Sankakucomplex](%v)", uri)
+	case strings.Contains(uri, "pixiv"):
+		return fmt.Sprintf("[Pixiv](%v)", uri)
+	case strings.Contains(uri, "twitter"):
+		return fmt.Sprintf("[Twitter](%v)", uri)
+	default:
+		return uri
+	}
+}
+
+func joinSauceURLs(urls []string, sep string) string {
+	var sb strings.Builder
+	if len(urls) == 0 {
+		return "-"
+	}
+
+	sb.WriteString(namedLink(urls[0]))
+	for _, uri := range urls[1:] {
+		sb.WriteString(sep)
+		sb.WriteString(namedLink(uri))
+	}
+
+	return sb.String()
+}
+
 func saucenao(link string) (*discordgo.MessageEmbed, error) {
 	res, err := saucenaoapi.SearchSauceByURL(link)
-	if err != nil {
-		return nil, err
-	}
-	if err != nil {
+	if err != nil && res == nil {
 		return nil, err
 	}
 
@@ -182,49 +212,39 @@ func saucenao(link string) (*discordgo.MessageEmbed, error) {
 		return nil, ErrNoSauce
 	}
 
-	findSauce := func() *saucenaoapi.Sauce {
-		for _, res := range res.Results {
-			if len(res.Data.URLs) == 0 {
-				continue
-			}
+	source := res.Results[0]
+	log.Infoln("Source found. URL: %v. Title: %v", source.Data.URLs[0], source.Data.Title)
 
-			if res.Data.Title == "" {
-				res.Data.Title = "Sauce"
-			}
-
-			return res
-		}
-		return nil
-	}
-
-	snaoSauce := findSauce()
-	if res == nil {
-		return nil, ErrNoSauce
-	}
-
-	log.Infoln("Source found. URL: %v. Title: %v", snaoSauce.Data.URLs[0], snaoSauce.Data.Title)
 	embed := &discordgo.MessageEmbed{
-		Title:     snaoSauce.Title(),
-		URL:       snaoSauce.Data.URLs[0],
+		Title:     fmt.Sprintf("Source found! Title: %v", source.Title()),
+		URL:       source.URL(),
 		Timestamp: utils.EmbedTimestamp(),
 		Color:     utils.EmbedColor,
 		Thumbnail: &discordgo.MessageEmbedThumbnail{
-			URL: snaoSauce.Header.Thumbnail,
+			URL: source.Header.Thumbnail,
 		},
 		Fields: []*discordgo.MessageEmbedField{
 			{
-				Name:  "URL",
-				Value: snaoSauce.Data.URLs[0],
+				Name:  "Source",
+				Value: source.URL(),
+			},
+			{
+				Name:  "URLs",
+				Value: joinSauceURLs(source.Data.URLs, " • "),
 			},
 			{
 				Name:  "Similarity",
-				Value: snaoSauce.Header.Similarity,
+				Value: source.Header.Similarity,
 			},
 			{
 				Name:  "Author",
-				Value: snaoSauce.Author(),
+				Value: source.Author(),
 			},
 		},
+	}
+
+	if _, err := url.ParseRequestURI(embed.URL); err != nil {
+		embed.URL = source.Data.URLs[0]
 	}
 	return embed, nil
 }
@@ -242,23 +262,23 @@ func wait(link string) (*discordgo.MessageEmbed, error) {
 	anime := res.Documents[0]
 
 	description := ""
-	url := ""
+	uri := ""
 	if anime.AnilistID != 0 && anime.MalID != 0 {
 		description = fmt.Sprintf("[AniList link](https://anilist.co/anime/%v/) | [MyAnimeList link](https://myanimelist.net/anime/%v/)", anime.AnilistID, anime.MalID)
-		url = fmt.Sprintf("https://myanimelist.net/anime/%v/", anime.MalID)
+		uri = fmt.Sprintf("https://myanimelist.net/anime/%v/", anime.MalID)
 	} else if anime.AnilistID != 0 {
 		description = fmt.Sprintf("[AniList link](https://anilist.co/anime/%v/)", anime.AnilistID)
-		url = fmt.Sprintf("https://anilist.co/anime/%v/", anime.AnilistID)
+		uri = fmt.Sprintf("https://anilist.co/anime/%v/", anime.AnilistID)
 	} else if anime.MalID != 0 {
 		description = fmt.Sprintf("[MyAnimeList link](https://myanimelist.net/anime/%v/)", anime.MalID)
-		url = fmt.Sprintf("https://myanimelist.net/anime/%v/", anime.MalID)
+		uri = fmt.Sprintf("https://myanimelist.net/anime/%v/", anime.MalID)
 	} else {
 		description = "No links :shrug:"
 	}
 
 	embed := &discordgo.MessageEmbed{
 		Title:       fmt.Sprintf("%v | %v", anime.TitleEnglish, anime.TitleNative),
-		URL:         url,
+		URL:         uri,
 		Description: description,
 		Color:       utils.EmbedColor,
 		Timestamp:   utils.EmbedTimestamp(),
@@ -419,12 +439,12 @@ func deepfry(s *discordgo.Session, m *discordgo.MessageCreate, args []string) er
 		args = append(args, m.Attachments[0].URL)
 	}
 
-	url := ""
+	uri := ""
 	times := 0
 	switch len(args) {
 	case 2:
 		if f := ImageURLRegex.FindString(args[0]); f != "" {
-			url = f
+			uri = f
 		} else {
 			var err error
 			times, err = strconv.Atoi(args[0])
@@ -434,15 +454,15 @@ func deepfry(s *discordgo.Session, m *discordgo.MessageCreate, args []string) er
 			if err != nil {
 				return err
 			}
-			url = ImageURLRegex.FindString(args[1])
+			uri = ImageURLRegex.FindString(args[1])
 		}
 
-		if url == "" {
+		if uri == "" {
 			return errors.New("received a non-image url")
 		}
 	case 1:
 		if f := ImageURLRegex.FindString(args[0]); f != "" {
-			url = f
+			uri = f
 		} else {
 			return errors.New("received a non-image url")
 		}
@@ -450,7 +470,7 @@ func deepfry(s *discordgo.Session, m *discordgo.MessageCreate, args []string) er
 		return utils.ErrNotEnoughArguments
 	}
 
-	img, err := images.DownloadImage(url)
+	img, err := images.DownloadImage(uri)
 	if err != nil {
 		return err
 	}
