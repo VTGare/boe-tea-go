@@ -1,6 +1,7 @@
 package pixivhelper
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -19,7 +20,7 @@ var (
 	Regex = regexp.MustCompile(`(?i)http(?:s)?:\/\/(?:www\.)?pixiv\.net\/(?:en\/)?(?:artworks\/|member_illust\.php\?)(?:mode=medium\&)?(?:illust_id=)?([0-9]+)`)
 	//EmbedCache caches sent embeds so users can delete them within certain time interval
 	EmbedCache   = make(map[string]string)
-	embedWarning = fmt.Sprintf("Please follow the link in the title to download high-res image")
+	embedWarning = fmt.Sprintf("If you're reading this you're epic.")
 )
 
 //Options is a settings structure for configuring Pixiv repost feature for different purposes
@@ -81,9 +82,15 @@ func PostPixiv(s *discordgo.Session, m *discordgo.MessageCreate, pixivIDs []stri
 		postIDs := make([]string, 0)
 
 		for _, message := range posts {
-			post, _ := s.ChannelMessageSendComplex(m.ChannelID, &message)
-			postIDs = append(postIDs, post.ID)
-			EmbedCache[post.ID] = m.Author.ID
+			post, err := s.ChannelMessageSendComplex(m.ChannelID, &message)
+			if err != nil {
+				return errors.New("a post you're trying to repost is either removed or restricted")
+			}
+
+			if post != nil {
+				postIDs = append(postIDs, post.ID)
+				EmbedCache[post.ID] = m.Author.ID
+			}
 		}
 
 		go func() {
@@ -103,7 +110,7 @@ func createPosts(s *discordgo.Session, m *discordgo.MessageCreate, pixivIDs []st
 	var (
 		messages      = make([]discordgo.MessageSend, 0)
 		repostSetting = database.GuildCache[m.GuildID].Repost
-		strictIDs     = make([]string, 0)
+		reposts       = make([]*database.ImagePost, 0)
 		ch, _         = s.Channel(m.ChannelID)
 		pixivPosts    = make([]*services.PixivPost, 0)
 		guild         = database.GuildCache[m.GuildID]
@@ -111,7 +118,12 @@ func createPosts(s *discordgo.Session, m *discordgo.MessageCreate, pixivIDs []st
 	)
 
 	for _, id := range pixivIDs {
-		if (repostSetting == "enabled" || repostSetting == "strict") && utils.IsRepost(m.ChannelID, id) {
+		repost, err := utils.IsRepost(m.ChannelID, id)
+		if err != nil {
+			return nil, err
+		}
+
+		if (repostSetting == "enabled" || repostSetting == "strict") && repost != nil {
 			if repostSetting == "enabled" {
 				prompt := utils.CreatePrompt(s, m, &utils.PromptOptions{
 					Actions: map[string]func() bool{
@@ -134,7 +146,7 @@ func createPosts(s *discordgo.Session, m *discordgo.MessageCreate, pixivIDs []st
 					continue
 				}
 			} else if repostSetting == "strict" {
-				strictIDs = append(strictIDs, id)
+				reposts = append(reposts, repost)
 				continue
 			}
 		}
@@ -185,7 +197,7 @@ func createPosts(s *discordgo.Session, m *discordgo.MessageCreate, pixivIDs []st
 			created = true
 			createdCount++
 
-			utils.NewRepostChecker(m.ChannelID, post.ID)
+			utils.NewRepostDetection(m.Author.Username, m.GuildID, m.ChannelID, m.ID, post.ID)
 			messages = append(messages, createEmbed(post, thumbnail, post.OriginalImages[ind], ind))
 		}
 	}
@@ -194,8 +206,8 @@ func createPosts(s *discordgo.Session, m *discordgo.MessageCreate, pixivIDs []st
 		messages[0].Content = fmt.Sprintf("```Album size (%v) is larger than limit set on this server (%v), only first image of every post is reposted.```", pageCount, guild.Limit)
 	}
 
-	if repostSetting == "strict" && len(strictIDs) > 0 {
-		if len(strictIDs) == len(pixivIDs) {
+	if repostSetting == "strict" && len(reposts) > 0 {
+		if len(reposts) == len(pixivIDs) {
 			if f, _ := utils.MemberHasPermission(s, m.GuildID, s.State.User.ID, discordgo.PermissionManageMessages|discordgo.PermissionAdministrator); f {
 				err := s.ChannelMessageDelete(m.ChannelID, m.ID)
 				if err != nil {
@@ -204,18 +216,36 @@ func createPosts(s *discordgo.Session, m *discordgo.MessageCreate, pixivIDs []st
 			}
 		}
 
-		content := ""
-		if len(strictIDs) == 1 {
-			content = fmt.Sprintf("Pixiv post ``%v`` is a repost and has been skipped.", strictIDs)
-		} else {
-			content = fmt.Sprintf("Pixiv posts with following IDs ``%v`` are reposts and have been skipped.", strictIDs)
+		embed := &discordgo.MessageEmbed{
+			Title: "General Reposti!",
+			Thumbnail: &discordgo.MessageEmbedThumbnail{
+				URL: "https://i.imgur.com/OZ1Al5h.png",
+			},
+			Timestamp: utils.EmbedTimestamp(),
+			Color:     utils.EmbedColor,
 		}
 
-		msg, _ := s.ChannelMessageSend(m.ChannelID, content)
-		go func() {
-			time.Sleep(15 * time.Second)
-			s.ChannelMessageDelete(msg.ChannelID, msg.ID)
-		}()
+		for _, rep := range reposts {
+			dur := rep.CreatedAt.Add(86400 * time.Second).Sub(time.Now())
+			content := &discordgo.MessageEmbedField{
+				Name:   "Content",
+				Value:  rep.Content,
+				Inline: true,
+			}
+			link := &discordgo.MessageEmbedField{
+				Name:   "Link to post",
+				Value:  fmt.Sprintf("[Press here desu~](https://discord.com/channels/%v/%v/%v)", rep.GuildID, rep.ChannelID, rep.MessageID),
+				Inline: true,
+			}
+			expires := &discordgo.MessageEmbedField{
+				Name:   "Expires",
+				Value:  dur.Round(time.Second).String(),
+				Inline: true,
+			}
+			embed.Fields = append(embed.Fields, content, link, expires)
+		}
+
+		s.ChannelMessageSendEmbed(m.ChannelID, embed)
 	}
 	return messages, nil
 }
@@ -253,7 +283,7 @@ func createEmbed(post *services.PixivPost, thumbnail, original string, ind int) 
 	return discordgo.MessageSend{
 		Embed: &discordgo.MessageEmbed{
 			Title:       title,
-			URL:         original,
+			URL:         fmt.Sprintf("https://www.pixiv.net/en/artworks/%v", post.ID),
 			Color:       utils.EmbedColor,
 			Timestamp:   utils.EmbedTimestamp(),
 			Description: fmt.Sprintf("[Original quality](%v)", original),

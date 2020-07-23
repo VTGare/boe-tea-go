@@ -51,11 +51,9 @@ func testCmd(s *discordgo.Session, m *discordgo.MessageCreate, args []string) er
 		return nil
 	}
 
-	embed1 := discordgo.MessageEmbed{
-		Title:       "[named links](https://discordapp.com)",
-		Description: "[named links](https://discordapp.com)",
+	if len(args) == 0 {
+		return utils.ErrNotEnoughArguments
 	}
 
-	s.ChannelMessageSendEmbed(m.ChannelID, &embed1)
 	return nil
 }

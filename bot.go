@@ -78,6 +78,56 @@ func handleError(s *discordgo.Session, m *discordgo.MessageCreate, err error) {
 	}
 }
 
+func prefixless(s *discordgo.Session, m *discordgo.MessageCreate) error {
+	guild := database.GuildCache[m.GuildID]
+	if guild.Pixiv {
+		matches := pixivhelper.Regex.FindAllStringSubmatch(m.Content, len(m.Content)+1)
+		if matches != nil {
+			ids := make([]string, 0)
+			for _, match := range matches {
+				ids = append(ids, match[1])
+			}
+
+			log.Infof("Executing pixiv reposting. Guild ID: %v, channel ID: %v", m.GuildID, m.ChannelID)
+			err := pixivhelper.PostPixiv(s, m, ids)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	if tweets := services.TwitterRegex.FindAllString(m.Content, len(m.Content)+1); tweets != nil {
+		repostSetting := guild.Repost
+		if repostSetting != "disabled" {
+			for _, tweet := range tweets {
+				repost, err := utils.IsRepost(m.ChannelID, tweet)
+				if err != nil {
+					return err
+				}
+
+				if repost != nil {
+					f, _ := utils.MemberHasPermission(s, m.GuildID, s.State.User.ID, discordgo.PermissionManageMessages|discordgo.PermissionAdministrator)
+
+					if f && repostSetting == "strict" {
+						err := s.ChannelMessageDelete(m.ChannelID, m.ID)
+						if err != nil {
+							log.Warn(err)
+						}
+					}
+					tweet, _ := s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Repost detected. This tweet has been posted before within the last 24 hours."))
+					go func() {
+						time.Sleep(15 * time.Second)
+						s.ChannelMessageDelete(tweet.ChannelID, tweet.ID)
+					}()
+				} else {
+					utils.NewRepostDetection(m.Author.Username, m.GuildID, m.ChannelID, m.ID, tweet)
+				}
+			}
+		}
+	}
+	return nil
+}
+
 func messageCreated(s *discordgo.Session, m *discordgo.MessageCreate) {
 	if m.Author.Bot {
 		return
@@ -94,50 +144,10 @@ func messageCreated(s *discordgo.Session, m *discordgo.MessageCreate) {
 	}
 
 	var content = trimPrefix(m.Content, m.GuildID)
-	if content == m.Content {
-		//no prefix functionality
-		var err error
-		if isGuild && database.GuildCache[m.GuildID].Pixiv {
-			matches := pixivhelper.Regex.FindAllStringSubmatch(m.Content, len(m.Content)+1)
-			if matches != nil {
-				ids := make([]string, 0)
-				for _, match := range matches {
-					ids = append(ids, match[1])
-				}
-
-				log.Infof("Found a pixiv link on %v (%v), channel %v", where(), m.GuildID, m.ChannelID)
-				err = pixivhelper.PostPixiv(s, m, ids)
-			}
-		}
-
-		if twitter := services.TwitterRegex.FindAllString(m.Content, len(m.Content)+1); isGuild && twitter != nil {
-			repostSetting := database.GuildCache[m.GuildID].Repost
-			if repostSetting != "disabled" {
-				for _, tweet := range twitter {
-					if utils.IsRepost(m.ChannelID, tweet) {
-						f, _ := utils.MemberHasPermission(s, m.GuildID, s.State.User.ID, discordgo.PermissionManageMessages|discordgo.PermissionAdministrator)
-
-						if f && repostSetting == "strict" {
-							err := s.ChannelMessageDelete(m.ChannelID, m.ID)
-							if err != nil {
-								log.Warn(err)
-							}
-						}
-						tweet, _ := s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Repost detected. This tweet has been posted before within the last 24 hours."))
-						go func() {
-							time.Sleep(15 * time.Second)
-							s.ChannelMessageDelete(tweet.ChannelID, tweet.ID)
-						}()
-					} else {
-						utils.NewRepostChecker(m.ChannelID, tweet)
-					}
-				}
-			}
-		}
-
+	if content == m.Content && isGuild {
+		err := prefixless(s, m)
 		if err != nil {
-			log.Warnln(err)
-			s.ChannelMessageSend(m.ChannelID, "Oops, something went wrong. Error message:\n``"+err.Error()+"``")
+			handleError(s, m, err)
 		}
 		return
 	}

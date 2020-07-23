@@ -1,27 +1,34 @@
 package utils
 
-import "time"
+import (
+	"fmt"
 
-var (
-	//RepostCache is in-memory cached repost checker.
-	RepostCache = make(map[string]map[string]bool)
+	"github.com/VTGare/boe-tea-go/database"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
-//IsRepost checks if something has been cached in repost cache
-func IsRepost(channelID, post string) bool {
-	_, ok := RepostCache[channelID][post]
-	return ok
+func errRepostDetection(err error) error {
+	return fmt.Errorf("Repost detection mechanism has failed. Please report this error to a dev and disable repost detection if problem remains.\n%v", err)
 }
 
-//NewRepostChecker caches post info per channel.
-func NewRepostChecker(channelID, post string) {
-	if _, ok := RepostCache[channelID]; !ok {
-		RepostCache[channelID] = map[string]bool{}
+//IsRepost checks if something has been cached in repost cache
+func IsRepost(channelID, post string) (*database.ImagePost, error) {
+	rep, err := database.IsRepost(channelID, post)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return nil, nil
+		}
+		return nil, errRepostDetection(err)
 	}
 
-	RepostCache[channelID][post] = true
-	go func() {
-		time.Sleep(24 * time.Hour)
-		delete(RepostCache[channelID], post)
-	}()
+	return rep, nil
+}
+
+//NewRepostDetection caches post info per channel.
+func NewRepostDetection(author, guildID, channelID, messageID, post string) error {
+	err := database.InsertOnePost(database.NewImagePost(author, guildID, channelID, messageID, post))
+	if err != nil {
+		return errRepostDetection(err)
+	}
+	return nil
 }
