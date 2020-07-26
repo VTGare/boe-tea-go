@@ -73,7 +73,7 @@ func SearchSauceByURL(image string) (*SauceNaoResult, error) {
 
 	filter := make([]*Sauce, 0)
 	for _, source := range res.Results {
-		if len(source.Data.URLs) == 0 && source.Data.Source == "" {
+		if len(source.Data.URLs) == 0 || source.Data.Source == "" {
 			continue
 		}
 		if source.Data.Title == "" {
