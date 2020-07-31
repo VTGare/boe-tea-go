@@ -2,10 +2,12 @@ package saucenaoapi
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/url"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/VTGare/boe-tea-go/services"
 )
@@ -73,17 +75,32 @@ func SearchSauceByURL(image string) (*SauceNaoResult, error) {
 
 	filter := make([]*Sauce, 0)
 	for _, source := range res.Results {
-		if len(source.Data.URLs) == 0 || source.Data.Source == "" {
+		if len(source.Data.URLs) == 0 && source.Data.Source == "" {
 			continue
 		}
 		if source.Data.Title == "" {
 			source.Data.Title = "No title"
 		}
+
+		for ind, uri := range source.Data.URLs {
+			source.Data.URLs[ind] = beautifyPixiv(uri)
+		}
+		source.Data.Source = beautifyPixiv(source.Data.Source)
+
 		filter = append(filter, source)
 	}
 	res.Results = filter
 
 	return &res, nil
+}
+
+func beautifyPixiv(url string) string {
+	if strings.HasPrefix(url, "https://www.pixiv.net/member_illust.php?mode=medium&illust_id=") {
+		id := strings.TrimPrefix(url, "https://www.pixiv.net/member_illust.php?mode=medium&illust_id=")
+		url = fmt.Sprintf("https://www.pixiv.net/en/artworks/%v", id)
+	}
+
+	return url
 }
 
 //FilterLowSimilarity filters results below min

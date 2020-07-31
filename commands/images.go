@@ -213,7 +213,7 @@ func saucenao(link string) (*discordgo.MessageEmbed, error) {
 	}
 
 	source := res.Results[0]
-	log.Infoln("Source found. URL: %v. Title: %v", source.Data.URLs[0], source.Data.Title)
+	log.Infof("Source found. URL: %v. Title: %v", source.Data.URLs[0], source.Data.Title)
 
 	embed := &discordgo.MessageEmbed{
 		Title:     fmt.Sprintf("Source found! Title: %v", source.Title()),
