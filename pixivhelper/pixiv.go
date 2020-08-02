@@ -18,7 +18,7 @@ import (
 var (
 	//EmbedCache caches sent embeds so users can delete them within certain time interval
 	EmbedCache   = make(map[string]string)
-	embedWarning = []string{"If you're reading this you're epic.", "If you react ❌ to a pixiv embed it'll be removed", "bt!nhentai 271920, enjoy", "This embed was sponsored by Raid Shadow Legends", "There are several hidden meme commands, try to find them", "Love, from Shamoki-chan", "bt!twitter is useful for mobile users", "Ramiel best girl", "#BlueLivesMatter", "PM the creator of this bot lolis.", "If you wrap a link in <> Discord won't embed it", "Who's Rem", "Every 60 seconds one minute passes in Africa", "People die when they're killed", "You thought it was a useful message, but it was me DIO!", "Enable strict mode to remove filthy reposts."}
+	embedWarning = []string{"POMF POMF KIMOCHI", "https://www.youtube.com/watch?v=899kstdMUoQ", "Haruhi is a goddess", "My creator's waifu is 2B", "Epstein didn't kill himself", "If you're reading this you're epic.", "If you react ❌ to a pixiv embed it'll be removed", "bt!nhentai 271920, enjoy", "This embed was sponsored by Raid Shadow Legends", "There are several hidden meme commands, try to find them", "Love, from Shamoki-chan", "bt!twitter is useful for mobile users", "Ramiel best girl", "#BlueLivesMatter", "PM the creator of this bot lolis.", "If you wrap a link in <> Discord won't embed it", "Who's Rem", "Every 60 seconds one minute passes in Africa", "People die when they're killed", "You thought it was a useful message, but it was me DIO!", "Enable strict mode to remove filthy reposts."}
 )
 
 //Options is a settings structure for configuring Pixiv repost feature for different purposes
@@ -174,6 +174,8 @@ func createPosts(s *discordgo.Session, m *discordgo.MessageCreate, pixivIDs []st
 	}
 
 	createdCount := 0
+
+	easterEgg := rand.Intn(len(embedWarning))
 	for _, post := range pixivPosts {
 		created := false
 		if createdCount >= guild.Limit {
@@ -191,7 +193,6 @@ func createPosts(s *discordgo.Session, m *discordgo.MessageCreate, pixivIDs []st
 			created = true
 			createdCount++
 
-			easterEgg := rand.Intn(len(embedWarning))
 			utils.NewRepostDetection(m.Author.Username, m.GuildID, m.ChannelID, m.ID, post.ID)
 			messages = append(messages, createEmbed(post, thumbnail, post.OriginalImages[ind], ind, easterEgg))
 		}
