@@ -284,6 +284,17 @@ func pixiv(s *discordgo.Session, m *discordgo.MessageCreate, args []string) erro
 		return errors.New("first arguments must be a pixiv link")
 	}
 
+	repost, err := database.IsRepost(m.ChannelID, match[1])
+	if err != nil {
+		return err
+	}
+
+	if repost != nil {
+		embed := utils.RepostsToEmbed(repost)
+		s.ChannelMessageSendEmbed(m.ChannelID, embed)
+		return nil
+	}
+
 	args = args[1:]
 	excludes := make(map[int]bool)
 	for _, arg := range args {

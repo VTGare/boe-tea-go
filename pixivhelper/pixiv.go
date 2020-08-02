@@ -3,6 +3,7 @@ package pixivhelper
 import (
 	"errors"
 	"fmt"
+	"math/rand"
 	"strconv"
 	"strings"
 	"time"
@@ -17,7 +18,7 @@ import (
 var (
 	//EmbedCache caches sent embeds so users can delete them within certain time interval
 	EmbedCache   = make(map[string]string)
-	embedWarning = fmt.Sprintf("If you're reading this you're epic.")
+	embedWarning = []string{"If you're reading this you're epic.", "If you react ❌ to a pixiv embed it'll be removed", "bt!nhentai 271920, enjoy", "This embed was sponsored by Raid Shadow Legends", "There are several hidden meme commands, try to find them", "Love, from Shamoki-chan", "bt!twitter is useful for mobile users", "Ramiel best girl", "#BlueLivesMatter", "PM the creator of this bot lolis.", "If you wrap a link in <> Discord won't embed it", "Who's Rem", "Every 60 seconds one minute passes in Africa", "People die when they're killed", "You thought it was a useful message, but it was me DIO!", "Enable strict mode to remove filthy reposts."}
 )
 
 //Options is a settings structure for configuring Pixiv repost feature for different purposes
@@ -107,7 +108,6 @@ func createPosts(s *discordgo.Session, m *discordgo.MessageCreate, pixivIDs []st
 	var (
 		messages      = make([]discordgo.MessageSend, 0)
 		repostSetting = database.GuildCache[m.GuildID].Repost
-		reposts       = make([]*database.ImagePost, 0)
 		ch, _         = s.Channel(m.ChannelID)
 		pixivPosts    = make([]*services.PixivPost, 0)
 		guild         = database.GuildCache[m.GuildID]
@@ -142,9 +142,6 @@ func createPosts(s *discordgo.Session, m *discordgo.MessageCreate, pixivIDs []st
 				if !prompt() {
 					continue
 				}
-			} else if repostSetting == "strict" {
-				reposts = append(reposts, repost)
-				continue
 			}
 		}
 
@@ -194,8 +191,9 @@ func createPosts(s *discordgo.Session, m *discordgo.MessageCreate, pixivIDs []st
 			created = true
 			createdCount++
 
+			easterEgg := rand.Intn(len(embedWarning))
 			utils.NewRepostDetection(m.Author.Username, m.GuildID, m.ChannelID, m.ID, post.ID)
-			messages = append(messages, createEmbed(post, thumbnail, post.OriginalImages[ind], ind))
+			messages = append(messages, createEmbed(post, thumbnail, post.OriginalImages[ind], ind, easterEgg))
 		}
 	}
 
@@ -203,47 +201,6 @@ func createPosts(s *discordgo.Session, m *discordgo.MessageCreate, pixivIDs []st
 		messages[0].Content = fmt.Sprintf("```Album size (%v) is larger than limit set on this server (%v), only first image of every post is reposted.```", pageCount, guild.Limit)
 	}
 
-	if repostSetting == "strict" && len(reposts) > 0 {
-		if len(reposts) == len(pixivIDs) {
-			if f, _ := utils.MemberHasPermission(s, m.GuildID, s.State.User.ID, discordgo.PermissionManageMessages|discordgo.PermissionAdministrator); f {
-				err := s.ChannelMessageDelete(m.ChannelID, m.ID)
-				if err != nil {
-					log.Warn(err)
-				}
-			}
-		}
-
-		embed := &discordgo.MessageEmbed{
-			Title: "General Reposti!",
-			Thumbnail: &discordgo.MessageEmbedThumbnail{
-				URL: "https://i.imgur.com/OZ1Al5h.png",
-			},
-			Timestamp: utils.EmbedTimestamp(),
-			Color:     utils.EmbedColor,
-		}
-
-		for _, rep := range reposts {
-			dur := rep.CreatedAt.Add(86400 * time.Second).Sub(time.Now())
-			content := &discordgo.MessageEmbedField{
-				Name:   "Content",
-				Value:  rep.Content,
-				Inline: true,
-			}
-			link := &discordgo.MessageEmbedField{
-				Name:   "Link to post",
-				Value:  fmt.Sprintf("[Press here desu~](https://discord.com/channels/%v/%v/%v)", rep.GuildID, rep.ChannelID, rep.MessageID),
-				Inline: true,
-			}
-			expires := &discordgo.MessageEmbedField{
-				Name:   "Expires",
-				Value:  dur.Round(time.Second).String(),
-				Inline: true,
-			}
-			embed.Fields = append(embed.Fields, content, link, expires)
-		}
-
-		s.ChannelMessageSendEmbed(m.ChannelID, embed)
-	}
 	return messages, nil
 }
 
@@ -269,7 +226,7 @@ func joinTags(elems []string, sep string) string {
 	return b.String()
 }
 
-func createEmbed(post *services.PixivPost, thumbnail, original string, ind int) discordgo.MessageSend {
+func createEmbed(post *services.PixivPost, thumbnail, original string, ind, easterEgg int) discordgo.MessageSend {
 	title := ""
 	if len(post.LargeImages) == 1 {
 		title = fmt.Sprintf("%v by %v", post.Title, post.Author)
@@ -300,7 +257,7 @@ func createEmbed(post *services.PixivPost, thumbnail, original string, ind int) 
 				URL: thumbnail,
 			},
 			Footer: &discordgo.MessageEmbedFooter{
-				Text: embedWarning,
+				Text: embedWarning[easterEgg],
 			},
 		},
 	}

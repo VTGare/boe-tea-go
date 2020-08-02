@@ -81,7 +81,7 @@ func prefixless(s *discordgo.Session, m *discordgo.MessageCreate) error {
 	if guild.Repost == "strict" {
 		ips := utils.RemoveReposts(s, m)
 		if len(ips) != 0 {
-			s.ChannelMessageSendEmbed(m.ChannelID, utils.RepostsToEmbed(ips))
+			s.ChannelMessageSendEmbed(m.ChannelID, utils.RepostsToEmbed(ips...))
 		}
 	}
 
