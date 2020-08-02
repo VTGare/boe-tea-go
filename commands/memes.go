@@ -6,38 +6,11 @@ import (
 )
 
 func init() {
-	memesGroup := CommandGroup{
-		Name:        "memes",
-		Description: "Useless commands for laughs and giggles",
-		NSFW:        false,
-		Commands:    make(map[string]Command),
-		IsVisible:   true,
-	}
+	memes := CommandFramework.AddGroup("memes")
+	memes.IsVisible = false
 
-	borgarCommand := newCommand("borgar", "dino eats borgar yummy").setExec(borgar)
-	brainpowerCommand := newCommand("brainpower", "Party time!").setExec(brainpower)
-
-	memesGroup.addCommand(borgarCommand)
-	memesGroup.addCommand(brainpowerCommand)
-	CommandGroups["memes"] = memesGroup
-	/*Commands["borgar"] = Command{
-		Name:            "borgar",
-		Description:     "dino eats borgar",
-		GuildOnly:       false,
-		Exec:            borgar,
-		Help:            false,
-		AdvancedCommand: false,
-		ExtendedHelp:    nil,
-	}
-	Commands["brainpower"] = Command{
-		Name:            "brainpower",
-		Description:     "Party time!",
-		GuildOnly:       false,
-		Exec:            brainpower,
-		Help:            false,
-		AdvancedCommand: false,
-		ExtendedHelp:    nil,
-	}*/
+	memes.AddCommand("borgar", borgar)
+	memes.AddCommand("brainpower", brainpower)
 }
 
 func borgar(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {

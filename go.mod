@@ -3,20 +3,19 @@ module github.com/VTGare/boe-tea-go
 go 1.14
 
 require (
-	github.com/PuerkitoBio/goquery v1.5.1 // indirect
-	github.com/antchfx/htmlquery v1.2.2 // indirect
-	github.com/antchfx/xmlquery v1.2.3 // indirect
-	github.com/antchfx/xpath v1.1.5 // indirect
-	github.com/bwmarrin/discordgo v0.20.3
+	github.com/VTGare/gumi v0.1.5
+	github.com/antchfx/xpath v1.1.10 // indirect
+	github.com/bwmarrin/discordgo v0.22.0
 	github.com/disintegration/gift v1.2.1
 	github.com/everpcpc/pixiv v0.0.0-20200407035647-9a31a1508c38
-	github.com/gocolly/colly/v2 v2.0.1
-	github.com/golang/groupcache v0.0.0-20200121045136-8c9f03a8e57e // indirect
-	github.com/golang/protobuf v1.4.0 // indirect
-	github.com/klauspost/compress v1.10.4 // indirect
+	github.com/gocolly/colly/v2 v2.1.0
+	github.com/gorilla/websocket v1.4.2 // indirect
+	github.com/klauspost/compress v1.10.10 // indirect
 	github.com/sirupsen/logrus v1.6.0
-	github.com/valyala/fasthttp v1.10.0
-	go.mongodb.org/mongo-driver v1.3.2
-	golang.org/x/net v0.0.0-20200324143707-d3edc9973b7e // indirect
-	google.golang.org/appengine v1.6.5 // indirect
+	github.com/valyala/fasthttp v1.15.1
+	go.mongodb.org/mongo-driver v1.4.0
+	golang.org/x/crypto v0.0.0-20200728195943-123391ffb6de // indirect
+	golang.org/x/net v0.0.0-20200707034311-ab3426394381 // indirect
+	golang.org/x/sys v0.0.0-20200728102440-3e129f6d46b1 // indirect
+	google.golang.org/protobuf v1.25.0 // indirect
 )

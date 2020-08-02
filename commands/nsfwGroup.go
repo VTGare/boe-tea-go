@@ -5,38 +5,26 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"time"
 
 	nhentaiAPI "github.com/VTGare/boe-tea-go/nhentai"
 	"github.com/VTGare/boe-tea-go/utils"
+	"github.com/VTGare/gumi"
 	"github.com/bwmarrin/discordgo"
 )
 
 func init() {
-	nsfwGroup := CommandGroup{
-		Name:        "nsfw",
-		Description: "All kinds of potentionally NSFW commands are here",
-		NSFW:        true,
-		Commands:    make(map[string]Command),
-		IsVisible:   true,
-	}
-
-	nhentaiCommand := newCommand("nhentai", "Sends detailed information about an nhentai book.").setExec(nhentai).setHelp(&HelpSettings{
-		IsVisible: true,
-		ExtendedHelp: []*discordgo.MessageEmbedField{
-			{
-				Name:  "Usage",
-				Value: "bt!nhentai <magic number>",
-			},
-			{
-				Name:  "magic number",
-				Value: "Typically, but not always, a 6-digit number only weebs understand.",
-			},
+	nsfwG := CommandFramework.AddGroup("nsfw", gumi.GroupDescription("All NSFW commands dwell here."), gumi.GroupNSFW())
+	nhCmd := nsfwG.AddCommand("nhentai", nhentai, gumi.CommandDescription("Posts detailed info about nhentai book"), gumi.WithAliases("nh"))
+	nhCmd.Help.ExtendedHelp = []*discordgo.MessageEmbedField{
+		{
+			Name:  "Usage",
+			Value: "bt!nhentai <magic number>",
 		},
-	})
-
-	nsfwGroup.addCommand(nhentaiCommand)
-	CommandGroups["nsfw"] = nsfwGroup
+		{
+			Name:  "magic number",
+			Value: "Typically, but not always, a 6-digit number only weebs understand.",
+		},
+	}
 }
 
 func nhentai(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
@@ -46,24 +34,6 @@ func nhentai(s *discordgo.Session, m *discordgo.MessageCreate, args []string) er
 
 	if _, err := strconv.Atoi(args[0]); err != nil {
 		return errors.New("invalid nhentai ID")
-	}
-
-	ch, err := s.Channel(m.ChannelID)
-	if err != nil {
-		return err
-	}
-
-	if !ch.NSFW {
-		prompt := utils.CreatePrompt(s, m, &utils.PromptOptions{
-			Actions: map[string]func() bool{
-				"👌": func() bool { return true },
-			},
-			Message: "Are you sure you want to use ``nhentai`` in an SFW channel? React 👌 to confirm.",
-			Timeout: 15 * time.Second,
-		})
-		if prompt == nil {
-			return nil
-		}
 	}
 
 	book, err := nhentaiAPI.GetNHentai(args[0])

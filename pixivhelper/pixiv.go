@@ -3,7 +3,6 @@ package pixivhelper
 import (
 	"errors"
 	"fmt"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -16,8 +15,6 @@ import (
 )
 
 var (
-	//Regex is a regular experession that detects various Pixiv links
-	Regex = regexp.MustCompile(`(?i)http(?:s)?:\/\/(?:www\.)?pixiv\.net\/(?:en\/)?(?:artworks\/|member_illust\.php\?)(?:mode=medium\&)?(?:illust_id=)?([0-9]+)`)
 	//EmbedCache caches sent embeds so users can delete them within certain time interval
 	EmbedCache   = make(map[string]string)
 	embedWarning = fmt.Sprintf("If you're reading this you're epic.")

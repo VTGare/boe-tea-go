@@ -16,6 +16,7 @@ import (
 	"github.com/VTGare/boe-tea-go/saucenaoapi"
 	"github.com/VTGare/boe-tea-go/services"
 	"github.com/VTGare/boe-tea-go/utils"
+	"github.com/VTGare/gumi"
 	"github.com/bwmarrin/discordgo"
 	log "github.com/sirupsen/logrus"
 )
@@ -32,80 +33,30 @@ var (
 )
 
 func init() {
-	imagesGroup := CommandGroup{
-		Name:        "images",
-		Description: "Main bot's functionality, source image commands and magick commands.",
-		NSFW:        false,
-		Commands:    make(map[string]Command),
-		IsVisible:   true,
+	ig := CommandFramework.AddGroup("images", gumi.GroupDescription("Main bot's functionality, source image commands and magick commands"))
+	sauceCmd := ig.AddCommand("sauce", sauce, gumi.CommandDescription("Tries to find sauce of an anime picture."))
+	sauceCmd.Help.ExtendedHelp = []*discordgo.MessageEmbedField{
+		{
+			Name:  "Usage",
+			Value: "bt!sauce <search engine> <image link>",
+		},
+		{
+			Name:  "Reverse image search engine",
+			Value: "Not required. ``saucenao`` or ``wait``. If omitted uses server's default option",
+		},
+		{
+			Name:  "image link",
+			Value: "Required. Link must have one of the following suffixes:  *jpg*, *jpeg*, *png*, *gif*, *webp*.\nURL parameters after the link are acceptable (e.g. <link>.jpg***?width=441&height=441***)",
+		},
 	}
 
-	sauceCommand := newCommand("sauce", "Tries to find a source of an anime picture.").setExec(sauce).setAliases("source", "saucenao", "origami").setHelp(&HelpSettings{
-		IsVisible: true,
-		ExtendedHelp: []*discordgo.MessageEmbedField{
-			{
-				Name:  "Usage",
-				Value: "bt!sauce <search engine> <image link>",
-			},
-			{
-				Name:  "Reverse image search engine",
-				Value: "Not required. ``saucenao`` or ``wait``. If omitted uses server's default option",
-			},
-			{
-				Name:  "image link",
-				Value: "Required. Link must have one of the following suffixes:  *jpg*, *jpeg*, *png*, *gif*, *webp*.\nURL parameters after the link are acceptable (e.g. <link>.jpg***?width=441&height=441***)",
-			},
-		},
-	})
-	pixivCommand := newCommand("pixiv", "Advanced pixiv repost command that lets you exclude images from an album.").setExec(pixiv).setHelp(&HelpSettings{
-		IsVisible: true,
-		ExtendedHelp: []*discordgo.MessageEmbedField{
-			{
-				Name:  "Usage",
-				Value: "bt!pixiv <post link> [optional excluded images]",
-			},
-			{
-				Name:  "excluded images",
-				Value: "Indexes must be separated by whitespace (e.g. 1 2 4 6 10 45)",
-			},
-		},
-	})
-	deepfryCommand := newCommand("deepfry", "Deepfries an image, itadakimasu.").setExec(deepfry).setHelp(&HelpSettings{
-		IsVisible: true,
-		ExtendedHelp: []*discordgo.MessageEmbedField{
-			{
-				Name:  "Usage",
-				Value: "bt!deepfry <optional times deepfried> <image link>",
-			},
-			{
-				Name:  "times deepfried",
-				Value: "Repeats deepfrying process given amount of times, up to 5.",
-			},
-			{
-				Name:  "image link",
-				Value: "Image link, if not present uses an attachment.",
-			},
-		},
-	})
-	twitterCommand := newCommand("twitter", "Reposts each twitter post's image separately. Useful for mobile.").setExec(twitter).setHelp(&HelpSettings{
-		IsVisible: true,
-		ExtendedHelp: []*discordgo.MessageEmbedField{
-			{
-				Name:  "Usage",
-				Value: "bt!twitter <twitter link>",
-			},
-			{
-				Name:  "Twitter link",
-				Value: "Must look something like this: https://twitter.com/mhy_shima/status/1258684420011069442",
-			},
-		},
-	})
+	pixivCmd := ig.AddCommand("pixiv", pixiv, gumi.CommandDescription("Advanced pixiv repost command that lets you exclude images from an album"))
+	pixivCmd.Help = gumi.NewHelpSettings().AddField("Usage", "bt!pixiv <post link> [optional excluded images]", false).AddField("excluded images", "Indexes must be separated by whitespace (e.g. 1 2 4 6 10 45)", false)
 
-	imagesGroup.addCommand(twitterCommand)
-	imagesGroup.addCommand(pixivCommand)
-	imagesGroup.addCommand(deepfryCommand)
-	imagesGroup.addCommand(sauceCommand)
-	CommandGroups["images"] = imagesGroup
+	dfCmd := ig.AddCommand("deepfry", deepfry, gumi.CommandDescription("Deepfries an image, itadakimasu"))
+	dfCmd.Help = gumi.NewHelpSettings().AddField("Usage", "bt!deepfry <optional times deepfried> <image link>", false).AddField("times deepfried", "Repeats deepfrying process given amount of times, up to 5.", false)
+	tCmd := ig.AddCommand("twitter", twitter, gumi.CommandDescription("Reposts each twitter post's image separately. Useful for mobile."))
+	tCmd.Help = gumi.NewHelpSettings().AddField("Usage", "bt!twitter <twitter link>", false).AddField("Twitter link", "Must look something like this: https://twitter.com/mhy_shima/status/1258684420011069442", false)
 }
 
 func sauce(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
@@ -328,7 +279,7 @@ func pixiv(s *discordgo.Session, m *discordgo.MessageCreate, args []string) erro
 		return utils.ErrNotEnoughArguments
 	}
 
-	match := pixivhelper.Regex.FindStringSubmatch(args[0])
+	match := utils.PixivRegex.FindStringSubmatch(args[0])
 	if match == nil {
 		return errors.New("first arguments must be a pixiv link")
 	}
