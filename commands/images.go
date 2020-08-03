@@ -286,7 +286,7 @@ func pixiv(s *discordgo.Session, m *discordgo.MessageCreate, args []string) erro
 
 	repost, err := database.IsRepost(m.ChannelID, match[1])
 	if err != nil {
-		return err
+		log.Warnln(err)
 	}
 
 	if repost != nil {
