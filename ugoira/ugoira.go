@@ -64,15 +64,15 @@ func unzip(src, dest string) ([]string, error) {
 func makeWebm(folder string, u *PixivUgoira) (string, error) {
 	var err error
 	if u.Duration() < 10.0 {
-		err = runCmd("ffmpeg", "-loop", "1", "-framerate", strconv.Itoa(u.FPS()), "-f", "image2", "-i", folder+"/%06d.jpg", "-t", "10", folder+".webm")
+		err = runCmd("ffmpeg", "-loop", "1", "-framerate", strconv.Itoa(u.FPS()), "-i", folder+"/%06d.jpg", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-t", "10", folder+".mp4")
 	} else {
-		err = runCmd("ffmpeg", "-framerate", strconv.Itoa(u.FPS()), "-f", "image2", "-i", folder+"/%06d.jpg", folder+".webm")
+		err = runCmd("ffmpeg", "-framerate", strconv.Itoa(u.FPS()), "-i", folder+"/%06d.jpg", "-c:v", "libx264", "-pix_fmt", "yuv420p", folder+".mp4")
 	}
 
 	if err != nil {
 		return "", err
 	}
-	return folder + ".webm", nil
+	return folder + ".mp4", nil
 }
 
 func readAndPrint(r io.Reader) {

@@ -295,6 +295,7 @@ func createEmbed(post *services.PixivPost, thumbnail, original string, ind, east
 				Reader: f,
 			}
 
+			send.Embed.Description = ""
 			send.Files = []*discordgo.File{file}
 			send.Embed.Image = nil
 			embed.isUgoira = true
