@@ -291,7 +291,7 @@ func createEmbed(post *services.PixivPost, thumbnail, original string, ind, east
 			f, _ := os.Open(webm)
 
 			file := &discordgo.File{
-				Name:   webm,
+				Name:   post.ID + ".mp4",
 				Reader: f,
 			}
 
