@@ -4,12 +4,14 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"os"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/VTGare/boe-tea-go/database"
 	"github.com/VTGare/boe-tea-go/services"
+	"github.com/VTGare/boe-tea-go/ugoira"
 	"github.com/VTGare/boe-tea-go/utils"
 	"github.com/bwmarrin/discordgo"
 	log "github.com/sirupsen/logrus"
@@ -26,6 +28,12 @@ type Options struct {
 	ProcPrompt bool
 	Indexes    map[int]bool
 	Exclude    bool
+}
+
+type pixivEmbed struct {
+	messageSend *discordgo.MessageSend
+	isUgoira    bool
+	ugoiraFile  *os.File
 }
 
 //PostPixiv reposts Pixiv images from a link to a discord channel
@@ -80,7 +88,12 @@ func PostPixiv(s *discordgo.Session, m *discordgo.MessageCreate, pixivIDs []stri
 		postIDs := make([]string, 0)
 
 		for _, message := range posts {
-			post, err := s.ChannelMessageSendComplex(m.ChannelID, &message)
+			post, err := s.ChannelMessageSendComplex(m.ChannelID, message.messageSend)
+			if message.isUgoira {
+				message.ugoiraFile.Close()
+				os.Remove(message.ugoiraFile.Name())
+			}
+
 			if err != nil {
 				return errors.New("a post you're trying to repost is either removed or restricted")
 			}
@@ -102,11 +115,11 @@ func PostPixiv(s *discordgo.Session, m *discordgo.MessageCreate, pixivIDs []stri
 	return nil
 }
 
-func createPosts(s *discordgo.Session, m *discordgo.MessageCreate, pixivIDs []string, excluded map[int]bool) ([]discordgo.MessageSend, error) {
+func createPosts(s *discordgo.Session, m *discordgo.MessageCreate, pixivIDs []string, excluded map[int]bool) ([]*pixivEmbed, error) {
 	log.Infoln("Creating posts for following IDs: ", pixivIDs)
 
 	var (
-		messages      = make([]discordgo.MessageSend, 0)
+		messages      = make([]*pixivEmbed, 0)
 		repostSetting = database.GuildCache[m.GuildID].Repost
 		ch, _         = s.Channel(m.ChannelID)
 		pixivPosts    = make([]*services.PixivPost, 0)
@@ -115,13 +128,13 @@ func createPosts(s *discordgo.Session, m *discordgo.MessageCreate, pixivIDs []st
 	)
 
 	for _, id := range pixivIDs {
-		repost, err := utils.IsRepost(m.ChannelID, id)
-		if err != nil {
-			return nil, err
-		}
+		if repostSetting == "enabled" {
+			repost, err := utils.IsRepost(m.ChannelID, id)
+			if err != nil {
+				return nil, err
+			}
 
-		if (repostSetting == "enabled" || repostSetting == "strict") && repost != nil {
-			if repostSetting == "enabled" {
+			if repost != nil {
 				prompt := utils.CreatePrompt(s, m, &utils.PromptOptions{
 					Actions: map[string]func() bool{
 						"✅": func() bool {
@@ -194,12 +207,14 @@ func createPosts(s *discordgo.Session, m *discordgo.MessageCreate, pixivIDs []st
 			createdCount++
 
 			utils.NewRepostDetection(m.Author.Username, m.GuildID, m.ChannelID, m.ID, post.ID)
-			messages = append(messages, createEmbed(post, thumbnail, post.OriginalImages[ind], ind, easterEgg))
+
+			pe := createEmbed(post, thumbnail, post.OriginalImages[ind], ind, easterEgg)
+			messages = append(messages, pe)
 		}
 	}
 
 	if pageCount > guild.Limit {
-		messages[0].Content = fmt.Sprintf("```Album size (%v) is larger than limit set on this server (%v), only first image of every post is reposted.```", pageCount, guild.Limit)
+		messages[0].messageSend.Content = fmt.Sprintf("```Album size (%v) is larger than limit set on this server (%v), only first image of every post is reposted.```", pageCount, guild.Limit)
 	}
 
 	return messages, nil
@@ -227,15 +242,20 @@ func joinTags(elems []string, sep string) string {
 	return b.String()
 }
 
-func createEmbed(post *services.PixivPost, thumbnail, original string, ind, easterEgg int) discordgo.MessageSend {
+func createEmbed(post *services.PixivPost, thumbnail, original string, ind, easterEgg int) *pixivEmbed {
+	var (
+		embed = &pixivEmbed{}
+	)
+
 	title := ""
+
 	if len(post.LargeImages) == 1 {
 		title = fmt.Sprintf("%v by %v", post.Title, post.Author)
 	} else {
 		title = fmt.Sprintf("%v by %v. Page %v/%v", post.Title, post.Author, ind+1, len(post.LargeImages))
 	}
 
-	return discordgo.MessageSend{
+	send := &discordgo.MessageSend{
 		Embed: &discordgo.MessageEmbed{
 			Title:       title,
 			URL:         fmt.Sprintf("https://www.pixiv.net/en/artworks/%v", post.ID),
@@ -262,4 +282,26 @@ func createEmbed(post *services.PixivPost, thumbnail, original string, ind, east
 			},
 		},
 	}
+
+	if post.Type == "ugoira" {
+		webm, err := ugoira.UgoiraToGIF(post.ID)
+		if err != nil {
+			log.Warn(err)
+		} else {
+			f, _ := os.Open(webm)
+
+			file := &discordgo.File{
+				Name:   webm,
+				Reader: f,
+			}
+
+			send.Files = []*discordgo.File{file}
+			send.Embed.Image = nil
+			embed.isUgoira = true
+			embed.ugoiraFile = f
+		}
+	}
+
+	embed.messageSend = send
+	return embed
 }
