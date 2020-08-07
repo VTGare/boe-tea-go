@@ -61,7 +61,7 @@ func unzip(src, dest string) ([]string, error) {
 	return filenames, nil
 }
 
-func makeWebm(folder string, u *PixivUgoira) (string, error) {
+func makeWebm(folder string, u *Ugoira) (string, error) {
 	var err error
 	if u.Duration() < 10.0 {
 		err = runCmd("ffmpeg", "-loop", "1", "-framerate", strconv.Itoa(u.FPS()), "-i", folder+"/%06d.jpg", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-t", "10", folder+".mp4")
@@ -99,32 +99,4 @@ func runCmd(name string, args ...string) error {
 	}
 
 	return nil
-}
-
-func UgoiraToGIF(id string) (string, error) {
-	u, err := getUgoira(id)
-	if err != nil {
-		return "", err
-	}
-
-	zip, err := downloadZIP(u)
-	if err != nil {
-		return "", err
-	}
-
-	folder := strings.TrimSuffix(zip.Name(), ".zip")
-	_, err = unzip(zip.Name(), folder)
-	if err != nil {
-		return "", err
-	}
-
-	webm, err := makeWebm(folder, u)
-	if err != nil {
-		return "", err
-	}
-	os.RemoveAll(folder)
-
-	zip.Close()
-	os.Remove(zip.Name())
-	return webm, nil
 }

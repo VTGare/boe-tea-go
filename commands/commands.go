@@ -3,7 +3,7 @@ package commands
 import (
 	"fmt"
 
-	"github.com/VTGare/boe-tea-go/database"
+	"github.com/VTGare/boe-tea-go/internal/database"
 	"github.com/VTGare/boe-tea-go/utils"
 	"github.com/VTGare/gumi"
 	"github.com/bwmarrin/discordgo"

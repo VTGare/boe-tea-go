@@ -1,6 +1,7 @@
-package services
+package ugoira
 
 import (
+	"fmt"
 	"os"
 	"strconv"
 	"strings"
@@ -14,13 +15,20 @@ var (
 	app     *pixiv.AppPixivAPI
 )
 
+type PixivArtist struct {
+	ID             string
+	ProfilePicture string
+	Name           string
+}
+
 type PixivPost struct {
 	ID             string
 	Type           string
-	Author         string
+	Author         PixivArtist
 	Title          string
 	Likes          int
 	Pages          int
+	Ugoira         *Ugoira
 	Tags           []string
 	LargeImages    []string
 	OriginalImages []string
@@ -43,6 +51,20 @@ func init() {
 		log.Fatalln(err)
 	}
 	app = pixiv.NewApp()
+}
+
+func (p *PixivPost) DownloadUgoira() error {
+	u, err := NewUgoira(p.ID)
+	if err != nil {
+		return err
+	}
+	err = u.toWebm()
+	if err != nil {
+		return err
+	}
+
+	p.Ugoira = u
+	return nil
 }
 
 //GetPixivPost perfoms a Pixiv API call and returns an array of high-resolution image URLs
@@ -88,8 +110,12 @@ func GetPixivPost(id string) (*PixivPost, error) {
 	}
 
 	post := &PixivPost{
-		ID:             id,
-		Author:         illust.User.Name,
+		ID: id,
+		Author: PixivArtist{
+			ID:             fmt.Sprintf("%v", illust.User.ID),
+			ProfilePicture: illust.User.ProfileImages.Medium,
+			Name:           illust.User.Name,
+		},
 		Type:           illust.Type,
 		Title:          illust.Title,
 		Tags:           tags,

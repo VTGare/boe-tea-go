@@ -10,9 +10,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/VTGare/boe-tea-go/database"
-	"github.com/VTGare/boe-tea-go/images"
-	"github.com/VTGare/boe-tea-go/pixivhelper"
+	"github.com/VTGare/boe-tea-go/internal/database"
+	"github.com/VTGare/boe-tea-go/internal/images"
+	"github.com/VTGare/boe-tea-go/internal/repost"
 	"github.com/VTGare/boe-tea-go/saucenaoapi"
 	"github.com/VTGare/boe-tea-go/services"
 	"github.com/VTGare/boe-tea-go/utils"
@@ -278,21 +278,21 @@ func pixiv(s *discordgo.Session, m *discordgo.MessageCreate, args []string) erro
 	if len(args) == 0 {
 		return utils.ErrNotEnoughArguments
 	}
+	guild := database.GuildCache[m.GuildID]
 
-	match := utils.PixivRegex.FindStringSubmatch(args[0])
-	if match == nil {
+	rep := repost.NewPost(*m, args[0])
+	if rep.Len() == 0 {
 		return errors.New("first arguments must be a pixiv link")
 	}
-
-	repost, err := database.IsRepost(m.ChannelID, match[1])
-	if err != nil {
-		log.Warnln(err)
-	}
-
-	if repost != nil {
-		embed := utils.RepostsToEmbed(repost)
-		s.ChannelMessageSendEmbed(m.ChannelID, embed)
-		return nil
+	if guild.Repost == "strict" {
+		rep.FindReposts()
+		if len(rep.Reposts) != 0 {
+			_, err := s.ChannelMessageSendEmbed(m.ChannelID, rep.RepostEmbed())
+			if err != nil {
+				log.Warnln(err)
+			}
+			return nil
+		}
 	}
 
 	args = args[1:]
@@ -316,11 +316,21 @@ func pixiv(s *discordgo.Session, m *discordgo.MessageCreate, args []string) erro
 		}
 	}
 
-	pixivhelper.PostPixiv(s, m, []string{match[1]}, pixivhelper.Options{
-		ProcPrompt: false,
-		Indexes:    excludes,
-		Exclude:    true,
+	messages, err := rep.SendPixiv(s, repost.SendPixivOptions{
+		SkipPrompt: true,
+		Exclude:    excludes,
 	})
+	if err != nil {
+		return err
+	}
+
+	for _, mes := range messages {
+		s.ChannelMessageSendComplex(m.ChannelID, mes)
+	}
+
+	if rep.HasUgoira {
+		rep.Cleanup()
+	}
 	return nil
 }
 

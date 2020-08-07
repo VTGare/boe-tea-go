@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type ImagePost struct {
@@ -50,13 +51,13 @@ func InsertManyPosts(posts []interface{}) error {
 func IsRepost(channelID, content string) (*ImagePost, error) {
 	collection := DB.Collection("image_posts")
 	res := collection.FindOne(context.Background(), bson.D{{"channel_id", channelID}, {"content", content}})
-	if err := res.Err(); err != nil {
-		return nil, err
-	}
 
 	post := &ImagePost{}
 	err := res.Decode(post)
-	if err != nil {
+	if err != nil && err != mongo.ErrNoDocuments {
+		if err == mongo.ErrNoDocuments {
+			return nil, nil
+		}
 		return nil, err
 	}
 

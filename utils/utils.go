@@ -8,13 +8,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/VTGare/boe-tea-go/database"
+	"github.com/VTGare/boe-tea-go/internal/database"
 	"github.com/bwmarrin/discordgo"
 	log "github.com/sirupsen/logrus"
 )
-
-//ActionFunc is a function type alias for prompt actions
-type ActionFunc = func() bool
 
 //Range is a range struct. Low is beginning value and High is end value. High can't be higher than Low.
 type Range struct {
@@ -24,7 +21,7 @@ type Range struct {
 
 //PromptOptions is a struct that defines prompt's behaviour.
 type PromptOptions struct {
-	Actions map[string]ActionFunc
+	Actions map[string]bool
 	Message string
 	Timeout time.Duration
 }
@@ -47,6 +44,20 @@ var (
 	//ErrNoPermission is a default error when user doesn't have enough permissions to execute a command
 	ErrNoPermission = errors.New("you don't have permissions to execute this command")
 )
+
+func Max(x, y int) int {
+	if x < y {
+		return y
+	}
+	return x
+}
+
+func Min(x, y int) int {
+	if x > y {
+		return y
+	}
+	return x
+}
 
 //MemberHasPermission checks if guild member has a permission to do something on a server.
 func MemberHasPermission(s *discordgo.Session, guildID string, userID string, permission int) (bool, error) {
@@ -107,7 +118,7 @@ func EmbedTimestamp() string {
 }
 
 //CreatePrompt sends a prompt message to a discord channel
-func CreatePrompt(s *discordgo.Session, m *discordgo.MessageCreate, opts *PromptOptions) ActionFunc {
+func CreatePrompt(s *discordgo.Session, m *discordgo.MessageCreate, opts *PromptOptions) bool {
 	prompt, _ := s.ChannelMessageSend(m.ChannelID, opts.Message)
 	for emoji := range opts.Actions {
 		s.MessageReactionAdd(m.ChannelID, prompt.ID, emoji)
@@ -120,7 +131,7 @@ func CreatePrompt(s *discordgo.Session, m *discordgo.MessageCreate, opts *Prompt
 			reaction = k.MessageReaction
 		case <-time.After(opts.Timeout):
 			s.ChannelMessageDelete(prompt.ChannelID, prompt.ID)
-			return nil
+			return false
 		}
 
 		if _, ok := opts.Actions[reaction.Emoji.APIName()]; !ok {
@@ -133,6 +144,41 @@ func CreatePrompt(s *discordgo.Session, m *discordgo.MessageCreate, opts *Prompt
 
 		s.ChannelMessageDelete(prompt.ChannelID, prompt.ID)
 		return opts.Actions[reaction.Emoji.APIName()]
+	}
+}
+
+//CreatePromptWithMessage sends a prompt message to a discord channel
+func CreatePromptWithMessage(s *discordgo.Session, m *discordgo.MessageCreate, message *discordgo.MessageSend) bool {
+	var (
+		prompt, _ = s.ChannelMessageSendComplex(m.ChannelID, message)
+		timeout   = 15 * time.Second
+		actions   = map[string]bool{"👌": true}
+	)
+
+	for emoji := range actions {
+		s.MessageReactionAdd(m.ChannelID, prompt.ID, emoji)
+	}
+
+	var reaction *discordgo.MessageReaction
+	for {
+		select {
+		case k := <-nextMessageReactionAdd(s):
+			reaction = k.MessageReaction
+		case <-time.After(timeout):
+			s.ChannelMessageDelete(prompt.ChannelID, prompt.ID)
+			return false
+		}
+
+		if _, ok := actions[reaction.Emoji.APIName()]; !ok {
+			continue
+		}
+
+		if reaction.MessageID != prompt.ID || s.State.User.ID == reaction.UserID || reaction.UserID != m.Author.ID {
+			continue
+		}
+
+		s.ChannelMessageDelete(prompt.ChannelID, prompt.ID)
+		return actions[reaction.Emoji.APIName()]
 	}
 }
 

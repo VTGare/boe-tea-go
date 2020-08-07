@@ -5,10 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/valyala/fasthttp"
@@ -18,8 +18,9 @@ var (
 	client = http.DefaultClient
 )
 
-type PixivUgoira struct {
+type Ugoira struct {
 	ID      string
+	File    *os.File
 	Error   bool       `json:"error"`
 	Message string     `json:"message"`
 	Body    UgoiraBody `json:"body"`
@@ -37,11 +38,57 @@ type UgoiraFrame struct {
 	Delay int    `json:"delay"`
 }
 
-func (u *PixivUgoira) Duration() float64 {
+func NewUgoira(id string) (*Ugoira, error) {
+	uri := fmt.Sprintf("https://www.pixiv.net/ajax/illust/%v/ugoira_meta", id)
+	resp, err := fasthttpGet(uri, id)
+	if err != nil {
+		return nil, err
+	}
+
+	var res Ugoira
+	err = json.Unmarshal(resp, &res)
+	if err != nil {
+		return nil, err
+	}
+	res.ID = id
+
+	return &res, nil
+}
+
+func (u *Ugoira) toWebm() error {
+	zip, err := downloadZIP(u)
+	if err != nil {
+		return err
+	}
+
+	folder := strings.TrimSuffix(zip.Name(), ".zip")
+	_, err = unzip(zip.Name(), folder)
+	if err != nil {
+		return err
+	}
+
+	webm, err := makeWebm(folder, u)
+	if err != nil {
+		return err
+	}
+	os.RemoveAll(folder)
+	zip.Close()
+	os.Remove(zip.Name())
+
+	file, err := os.Open(webm)
+	if err != nil {
+		return err
+	}
+
+	u.File = file
+	return nil
+}
+
+func (u *Ugoira) Duration() float64 {
 	return float64(len(u.Body.Frames)) / float64(u.FPS())
 }
 
-func (u *PixivUgoira) FPS() int {
+func (u *Ugoira) FPS() int {
 	var (
 		ms = 0.0
 	)
@@ -53,32 +100,6 @@ func (u *PixivUgoira) FPS() int {
 	l := len(u.Body.Frames)
 	fps := 1.0 / ((ms / float64(l)) / 1000.0)
 	return int(math.Floor(fps + 0.5))
-}
-
-func getUgoira(id string) (*PixivUgoira, error) {
-	resp, err := http.Get("https://www.pixiv.net/ajax/illust/" + id + "/ugoira_meta")
-	if err != nil {
-		return nil, err
-	}
-
-	defer resp.Body.Close()
-	data, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("failed to get ugoira. status %v", resp.Status)
-	}
-
-	var res PixivUgoira
-	err = json.Unmarshal(data, &res)
-	if err != nil {
-		return nil, err
-	}
-	res.ID = id
-
-	return &res, nil
 }
 
 func fasthttpGet(uri, id string) ([]byte, error) {
@@ -103,7 +124,7 @@ func fasthttpGet(uri, id string) ([]byte, error) {
 	return resp.Body(), nil
 }
 
-func downloadZIP(ugoira *PixivUgoira) (*os.File, error) {
+func downloadZIP(ugoira *Ugoira) (*os.File, error) {
 	body, err := fasthttpGet(ugoira.Body.OriginalSource, ugoira.ID)
 	if err != nil {
 		return nil, err

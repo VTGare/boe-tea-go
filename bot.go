@@ -2,11 +2,10 @@ package main
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/VTGare/boe-tea-go/commands"
-	"github.com/VTGare/boe-tea-go/database"
-	"github.com/VTGare/boe-tea-go/pixivhelper"
+	"github.com/VTGare/boe-tea-go/internal/database"
+	"github.com/VTGare/boe-tea-go/internal/repost"
 	"github.com/VTGare/boe-tea-go/utils"
 	"github.com/bwmarrin/discordgo"
 	log "github.com/sirupsen/logrus"
@@ -25,35 +24,6 @@ func onReady(s *discordgo.Session, e *discordgo.Ready) {
 	if err != nil {
 		log.Warnln("Error adding guilds: ", err)
 	}
-}
-
-func trimPrefix(content, guildID string) string {
-	guild, ok := database.GuildCache[guildID]
-	var defaultPrefix bool
-	if ok && guild.Prefix == "bt!" {
-		defaultPrefix = true
-	} else if !ok {
-		defaultPrefix = true
-	} else {
-		defaultPrefix = false
-	}
-
-	switch {
-	case strings.HasPrefix(content, botMention):
-		return strings.TrimPrefix(content, botMention)
-	case defaultPrefix:
-		for _, prefix := range defaultPrefixes {
-			if strings.HasPrefix(content, prefix) {
-				return strings.TrimPrefix(content, prefix)
-			}
-		}
-	case !defaultPrefix && ok:
-		return strings.TrimPrefix(content, guild.Prefix)
-	default:
-		return content
-	}
-
-	return content
 }
 
 func handleError(s *discordgo.Session, m *discordgo.MessageCreate, err error) {
@@ -77,30 +47,47 @@ func handleError(s *discordgo.Session, m *discordgo.MessageCreate, err error) {
 }
 
 func prefixless(s *discordgo.Session, m *discordgo.MessageCreate) error {
+	art := repost.NewPost(*m)
 	guild := database.GuildCache[m.GuildID]
-	if guild.Repost == "strict" {
-		ips := utils.RemoveReposts(s, m)
-		if len(ips) != 0 {
-			s.ChannelMessageSendEmbed(m.ChannelID, utils.RepostsToEmbed(ips...))
+
+	if guild.Repost != "disabled" {
+		art.FindReposts()
+		if len(art.Reposts) > 0 {
+			if guild.Repost == "strict" {
+				art.RemoveReposts()
+				s.ChannelMessageSendEmbed(m.ChannelID, art.RepostEmbed())
+				if art.Len() == 0 {
+
+					s.ChannelMessageDelete(m.ChannelID, m.ID)
+				}
+			} else if guild.Repost == "enabled" {
+				if art.PixivReposts() > 0 {
+					prompt := utils.CreatePromptWithMessage(s, m, &discordgo.MessageSend{
+						Content: "Following posts are reposts, react 👌 to post them.",
+						Embed:   art.RepostEmbed(),
+					})
+					if !prompt {
+						return nil
+					}
+				} else {
+					s.ChannelMessageSendEmbed(m.ChannelID, art.RepostEmbed())
+				}
+			}
 		}
 	}
 
-	if guild.Pixiv {
-		matches := utils.PixivRegex.FindAllStringSubmatch(m.Content, len(m.Content)+1)
-		if matches != nil {
-			ids := make([]string, 0)
-			for _, match := range matches {
-				ids = append(ids, match[1])
-			}
-
-			log.Infof("Executing pixiv reposting. Guild ID: %v, channel ID: %v", m.GuildID, m.ChannelID)
-			err := pixivhelper.PostPixiv(s, m, ids)
-			if err != nil {
-				return err
-			}
-		}
+	messages, err := art.SendPixiv(s)
+	if err != nil {
+		return err
 	}
 
+	for _, message := range messages {
+		s.ChannelMessageSendComplex(m.ChannelID, message)
+	}
+
+	if art.HasUgoira {
+		art.Cleanup()
+	}
 	return nil
 }
 
@@ -117,9 +104,9 @@ func messageCreated(s *discordgo.Session, m *discordgo.MessageCreate) {
 }
 
 func reactCreated(s *discordgo.Session, r *discordgo.MessageReactionAdd) {
-	if author, ok := pixivhelper.EmbedCache[r.MessageID]; ok && author == r.UserID && r.Emoji.APIName() == "❌" {
+	/*if author, ok := pixivhelper.EmbedCache[r.MessageID]; ok && author == r.UserID && r.Emoji.APIName() == "❌" {
 		s.ChannelMessageDelete(r.ChannelID, r.MessageID)
-	}
+	}*/
 }
 
 func guildCreated(s *discordgo.Session, g *discordgo.GuildCreate) {
