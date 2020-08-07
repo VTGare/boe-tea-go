@@ -353,7 +353,7 @@ func createEmbed(post *ugoira.PixivPost, thumbnail, original string, ind, easter
 	title := ""
 
 	if len(post.LargeImages) == 1 {
-		title = fmt.Sprintf("%v by %v", post.Title, post.Author.Name)
+		title = fmt.Sprintf("%v by %v", post.Title, post.Author)
 	} else {
 		title = fmt.Sprintf("%v by %v. Page %v/%v", post.Title, post.Author, ind+1, len(post.LargeImages))
 	}
@@ -390,7 +390,7 @@ func createEmbed(post *ugoira.PixivPost, thumbnail, original string, ind, easter
 }
 
 func createUgoiraEmbed(post *ugoira.PixivPost, easterEgg int) *discordgo.MessageSend {
-	title := fmt.Sprintf("%v by %v", post.Title, post.Author.Name)
+	title := fmt.Sprintf("%v by %v", post.Title, post.Author)
 	send := &discordgo.MessageSend{
 		Embed: &discordgo.MessageEmbed{
 			Title:     title,

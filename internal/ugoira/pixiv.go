@@ -1,7 +1,6 @@
 package ugoira
 
 import (
-	"fmt"
 	"os"
 	"strconv"
 	"strings"
@@ -15,16 +14,10 @@ var (
 	app     *pixiv.AppPixivAPI
 )
 
-type PixivArtist struct {
-	ID             string
-	ProfilePicture string
-	Name           string
-}
-
 type PixivPost struct {
 	ID             string
 	Type           string
-	Author         PixivArtist
+	Author         string
 	Title          string
 	Likes          int
 	Pages          int
@@ -110,12 +103,8 @@ func GetPixivPost(id string) (*PixivPost, error) {
 	}
 
 	post := &PixivPost{
-		ID: id,
-		Author: PixivArtist{
-			ID:             fmt.Sprintf("%v", illust.User.ID),
-			ProfilePicture: illust.User.ProfileImages.Medium,
-			Name:           illust.User.Name,
-		},
+		ID:             id,
+		Author:         illust.User.Name,
 		Type:           illust.Type,
 		Title:          illust.Title,
 		Tags:           tags,
