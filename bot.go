@@ -2,7 +2,9 @@ package main
 
 import (
 	"fmt"
+	"time"
 
+	"github.com/ReneKroon/ttlcache"
 	"github.com/VTGare/boe-tea-go/commands"
 	"github.com/VTGare/boe-tea-go/internal/database"
 	"github.com/VTGare/boe-tea-go/internal/repost"
@@ -14,7 +16,18 @@ import (
 var (
 	botMention      string
 	defaultPrefixes = []string{"bt!", "bt.", "bt "}
+	messageCache    *ttlcache.Cache
 )
+
+type cachedMessage struct {
+	Parent   *discordgo.Message
+	Children []*discordgo.Message
+}
+
+func init() {
+	messageCache = ttlcache.NewCache()
+	messageCache.SetTTL(15 * time.Minute)
+}
 
 func onReady(s *discordgo.Session, e *discordgo.Ready) {
 	botMention = "<@!" + e.User.ID + ">"
@@ -61,7 +74,7 @@ func prefixless(s *discordgo.Session, m *discordgo.MessageCreate) error {
 					s.ChannelMessageDelete(m.ChannelID, m.ID)
 				}
 			} else if guild.Repost == "enabled" {
-				if art.PixivReposts() > 0 {
+				if art.PixivReposts() > 0 && guild.Pixiv {
 					prompt := utils.CreatePromptWithMessage(s, m, &discordgo.MessageSend{
 						Content: "Following posts are reposts, react 👌 to post them.",
 						Embed:   art.RepostEmbed(),
@@ -81,12 +94,25 @@ func prefixless(s *discordgo.Session, m *discordgo.MessageCreate) error {
 		if err != nil {
 			return err
 		}
+
+		embeds := make([]*discordgo.Message, 0)
+		keys := make([]string, 0)
+		keys = append(keys, m.Message.ID)
+
 		for _, message := range messages {
-			s.ChannelMessageSendComplex(m.ChannelID, message)
+			embed, _ := s.ChannelMessageSendComplex(m.ChannelID, message)
+
+			keys = append(keys, embed.ID)
+			embeds = append(embeds, embed)
 		}
 
 		if art.HasUgoira {
 			art.Cleanup()
+		}
+
+		c := &cachedMessage{m.Message, embeds}
+		for _, key := range keys {
+			messageCache.Set(key, c)
 		}
 	}
 
@@ -106,9 +132,40 @@ func messageCreated(s *discordgo.Session, m *discordgo.MessageCreate) {
 }
 
 func reactCreated(s *discordgo.Session, r *discordgo.MessageReactionAdd) {
-	/*if author, ok := pixivhelper.EmbedCache[r.MessageID]; ok && author == r.UserID && r.Emoji.APIName() == "❌" {
-		s.ChannelMessageDelete(r.ChannelID, r.MessageID)
-	}*/
+	if messageCache.Count() > 0 && r.Emoji.APIName() == "❌" {
+		if m, ok := messageCache.Get(r.MessageID); ok {
+			c := m.(*cachedMessage)
+			if r.UserID == c.Parent.Author.ID {
+				if r.MessageID == c.Parent.ID {
+					s.ChannelMessageDelete(c.Parent.ChannelID, c.Parent.ID)
+					messageCache.Remove(c.Parent.ID)
+					for _, child := range c.Children {
+						s.ChannelMessageDelete(child.ChannelID, child.ID)
+						messageCache.Remove(child.ID)
+					}
+				} else {
+					s.ChannelMessageDelete(r.ChannelID, r.MessageID)
+					messageCache.Remove(r.MessageID)
+				}
+			}
+		}
+	}
+}
+
+func messageDeleted(s *discordgo.Session, m *discordgo.MessageDelete) {
+	if messageCache.Count() > 0 {
+		if mes, ok := messageCache.Get(m.ID); ok {
+			c := mes.(*cachedMessage)
+			if c.Parent.ID == m.ID {
+				s.ChannelMessageDelete(c.Parent.ChannelID, c.Parent.ID)
+				messageCache.Remove(c.Parent.ID)
+				for _, child := range c.Children {
+					s.ChannelMessageDelete(child.ChannelID, child.ID)
+					messageCache.Remove(child.ID)
+				}
+			}
+		}
+	}
 }
 
 func guildCreated(s *discordgo.Session, g *discordgo.GuildCreate) {

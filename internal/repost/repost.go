@@ -314,8 +314,9 @@ func createEmbeds(a *ArtPost, excluded map[int]bool, guild database.GuildSetting
 		messages     = make([]*discordgo.MessageSend, 0)
 	)
 
+	count := countPages(a.posts)
 	for _, post := range a.posts {
-		if createdCount >= guild.Limit {
+		if createdCount == guild.Limit {
 			break
 		}
 
@@ -339,10 +340,14 @@ func createEmbeds(a *ArtPost, excluded map[int]bool, guild database.GuildSetting
 				ms = createEmbed(post, thumbnail, post.OriginalImages[ind], ind, easterEgg)
 			}
 			messages = append(messages, ms)
+
+			if count >= guild.Limit {
+				break
+			}
 		}
 	}
 
-	if count := countPages(a.posts); count > guild.Limit {
+	if count > guild.Limit {
 		messages[0].Content = fmt.Sprintf("```Album size (%v) is larger than limit set on this server (%v), only first image of every post is reposted.```", count, guild.Limit)
 	}
 

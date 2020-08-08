@@ -36,6 +36,7 @@ func main() {
 	dg.AddHandler(guildCreated)
 	dg.AddHandler(reactCreated)
 	dg.AddHandler(guildDeleted)
+	dg.AddHandler(messageDeleted)
 
 	if err := dg.Open(); err != nil {
 		log.Fatalln("Error opening connection,", err)

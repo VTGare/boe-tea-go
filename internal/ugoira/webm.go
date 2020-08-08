@@ -63,10 +63,12 @@ func unzip(src, dest string) ([]string, error) {
 
 func makeWebm(folder string, u *Ugoira) (string, error) {
 	var err error
+
+	//-vf "pad=ceil(iw/2)*2:ceil(ih/2)*2"
 	if u.Duration() < 10.0 {
-		err = runCmd("ffmpeg", "-loop", "1", "-framerate", strconv.Itoa(u.FPS()), "-i", folder+"/%06d.jpg", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-t", "10", folder+".mp4")
+		err = runCmd("ffmpeg", "-loop", "1", "-framerate", strconv.Itoa(u.FPS()), "-i", folder+"/%06d.jpg", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-vf", `pad=ceil(iw/2)*2:ceil(ih/2)*2`, "-t", "10", folder+".mp4")
 	} else {
-		err = runCmd("ffmpeg", "-framerate", strconv.Itoa(u.FPS()), "-i", folder+"/%06d.jpg", "-c:v", "libx264", "-pix_fmt", "yuv420p", folder+".mp4")
+		err = runCmd("ffmpeg", "-framerate", strconv.Itoa(u.FPS()), "-i", folder+"/%06d.jpg", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-vf", `pad=ceil(iw/2)*2:ceil(ih/2)*2`, folder+".mp4")
 	}
 
 	if err != nil {
