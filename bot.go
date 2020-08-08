@@ -76,18 +76,20 @@ func prefixless(s *discordgo.Session, m *discordgo.MessageCreate) error {
 		}
 	}
 
-	messages, err := art.SendPixiv(s)
-	if err != nil {
-		return err
+	if guild.Pixiv {
+		messages, err := art.SendPixiv(s)
+		if err != nil {
+			return err
+		}
+		for _, message := range messages {
+			s.ChannelMessageSendComplex(m.ChannelID, message)
+		}
+
+		if art.HasUgoira {
+			art.Cleanup()
+		}
 	}
 
-	for _, message := range messages {
-		s.ChannelMessageSendComplex(m.ChannelID, message)
-	}
-
-	if art.HasUgoira {
-		art.Cleanup()
-	}
 	return nil
 }
 
