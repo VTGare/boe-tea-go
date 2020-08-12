@@ -17,9 +17,11 @@ import (
 )
 
 func set(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
+	settings := database.GuildCache[m.GuildID]
+
 	switch len(args) {
 	case 0:
-		showGuildSettings(s, m)
+		showGuildSettings(s, m, settings)
 	case 2:
 		isAdmin, err := utils.MemberHasPermission(s, m.GuildID, m.Author.ID, discordgo.PermissionAdministrator)
 		if err != nil {
@@ -86,7 +88,25 @@ func set(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error 
 		if err != nil {
 			return err
 		}
-		s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Successfully changed ``%v`` to ``%v``", setting, newSetting))
+
+		embed := &discordgo.MessageEmbed{
+			Title: "✅ Successfully changed a setting!",
+			Fields: []*discordgo.MessageEmbedField{
+				{
+					Name:   "Setting",
+					Value:  setting,
+					Inline: true,
+				},
+				{
+					Name:   "New value",
+					Value:  newSetting,
+					Inline: true,
+				},
+			},
+			Color:     utils.EmbedColor,
+			Timestamp: utils.EmbedTimestamp(),
+		}
+		s.ChannelMessageSendEmbed(m.ChannelID, embed)
 	default:
 		return errors.New("incorrect command usage. Please use bt!help set command for more information")
 	}
@@ -94,8 +114,7 @@ func set(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error 
 	return nil
 }
 
-func showGuildSettings(s *discordgo.Session, m *discordgo.MessageCreate) {
-	settings := database.GuildCache[m.GuildID]
+func showGuildSettings(s *discordgo.Session, m *discordgo.MessageCreate, settings *database.GuildSettings) {
 	guild, _ := s.Guild(settings.GuildID)
 
 	emoji := ""
@@ -147,6 +166,6 @@ func changeSetting(guildID, setting string, newSetting interface{}) error {
 		return err
 	}
 
-	database.GuildCache[guildID] = *guild
+	database.GuildCache[guildID] = guild
 	return nil
 }

@@ -14,9 +14,8 @@ import (
 )
 
 var (
-	botMention      string
-	defaultPrefixes = []string{"bt!", "bt.", "bt "}
-	messageCache    *ttlcache.Cache
+	botMention   string
+	messageCache *ttlcache.Cache
 )
 
 type cachedMessage struct {
@@ -47,13 +46,9 @@ func handleError(s *discordgo.Session, m *discordgo.MessageCreate, err error) {
 			Thumbnail: &discordgo.MessageEmbedThumbnail{
 				URL: "https://i.imgur.com/OZ1Al5h.png",
 			},
-			Description: fmt.Sprintf(`***Error message:***
-			%v
-
-			Please contact bot's author using bt!feedback command or directly at VTGare#3370 if you can't understand the error. 
-			`, err),
-			Color:     utils.EmbedColor,
-			Timestamp: utils.EmbedTimestamp(),
+			Description: fmt.Sprintf("***Error message:***\n%v\n\nPlease contact bot's author using bt!feedback command or directly at VTGare#3370 if you can't understand the error.", err),
+			Color:       utils.EmbedColor,
+			Timestamp:   utils.EmbedTimestamp(),
 		}
 		s.ChannelMessageSendEmbed(m.ChannelID, embed)
 	}
@@ -165,6 +160,14 @@ func messageDeleted(s *discordgo.Session, m *discordgo.MessageDelete) {
 					s.ChannelMessageDelete(child.ChannelID, child.ID)
 					messageCache.Remove(child.ID)
 				}
+			} else {
+				for ind, child := range c.Children {
+					if child.ID == m.ID {
+						messageCache.Remove(child.ID)
+						c.Children = append(c.Children[:ind], c.Children[ind+1:]...)
+						break
+					}
+				}
 			}
 		}
 	}
@@ -182,7 +185,7 @@ func guildCreated(s *discordgo.Session, g *discordgo.GuildCreate) {
 			log.Println(err)
 		}
 
-		database.GuildCache[g.ID] = *newGuild
+		database.GuildCache[g.ID] = newGuild
 		log.Infoln("Joined ", g.Name)
 	}
 }

@@ -201,7 +201,7 @@ func FormatBool(b bool) string {
 //CreateDB caches all new Guilds bot's connected to in a database.
 func CreateDB(eventGuilds []*discordgo.Guild) error {
 	allGuilds := database.AllGuilds()
-	for _, guild := range *allGuilds {
+	for _, guild := range allGuilds {
 		database.GuildCache[guild.GuildID] = guild
 	}
 
@@ -211,7 +211,7 @@ func CreateDB(eventGuilds []*discordgo.Guild) error {
 			log.Infoln(guild.ID, "not found in database. Adding...")
 			g := database.DefaultGuildSettings(guild.ID)
 			newGuilds = append(newGuilds, g)
-			database.GuildCache[g.GuildID] = *g
+			database.GuildCache[g.GuildID] = g
 		}
 	}
 

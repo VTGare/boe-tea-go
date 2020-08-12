@@ -18,7 +18,7 @@ import (
 )
 
 var (
-	embedWarning = []string{"POMF POMF KIMOCHI", "https://www.youtube.com/watch?v=899kstdMUoQ", "Do you believe in gravity?", "Shit waifu, ngl.", "Watch Monogatari.", "Is this thing on?", "Haruhi is a goddess", "My creator's waifu is 2B", "If you're reading this you're epic.", "If you react ❌ to a pixiv embed it'll be removed", "bt!nhentai 271920, enjoy", "This embed was sponsored by Raid Shadow Legends", "There are several hidden meme commands, try to find them", "Love, from Shamiko-chan", "bt!twitter is useful for mobile users", "Ramiel best girl", "PM the creator of this bot lolis.", "If you wrap a link in <> Discord won't embed it", "Who's Rem", "Every 60 seconds one minute passes in Africa", "People die when they're killed", "You thought it was a useful message, but it was me DIO!", "Enable strict mode to remove filthy reposts."}
+	embedWarning = []string{"Boe Tea has a support server now! Use bt!support command to get an invite link.", "POMF POMF KIMOCHI", "https://www.youtube.com/watch?v=899kstdMUoQ", "Do you believe in gravity?", "Shit waifu, ngl.", "Watch Monogatari.", "Is this thing on?", "Haruhi is a goddess", "My creator's waifu is 2B", "If you're reading this you're epic.", "If you react ❌ to a pixiv embed it'll be removed", "bt!nhentai 271920, enjoy", "This embed was sponsored by Raid Shadow Legends", "There are several hidden meme commands, try to find them", "Love, from Shamiko-chan", "bt!twitter is useful for mobile users", "Ramiel best girl", "PM the creator of this bot lolis.", "If you wrap a link in <> Discord won't embed it", "Who's Rem", "Every 60 seconds one minute passes in Africa", "People die when they're killed", "You thought it was a useful message, but it was me DIO!", "Enable strict mode to remove filthy reposts."}
 )
 
 type ArtPost struct {
@@ -307,7 +307,7 @@ func joinTags(elems []string, sep string) string {
 	return b.String()
 }
 
-func createEmbeds(a *ArtPost, excluded map[int]bool, guild database.GuildSettings) []*discordgo.MessageSend {
+func createEmbeds(a *ArtPost, excluded map[int]bool, guild *database.GuildSettings) []*discordgo.MessageSend {
 	var (
 		easterEgg    = rand.Intn(len(embedWarning))
 		createdCount = 0

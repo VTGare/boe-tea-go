@@ -87,5 +87,5 @@ func init() {
 		},
 	}
 	generalGroup.AddCommand("set", set, gumi.CommandDescription("Show or change server's settings."), gumi.WithHelp(setHelp), gumi.GuildOnly(), gumi.WithAliases("config", "cfg", "settings"))
-
+	generalGroup.AddCommand("support", support, gumi.CommandDescription("Sends a support server invite link"))
 }

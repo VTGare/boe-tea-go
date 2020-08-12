@@ -10,7 +10,7 @@ import (
 
 var (
 	//GuildCache stores guild settings locally
-	GuildCache = make(map[string]GuildSettings)
+	GuildCache = make(map[string]*GuildSettings)
 )
 
 //GuildSettings is a database model for per guild bot settings
@@ -60,22 +60,22 @@ func DefaultGuildSettings(guildID string) *GuildSettings {
 }
 
 //AllGuilds returns all guilds from a database.
-func AllGuilds() *[]GuildSettings {
+func AllGuilds() []*GuildSettings {
 	collection := DB.Collection("guildsettings")
 	cur, err := collection.Find(context.Background(), bson.M{})
 
 	if err != nil {
-		return &[]GuildSettings{}
+		return []*GuildSettings{}
 	}
 
-	guilds := make([]GuildSettings, 0)
+	guilds := make([]*GuildSettings, 0)
 	cur.All(context.Background(), &guilds)
 
 	if err != nil {
 		log.Println("Error decoding", err)
 	}
 
-	return &guilds
+	return guilds
 }
 
 //InsertOneGuild inserts one guild to a database

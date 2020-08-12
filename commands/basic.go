@@ -56,3 +56,12 @@ func invite(s *discordgo.Session, m *discordgo.MessageCreate, args []string) err
 
 	return nil
 }
+
+func support(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
+	_, err := s.ChannelMessageSend(m.ChannelID, "**Support server invite link:** https://discord.gg/hcxuHE7")
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
