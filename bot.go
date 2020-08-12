@@ -102,8 +102,10 @@ func prefixless(s *discordgo.Session, m *discordgo.MessageCreate) error {
 		for _, message := range messages {
 			embed, _ := s.ChannelMessageSendComplex(m.ChannelID, message)
 
-			keys = append(keys, embed.ID)
-			embeds = append(embeds, embed)
+			if embed != nil {
+				keys = append(keys, embed.ID)
+				embeds = append(embeds, embed)
+			}
 		}
 
 		if art.HasUgoira {
