@@ -6,10 +6,14 @@ import (
 	"strconv"
 	"strings"
 
-	nhentaiAPI "github.com/VTGare/boe-tea-go/nhentai"
+	"github.com/VTGare/boe-tea-go/pkg/nozoki"
 	"github.com/VTGare/boe-tea-go/utils"
 	"github.com/VTGare/gumi"
 	"github.com/bwmarrin/discordgo"
+)
+
+var (
+	nh = nozoki.NewNozoki()
 )
 
 func init() {
@@ -36,7 +40,7 @@ func nhentai(s *discordgo.Session, m *discordgo.MessageCreate, args []string) er
 		return errors.New("invalid nhentai ID")
 	}
 
-	book, err := nhentaiAPI.GetNHentai(args[0])
+	book, err := nh.GetBook(args[0])
 	if err != nil {
 		return err
 	}

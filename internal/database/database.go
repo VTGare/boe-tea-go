@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 	"time"
@@ -11,26 +12,45 @@ import (
 )
 
 var (
-	//DB is a global mongo database instance.
-	DB *mongo.Database
-	//Client is a global mongo client instance
-	Client *mongo.Client
+	err error
+	//DB is a global database connection
+	DB *Database
 )
 
 func init() {
-	connStr := os.Getenv("MONGODB_URL")
-	if connStr == "" {
-		log.Fatalln("MONGODB_URL env variable is not found.")
+	url := os.Getenv("MONGODB_URL")
+	if url == "" {
+		fmt.Println("MONGODB_URL is empty")
+		os.Exit(1)
 	}
 
-	var err error
+	DB, err = NewDatabase(url, "boe-tea")
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+}
+
+type Database struct {
+	db            *mongo.Database
+	client        *mongo.Client
+	GuildSettings *mongo.Collection
+	posts         *mongo.Collection
+}
+
+func (d *Database) Close() {
+	d.client.Disconnect(context.Background())
+}
+
+func NewDatabase(url, dbname string) (*Database, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	Client, err = mongo.Connect(ctx, options.Client().ApplyURI(connStr))
+	client, err := mongo.Connect(ctx, options.Client().ApplyURI(url))
 	if err != nil {
 		log.Fatalln("Error connecting to Mongo DB", err)
 	}
 
-	DB = Client.Database("boe-tea")
+	db := client.Database(dbname)
+	return &Database{db, client, db.Collection("guildsettings"), db.Collection("image_posts")}, nil
 }

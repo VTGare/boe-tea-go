@@ -1,19 +1,15 @@
 package commands
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"strconv"
 	"strings"
-	"time"
 	"unicode"
 
 	"github.com/VTGare/boe-tea-go/internal/database"
 	"github.com/VTGare/boe-tea-go/utils"
 	"github.com/bwmarrin/discordgo"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 func set(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
@@ -84,7 +80,7 @@ func set(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error 
 			return err
 		}
 
-		err = changeSetting(m.GuildID, setting, passedSetting)
+		err = database.DB.ChangeSetting(m.GuildID, setting, passedSetting)
 		if err != nil {
 			return err
 		}
@@ -146,26 +142,4 @@ func showGuildSettings(s *discordgo.Session, m *discordgo.MessageCreate, setting
 		},
 		Timestamp: utils.EmbedTimestamp(),
 	})
-}
-
-func changeSetting(guildID, setting string, newSetting interface{}) error {
-	col := database.DB.Collection("guildsettings")
-
-	res := col.FindOneAndUpdate(context.Background(), bson.M{
-		"guild_id": guildID,
-	}, bson.M{
-		"$set": bson.M{
-			setting:      newSetting,
-			"updated_at": time.Now(),
-		},
-	}, options.FindOneAndUpdate().SetReturnDocument(options.After))
-
-	guild := &database.GuildSettings{}
-	err := res.Decode(guild)
-	if err != nil {
-		return err
-	}
-
-	database.GuildCache[guildID] = guild
-	return nil
 }

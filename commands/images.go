@@ -6,6 +6,7 @@ import (
 	"image"
 	"net/http"
 	"net/url"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -13,8 +14,9 @@ import (
 	"github.com/VTGare/boe-tea-go/internal/database"
 	"github.com/VTGare/boe-tea-go/internal/images"
 	"github.com/VTGare/boe-tea-go/internal/repost"
-	"github.com/VTGare/boe-tea-go/saucenaoapi"
-	"github.com/VTGare/boe-tea-go/services"
+	"github.com/VTGare/boe-tea-go/pkg/chotto"
+	"github.com/VTGare/boe-tea-go/pkg/seieki"
+	"github.com/VTGare/boe-tea-go/pkg/tsuita"
 	"github.com/VTGare/boe-tea-go/utils"
 	"github.com/VTGare/gumi"
 	"github.com/bwmarrin/discordgo"
@@ -26,6 +28,7 @@ var (
 	ImageURLRegex = regexp.MustCompile(`(?i)(http(s?):)([/|.|\w|\s|-])*\.(?:jpg|jpeg|gif|png|webp)`)
 	//ErrNoSauce is an error when source couldn't be found.
 	ErrNoSauce    = errors.New("seems like sauce couldn't be found. Try using following websites yourself:\nhttps://ascii2d.net/\nhttps://iqdb.org/")
+	sei           = seieki.NewSeieki(os.Getenv("SAUCENAO_API"))
 	searchEngines = map[string]func(link string) (*discordgo.MessageEmbed, error){
 		"saucenao": saucenao,
 		"wait":     wait,
@@ -153,7 +156,7 @@ func joinSauceURLs(urls []string, sep string) string {
 }
 
 func saucenao(link string) (*discordgo.MessageEmbed, error) {
-	res, err := saucenaoapi.SearchSauceByURL(link)
+	res, err := sei.Sauce(link)
 	if err != nil && res == nil {
 		return nil, err
 	}
@@ -201,7 +204,7 @@ func saucenao(link string) (*discordgo.MessageEmbed, error) {
 }
 
 func wait(link string) (*discordgo.MessageEmbed, error) {
-	res, err := services.SearchWait(link)
+	res, err := chotto.SearchWait(link)
 	if err != nil {
 		return nil, err
 	}
@@ -339,7 +342,7 @@ func twitter(s *discordgo.Session, m *discordgo.MessageCreate, args []string) er
 		return utils.ErrNotEnoughArguments
 	}
 
-	tweet, err := services.GetTweet(args[0])
+	tweet, err := tsuita.GetTweet(args[0])
 	if err != nil {
 		return err
 	}

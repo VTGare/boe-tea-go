@@ -11,7 +11,7 @@ import (
 
 	"github.com/VTGare/boe-tea-go/internal/database"
 	"github.com/VTGare/boe-tea-go/internal/ugoira"
-	"github.com/VTGare/boe-tea-go/services"
+	"github.com/VTGare/boe-tea-go/pkg/tsuita"
 	"github.com/VTGare/boe-tea-go/utils"
 	"github.com/bwmarrin/discordgo"
 	"github.com/sirupsen/logrus"
@@ -107,11 +107,11 @@ func (a *ArtPost) FindReposts() {
 	for _, match := range matches {
 		go func(match string) {
 			defer wg.Done()
-			rep, _ := utils.IsRepost(a.event.ChannelID, match)
+			rep, _ := database.DB.IsRepost(a.event.ChannelID, match)
 			if rep.Content != "" {
 				resChan <- rep
 			} else {
-				utils.NewRepostDetection(a.event.Author.Username, a.event.GuildID, a.event.ChannelID, a.event.ID, match)
+				database.DB.NewRepostDetection(a.event.Author.Username, a.event.GuildID, a.event.ChannelID, a.event.ID, match)
 			}
 		}(match)
 	}
@@ -267,7 +267,7 @@ func NewPost(m discordgo.MessageCreate, content ...string) *ArtPost {
 		m.Content = content[0]
 	}
 
-	for _, str := range services.TwitterRegex.FindAllString(m.Content, len(m.Content)+1) {
+	for _, str := range tsuita.TwitterRegex.FindAllString(m.Content, len(m.Content)+1) {
 		twitter[str] = true
 	}
 

@@ -1,12 +1,13 @@
-package services
+package chotto
 
 import (
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/url"
-	"strings"
 	"time"
+
+	"github.com/valyala/fasthttp"
 )
 
 var (
@@ -15,15 +16,15 @@ var (
 	waitURL        = "https://trace.moe/api/search?url="
 )
 
-type WaitResult struct {
-	Limit     int            `json:"limit"`
-	LimitTTL  int            `json:"limit_ttl"`
-	Quota     int            `json:"quota"`
-	QuotaTTL  int            `json:"quota_ttl"`
-	Documents []WaitDocument `json:"docs"`
+type Result struct {
+	Limit     int        `json:"limit"`
+	LimitTTL  int        `json:"limit_ttl"`
+	Quota     int        `json:"quota"`
+	QuotaTTL  int        `json:"quota_ttl"`
+	Documents []Document `json:"docs"`
 }
 
-type WaitDocument struct {
+type Document struct {
 	AnilistID    int         `json:"anilist_id"`
 	MalID        int         `json:"mal_id"`
 	Anime        string      `json:"anime"`
@@ -50,24 +51,46 @@ func secondsToReadable(sec int) string {
 	return t.String()
 }
 
-func SearchWait(image string) (*WaitResult, error) {
+func SearchWait(image string) (*Result, error) {
 	image = url.QueryEscape(image)
 	uri := waitURL + image
 
-	body, err := FasthttpGet(uri)
+	resp, err := get(uri)
+	defer fasthttp.ReleaseResponse(resp)
 	if err != nil {
 		return nil, err
 	}
 
-	if strings.Contains(string(body), "Search limit exceeded") {
-		return nil, ErrRateLimited
+	switch resp.StatusCode() {
+	case 400:
+		return nil, fmt.Errorf("search image is empty")
+	case 403:
+		return nil, fmt.Errorf("invalid token")
+	case 429:
+		return nil, fmt.Errorf("requesting too fast")
+	case 500:
+		return nil, fmt.Errorf("something went wrong in the trace.moe backend")
 	}
 
-	var res WaitResult
-	err = json.Unmarshal(body, &res)
+	var res Result
+	err = json.Unmarshal(resp.Body(), &res)
 	if err != nil {
 		return nil, err
 	}
 
 	return &res, nil
+}
+
+func get(uri string) (*fasthttp.Response, error) {
+	req := fasthttp.AcquireRequest()
+	resp := fasthttp.AcquireResponse()
+	defer fasthttp.ReleaseRequest(req)
+
+	req.SetRequestURI(uri)
+	req.Header.SetMethod("GET")
+	err := fasthttp.Do(req, resp)
+	if err != nil {
+		return nil, err
+	}
+	return resp, nil
 }

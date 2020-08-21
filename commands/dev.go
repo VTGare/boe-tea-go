@@ -45,7 +45,7 @@ func migrateDB(s *discordgo.Session, m *discordgo.MessageCreate, args []string) 
 		return nil
 	}
 
-	c := database.DB.Collection("guildsettings")
+	c := database.DB.GuildSettings
 	res, err := c.UpdateMany(context.Background(), bson.M{}, bson.M{
 		"$set": bson.M{
 			"repost": "enabled",

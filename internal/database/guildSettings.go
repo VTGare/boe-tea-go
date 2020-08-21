@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 var (
@@ -60,9 +61,8 @@ func DefaultGuildSettings(guildID string) *GuildSettings {
 }
 
 //AllGuilds returns all guilds from a database.
-func AllGuilds() []*GuildSettings {
-	collection := DB.Collection("guildsettings")
-	cur, err := collection.Find(context.Background(), bson.M{})
+func (d *Database) AllGuilds() []*GuildSettings {
+	cur, err := d.GuildSettings.Find(context.Background(), bson.M{})
 
 	if err != nil {
 		return []*GuildSettings{}
@@ -79,9 +79,8 @@ func AllGuilds() []*GuildSettings {
 }
 
 //InsertOneGuild inserts one guild to a database
-func InsertOneGuild(guild *GuildSettings) error {
-	collection := DB.Collection("guildsettings")
-	_, err := collection.InsertOne(context.Background(), guild)
+func (d *Database) InsertOneGuild(guild *GuildSettings) error {
+	_, err := d.GuildSettings.InsertOne(context.Background(), guild)
 	if err != nil {
 		return err
 	}
@@ -89,9 +88,8 @@ func InsertOneGuild(guild *GuildSettings) error {
 }
 
 //InsertManyGuilds insert a bulk of guilds to a database
-func InsertManyGuilds(guilds []interface{}) error {
-	collection := DB.Collection("guildsettings")
-	_, err := collection.InsertMany(context.Background(), guilds)
+func (d *Database) InsertManyGuilds(guilds []interface{}) error {
+	_, err := d.GuildSettings.InsertMany(context.Background(), guilds)
 	if err != nil {
 		return err
 	}
@@ -99,12 +97,31 @@ func InsertManyGuilds(guilds []interface{}) error {
 }
 
 //RemoveGuild removes a guild from a database.
-func RemoveGuild(guildID string) error {
-	collection := DB.Collection("guildsettings")
-	_, err := collection.DeleteOne(context.Background(), bson.M{"guild_id": guildID})
+func (d *Database) RemoveGuild(guildID string) error {
+	_, err := d.GuildSettings.DeleteOne(context.Background(), bson.M{"guild_id": guildID})
 	if err != nil {
 		return err
 	}
 
+	return nil
+}
+
+func (d *Database) ChangeSetting(guildID, setting string, newSetting interface{}) error {
+	res := d.GuildSettings.FindOneAndUpdate(context.Background(), bson.M{
+		"guild_id": guildID,
+	}, bson.M{
+		"$set": bson.M{
+			setting:      newSetting,
+			"updated_at": time.Now(),
+		},
+	}, options.FindOneAndUpdate().SetReturnDocument(options.After))
+
+	guild := &GuildSettings{}
+	err := res.Decode(guild)
+	if err != nil {
+		return err
+	}
+
+	GuildCache[guildID] = guild
 	return nil
 }

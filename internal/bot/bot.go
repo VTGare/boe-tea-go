@@ -1,7 +1,10 @@
-package main
+package bot
 
 import (
 	"fmt"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/ReneKroon/ttlcache"
@@ -18,6 +21,39 @@ var (
 	messageCache *ttlcache.Cache
 )
 
+type Bot struct {
+	s *discordgo.Session
+}
+
+func (b *Bot) Run() error {
+	if err := b.s.Open(); err != nil {
+		return err
+	}
+
+	defer b.s.Close()
+	sc := make(chan os.Signal, 1)
+	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, syscall.SIGSEGV, syscall.SIGHUP)
+	<-sc
+
+	return nil
+}
+
+func NewBot(token string) (*Bot, error) {
+	dg, err := discordgo.New("Bot " + token)
+	if err != nil {
+		return nil, err
+	}
+
+	bot := &Bot{dg}
+	dg.AddHandler(bot.messageCreated)
+	dg.AddHandler(bot.onReady)
+	dg.AddHandler(bot.reactCreated)
+	dg.AddHandler(bot.messageDeleted)
+	dg.AddHandler(bot.guildCreated)
+	dg.AddHandler(bot.guildDeleted)
+	return bot, nil
+}
+
 type cachedMessage struct {
 	Parent   *discordgo.Message
 	Children []*discordgo.Message
@@ -28,7 +64,7 @@ func init() {
 	messageCache.SetTTL(15 * time.Minute)
 }
 
-func onReady(s *discordgo.Session, e *discordgo.Ready) {
+func (b *Bot) onReady(s *discordgo.Session, e *discordgo.Ready) {
 	botMention = "<@!" + e.User.ID + ">"
 	log.Infoln(e.User.String(), "is ready.")
 
@@ -54,7 +90,7 @@ func handleError(s *discordgo.Session, m *discordgo.MessageCreate, err error) {
 	}
 }
 
-func prefixless(s *discordgo.Session, m *discordgo.MessageCreate) error {
+func (b *Bot) prefixless(s *discordgo.Session, m *discordgo.MessageCreate) error {
 	art := repost.NewPost(*m)
 	guild := database.GuildCache[m.GuildID]
 
@@ -116,19 +152,19 @@ func prefixless(s *discordgo.Session, m *discordgo.MessageCreate) error {
 	return nil
 }
 
-func messageCreated(s *discordgo.Session, m *discordgo.MessageCreate) {
+func (b *Bot) messageCreated(s *discordgo.Session, m *discordgo.MessageCreate) {
 	if m.Author.Bot {
 		return
 	}
 
 	isCommand := commands.CommandFramework.Handle(s, m)
 	if !isCommand {
-		err := prefixless(s, m)
+		err := b.prefixless(s, m)
 		commands.CommandFramework.ErrorHandler(err)
 	}
 }
 
-func reactCreated(s *discordgo.Session, r *discordgo.MessageReactionAdd) {
+func (b *Bot) reactCreated(s *discordgo.Session, r *discordgo.MessageReactionAdd) {
 	if messageCache.Count() > 0 && r.Emoji.APIName() == "❌" {
 		if m, ok := messageCache.Get(r.MessageID); ok {
 			c := m.(*cachedMessage)
@@ -149,7 +185,7 @@ func reactCreated(s *discordgo.Session, r *discordgo.MessageReactionAdd) {
 	}
 }
 
-func messageDeleted(s *discordgo.Session, m *discordgo.MessageDelete) {
+func (b *Bot) messageDeleted(s *discordgo.Session, m *discordgo.MessageDelete) {
 	if messageCache.Count() > 0 {
 		if mes, ok := messageCache.Get(m.ID); ok {
 			c := mes.(*cachedMessage)
@@ -173,14 +209,14 @@ func messageDeleted(s *discordgo.Session, m *discordgo.MessageDelete) {
 	}
 }
 
-func guildCreated(s *discordgo.Session, g *discordgo.GuildCreate) {
+func (b *Bot) guildCreated(s *discordgo.Session, g *discordgo.GuildCreate) {
 	if len(database.GuildCache) == 0 {
 		return
 	}
 
 	if _, ok := database.GuildCache[g.ID]; !ok {
 		newGuild := database.DefaultGuildSettings(g.ID)
-		err := database.InsertOneGuild(newGuild)
+		err := database.DB.InsertOneGuild(newGuild)
 		if err != nil {
 			log.Println(err)
 		}
@@ -190,8 +226,8 @@ func guildCreated(s *discordgo.Session, g *discordgo.GuildCreate) {
 	}
 }
 
-func guildDeleted(s *discordgo.Session, g *discordgo.GuildDelete) {
-	err := database.RemoveGuild(g.ID)
+func (b *Bot) guildDeleted(s *discordgo.Session, g *discordgo.GuildDelete) {
+	err := database.DB.RemoveGuild(g.ID)
 	if err != nil {
 		log.Println(err)
 	}
