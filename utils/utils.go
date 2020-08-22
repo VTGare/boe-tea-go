@@ -27,6 +27,8 @@ type PromptOptions struct {
 }
 
 var (
+	//DefaultEmbedImage is an image for embeds
+	DefaultEmbedImage = "https://i.imgur.com/OZ1Al5h.png"
 	//PixivRegex is a regular experession that detects various Pixiv links
 	PixivRegex = regexp.MustCompile(`(?i)http(?:s)?:\/\/(?:www\.)?pixiv\.net\/(?:en\/)?(?:artworks\/|member_illust\.php\?)(?:mode=medium\&)?(?:illust_id=)?([0-9]+)`)
 	//EmojiRegex matches some Unicode emojis, it's not perfect but better than nothing
@@ -151,8 +153,8 @@ func CreatePrompt(s *discordgo.Session, m *discordgo.MessageCreate, opts *Prompt
 func CreatePromptWithMessage(s *discordgo.Session, m *discordgo.MessageCreate, message *discordgo.MessageSend) bool {
 	var (
 		prompt, _ = s.ChannelMessageSendComplex(m.ChannelID, message)
-		timeout   = 15 * time.Second
-		actions   = map[string]bool{"👌": true}
+		timeout   = 45 * time.Second
+		actions   = map[string]bool{"👌": true, "🙅‍♂️": false}
 	)
 
 	for emoji := range actions {
@@ -233,10 +235,16 @@ func GetEmoji(s *discordgo.Session, guildID, e string) (string, error) {
 		return e, nil
 	}
 
-	emojiID := NumRegex.FindString(e)
-	emoji, err := s.State.Emoji(guildID, emojiID)
+	emojis, err := s.GuildEmojis(guildID)
 	if err != nil {
 		return "", err
 	}
-	return emoji.APIName(), nil
+
+	for _, emoji := range emojis {
+		if str := fmt.Sprintf("<:%v>", strings.ToLower(emoji.APIName())); str == e {
+			return str, nil
+		}
+	}
+
+	return "", errors.New("emoji not found")
 }

@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/ReneKroon/ttlcache"
-	"github.com/VTGare/boe-tea-go/commands"
+	"github.com/VTGare/boe-tea-go/internal/commands"
 	"github.com/VTGare/boe-tea-go/internal/database"
 	"github.com/VTGare/boe-tea-go/internal/repost"
 	"github.com/VTGare/boe-tea-go/utils"
@@ -80,7 +80,7 @@ func handleError(s *discordgo.Session, m *discordgo.MessageCreate, err error) {
 		embed := &discordgo.MessageEmbed{
 			Title: "Oops, something went wrong!",
 			Thumbnail: &discordgo.MessageEmbedThumbnail{
-				URL: "https://i.imgur.com/OZ1Al5h.png",
+				URL: utils.DefaultEmbedImage,
 			},
 			Description: fmt.Sprintf("***Error message:***\n%v\n\nPlease contact bot's author using bt!feedback command or directly at VTGare#3370 if you can't understand the error.", err),
 			Color:       utils.EmbedColor,
@@ -146,6 +146,41 @@ func (b *Bot) prefixless(s *discordgo.Session, m *discordgo.MessageCreate) error
 		c := &cachedMessage{m.Message, embeds}
 		for _, key := range keys {
 			messageCache.Set(key, c)
+		}
+	}
+
+	if guild.Twitter && len(art.TwitterMatches) > 0 {
+		tweets, err := art.SendTwitter(s, true)
+		if err != nil {
+			return err
+		}
+
+		if len(tweets) > 0 {
+			msg := ""
+			if len(tweets) == 1 {
+				msg = "Detected a tweet with more than one image, would you like to send embeds of other images for mobile users?"
+			} else {
+				msg = "Detected tweets with more than one image, would you like to send embeds of other images for mobile users?"
+			}
+
+			prompt := utils.CreatePrompt(s, m, &utils.PromptOptions{
+				Actions: map[string]bool{
+					"👌": true,
+				},
+				Message: msg,
+				Timeout: 10 * time.Second,
+			})
+
+			if prompt {
+				for _, t := range tweets {
+					for _, send := range t {
+						_, err := s.ChannelMessageSendComplex(m.ChannelID, send)
+						if err != nil {
+							log.Warnln(err)
+						}
+					}
+				}
+			}
 		}
 	}
 

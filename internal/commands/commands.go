@@ -19,7 +19,7 @@ func init() {
 			embed := &discordgo.MessageEmbed{
 				Title: "Oops, something went wrong!",
 				Thumbnail: &discordgo.MessageEmbedThumbnail{
-					URL: "https://i.imgur.com/OZ1Al5h.png",
+					URL: utils.DefaultEmbedImage,
 				},
 				Description: fmt.Sprintf("***Error message:***\n%v\n\nPlease contact bot's author using bt!feedback command or directly at VTGare#3370 if you can't understand the error. ", e),
 				Color:       utils.EmbedColor,

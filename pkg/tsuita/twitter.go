@@ -17,6 +17,7 @@ var (
 
 type Tweet struct {
 	Author    string
+	URL       string
 	Content   string
 	Timestamp string
 	Likes     int
@@ -31,16 +32,17 @@ type TwitterMedia struct {
 }
 
 func GetTweet(uri string) (*Tweet, error) {
-	str := TwitterRegex.FindString(uri)
+	var (
+		res = &Tweet{URL: uri, Gallery: make([]TwitterMedia, 0)}
+		str = TwitterRegex.FindString(uri)
+	)
+
 	if str == "" {
 		return nil, errors.New("invalid twitter url")
 	}
-	uri = strings.ReplaceAll(str, "twitter.com", "nitter.net")
 
+	uri = strings.ReplaceAll(str, "twitter.com", "nitter.net")
 	c := colly.NewCollector()
-	res := &Tweet{
-		Gallery: make([]TwitterMedia, 0),
-	}
 
 	c.OnHTML(".main-tweet .still-image", func(e *colly.HTMLElement) {
 		imageURL := nitterURL + e.Attr("href")

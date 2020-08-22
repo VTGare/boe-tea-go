@@ -30,7 +30,7 @@ func message(s *discordgo.Session, m *discordgo.MessageCreate, args []string) er
 
 	for _, g := range s.State.Guilds {
 		for _, ch := range g.Channels {
-			if strings.Contains(ch.Name, "general") && ch.Type == discordgo.ChannelTypeGuildText {
+			if (strings.Contains(ch.Name, "general") || strings.Contains(ch.Name, "art") || strings.Contains(ch.Name, "sfw") || strings.Contains(ch.Name, "discussion")) && ch.Type == discordgo.ChannelTypeGuildText {
 				s.ChannelMessageSend(ch.ID, strings.Join(args, " "))
 				break
 			}
@@ -46,9 +46,10 @@ func migrateDB(s *discordgo.Session, m *discordgo.MessageCreate, args []string) 
 	}
 
 	c := database.DB.GuildSettings
-	res, err := c.UpdateMany(context.Background(), bson.M{}, bson.M{
+	res, err := c.UpdateMany(context.Background(), bson.M{"repost": "enabled"}, bson.M{
 		"$set": bson.M{
-			"repost": "enabled",
+			"repost":  "disabled",
+			"twitter": false,
 		},
 	})
 	if err != nil {
