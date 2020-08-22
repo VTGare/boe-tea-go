@@ -167,11 +167,10 @@ func saucenao(link string) (*discordgo.MessageEmbed, error) {
 	}
 
 	source := res.Results[0]
-	log.Infof("Source found. URL: %v. Title: %v", source.Data.URLs[0], source.Data.Title)
+	log.Infof("Source found. Title: %v", source.Data.Title)
 
 	embed := &discordgo.MessageEmbed{
 		Title:     fmt.Sprintf("Source found! Title: %v", source.Title()),
-		URL:       source.URL(),
 		Timestamp: utils.EmbedTimestamp(),
 		Color:     utils.EmbedColor,
 		Thumbnail: &discordgo.MessageEmbedThumbnail{
@@ -197,9 +196,14 @@ func saucenao(link string) (*discordgo.MessageEmbed, error) {
 		},
 	}
 
-	if _, err := url.ParseRequestURI(embed.URL); err != nil {
-		embed.URL = source.Data.URLs[0]
+	if s := source.URL(); s != "" {
+		if _, err := url.ParseRequestURI(embed.URL); err != nil && len(source.Data.URLs) > 0 {
+			embed.URL = source.Data.URLs[0]
+		}
+	} else {
+		embed.Fields = embed.Fields[1:]
 	}
+
 	return embed, nil
 }
 

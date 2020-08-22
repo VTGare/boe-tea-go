@@ -32,7 +32,11 @@ func (s *Sauce) URL() string {
 		return s.Data.Source
 	}
 
-	return s.Data.URLs[0]
+	if len(s.Data.URLs) > 0 {
+		return s.Data.URLs[0]
+	}
+
+	return ""
 }
 
 func (s *Sauce) Author() string {
