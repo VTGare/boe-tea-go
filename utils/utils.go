@@ -121,9 +121,18 @@ func EmbedTimestamp() string {
 
 //CreatePrompt sends a prompt message to a discord channel
 func CreatePrompt(s *discordgo.Session, m *discordgo.MessageCreate, opts *PromptOptions) bool {
-	prompt, _ := s.ChannelMessageSend(m.ChannelID, opts.Message)
+	prompt, err := s.ChannelMessageSend(m.ChannelID, opts.Message)
+	if err != nil {
+		log.Warnln(err)
+		return false
+	}
+
 	for emoji := range opts.Actions {
-		s.MessageReactionAdd(m.ChannelID, prompt.ID, emoji)
+		err = s.MessageReactionAdd(m.ChannelID, prompt.ID, emoji)
+		if err != nil {
+			log.Warnln(err)
+			return false
+		}
 	}
 
 	var reaction *discordgo.MessageReaction
@@ -152,13 +161,24 @@ func CreatePrompt(s *discordgo.Session, m *discordgo.MessageCreate, opts *Prompt
 //CreatePromptWithMessage sends a prompt message to a discord channel
 func CreatePromptWithMessage(s *discordgo.Session, m *discordgo.MessageCreate, message *discordgo.MessageSend) bool {
 	var (
-		prompt, _ = s.ChannelMessageSendComplex(m.ChannelID, message)
-		timeout   = 45 * time.Second
-		actions   = map[string]bool{"👌": true, "🙅‍♂️": false}
+		timeout = 45 * time.Second
+		actions = map[string]bool{"👌": true, "🙅‍♂️": false}
 	)
 
+	prompt, err := s.ChannelMessageSendComplex(m.ChannelID, message)
+	if err != nil || prompt == nil {
+		log.Warnln(err)
+		s.ChannelMessageSend(m.ChannelID, "Error while creating a prompt")
+		return false
+	}
+
 	for emoji := range actions {
-		s.MessageReactionAdd(m.ChannelID, prompt.ID, emoji)
+		err = s.MessageReactionAdd(m.ChannelID, prompt.ID, emoji)
+		if err != nil {
+			log.Warnln(err)
+			s.ChannelMessageSend(m.ChannelID, "Error while creating a prompt")
+			return false
+		}
 	}
 
 	var reaction *discordgo.MessageReaction
