@@ -11,12 +11,12 @@ require (
 	github.com/everpcpc/pixiv v0.0.0-20200407035647-9a31a1508c38
 	github.com/gocolly/colly/v2 v2.1.0
 	github.com/gorilla/websocket v1.4.2 // indirect
-	github.com/klauspost/compress v1.10.10 // indirect
+	github.com/klauspost/compress v1.10.11 // indirect
 	github.com/sirupsen/logrus v1.6.0
-	github.com/valyala/fasthttp v1.15.1
+	github.com/valyala/fasthttp v1.16.0
 	go.mongodb.org/mongo-driver v1.4.0
-	golang.org/x/crypto v0.0.0-20200728195943-123391ffb6de // indirect
-	golang.org/x/net v0.0.0-20200707034311-ab3426394381 // indirect
-	golang.org/x/sys v0.0.0-20200728102440-3e129f6d46b1 // indirect
+	golang.org/x/crypto v0.0.0-20200820211705-5c72a883971a // indirect
+	golang.org/x/net v0.0.0-20200822124328-c89045814202 // indirect
+	golang.org/x/sys v0.0.0-20200821140526-fda516888d29 // indirect
 	google.golang.org/protobuf v1.25.0 // indirect
 )

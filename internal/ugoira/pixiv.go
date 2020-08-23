@@ -72,7 +72,7 @@ func GetPixivPost(id string) (*PixivPost, error) {
 		return nil, err
 	}
 
-	log.Infoln("getting a pixiv post with a following ID: ", id)
+	log.Infof("Fetching Pixiv post. ID: %v", id)
 	illust, err := getIllust(pid)
 	if err != nil {
 		log.Warnln(err)
@@ -115,7 +115,7 @@ func GetPixivPost(id string) (*PixivPost, error) {
 		NSFW:           nsfw,
 	}
 
-	log.Infoln("resulting post\n", post)
+	log.Infoln("Fetched successfully! ID: %v. Pages: %v", post.ID, post.Pages)
 	return post, nil
 }
 

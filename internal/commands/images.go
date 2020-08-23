@@ -110,7 +110,7 @@ func sauce(s *discordgo.Session, m *discordgo.MessageCreate, args []string) erro
 		}
 	}
 
-	log.Infoln("Searching sauce for", uri, "on", searchEngine)
+	log.Infof("Searching for source image. URL: %v. Reverse search engine: %v", uri, searchEngine)
 	embed, err := searchEngines[searchEngine](uri)
 	if err != nil {
 		return err
@@ -167,7 +167,7 @@ func saucenao(link string) (*discordgo.MessageEmbed, error) {
 	}
 
 	source := res.Results[0]
-	log.Infof("Source found. Title: %v", source.Data.Title)
+	log.Infof("Found source. Resulting struct: %v", source)
 
 	embed := &discordgo.MessageEmbed{
 		Title:     fmt.Sprintf("Source found! Title: %v", source.Title()),

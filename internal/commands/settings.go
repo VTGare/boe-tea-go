@@ -156,7 +156,7 @@ func setRepost(s *discordgo.Session, m *discordgo.MessageCreate, str string) (in
 				Thumbnail: &discordgo.MessageEmbedThumbnail{
 					URL: utils.DefaultEmbedImage,
 				},
-				Description: "Repost checking requires collecting following data. Do you agree to sharing this information?",
+				Description: "Repost checking requires collecting following data. Do you agree sharing this information?",
 				Fields: []*discordgo.MessageEmbedField{
 					{
 						Name:  "Post content",
