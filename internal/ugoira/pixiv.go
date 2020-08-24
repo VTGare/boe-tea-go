@@ -115,7 +115,7 @@ func GetPixivPost(id string) (*PixivPost, error) {
 		NSFW:           nsfw,
 	}
 
-	log.Infoln("Fetched successfully! ID: %v. Pages: %v", post.ID, post.Pages)
+	log.Infof("Fetched successfully! ID: %v. Pages: %v", post.ID, post.Pages)
 	return post, nil
 }
 

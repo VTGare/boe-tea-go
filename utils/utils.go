@@ -3,6 +3,7 @@ package utils
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -267,4 +268,9 @@ func GetEmoji(s *discordgo.Session, guildID, e string) (string, error) {
 	}
 
 	return "", errors.New("emoji not found")
+}
+
+func IsValidURL(uri string) bool {
+	_, err := url.ParseRequestURI(uri)
+	return err == nil
 }

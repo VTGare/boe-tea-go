@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/gocolly/colly/v2"
+	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -41,6 +42,7 @@ func GetTweet(uri string) (*Tweet, error) {
 		return nil, errors.New("invalid twitter url")
 	}
 
+	logrus.Infof("Fetching a tweet by URL: %v", uri)
 	uri = strings.ReplaceAll(str, "twitter.com", "nitter.net")
 	c := colly.NewCollector()
 
@@ -103,5 +105,7 @@ func GetTweet(uri string) (*Tweet, error) {
 	}
 
 	c.Wait()
+
+	logrus.Infof("Fetched a tweet successfully. URL: %v. Images: %v", res.URL, len(res.Gallery))
 	return res, nil
 }

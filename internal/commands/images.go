@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"image"
-	"net/http"
 	"net/url"
 	"os"
 	"regexp"
@@ -16,7 +15,6 @@ import (
 	"github.com/VTGare/boe-tea-go/internal/repost"
 	"github.com/VTGare/boe-tea-go/pkg/chotto"
 	"github.com/VTGare/boe-tea-go/pkg/seieki"
-	"github.com/VTGare/boe-tea-go/pkg/tsuita"
 	"github.com/VTGare/boe-tea-go/utils"
 	"github.com/VTGare/gumi"
 	"github.com/bwmarrin/discordgo"
@@ -27,9 +25,10 @@ var (
 	//ImageURLRegex is a regex for image URLs
 	ImageURLRegex = regexp.MustCompile(`(?i)(http(s?):)([/|.|\w|\s|-])*\.(?:jpg|jpeg|gif|png|webp)`)
 	//ErrNoSauce is an error when source couldn't be found.
-	ErrNoSauce    = errors.New("seems like sauce couldn't be found. Try using following websites yourself:\nhttps://ascii2d.net/\nhttps://iqdb.org/")
-	sei           = seieki.NewSeieki(os.Getenv("SAUCENAO_API"))
-	searchEngines = map[string]func(link string) (*discordgo.MessageEmbed, error){
+	ErrNoSauce       = errors.New("seems like sauce couldn't be found. Try using following websites yourself:\nhttps://ascii2d.net/\nhttps://iqdb.org/")
+	messageLinkRegex = regexp.MustCompile(`(?i)http(?:s)?:\/\/(?:www\.)?discord(?:app)?.com\/channels\/\d+\/(\d+)\/(\d+)`)
+	sei              = seieki.NewSeieki(os.Getenv("SAUCENAO_API"))
+	searchEngines    = map[string]func(link string) (*discordgo.MessageEmbed, error){
 		"saucenao": saucenao,
 		"wait":     wait,
 	}
@@ -63,55 +62,70 @@ func init() {
 }
 
 func sauce(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
-	if len(m.Attachments) > 0 {
-		args = append(args, m.Attachments[0].URL)
+	var (
+		engine = "saucenao"
+		link   = ""
+	)
+
+	if guild, ok := database.GuildCache[m.GuildID]; ok {
+		engine = guild.ReverseSearch
 	}
 
-	messages, err := s.ChannelMessages(m.ChannelID, 5, m.ID, "", "")
-	if err != nil {
-		return err
-	}
-
-	if recent := findRecentImage(messages); recent != "" {
-		args = append(args, recent)
-	}
-
-	findEngine := func() string {
-		if m.GuildID != "" {
-			return database.GuildCache[m.GuildID].ReverseSearch
-		}
-		return "saucenao"
-	}
-
-	uri := ""
-	searchEngine := ""
-
-	if len(args) == 0 {
-		return utils.ErrNotEnoughArguments
-	} else if len(args) == 1 {
-		searchEngine = findEngine()
-		uri = ImageURLRegex.FindString(args[0])
-		if uri == "" {
-			return errors.New("received a non-image url")
-		}
-	} else if len(args) >= 2 {
-		if f := ImageURLRegex.FindString(args[0]); f != "" {
-			searchEngine = findEngine()
-			uri = f
-		} else if _, ok := searchEngines[args[0]]; ok {
-			searchEngine = args[0]
-			uri = ImageURLRegex.FindString(args[1])
+	if len(args) == 0 || len(args) == 1 && args[0] == "saucenao" || args[0] == "wait" {
+		if len(m.Attachments) > 0 && ImageURLRegex.MatchString(m.Attachments[0].URL) {
+			args = append(args, m.Attachments[0].URL)
 		} else {
-			return errors.New("incorrect command usage, please use bt!help sauce for more info")
-		}
-
-		if uri == "" {
-			return errors.New("received a non-image url")
+			messages, err := s.ChannelMessages(m.ChannelID, 5, m.ID, "", "")
+			if err != nil {
+				return err
+			}
+			if recent := findRecentImage(messages); recent != "" {
+				args = append(args, recent)
+			} else {
+				return utils.ErrNotEnoughArguments
+			}
 		}
 	}
 
-	log.Infof("Searching for source image. URL: %v. Reverse search engine: %v", uri, searchEngine)
-	embed, err := searchEngines[searchEngine](uri)
+	switch {
+	case len(args) == 1:
+		if arg := ImageURLRegex.FindString(args[0]); arg != "" {
+			link = arg
+		} else {
+			str, err := sauceInMessageLink(s, args[0])
+			if err != nil {
+				return err
+			}
+			link = str
+		}
+
+		if link == "" {
+			return fmt.Errorf("incorrect command usage. Please refer to ``bt!help images sauce`` for more information")
+		}
+	case len(args) >= 2:
+		if ImageURLRegex.MatchString(args[0]) {
+			link = args[0]
+		} else if args[0] == "saucenao" || args[0] == "wait" {
+			engine = args[0]
+			if ImageURLRegex.MatchString(args[1]) {
+				link = args[1]
+			} else if messageLinkRegex.MatchString(args[1]) {
+				str, err := sauceInMessageLink(s, args[1])
+				if err != nil {
+					return err
+				}
+				if str != "" {
+					link = str
+				}
+			}
+		}
+		if link == "" {
+			return fmt.Errorf("incorrect command usage. Please refer to ``bt!help images sauce`` for more information")
+		}
+	}
+
+	log.Infof("Searching for source image. URL: %v. Reverse search engine: %v", link, engine)
+	embed, err := searchEngines[engine](link)
 	if err != nil {
 		return err
 	}
@@ -121,6 +135,20 @@ func sauce(s *discordgo.Session, m *discordgo.MessageCreate, args []string) erro
 	}
 
 	return nil
+}
+
+func sauceInMessageLink(s *discordgo.Session, arg string) (string, error) {
+	if matches := messageLinkRegex.FindStringSubmatch(arg); matches != nil {
+		m, err := s.ChannelMessage(matches[1], matches[2])
+		if err != nil {
+			return "", err
+		}
+		if recent := findRecentImage([]*discordgo.Message{m}); recent != "" {
+			return recent, nil
+		}
+	}
+
+	return "", nil
 }
 
 func namedLink(uri string) string {
@@ -167,7 +195,7 @@ func saucenao(link string) (*discordgo.MessageEmbed, error) {
 	}
 
 	source := res.Results[0]
-	log.Infof("Found source. Resulting struct: %v", source)
+	log.Infof("Found source. Author: %v. Title: %v. URL: %v", source.Author(), source.Title(), source.URL())
 
 	embed := &discordgo.MessageEmbed{
 		Title:     fmt.Sprintf("Source found! Title: %v", source.Title()),
@@ -346,70 +374,42 @@ func twitter(s *discordgo.Session, m *discordgo.MessageCreate, args []string) er
 		return utils.ErrNotEnoughArguments
 	}
 
-	tweet, err := tsuita.GetTweet(args[0])
+	guild := database.GuildCache[m.GuildID]
+	a := repost.NewPost(*m, args[0])
+
+	if guild.Repost != "disabled" {
+		a.FindReposts()
+		if len(a.Reposts) > 0 {
+			switch guild.Repost {
+			case "strict":
+				s.ChannelMessageSendEmbed(m.ChannelID, a.RepostEmbed())
+				return nil
+			case "enabled":
+				f := utils.CreatePromptWithMessage(s, m, &discordgo.MessageSend{
+					Content: "Tweet you're trying to post is a repost. Are you sure about that?",
+					Embed:   a.RepostEmbed(),
+				})
+				if !f {
+					return nil
+				}
+			}
+		}
+	}
+
+	tweets, err := a.SendTwitter(s, false)
 	if err != nil {
 		return err
 	}
 
-	messages := make([]discordgo.MessageSend, 0)
-	for ind, media := range tweet.Gallery {
-		title := ""
-		if len(tweet.Gallery) > 1 {
-			title = fmt.Sprintf("%v's tweet | Page %v/%v", tweet.Author, ind+1, len(tweet.Gallery))
-		} else {
-			title = fmt.Sprintf("%v's tweet", tweet.Author)
-		}
-
-		embed := discordgo.MessageEmbed{
-			Title:     title,
-			Timestamp: tweet.Timestamp,
-			Fields: []*discordgo.MessageEmbedField{
-				{
-					Name:   "Likes",
-					Value:  strconv.Itoa(tweet.Likes),
-					Inline: true,
-				},
-				{
-					Name:   "Retweets",
-					Value:  strconv.Itoa(tweet.Retweets),
-					Inline: true,
-				},
-			},
-		}
-
-		msg := discordgo.MessageSend{}
-		if ind == 0 {
-			embed.Description = tweet.Content
-		}
-
-		if media.Animated {
-			resp, err := http.Get(media.URL)
+	for _, t := range tweets {
+		for _, send := range t {
+			_, err := s.ChannelMessageSendComplex(m.ChannelID, send)
 			if err != nil {
-				return err
-			}
-			defer resp.Body.Close()
-
-			filename := media.URL[strings.LastIndex(media.URL, "/")+1:]
-			msg.File = &discordgo.File{
-				Name:   filename,
-				Reader: resp.Body,
-			}
-		} else {
-			embed.Image = &discordgo.MessageEmbedImage{
-				URL: media.URL,
+				log.Warnln(err)
 			}
 		}
-		msg.Embed = &embed
-
-		messages = append(messages, msg)
 	}
 
-	for _, message := range messages {
-		_, err := s.ChannelMessageSendComplex(m.ChannelID, &message)
-		if err != nil {
-			return err
-		}
-	}
 	return nil
 }
 
