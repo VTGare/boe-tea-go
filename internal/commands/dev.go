@@ -4,6 +4,7 @@ import (
 	"context"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/VTGare/boe-tea-go/internal/database"
 	"github.com/VTGare/boe-tea-go/utils"
@@ -17,6 +18,7 @@ func init() {
 	dg.AddCommand("migrate", migrateDB)
 	dg.AddCommand("test", test)
 	dg.AddCommand("message", message)
+	dg.AddCommand("devstats", devstats)
 }
 
 func message(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
@@ -69,5 +71,51 @@ func test(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error
 		return utils.ErrNotEnoughArguments
 	}
 
+	return nil
+}
+
+func devstats(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
+	if m.Author.ID != utils.AuthorID {
+		return nil
+	}
+
+	guilds := len(s.State.Guilds)
+
+	channels := 0
+	for _, g := range s.State.Guilds {
+		channels += len(g.Channels)
+	}
+	latency := s.HeartbeatLatency().Round(1 * time.Millisecond)
+
+	s.ChannelMessageSendEmbed(m.ChannelID, &discordgo.MessageEmbed{
+		Title:     "Bot stats",
+		Color:     utils.EmbedColor,
+		Timestamp: utils.EmbedTimestamp(),
+		Thumbnail: &discordgo.MessageEmbedThumbnail{
+			URL: utils.DefaultEmbedImage,
+		},
+		Fields: []*discordgo.MessageEmbedField{
+			{
+				Name:   "Guilds",
+				Value:  strconv.Itoa(guilds),
+				Inline: true,
+			},
+			{
+				Name:   "Channels",
+				Value:  strconv.Itoa(channels),
+				Inline: true,
+			},
+			{
+				Name:   "Latency",
+				Value:  latency.String(),
+				Inline: true,
+			},
+			{
+				Name:   "Shards",
+				Value:  strconv.Itoa(s.ShardCount),
+				Inline: true,
+			},
+		},
+	})
 	return nil
 }

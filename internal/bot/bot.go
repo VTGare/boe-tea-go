@@ -51,6 +51,7 @@ func NewBot(token string) (*Bot, error) {
 	dg.AddHandler(bot.messageDeleted)
 	dg.AddHandler(bot.guildCreated)
 	dg.AddHandler(bot.guildDeleted)
+	dg.Identify.Intents = discordgo.MakeIntent(discordgo.IntentsAllWithoutPrivileged)
 	return bot, nil
 }
 
