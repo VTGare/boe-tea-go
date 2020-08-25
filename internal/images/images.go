@@ -3,14 +3,13 @@ package images
 import (
 	"bytes"
 	"image"
-
 	_ "image/gif"
 	"image/jpeg"
 	_ "image/png"
-
 	"net/http"
 
 	"github.com/disintegration/gift"
+	_ "golang.org/x/image/webp"
 )
 
 func Deepfry(original image.Image) *bytes.Buffer {
@@ -27,6 +26,14 @@ func Deepfry(original image.Image) *bytes.Buffer {
 	var buf bytes.Buffer
 	jpeg.Encode(&buf, deepfried, &jpeg.Options{
 		Quality: 10,
+	})
+	return &buf
+}
+
+func Jpegify(original image.Image, quality int) *bytes.Buffer {
+	var buf bytes.Buffer
+	jpeg.Encode(&buf, original, &jpeg.Options{
+		Quality: quality,
 	})
 	return &buf
 }

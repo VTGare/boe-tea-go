@@ -56,9 +56,18 @@ func init() {
 	pixivCmd.Help = gumi.NewHelpSettings().AddField("Usage", "bt!pixiv <post link> [optional excluded images]", false).AddField("excluded images", "Indexes must be separated by whitespace (e.g. 1 2 4 6 10 45)", false)
 
 	dfCmd := ig.AddCommand("deepfry", deepfry, gumi.CommandDescription("Deepfries an image, itadakimasu"))
-	dfCmd.Help = gumi.NewHelpSettings().AddField("Usage", "bt!deepfry <optional times deepfried> <image link>", false).AddField("times deepfried", "Repeats deepfrying process given amount of times, up to 5.", false)
+	dfCmd.Help = gumi.NewHelpSettings()
+	dfCmd.Help.AddField("Usage", "bt!deepfry <optional times deepfried> <image link>", false)
+	dfCmd.Help.AddField("times deepfried", "Repeats deepfrying process given amount of times, up to 5.", false)
+
 	tCmd := ig.AddCommand("twitter", twitter, gumi.CommandDescription("Reposts each twitter post's image separately. Useful for mobile."))
-	tCmd.Help = gumi.NewHelpSettings().AddField("Usage", "bt!twitter <twitter link>", false).AddField("Twitter link", "Must look something like this: https://twitter.com/mhy_shima/status/1258684420011069442", false)
+	tCmd.Help = gumi.NewHelpSettings()
+	tCmd.Help.AddField("Usage", "bt!twitter <twitter link>", false)
+	tCmd.Help.AddField("Twitter link", "Must look something like this: https://twitter.com/mhy_shima/status/1258684420011069442", false)
+
+	jpegCmd := ig.AddCommand("jpeg", jpegify, gumi.CommandDescription("Gives image a soul. Extremely redpilled command."))
+	jpegCmd.Help = gumi.NewHelpSettings()
+	jpegCmd.Help.AddField("Usage", "bt!jpeg <image quality> <image url>", false).AddField("image quality", "Optional integer from 0 to 100", false).AddField("image url", "Optional if attachment is present. Attachment is prioritized.", false)
 }
 
 func sauce(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
@@ -461,5 +470,51 @@ func deepfry(s *discordgo.Session, m *discordgo.MessageCreate, args []string) er
 	}
 
 	s.ChannelFileSend(m.ChannelID, "deepfried.jpg", deepfried)
+	return nil
+}
+
+func jpegify(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
+	if len(m.Attachments) > 0 {
+		args = append(args, m.Attachments[0].URL)
+	}
+
+	uri := ""
+	quality := 10
+	switch len(args) {
+	case 2:
+		if f := ImageURLRegex.FindString(args[0]); f != "" {
+			uri = f
+		} else {
+			var err error
+			quality, err = strconv.Atoi(args[0])
+			if quality > 100 || quality < 1 {
+				return errors.New("quality can't be higher than 100 or lower than 1")
+			}
+			if err != nil {
+				return err
+			}
+			uri = ImageURLRegex.FindString(args[1])
+		}
+
+		if uri == "" {
+			return errors.New("received a non-image url")
+		}
+	case 1:
+		if f := ImageURLRegex.FindString(args[0]); f != "" {
+			uri = f
+		} else {
+			return errors.New("received a non-image url")
+		}
+	case 0:
+		return utils.ErrNotEnoughArguments
+	}
+
+	img, err := images.DownloadImage(uri)
+	if err != nil {
+		return err
+	}
+
+	deepfried := images.Jpegify(img, quality)
+	s.ChannelFileSend(m.ChannelID, "soul.jpg", deepfried)
 	return nil
 }
