@@ -121,7 +121,7 @@ func (b *Bot) prefixless(s *discordgo.Session, m *discordgo.MessageCreate) error
 		}
 	}
 
-	if guild.Pixiv {
+	if guild.Pixiv && len(art.PixivMatches) > 0 {
 		messages, err := art.SendPixiv(s)
 		if err != nil {
 			return err
