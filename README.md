@@ -4,28 +4,27 @@
 
 <img align="center" src="https://cdn.discordapp.com/avatars/636468907049353216/f22aa4bf930d9743dd40a10287de8b04.png?size=256">
 
-**Boe Tea** is a source image bot that makes it easier to post your favourite anime art (only Pixiv as of right now) on Discord and find sauce without leaving your Discord window.
+**Boe Tea** is a source image bot that reposts Pixiv, Twitter images, detects reposts and searches sauce for you!
 
 ## Getting started
 
 [![Invite](https://img.shields.io/badge/Invite%20Link-%40Boe%20Tea-brightgreen)](https://discordapp.com/api/oauth2/authorize?client_id=636468907049353216&permissions=537250880&scope=bot)
 
-To invite him please follow the link above. It requires following permissions to work correctly now and in future _(more fuctionality to come!)_
-
+To invite him please follow the link above. It requires following permissions to work correctly.
 -   Manage webhooks (for future functionality)
 -   Read messages
 -   Send messages
 -   Embed links
 -   Attach files
--   Read Message History (for future functionality)
+-   Read Message History
 -   Add reactions
 -   Use external Emojis
 
-If you run into a problem or have a suggestion create an issue here or contact me on Discord at _VTGare#3370_.
+If you ran into a problem or have a suggestion create an issue here, use bt!feedback command or contact me on Discord at _VTGare#3370_.
 
 ## Documentation
 
-Currently Boe Tea possesses a limited amount of features. All commands can be described on a single page, what I'm about to prove right here.
+Current documentation is out of date, all these commands still work, but there are more their behaviour is subject to change. I'll make sure Boe Tea is fully documented when I finally release its own fansy website.
 
 -   `bt!sauce` - tries to find original image source on SauceNAO or ASCII2D search engine.
     -   _Usage_: `bt!sauce <optional reverse search engine> <optional link>`. If reverse search engine is not present uses guild's default. If link is not present looks up for an attachment.
@@ -55,7 +54,10 @@ Currently Boe Tea possesses a limited amount of features. All commands can be de
     - _Usage_: `bt!nhentai <magic number>`
     - _magic number_: Typically, but not always, a 6-digit numbers only weebs can understand meaning of.
 
-## Additional features
+## Building
 
--   NSFW check. If Pixiv post has an R-18 tag it's only allowed to be reposted in NSFW channels.
--   Ability to delete an image after it was posted (react ❌ `:x:` to Boe Tea's message)
+# Requirements
+- Golang (1.13+)
+- ffmpeg
+
+Soon there will be a guide how build and deploy your own Boe Tea but until then you can go through the source code to figure it out yourself Kappa
