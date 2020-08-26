@@ -56,7 +56,7 @@ Current documentation is out of date. All these commands still work as documente
 
 ## Building
 
-# Requirements
+### Requirements
 - Golang (1.13+)
 - ffmpeg
 
