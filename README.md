@@ -24,7 +24,7 @@ If you ran into a problem or have a suggestion create an issue here, use bt!feed
 
 ## Documentation
 
-Current documentation is out of date, all these commands still work, but there are more their behaviour is subject to change. I'll make sure Boe Tea is fully documented when I finally release its own fansy website.
+Current documentation is out of date. All these commands still work as documented, but there are more undocumented commands or missed features on documented ones. Also their behaviour is subject to change soon. I'll make sure Boe Tea is fully documented when I finally release its own fansy website.
 
 -   `bt!sauce` - tries to find original image source on SauceNAO or ASCII2D search engine.
     -   _Usage_: `bt!sauce <optional reverse search engine> <optional link>`. If reverse search engine is not present uses guild's default. If link is not present looks up for an attachment.
