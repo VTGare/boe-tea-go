@@ -2,6 +2,8 @@ package commands
 
 import (
 	"context"
+	"fmt"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -79,6 +81,11 @@ func devstats(s *discordgo.Session, m *discordgo.MessageCreate, args []string) e
 		return nil
 	}
 
+	var (
+		mem runtime.MemStats
+	)
+	runtime.ReadMemStats(&mem)
+
 	guilds := len(s.State.Guilds)
 
 	channels := 0
@@ -115,6 +122,7 @@ func devstats(s *discordgo.Session, m *discordgo.MessageCreate, args []string) e
 				Value:  strconv.Itoa(s.ShardCount),
 				Inline: true,
 			},
+			{Name: "RAM used", Value: fmt.Sprintf("%v MB", mem.Alloc/1024/1024), Inline: true},
 		},
 	})
 	return nil
