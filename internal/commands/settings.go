@@ -113,7 +113,7 @@ func showGuildSettings(s *discordgo.Session, m *discordgo.MessageCreate, setting
 }
 
 func setBool(s *discordgo.Session, m *discordgo.MessageCreate, str string) (interface{}, error) {
-	return strconv.ParseBool(str)
+	return utils.ParseBool(str)
 }
 
 func setPrefix(s *discordgo.Session, m *discordgo.MessageCreate, str string) (interface{}, error) {

@@ -88,6 +88,12 @@ func (a *ArtPost) SendPixiv(s *discordgo.Session, opts ...SendPixivOptions) ([]*
 		return nil, err
 	}
 
+	for excl := range exclude {
+		if excl < 0 || excl > countPages(a.posts) {
+			delete(exclude, excl)
+		}
+	}
+
 	count := countPages(a.posts) - len(exclude)
 	if count >= guild.LargeSet && !skipPrompt {
 		prompt := utils.CreatePrompt(s, &a.event, &utils.PromptOptions{
@@ -151,7 +157,7 @@ func createPixivEmbeds(a *ArtPost, excluded map[int]bool, guild *database.GuildS
 		messages     = make([]*discordgo.MessageSend, 0)
 	)
 
-	count := countPages(a.posts)
+	count := countPages(a.posts) - len(excluded)
 	for _, post := range a.posts {
 		if createdCount == guild.Limit {
 			break
@@ -202,11 +208,10 @@ func createPixivEmbed(post *ugoira.PixivPost, thumbnail, original string, ind, e
 
 	send := &discordgo.MessageSend{
 		Embed: &discordgo.MessageEmbed{
-			Title:       title,
-			URL:         fmt.Sprintf("https://www.pixiv.net/en/artworks/%v", post.ID),
-			Color:       utils.EmbedColor,
-			Timestamp:   utils.EmbedTimestamp(),
-			Description: fmt.Sprintf("[Original quality](%v)", original),
+			Title:     title,
+			URL:       fmt.Sprintf("https://www.pixiv.net/en/artworks/%v", post.ID),
+			Color:     utils.EmbedColor,
+			Timestamp: utils.EmbedTimestamp(),
 			Fields: []*discordgo.MessageEmbedField{
 				{
 					Name:   "Likes",
@@ -214,8 +219,8 @@ func createPixivEmbed(post *ugoira.PixivPost, thumbnail, original string, ind, e
 					Inline: true,
 				},
 				{
-					Name:   "Tags",
-					Value:  joinTags(post.Tags, " • "),
+					Name:   "Original quality",
+					Value:  fmt.Sprintf("[Click here desu~](%v)", original),
 					Inline: true,
 				},
 			},
@@ -226,6 +231,10 @@ func createPixivEmbed(post *ugoira.PixivPost, thumbnail, original string, ind, e
 				Text: embedWarning[easterEgg],
 			},
 		},
+	}
+
+	if ind == 0 {
+		send.Embed.Description = fmt.Sprintf("**Tags**\n%v", joinTags(post.Tags, " • "))
 	}
 
 	return send

@@ -274,3 +274,13 @@ func IsValidURL(uri string) bool {
 	_, err := url.ParseRequestURI(uri)
 	return err == nil
 }
+
+func ParseBool(s string) (bool, error) {
+	switch {
+	case strings.EqualFold(s, "enabled") || strings.EqualFold(s, "true") || strings.EqualFold(s, "t") || strings.EqualFold(s, "on"):
+		return true, nil
+	case strings.EqualFold(s, "disabled") || strings.EqualFold(s, "false") || strings.EqualFold(s, "f") || strings.EqualFold(s, "off"):
+		return false, nil
+	}
+	return false, fmt.Errorf("unable to parse %v to bool", s)
+}

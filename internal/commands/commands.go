@@ -59,27 +59,27 @@ func init() {
 		},
 		{
 			Name:  "prefix",
-			Value: "Changes bot's prefix. Maximum ***5 characters***. If last character is a letter whitespace is assumed (takes one character).",
+			Value: "Bot's prefix. Up to ***5 characters***. If last character is a letter whitespace is assumed (takes one character).",
 		},
 		{
 			Name:  "largeset",
-			Value: "Amount of pictures considered a large set, which invokes a prompt. Must be an ***integer***. Set to 0 to ask every time",
+			Value: "Album size considered as large and invokes a prompt when posted.",
 		},
 		{
 			Name:  "limit",
-			Value: "Image set size hard limit. If you attempt to repost a post or bulk post more than the limit it'll fail",
+			Value: "Hard limit for album size. Only first image from an album will be posted if album size exceeded limit.",
 		},
 		{
-			Name:  "pixiv",
-			Value: "Pixiv reposting switch, accepts ***f or false (case-insensitive)*** to disable and ***t or true*** to enable.",
+			Name:  "pixiv | twitter",
+			Value: "Pixiv or Twitter reposting switch, valid parameters: ***[enabled, on, t, true], [disabled, off, f, false]***",
 		},
 		{
 			Name:  "repost",
-			Value: "Repost check setting, accepts ***enabled***, ***disabled***, and ***strict*** settings. Strict mode disables a prompt and removes Twitter reposts (if bot has Manage Messages permission)",
+			Value: "Repost check setting, valid parameters: ***[enabled, disabled, strict]***. Strict mode disables a prompt and removes reposts on sight.",
 		},
 		{
 			Name:  "reversesearch",
-			Value: "Default reverse image search engine. Only ***SauceNAO*** or ***WAIT*** are available as of now.",
+			Value: "Default reverse image search engine. Available options: ***[saucenao, wait]***",
 		},
 		{
 			Name:  "promptemoji",
