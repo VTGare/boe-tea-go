@@ -120,9 +120,9 @@ func devstats(s *discordgo.Session, m *discordgo.MessageCreate, args []string) e
 			{
 				Name:   "Shards",
 				Value:  strconv.Itoa(s.ShardCount),
-				Inline: true,
+				Inline: false,
 			},
-			{Name: "RAM used", Value: fmt.Sprintf("%v MB", mem.Alloc/1024/1024), Inline: true},
+			{Name: "RAM used", Value: fmt.Sprintf("%v MB", mem.Alloc/1024/1024), Inline: false},
 		},
 	})
 	return nil

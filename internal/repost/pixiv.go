@@ -237,6 +237,10 @@ func createPixivEmbed(post *ugoira.PixivPost, thumbnail, original string, ind, e
 		send.Embed.Description = fmt.Sprintf("**Tags**\n%v", joinTags(post.Tags, " • "))
 	}
 
+	if post.GoodWaifu && strings.Contains(send.Embed.Footer.Text, "Shit waifu") {
+		send.Embed.Footer.Text = strings.Replace(send.Embed.Footer.Text, "Shit", "Good", 1)
+	}
+
 	return send
 }
 

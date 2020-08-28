@@ -26,6 +26,7 @@ type PixivPost struct {
 	LargeImages    []string
 	OriginalImages []string
 	NSFW           bool
+	GoodWaifu      bool
 }
 
 func init() {
@@ -94,11 +95,17 @@ func GetPixivPost(id string) (*PixivPost, error) {
 	}
 
 	nsfw := false
+	goodwaifu := false
 	tags := make([]string, 0)
 	for _, t := range illust.Tags {
 		if t.Name == "R-18" {
 			nsfw = true
 		}
+
+		if strings.Contains(t.Name, "すいせい") || strings.Contains(t.Name, "ヨルハ二号B型") || strings.Contains(t.Name, "2B") || strings.Contains(t.Name, "牧瀬紅莉栖") {
+			goodwaifu = true
+		}
+
 		tags = append(tags, t.Name)
 	}
 
@@ -113,6 +120,7 @@ func GetPixivPost(id string) (*PixivPost, error) {
 		OriginalImages: originalImages,
 		Likes:          illust.TotalBookmarks,
 		NSFW:           nsfw,
+		GoodWaifu:      goodwaifu,
 	}
 
 	log.Infof("Fetched successfully! ID: %v. Pages: %v", post.ID, post.Pages)
