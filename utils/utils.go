@@ -70,7 +70,14 @@ func MemberHasPermission(s *discordgo.Session, guildID string, userID string, pe
 			return false, err
 		}
 	}
+	g, err := s.Guild(guildID)
+	if err != nil {
+		return false, err
+	}
 
+	if g.OwnerID == userID {
+		return true, nil
+	}
 	// Iterate through the role IDs stored in member.Roles
 	// to check permissions
 	for _, roleID := range member.Roles {
