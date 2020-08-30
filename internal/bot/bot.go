@@ -194,7 +194,7 @@ func (b *Bot) messageCreated(s *discordgo.Session, m *discordgo.MessageCreate) {
 	}
 
 	isCommand := commands.CommandFramework.Handle(s, m)
-	if !isCommand {
+	if !isCommand && m.GuildID != "" {
 		err := b.prefixless(s, m)
 		commands.CommandFramework.ErrorHandler(err)
 	}
