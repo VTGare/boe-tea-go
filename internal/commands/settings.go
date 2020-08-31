@@ -150,7 +150,7 @@ func setRepost(s *discordgo.Session, m *discordgo.MessageCreate, str string) (in
 	if str == "enabled" || str == "strict" {
 		description := "Repost checking requires collecting following data. Do you agree sharing this information?"
 		if str == "strict" {
-			description += "\nPlease enable Manage Messages permissions to remove reposts with strict mode on, otherwise strict mode is useless."
+			description += "\nPlease enable Manage Messages permission to remove reposts with strict mode on, otherwise strict mode is useless."
 		}
 
 		agree := utils.CreatePromptWithMessage(s, m, &discordgo.MessageSend{

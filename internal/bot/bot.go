@@ -108,7 +108,7 @@ func (b *Bot) prefixless(s *discordgo.Session, m *discordgo.MessageCreate) error
 				}
 
 				if !perm {
-					s.ChannelMessageSend(m.ChannelID, "Please enable Manage Messages permissions to remove reposts with strict mode on, otherwise strict mode is useless.")
+					s.ChannelMessageSend(m.ChannelID, "Please enable Manage Messages permission to remove reposts with strict mode on, otherwise strict mode is useless.")
 				} else if art.Len() == 0 {
 					s.ChannelMessageDelete(m.ChannelID, m.ID)
 				}
