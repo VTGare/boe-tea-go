@@ -12,6 +12,7 @@ import (
 	"github.com/VTGare/boe-tea-go/pkg/tsuita"
 	"github.com/VTGare/boe-tea-go/utils"
 	"github.com/bwmarrin/discordgo"
+	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -140,6 +141,7 @@ func (a *ArtPost) RemoveReposts() {
 func (a *ArtPost) Cleanup() {
 	for _, p := range a.posts {
 		if p.Ugoira != nil && p.Ugoira.File != nil {
+			logrus.Infoln("Removing Ugoira file.")
 			p.Ugoira.File.Close()
 			os.Remove(p.Ugoira.File.Name())
 		}

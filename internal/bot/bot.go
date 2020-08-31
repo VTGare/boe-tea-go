@@ -101,8 +101,15 @@ func (b *Bot) prefixless(s *discordgo.Session, m *discordgo.MessageCreate) error
 			if guild.Repost == "strict" {
 				art.RemoveReposts()
 				s.ChannelMessageSendEmbed(m.ChannelID, art.RepostEmbed())
-				if art.Len() == 0 {
 
+				perm, err := utils.MemberHasPermission(s, m.GuildID, s.State.User.ID, 8|8192)
+				if err != nil {
+					return err
+				}
+
+				if !perm {
+					s.ChannelMessageSend(m.ChannelID, "Please enable Manage Messages permissions to remove reposts with strict mode on, otherwise strict mode is useless.")
+				} else if art.Len() == 0 {
 					s.ChannelMessageDelete(m.ChannelID, m.ID)
 				}
 			} else if guild.Repost == "enabled" {
