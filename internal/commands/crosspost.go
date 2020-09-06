@@ -115,7 +115,7 @@ func createGroup(s *discordgo.Session, m *discordgo.MessageCreate, args []string
 
 func deleteGroup(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
 	if len(args) < 1 {
-		return fmt.Errorf("``bt!delete`` requires at least one arguments.\n**Usage:** ``bt!delete ntr``")
+		return fmt.Errorf("``bt!delete`` requires at least one argument.\n**Usage:** ``bt!delete ntr``")
 	}
 
 	user := database.DB.FindUser(m.Author.ID)
