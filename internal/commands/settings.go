@@ -85,7 +85,7 @@ func set(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error 
 }
 
 func showGuildSettings(s *discordgo.Session, m *discordgo.MessageCreate, settings *database.GuildSettings) {
-	guild, _ := s.Guild(settings.GuildID)
+	guild, _ := s.Guild(settings.ID)
 
 	s.ChannelMessageSendEmbed(m.ChannelID, &discordgo.MessageEmbed{
 		Title:       "Current settings",

@@ -24,6 +24,7 @@ type ArtPost struct {
 	PixivMatches   map[string]bool
 	Reposts        []*database.ImagePost
 	HasUgoira      bool
+	Crosspost      bool
 	event          discordgo.MessageCreate
 	posts          []*ugoira.PixivPost
 }
@@ -149,7 +150,7 @@ func (a *ArtPost) Cleanup() {
 }
 
 //NewPost creates an ArtPost from discordgo message create event.
-func NewPost(m discordgo.MessageCreate, content ...string) *ArtPost {
+func NewPost(m discordgo.MessageCreate, crosspost bool, content ...string) *ArtPost {
 	var (
 		twitter = make(map[string]bool)
 		IDs     = make(map[string]bool)
@@ -172,6 +173,7 @@ func NewPost(m discordgo.MessageCreate, content ...string) *ArtPost {
 
 	return &ArtPost{
 		event:          m,
+		Crosspost:      crosspost,
 		TwitterMatches: twitter,
 		PixivMatches:   IDs,
 	}

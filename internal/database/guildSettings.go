@@ -2,7 +2,7 @@ package database
 
 import (
 	"context"
-	"log"
+	"fmt"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -16,7 +16,7 @@ var (
 
 //GuildSettings is a database model for per guild bot settings
 type GuildSettings struct {
-	GuildID       string    `bson:"guild_id" json:"guild_id"`
+	ID            string    `bson:"guild_id" json:"guild_id"`
 	Prefix        string    `bson:"prefix" json:"prefix"`
 	ReverseSearch string    `bson:"reversesearch" json:"reversesearch"`
 	LargeSet      int       `bson:"largeset" json:"largeset"`
@@ -32,7 +32,7 @@ type GuildSettings struct {
 //NewGuildSettings returns a new GuildSettings instance with given parameters.
 func NewGuildSettings(guildID, prefix, repost, reverseSearch, promptemoji string, largeset, limit int, pixiv, twitter bool) *GuildSettings {
 	return &GuildSettings{
-		GuildID:       guildID,
+		ID:            guildID,
 		ReverseSearch: reverseSearch,
 		Prefix:        prefix,
 		LargeSet:      largeset,
@@ -49,7 +49,7 @@ func NewGuildSettings(guildID, prefix, repost, reverseSearch, promptemoji string
 //DefaultGuildSettings returns a default GuildSettings struct.
 func DefaultGuildSettings(guildID string) *GuildSettings {
 	return &GuildSettings{
-		GuildID:       guildID,
+		ID:            guildID,
 		Prefix:        "bt!",
 		ReverseSearch: "saucenao",
 		LargeSet:      3,
@@ -64,21 +64,25 @@ func DefaultGuildSettings(guildID string) *GuildSettings {
 }
 
 //AllGuilds returns all guilds from a database.
-func (d *Database) AllGuilds() []*GuildSettings {
+func (d *Database) AllGuilds() ([]*GuildSettings, error) {
 	cur, err := d.GuildSettings.Find(context.Background(), bson.M{})
 
 	if err != nil {
-		return []*GuildSettings{}
+		return nil, err
 	}
 
 	guilds := make([]*GuildSettings, 0)
 	cur.All(context.Background(), &guilds)
 
 	if err != nil {
-		log.Println("Error decoding", err)
+		return nil, fmt.Errorf("AllGuild(): %v", err)
 	}
 
-	return guilds
+	for _, guild := range guilds {
+		GuildCache[guild.ID] = guild
+	}
+
+	return guilds, nil
 }
 
 //InsertOneGuild inserts one guild to a database

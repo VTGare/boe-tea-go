@@ -324,7 +324,7 @@ func pixiv(s *discordgo.Session, m *discordgo.MessageCreate, args []string) erro
 	}
 	guild := database.GuildCache[m.GuildID]
 
-	rep := repost.NewPost(*m, args[0])
+	rep := repost.NewPost(*m, false, args[0])
 	if rep.Len() == 0 {
 		return errors.New("first arguments must be a pixiv link")
 	}
@@ -384,7 +384,7 @@ func twitter(s *discordgo.Session, m *discordgo.MessageCreate, args []string) er
 	}
 
 	guild := database.GuildCache[m.GuildID]
-	a := repost.NewPost(*m, args[0])
+	a := repost.NewPost(*m, false, args[0])
 
 	if guild.Repost != "disabled" {
 		a.FindReposts()

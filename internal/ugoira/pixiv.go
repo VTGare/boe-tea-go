@@ -4,14 +4,18 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
+	"github.com/ReneKroon/ttlcache"
 	"github.com/everpcpc/pixiv"
 	log "github.com/sirupsen/logrus"
 )
 
 var (
-	baseURL = "https://api.kotori.love/pixiv/image/"
-	app     *pixiv.AppPixivAPI
+	baseURL    = "https://api.kotori.love/pixiv/image/"
+	app        *pixiv.AppPixivAPI
+	pixivCache *ttlcache.Cache
+	goodWaifus = map[string]bool{"すいせい": true, "ヨルハ二号B型": true, "2B": true, "牧瀬紅莉栖": true, "宝鐘マリン": true}
 )
 
 type PixivPost struct {
@@ -45,6 +49,9 @@ func init() {
 		log.Fatalln(err)
 	}
 	app = pixiv.NewApp()
+
+	pixivCache = ttlcache.NewCache()
+	pixivCache.SetTTL(60 * time.Minute)
 }
 
 func (p *PixivPost) DownloadUgoira() error {
@@ -67,6 +74,11 @@ func GetPixivPost(id string) (*PixivPost, error) {
 		largeImages    = make([]string, 0)
 		originalImages = make([]string, 0)
 	)
+
+	if post, ok := pixivCache.Get(id); ok {
+		log.Infof("Found cached pixiv post %s", id)
+		return post.(*PixivPost), nil
+	}
 
 	pid, err := strconv.ParseUint(id, 10, 0)
 	if err != nil {
@@ -102,7 +114,7 @@ func GetPixivPost(id string) (*PixivPost, error) {
 			nsfw = true
 		}
 
-		if strings.Contains(t.Name, "すいせい") || strings.Contains(t.Name, "ヨルハ二号B型") || strings.Contains(t.Name, "2B") || strings.Contains(t.Name, "牧瀬紅莉栖") {
+		if _, ok := goodWaifus[t.Name]; ok {
 			goodwaifu = true
 		}
 
@@ -123,6 +135,7 @@ func GetPixivPost(id string) (*PixivPost, error) {
 		GoodWaifu:      goodwaifu,
 	}
 
+	pixivCache.Set(id, post)
 	log.Infof("Fetched successfully! ID: %v. Pages: %v", post.ID, post.Pages)
 	return post, nil
 }

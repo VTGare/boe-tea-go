@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/VTGare/boe-tea-go/internal/database"
 	"github.com/bwmarrin/discordgo"
 	log "github.com/sirupsen/logrus"
 )
@@ -60,6 +59,24 @@ func Min(x, y int) int {
 		return y
 	}
 	return x
+}
+
+func Map(vs []string, f func(string) string) []string {
+	vsm := make([]string, len(vs))
+	for i, v := range vs {
+		vsm[i] = f(v)
+	}
+	return vsm
+}
+
+func Filter(vs []string, f func(string) bool) []string {
+	vsm := make([]string, 0)
+	for _, v := range vs {
+		if f(v) {
+			vsm = append(vsm, v)
+		}
+	}
+	return vsm
 }
 
 //MemberHasPermission checks if guild member has a permission to do something on a server.
@@ -226,35 +243,6 @@ func FormatBool(b bool) string {
 		return "enabled"
 	}
 	return "disabled"
-}
-
-//CreateDB caches all new Guilds bot's connected to in a database.
-func CreateDB(eventGuilds []*discordgo.Guild) error {
-	allGuilds := database.DB.AllGuilds()
-	for _, guild := range allGuilds {
-		database.GuildCache[guild.GuildID] = guild
-	}
-
-	newGuilds := make([]interface{}, 0)
-	for _, guild := range eventGuilds {
-		if _, ok := database.GuildCache[guild.ID]; !ok {
-			log.Infoln(guild.ID, "not found in database. Adding...")
-			g := database.DefaultGuildSettings(guild.ID)
-			newGuilds = append(newGuilds, g)
-			database.GuildCache[g.GuildID] = g
-		}
-	}
-
-	if len(newGuilds) > 0 {
-		err := database.DB.InsertManyGuilds(newGuilds)
-		if err != nil {
-			return err
-		}
-		log.Infoln("Successfully inserted all current guilds.")
-	}
-
-	log.Infoln(fmt.Sprintf("Connected to %v guilds", len(eventGuilds)))
-	return nil
 }
 
 //GetEmoji returns a guild emoji API name from Discord state

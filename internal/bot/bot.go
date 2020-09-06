@@ -68,11 +68,7 @@ func init() {
 func (b *Bot) onReady(s *discordgo.Session, e *discordgo.Ready) {
 	botMention = "<@!" + e.User.ID + ">"
 	log.Infoln(e.User.String(), "is ready.")
-
-	err := utils.CreateDB(e.Guilds)
-	if err != nil {
-		log.Warnln("Error adding guilds: ", err)
-	}
+	log.Infof("Connected to %v guilds!", len(e.Guilds))
 }
 
 func handleError(s *discordgo.Session, m *discordgo.MessageCreate, err error) {
@@ -91,28 +87,34 @@ func handleError(s *discordgo.Session, m *discordgo.MessageCreate, err error) {
 	}
 }
 
-func (b *Bot) prefixless(s *discordgo.Session, m *discordgo.MessageCreate) error {
-	art := repost.NewPost(*m)
-	guild := database.GuildCache[m.GuildID]
+func (b *Bot) prefixless(s *discordgo.Session, m *discordgo.MessageCreate, crosspost bool) error {
+	art := repost.NewPost(*m, crosspost)
 
+	guild := database.GuildCache[m.GuildID]
 	if guild.Repost != "disabled" {
 		art.FindReposts()
 		if len(art.Reposts) > 0 {
 			if guild.Repost == "strict" {
 				art.RemoveReposts()
-				s.ChannelMessageSendEmbed(m.ChannelID, art.RepostEmbed())
-
-				perm, err := utils.MemberHasPermission(s, m.GuildID, s.State.User.ID, 8|8192)
-				if err != nil {
-					return err
+				if crosspost {
+					log.Infoln("found a repost while crossposting")
 				}
 
-				if !perm {
-					s.ChannelMessageSend(m.ChannelID, "Please enable Manage Messages permission to remove reposts with strict mode on, otherwise strict mode is useless.")
-				} else if art.Len() == 0 {
-					s.ChannelMessageDelete(m.ChannelID, m.ID)
+				if !crosspost {
+					s.ChannelMessageSendEmbed(m.ChannelID, art.RepostEmbed())
+
+					perm, err := utils.MemberHasPermission(s, m.GuildID, s.State.User.ID, 8|8192)
+					if err != nil {
+						return err
+					}
+
+					if !perm {
+						s.ChannelMessageSend(m.ChannelID, "Please enable Manage Messages permission to remove reposts with strict mode on, otherwise strict mode is useless.")
+					} else if art.Len() == 0 {
+						s.ChannelMessageDelete(m.ChannelID, m.ID)
+					}
 				}
-			} else if guild.Repost == "enabled" {
+			} else if guild.Repost == "enabled" && !crosspost {
 				if art.PixivReposts() > 0 && guild.Pixiv {
 					prompt := utils.CreatePromptWithMessage(s, m, &discordgo.MessageSend{
 						Content: "Following posts are reposts, react 👌 to post them.",
@@ -158,7 +160,7 @@ func (b *Bot) prefixless(s *discordgo.Session, m *discordgo.MessageCreate) error
 	}
 
 	if guild.Twitter && len(art.TwitterMatches) > 0 {
-		tweets, err := art.SendTwitter(s, true)
+		tweets, err := art.SendTwitter(s, !crosspost)
 		if err != nil {
 			return err
 		}
@@ -171,13 +173,18 @@ func (b *Bot) prefixless(s *discordgo.Session, m *discordgo.MessageCreate) error
 				msg = "Detected tweets with more than one image, would you like to send embeds of other images for mobile users?"
 			}
 
-			prompt := utils.CreatePrompt(s, m, &utils.PromptOptions{
-				Actions: map[string]bool{
-					"👌": true,
-				},
-				Message: msg,
-				Timeout: 10 * time.Second,
-			})
+			prompt := false
+			if !crosspost {
+				prompt = utils.CreatePrompt(s, m, &utils.PromptOptions{
+					Actions: map[string]bool{
+						"👌": true,
+					},
+					Message: msg,
+					Timeout: 10 * time.Second,
+				})
+			} else {
+				prompt = true
+			}
 
 			if prompt {
 				for _, t := range tweets {
@@ -202,7 +209,26 @@ func (b *Bot) messageCreated(s *discordgo.Session, m *discordgo.MessageCreate) {
 
 	isCommand := commands.CommandFramework.Handle(s, m)
 	if !isCommand && m.GuildID != "" {
-		err := b.prefixless(s, m)
+		err := b.prefixless(s, m, false)
+		user := database.DB.FindUser(m.Author.ID)
+		if user != nil {
+			channels := user.Channels(m.ChannelID)
+			for _, id := range channels {
+				if id == m.ChannelID {
+					continue
+				}
+
+				ch, err := s.State.Channel(id)
+				if err != nil {
+					log.Warnf("prefixless(): %v", err)
+				}
+
+				m.ChannelID = id
+				m.GuildID = ch.GuildID
+				b.prefixless(s, m, true)
+			}
+		}
+
 		commands.CommandFramework.ErrorHandler(err)
 	}
 }
@@ -253,10 +279,6 @@ func (b *Bot) messageDeleted(s *discordgo.Session, m *discordgo.MessageDelete) {
 }
 
 func (b *Bot) guildCreated(s *discordgo.Session, g *discordgo.GuildCreate) {
-	if len(database.GuildCache) == 0 {
-		return
-	}
-
 	if _, ok := database.GuildCache[g.ID]; !ok {
 		newGuild := database.DefaultGuildSettings(g.ID)
 		err := database.DB.InsertOneGuild(newGuild)

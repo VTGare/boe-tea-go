@@ -194,6 +194,12 @@ func createPixivEmbeds(a *ArtPost, excluded map[int]bool, guild *database.GuildS
 		messages[0].Content = fmt.Sprintf("```Album size (%v) is larger than limit set on this server (%v), only first image of every post is reposted.```", count, guild.Limit)
 	}
 
+	if a.Crosspost {
+		for _, m := range messages {
+			m.Embed.Fields = append(m.Embed.Fields, &discordgo.MessageEmbedField{Name: "Cross-post", Value: fmt.Sprintf("Requested by %v", a.event.Author.Mention())})
+		}
+	}
+
 	return messages
 }
 
@@ -238,7 +244,7 @@ func createPixivEmbed(post *ugoira.PixivPost, thumbnail, original string, ind, e
 	}
 
 	if post.GoodWaifu && strings.Contains(send.Embed.Footer.Text, "Shit waifu") {
-		send.Embed.Footer.Text = strings.Replace(send.Embed.Footer.Text, "Shit", "Good", 1)
+		send.Embed.Footer.Text = "Good taste, mate."
 	}
 
 	return send
