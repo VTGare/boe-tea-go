@@ -102,7 +102,6 @@ func (b *Bot) prefixless(s *discordgo.Session, m *discordgo.MessageCreate, cross
 
 				if !crosspost {
 					s.ChannelMessageSendEmbed(m.ChannelID, art.RepostEmbed())
-
 					perm, err := utils.MemberHasPermission(s, m.GuildID, s.State.User.ID, 8|8192)
 					if err != nil {
 						return err
@@ -211,10 +210,12 @@ func (b *Bot) messageCreated(s *discordgo.Session, m *discordgo.MessageCreate) {
 	if !isCommand && m.GuildID != "" {
 		err := b.prefixless(s, m, false)
 		user := database.DB.FindUser(m.Author.ID)
+
 		if user != nil {
+			originalID := m.ChannelID
 			channels := user.Channels(m.ChannelID)
 			for _, id := range channels {
-				if id == m.ChannelID {
+				if id == originalID {
 					continue
 				}
 
