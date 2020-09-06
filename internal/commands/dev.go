@@ -17,10 +17,10 @@ import (
 func init() {
 	dg := CommandFramework.AddGroup("dev")
 	dg.IsVisible = false
-	dg.AddCommand("migrate", migrateDB)
-	dg.AddCommand("test", test)
+	dg.AddCommand("updateDB", updateDB)
+	//dg.AddCommand("test", test)
 	dg.AddCommand("message", message)
-	dg.AddCommand("devstats", devstats)
+	dg.AddCommand("stats", devstats)
 }
 
 func message(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
@@ -44,16 +44,15 @@ func message(s *discordgo.Session, m *discordgo.MessageCreate, args []string) er
 	return nil
 }
 
-func migrateDB(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
+func updateDB(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
 	if m.Author.ID != utils.AuthorID {
 		return nil
 	}
 
 	c := database.DB.GuildSettings
-	res, err := c.UpdateMany(context.Background(), bson.M{"repost": "enabled"}, bson.M{
+	res, err := c.UpdateMany(context.Background(), bson.M{}, bson.M{
 		"$set": bson.M{
-			"repost":  "disabled",
-			"twitter": false,
+			"crosspost": true,
 		},
 	})
 	if err != nil {
@@ -77,10 +76,6 @@ func test(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error
 }
 
 func devstats(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
-	if m.Author.ID != utils.AuthorID {
-		return nil
-	}
-
 	var (
 		mem runtime.MemStats
 	)

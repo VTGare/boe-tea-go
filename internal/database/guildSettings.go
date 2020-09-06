@@ -23,27 +23,11 @@ type GuildSettings struct {
 	Limit         int       `bson:"limit" json:"limit"`
 	Pixiv         bool      `bson:"pixiv" json:"pixiv"`
 	Twitter       bool      `bson:"twitter" json:"twitter"`
+	Crosspost     bool      `bson:"crosspost" json:"crosspost"`
 	PromptEmoji   string    `bson:"promptemoji" json:"promptemoji"`
 	Repost        string    `bson:"repost" json:"repost"`
 	CreatedAt     time.Time `bson:"created_at" json:"created_at"`
 	UpdatedAt     time.Time `bson:"updated_at" json:"updated_at"`
-}
-
-//NewGuildSettings returns a new GuildSettings instance with given parameters.
-func NewGuildSettings(guildID, prefix, repost, reverseSearch, promptemoji string, largeset, limit int, pixiv, twitter bool) *GuildSettings {
-	return &GuildSettings{
-		ID:            guildID,
-		ReverseSearch: reverseSearch,
-		Prefix:        prefix,
-		LargeSet:      largeset,
-		Limit:         limit,
-		Pixiv:         pixiv,
-		Twitter:       twitter,
-		Repost:        repost,
-		PromptEmoji:   promptemoji,
-		CreatedAt:     time.Now(),
-		UpdatedAt:     time.Now(),
-	}
 }
 
 //DefaultGuildSettings returns a default GuildSettings struct.
@@ -56,6 +40,7 @@ func DefaultGuildSettings(guildID string) *GuildSettings {
 		Limit:         50,
 		Pixiv:         true,
 		Twitter:       false,
+		Crosspost:     true,
 		Repost:        "disabled",
 		PromptEmoji:   "👌",
 		CreatedAt:     time.Now(),

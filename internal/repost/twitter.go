@@ -162,6 +162,10 @@ func (a *ArtPost) tweetToEmbeds(tweet *tsuita.Tweet, skipFirst bool) ([]*discord
 			}
 		}
 		msg.Embed = &embed
+
+		if a.Crosspost {
+			msg.Embed.Fields = append(msg.Embed.Fields, &discordgo.MessageEmbedField{Name: "Cross-post", Value: fmt.Sprintf("Requested by %v", a.event.Author.Mention())})
+		}
 		messages = append(messages, msg)
 	}
 

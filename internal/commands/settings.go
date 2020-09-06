@@ -21,6 +21,7 @@ var (
 func init() {
 	settingMap["pixiv"] = setBool
 	settingMap["twitter"] = setBool
+	settingMap["crosspost"] = setBool
 	settingMap["prefix"] = setPrefix
 	settingMap["largeset"] = setInt
 	settingMap["limit"] = setInt
@@ -98,7 +99,7 @@ func showGuildSettings(s *discordgo.Session, m *discordgo.MessageCreate, setting
 			},
 			{
 				Name:  "Features",
-				Value: fmt.Sprintf("**Pixiv:** %v\n**Twitter:** %v\n**Reverse search:** %v\n**Repost:** %v", utils.FormatBool(settings.Pixiv), utils.FormatBool(settings.Twitter), settings.ReverseSearch, settings.Repost),
+				Value: fmt.Sprintf("**Pixiv:** %v | **Twitter:** %v | **Reverse search:** %v | **Repost:** %v | **Crosspost**: %v", utils.FormatBool(settings.Pixiv), utils.FormatBool(settings.Twitter), settings.ReverseSearch, settings.Repost, utils.FormatBool(settings.Crosspost)),
 			},
 			{
 				Name:  "Pixiv settings",

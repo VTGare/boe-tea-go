@@ -88,9 +88,13 @@ func handleError(s *discordgo.Session, m *discordgo.MessageCreate, err error) {
 }
 
 func (b *Bot) prefixless(s *discordgo.Session, m *discordgo.MessageCreate, crosspost bool) error {
+	guild := database.GuildCache[m.GuildID]
+	if !guild.Crosspost && crosspost {
+		return nil
+	}
+
 	art := repost.NewPost(*m, crosspost)
 
-	guild := database.GuildCache[m.GuildID]
 	if guild.Repost != "disabled" {
 		art.FindReposts()
 		if len(art.Reposts) > 0 {
@@ -158,7 +162,7 @@ func (b *Bot) prefixless(s *discordgo.Session, m *discordgo.MessageCreate, cross
 		}
 	}
 
-	if guild.Twitter && len(art.TwitterMatches) > 0 {
+	if (guild.Twitter || crosspost) && len(art.TwitterMatches) > 0 {
 		tweets, err := art.SendTwitter(s, !crosspost)
 		if err != nil {
 			return err
