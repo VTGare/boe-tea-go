@@ -17,7 +17,7 @@ import (
 func init() {
 	dg := CommandFramework.AddGroup("dev")
 	dg.IsVisible = false
-	dg.AddCommand("updateDB", updateDB)
+	dg.AddCommand("update", updateDB)
 	//dg.AddCommand("test", test)
 	dg.AddCommand("message", message)
 	dg.AddCommand("stats", devstats)
