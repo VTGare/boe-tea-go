@@ -176,7 +176,7 @@ func (b *Bot) prefixless(s *discordgo.Session, m *discordgo.MessageCreate, cross
 				msg = "Detected tweets with more than one image, would you like to send embeds of other images for mobile users?"
 			}
 
-			prompt := false
+			prompt := true
 			if !crosspost {
 				prompt = utils.CreatePrompt(s, m, &utils.PromptOptions{
 					Actions: map[string]bool{
@@ -185,8 +185,6 @@ func (b *Bot) prefixless(s *discordgo.Session, m *discordgo.MessageCreate, cross
 					Message: msg,
 					Timeout: 10 * time.Second,
 				})
-			} else {
-				prompt = true
 			}
 
 			if prompt {

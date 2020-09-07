@@ -7,14 +7,22 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ReneKroon/ttlcache"
 	"github.com/gocolly/colly/v2"
 	"github.com/sirupsen/logrus"
 )
 
 var (
 	TwitterRegex = regexp.MustCompile(`https?://twitter.com/(\S+)/status/(\d+)`)
+
+	twitterCache *ttlcache.Cache
 	nitterURL    = "https://nitter.net"
 )
+
+func init() {
+	twitterCache = ttlcache.NewCache()
+	twitterCache.SetTTL(1 * time.Hour)
+}
 
 type Tweet struct {
 	Author    string
@@ -38,12 +46,17 @@ func GetTweet(uri string) (*Tweet, error) {
 		str = TwitterRegex.FindString(uri)
 	)
 
+	if cache, ok := twitterCache.Get(uri); ok {
+		logrus.Infof("Found a cached tweet with URL: %v", uri)
+		return cache.(*Tweet), nil
+	}
+
 	if str == "" {
 		return nil, errors.New("invalid twitter url")
 	}
 
 	logrus.Infof("Fetching a tweet by URL: %v", uri)
-	uri = strings.ReplaceAll(str, "twitter.com", "nitter.net")
+	nitter := strings.ReplaceAll(str, "twitter.com", "nitter.net")
 	c := colly.NewCollector()
 
 	c.OnHTML(".main-tweet .still-image", func(e *colly.HTMLElement) {
@@ -98,7 +111,7 @@ func GetTweet(uri string) (*Tweet, error) {
 		res.Author = e.Text
 	})
 
-	err := c.Visit(uri)
+	err := c.Visit(nitter)
 
 	if err != nil {
 		return nil, err
@@ -107,5 +120,7 @@ func GetTweet(uri string) (*Tweet, error) {
 	c.Wait()
 
 	logrus.Infof("Fetched a tweet successfully. URL: %v. Images: %v", res.URL, len(res.Gallery))
+	twitterCache.Set(uri, res)
+
 	return res, nil
 }
