@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ReneKroon/ttlcache"
 	"github.com/bwmarrin/discordgo"
 	log "github.com/sirupsen/logrus"
 )
@@ -43,7 +44,18 @@ var (
 	ErrParsingArgument = errors.New("error parsing arguments, please make sure all arguments are integers")
 	//ErrNoPermission is a default error when user doesn't have enough permissions to execute a command
 	ErrNoPermission = errors.New("you don't have permissions to execute this command")
+	MessageCache    *ttlcache.Cache
 )
+
+type CachedMessage struct {
+	Parent   *discordgo.Message
+	Children []*discordgo.Message
+}
+
+func init() {
+	MessageCache = ttlcache.NewCache()
+	MessageCache.SetTTL(15 * time.Minute)
+}
 
 func Max(x, y int) int {
 	if x < y {

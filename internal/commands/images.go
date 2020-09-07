@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/VTGare/boe-tea-go/internal/database"
 	"github.com/VTGare/boe-tea-go/internal/images"
@@ -68,6 +69,9 @@ func init() {
 	jpegCmd := ig.AddCommand("jpeg", jpegify, gumi.CommandDescription("Gives image a soul. Extremely redpilled command."))
 	jpegCmd.Help = gumi.NewHelpSettings()
 	jpegCmd.Help.AddField("Usage", "bt!jpeg <image quality> <image url>", false).AddField("image quality", "Optional integer from 0 to 100", false).AddField("image url", "Optional if attachment is present. Attachment is prioritized.", false)
+
+	excludeCmd := ig.AddCommand("exclude", exclude, gumi.CommandDescription("Cross-posts a pixiv or a twitter post to every children channel except included in this command."))
+	excludeCmd.Help.AddField("Usage", "bt!exclude <twitter or pixiv link> [excluded channels]", false).AddField("Excluded channels", "IDs or mentions of channels you'd like to exclude from crossposting", false)
 }
 
 func sauce(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
@@ -374,6 +378,181 @@ func pixiv(s *discordgo.Session, m *discordgo.MessageCreate, args []string) erro
 	if rep.HasUgoira {
 		rep.Cleanup()
 	}
+	return nil
+}
+
+func exclude(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
+	if len(args) < 2 {
+		return fmt.Errorf("bt!exclude requires at least two arguments. **Usage:** bt!exclude <pixiv link> [channel IDs]")
+	}
+
+	guild := database.GuildCache[m.GuildID]
+	user := database.DB.FindUser(m.Author.ID)
+	if user == nil {
+		return fmt.Errorf("You have no cross-post groups. Please create one using a following command: ``bt!create <group name> <parent id>``")
+	}
+	user.Channels(m.ChannelID)
+
+	post := func(m *discordgo.MessageCreate, crosspost bool) error {
+		art := repost.NewPost(*m, false, args[0])
+		if art.Len() == 0 {
+			return errors.New("first arguments must be a pixiv or a twitter link")
+		}
+
+		if guild.Repost != "disabled" {
+			art.FindReposts()
+			if len(art.Reposts) > 0 {
+				if guild.Repost == "strict" {
+					art.RemoveReposts()
+					if crosspost {
+						log.Infoln("found a repost while crossposting")
+					}
+
+					if !crosspost {
+						s.ChannelMessageSendEmbed(m.ChannelID, art.RepostEmbed())
+						perm, err := utils.MemberHasPermission(s, m.GuildID, s.State.User.ID, 8|8192)
+						if err != nil {
+							return err
+						}
+
+						if !perm {
+							s.ChannelMessageSend(m.ChannelID, "Please enable Manage Messages permission to remove reposts with strict mode on, otherwise strict mode is useless.")
+						} else if art.Len() == 0 {
+							s.ChannelMessageDelete(m.ChannelID, m.ID)
+						}
+					}
+				} else if guild.Repost == "enabled" && !crosspost {
+					if art.PixivReposts() > 0 && guild.Pixiv {
+						prompt := utils.CreatePromptWithMessage(s, m, &discordgo.MessageSend{
+							Content: "Following posts are reposts, react 👌 to post them.",
+							Embed:   art.RepostEmbed(),
+						})
+						if !prompt {
+							return nil
+						}
+					} else {
+						s.ChannelMessageSendEmbed(m.ChannelID, art.RepostEmbed())
+					}
+				}
+			}
+		}
+
+		if guild.Pixiv && len(art.PixivMatches) > 0 {
+			messages, err := art.SendPixiv(s)
+			if err != nil {
+				return err
+			}
+
+			embeds := make([]*discordgo.Message, 0)
+			keys := make([]string, 0)
+			keys = append(keys, m.Message.ID)
+
+			for _, message := range messages {
+				embed, _ := s.ChannelMessageSendComplex(m.ChannelID, message)
+
+				if embed != nil {
+					keys = append(keys, embed.ID)
+					embeds = append(embeds, embed)
+				}
+			}
+
+			if art.HasUgoira {
+				art.Cleanup()
+			}
+
+			c := &utils.CachedMessage{m.Message, embeds}
+			for _, key := range keys {
+				utils.MessageCache.Set(key, c)
+			}
+		}
+
+		if (guild.Twitter || crosspost) && len(art.TwitterMatches) > 0 {
+			tweets, err := art.SendTwitter(s, !crosspost)
+			if err != nil {
+				return err
+			}
+
+			if len(tweets) > 0 {
+				msg := ""
+				if len(tweets) == 1 {
+					msg = "Detected a tweet with more than one image, would you like to send embeds of other images for mobile users?"
+				} else {
+					msg = "Detected tweets with more than one image, would you like to send embeds of other images for mobile users?"
+				}
+
+				prompt := true
+				if !crosspost {
+					prompt = utils.CreatePrompt(s, m, &utils.PromptOptions{
+						Actions: map[string]bool{
+							"👌": true,
+						},
+						Message: msg,
+						Timeout: 10 * time.Second,
+					})
+				}
+
+				if prompt {
+					var (
+						embeds = make([]*discordgo.Message, 0)
+						keys   = make([]string, 0)
+					)
+					keys = append(keys, m.Message.ID)
+
+					for _, t := range tweets {
+						for _, send := range t {
+							embed, err := s.ChannelMessageSendComplex(m.ChannelID, send)
+							if err != nil {
+								log.Warnln(err)
+							}
+
+							if embed != nil {
+								keys = append(keys, embed.ID)
+								embeds = append(embeds, embed)
+							}
+						}
+					}
+
+					c := &utils.CachedMessage{m.Message, embeds}
+					for _, key := range keys {
+						utils.MessageCache.Set(key, c)
+					}
+				}
+			}
+		}
+
+		return nil
+	}
+
+	err := post(m, false)
+	if err != nil {
+		return err
+	}
+
+	channels := utils.Filter(user.Channels(m.ChannelID), func(str string) bool {
+		for _, a := range args[1:] {
+			a = strings.Trim(a, "<#>")
+			if a == str {
+				return false
+			}
+		}
+		return true
+	})
+
+	for _, ch := range channels {
+		c, err := s.State.Channel(ch)
+		if err != nil {
+			continue
+		}
+
+		m.ChannelID = c.ID
+		m.GuildID = c.GuildID
+
+		err = post(m, true)
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 

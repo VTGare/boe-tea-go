@@ -7,7 +7,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ReneKroon/ttlcache"
 	"github.com/VTGare/boe-tea-go/internal/commands"
 	"github.com/VTGare/boe-tea-go/internal/database"
 	"github.com/VTGare/boe-tea-go/internal/repost"
@@ -17,8 +16,7 @@ import (
 )
 
 var (
-	botMention   string
-	messageCache *ttlcache.Cache
+	botMention string
 )
 
 type Bot struct {
@@ -53,16 +51,6 @@ func NewBot(token string) (*Bot, error) {
 	dg.AddHandler(bot.guildDeleted)
 	dg.Identify.Intents = discordgo.MakeIntent(discordgo.IntentsAllWithoutPrivileged)
 	return bot, nil
-}
-
-type cachedMessage struct {
-	Parent   *discordgo.Message
-	Children []*discordgo.Message
-}
-
-func init() {
-	messageCache = ttlcache.NewCache()
-	messageCache.SetTTL(15 * time.Minute)
 }
 
 func (b *Bot) onReady(s *discordgo.Session, e *discordgo.Ready) {
@@ -156,9 +144,9 @@ func (b *Bot) prefixless(s *discordgo.Session, m *discordgo.MessageCreate, cross
 			art.Cleanup()
 		}
 
-		c := &cachedMessage{m.Message, embeds}
+		c := &utils.CachedMessage{m.Message, embeds}
 		for _, key := range keys {
-			messageCache.Set(key, c)
+			utils.MessageCache.Set(key, c)
 		}
 	}
 
@@ -208,9 +196,9 @@ func (b *Bot) prefixless(s *discordgo.Session, m *discordgo.MessageCreate, cross
 					}
 				}
 
-				c := &cachedMessage{m.Message, embeds}
+				c := &utils.CachedMessage{m.Message, embeds}
 				for _, key := range keys {
-					messageCache.Set(key, c)
+					utils.MessageCache.Set(key, c)
 				}
 			}
 		}
@@ -249,20 +237,20 @@ func (b *Bot) messageCreated(s *discordgo.Session, m *discordgo.MessageCreate) {
 }
 
 func (b *Bot) reactCreated(s *discordgo.Session, r *discordgo.MessageReactionAdd) {
-	if messageCache.Count() > 0 && r.Emoji.APIName() == "❌" {
-		if m, ok := messageCache.Get(r.MessageID); ok {
-			c := m.(*cachedMessage)
+	if utils.MessageCache.Count() > 0 && r.Emoji.APIName() == "❌" {
+		if m, ok := utils.MessageCache.Get(r.MessageID); ok {
+			c := m.(*utils.CachedMessage)
 			if r.UserID == c.Parent.Author.ID {
 				if r.MessageID == c.Parent.ID {
 					s.ChannelMessageDelete(c.Parent.ChannelID, c.Parent.ID)
-					messageCache.Remove(c.Parent.ID)
+					utils.MessageCache.Remove(c.Parent.ID)
 					for _, child := range c.Children {
 						s.ChannelMessageDelete(child.ChannelID, child.ID)
-						messageCache.Remove(child.ID)
+						utils.MessageCache.Remove(child.ID)
 					}
 				} else {
 					s.ChannelMessageDelete(r.ChannelID, r.MessageID)
-					messageCache.Remove(r.MessageID)
+					utils.MessageCache.Remove(r.MessageID)
 				}
 			}
 		}
@@ -270,20 +258,20 @@ func (b *Bot) reactCreated(s *discordgo.Session, r *discordgo.MessageReactionAdd
 }
 
 func (b *Bot) messageDeleted(s *discordgo.Session, m *discordgo.MessageDelete) {
-	if messageCache.Count() > 0 {
-		if mes, ok := messageCache.Get(m.ID); ok {
-			c := mes.(*cachedMessage)
+	if utils.MessageCache.Count() > 0 {
+		if mes, ok := utils.MessageCache.Get(m.ID); ok {
+			c := mes.(*utils.CachedMessage)
 			if c.Parent.ID == m.ID {
 				s.ChannelMessageDelete(c.Parent.ChannelID, c.Parent.ID)
-				messageCache.Remove(c.Parent.ID)
+				utils.MessageCache.Remove(c.Parent.ID)
 				for _, child := range c.Children {
 					s.ChannelMessageDelete(child.ChannelID, child.ID)
-					messageCache.Remove(child.ID)
+					utils.MessageCache.Remove(child.ID)
 				}
 			} else {
 				for ind, child := range c.Children {
 					if child.ID == m.ID {
-						messageCache.Remove(child.ID)
+						utils.MessageCache.Remove(child.ID)
 						c.Children = append(c.Children[:ind], c.Children[ind+1:]...)
 						break
 					}
