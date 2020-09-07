@@ -23,11 +23,9 @@ func init() {
 	settingMap["twitter"] = setBool
 	settingMap["crosspost"] = setBool
 	settingMap["prefix"] = setPrefix
-	settingMap["largeset"] = setInt
 	settingMap["limit"] = setInt
 	settingMap["repost"] = setRepost
 	settingMap["reversesearch"] = setReverseSearch
-	settingMap["emoji"] = setEmoji
 }
 
 func set(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
@@ -103,7 +101,7 @@ func showGuildSettings(s *discordgo.Session, m *discordgo.MessageCreate, setting
 			},
 			{
 				Name:  "Pixiv settings",
-				Value: fmt.Sprintf("**Large set**: %v\n**Limit**: %v\n**Prompt emoji**: %v", settings.LargeSet, settings.Limit, settings.PromptEmoji),
+				Value: fmt.Sprintf("**Limit**: %v", settings.Limit),
 			},
 		},
 		Thumbnail: &discordgo.MessageEmbedThumbnail{
@@ -133,14 +131,6 @@ func setInt(s *discordgo.Session, m *discordgo.MessageCreate, str string) (inter
 		return nil, utils.ErrParsingArgument
 	}
 	return ls, nil
-}
-
-func setEmoji(s *discordgo.Session, m *discordgo.MessageCreate, str string) (interface{}, error) {
-	emoji, err := utils.GetEmoji(s, m.GuildID, str)
-	if emoji == "" || err != nil {
-		return nil, errors.New("invalid emoji, please pass either server's or ascii emojis")
-	}
-	return emoji, nil
 }
 
 func setRepost(s *discordgo.Session, m *discordgo.MessageCreate, str string) (interface{}, error) {

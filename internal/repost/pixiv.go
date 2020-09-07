@@ -71,16 +71,15 @@ func isNSFW(posts []*ugoira.PixivPost) bool {
 
 func (a *ArtPost) SendPixiv(s *discordgo.Session, opts ...SendPixivOptions) ([]*discordgo.MessageSend, error) {
 	var (
-		guild      = database.GuildCache[a.event.GuildID]
-		exclude    = make(map[int]bool)
-		skipPrompt bool
-		err        error
+		guild   = database.GuildCache[a.event.GuildID]
+		exclude = make(map[int]bool)
+
+		err error
 	)
 	if len(opts) != 0 {
 		if opts[0].Exclude != nil {
 			exclude = opts[0].Exclude
 		}
-		skipPrompt = opts[0].SkipPrompt
 	}
 
 	a.posts, err = a.fetchPixivPosts()
@@ -91,20 +90,6 @@ func (a *ArtPost) SendPixiv(s *discordgo.Session, opts ...SendPixivOptions) ([]*
 	for excl := range exclude {
 		if excl < 0 || excl > countPages(a.posts) {
 			delete(exclude, excl)
-		}
-	}
-
-	count := countPages(a.posts) - len(exclude)
-	if count >= guild.LargeSet && !skipPrompt {
-		prompt := utils.CreatePrompt(s, &a.event, &utils.PromptOptions{
-			Actions: map[string]bool{
-				"👌": true,
-			},
-			Message: fmt.Sprintf("Album size ***(%v)*** is larger than large set setting ***(%v)***, please confirm the operation.", count, guild.LargeSet),
-			Timeout: 15 * time.Second,
-		})
-		if !prompt {
-			return nil, nil
 		}
 	}
 

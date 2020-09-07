@@ -31,8 +31,6 @@ var (
 	DefaultEmbedImage = "https://i.imgur.com/OZ1Al5h.png"
 	//PixivRegex is a regular experession that detects various Pixiv links
 	PixivRegex = regexp.MustCompile(`(?i)http(?:s)?:\/\/(?:www\.)?pixiv\.net\/(?:en\/)?(?:artworks\/|member_illust\.php\?)(?:mode=medium\&)?(?:illust_id=)?([0-9]+)`)
-	//EmojiRegex matches some Unicode emojis, it's not perfect but better than nothing
-	EmojiRegex = regexp.MustCompile(`(\x{00a9}|\x{00ae}|[\x{2000}-\x{3300}]|\x{d83c}[\x{d000}-\x{dfff}]|\x{d83d}[\x{d000}-\x{dfff}]|\x{d83e}[\x{d000}-\x{dfff}])`)
 	//NumRegex is a terrible number regex. Gonna replace it with better code.
 	NumRegex = regexp.MustCompile(`([0-9]+)`)
 	//EmbedColor is a default border colour for Discord embeds
@@ -243,26 +241,6 @@ func FormatBool(b bool) string {
 		return "enabled"
 	}
 	return "disabled"
-}
-
-//GetEmoji returns a guild emoji API name from Discord state
-func GetEmoji(s *discordgo.Session, guildID, e string) (string, error) {
-	if EmojiRegex.MatchString(e) || e == "👌" {
-		return e, nil
-	}
-
-	emojis, err := s.GuildEmojis(guildID)
-	if err != nil {
-		return "", err
-	}
-
-	for _, emoji := range emojis {
-		if str := fmt.Sprintf("<:%v>", strings.ToLower(emoji.APIName())); str == e {
-			return str, nil
-		}
-	}
-
-	return "", errors.New("emoji not found")
 }
 
 func IsValidURL(uri string) bool {

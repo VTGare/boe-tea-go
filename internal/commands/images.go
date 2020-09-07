@@ -361,8 +361,7 @@ func pixiv(s *discordgo.Session, m *discordgo.MessageCreate, args []string) erro
 	}
 
 	messages, err := rep.SendPixiv(s, repost.SendPixivOptions{
-		SkipPrompt: true,
-		Exclude:    excludes,
+		Exclude: excludes,
 	})
 	if err != nil {
 		return err

@@ -19,12 +19,10 @@ type GuildSettings struct {
 	ID            string    `bson:"guild_id" json:"guild_id"`
 	Prefix        string    `bson:"prefix" json:"prefix"`
 	ReverseSearch string    `bson:"reversesearch" json:"reversesearch"`
-	LargeSet      int       `bson:"largeset" json:"largeset"`
 	Limit         int       `bson:"limit" json:"limit"`
 	Pixiv         bool      `bson:"pixiv" json:"pixiv"`
 	Twitter       bool      `bson:"twitter" json:"twitter"`
 	Crosspost     bool      `bson:"crosspost" json:"crosspost"`
-	PromptEmoji   string    `bson:"promptemoji" json:"promptemoji"`
 	Repost        string    `bson:"repost" json:"repost"`
 	CreatedAt     time.Time `bson:"created_at" json:"created_at"`
 	UpdatedAt     time.Time `bson:"updated_at" json:"updated_at"`
@@ -36,13 +34,11 @@ func DefaultGuildSettings(guildID string) *GuildSettings {
 		ID:            guildID,
 		Prefix:        "bt!",
 		ReverseSearch: "saucenao",
-		LargeSet:      3,
-		Limit:         50,
+		Limit:         10,
 		Pixiv:         true,
 		Twitter:       false,
 		Crosspost:     true,
 		Repost:        "disabled",
-		PromptEmoji:   "👌",
 		CreatedAt:     time.Now(),
 		UpdatedAt:     time.Now(),
 	}

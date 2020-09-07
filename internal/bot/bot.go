@@ -221,6 +221,7 @@ func (b *Bot) messageCreated(s *discordgo.Session, m *discordgo.MessageCreate) {
 				ch, err := s.State.Channel(id)
 				if err != nil {
 					log.Warnf("prefixless(): %v", err)
+					return
 				}
 
 				m.ChannelID = id
@@ -283,11 +284,11 @@ func (b *Bot) guildCreated(s *discordgo.Session, g *discordgo.GuildCreate) {
 		newGuild := database.DefaultGuildSettings(g.ID)
 		err := database.DB.InsertOneGuild(newGuild)
 		if err != nil {
-			log.Println(err)
+			log.Warnln(err)
 		}
 
 		database.GuildCache[g.ID] = newGuild
-		log.Infoln("Joined ", g.Name)
+		log.Infoln("Joined", g.Name)
 	}
 }
 
