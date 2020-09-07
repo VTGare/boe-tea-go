@@ -217,7 +217,7 @@ func (b *Bot) messageCreated(s *discordgo.Session, m *discordgo.MessageCreate) {
 
 		if user != nil {
 			channels := user.Channels(m.ChannelID)
-			for id := range channels {
+			for _, id := range channels {
 				ch, err := s.State.Channel(id)
 				if err != nil {
 					log.Warnf("prefixless(): %v", err)

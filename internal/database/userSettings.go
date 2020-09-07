@@ -18,8 +18,9 @@ type UserSettings struct {
 }
 
 type Group struct {
-	Name       string   `json:"name" bson:"name"`
-	ChannelIDs []string `json:"channel_id" bson:"channel_id"`
+	Name     string   `json:"name" bson:"name"`
+	Parent   string   `json:"parent" bson:"parent"`
+	Children []string `json:"children" bson:"children"`
 }
 
 func NewUserSettings(id string) *UserSettings {
@@ -78,7 +79,7 @@ func (d *Database) RemoveUser(id string) error {
 	return nil
 }
 
-func (d *Database) CreateGroup(userID string, groupName string, channelIDs ...string) error {
+func (d *Database) CreateGroup(userID string, groupName string, parentID string) error {
 	user := d.FindUser(userID)
 	if user == nil {
 		return fmt.Errorf("User not found: %v", userID)
@@ -88,9 +89,13 @@ func (d *Database) CreateGroup(userID string, groupName string, channelIDs ...st
 		if g.Name == groupName {
 			return fmt.Errorf("Group %v already exists", groupName)
 		}
+
+		if g.Parent == parentID {
+			return fmt.Errorf("Group with a parent channel ID [%v] already exists", parentID)
+		}
 	}
 
-	user.ChannelGroups = append(user.ChannelGroups, &Group{groupName, channelIDs})
+	user.ChannelGroups = append(user.ChannelGroups, &Group{groupName, parentID, make([]string, 0)})
 	res := d.UserSettings.FindOneAndReplace(context.Background(), bson.M{"user_id": userID}, user)
 	if res.Err() != nil {
 		return res.Err()
@@ -120,29 +125,34 @@ func (d *Database) DeleteGroup(userID string, groupName string) error {
 	return nil
 }
 
-func (d *Database) AddToGroup(userID string, groupName string, channelIDs ...string) error {
+func (d *Database) AddToGroup(userID string, groupName string, channelIDs ...string) ([]string, error) {
+	var (
+		added = make([]string, 0)
+	)
+
 	user := d.FindUser(userID)
 	if user == nil {
-		return fmt.Errorf("User not found: %v", userID)
+		return nil, fmt.Errorf("User not found: %v", userID)
 	}
 
 	group, _ := user.findGroup(groupName)
 	if group == nil {
-		err := d.CreateGroup(userID, groupName, channelIDs...)
-		if err != nil {
-			return err
-		}
-
-		return nil
+		return nil, fmt.Errorf("Group doesn't exist: %v", groupName)
 	}
 
-	group.ChannelIDs = append(group.ChannelIDs, channelIDs...)
+	for _, c := range channelIDs {
+		if c != group.Parent {
+			added = append(added, c)
+			group.Children = append(group.Children, c)
+		}
+	}
+
 	res := d.UserSettings.FindOneAndReplace(context.Background(), bson.M{"user_id": userID}, user)
 	if res.Err() != nil {
-		return res.Err()
+		return nil, res.Err()
 	}
 
-	return nil
+	return added, nil
 }
 
 //RemoveFromGroup removes channel IDs from a cross-post group and returns removed elements.
@@ -156,20 +166,16 @@ func (d *Database) RemoveFromGroup(userID string, groupName string, channelID ..
 		return nil, fmt.Errorf("User not found: %v", userID)
 	}
 
-	group, index := user.findGroup(groupName)
+	group, _ := user.findGroup(groupName)
 	if group != nil {
 		for _, id := range channelID {
-			for ind, channel := range group.ChannelIDs {
+			for ind, channel := range group.Children {
 				if channel == id {
-					found = append(found, group.ChannelIDs[ind])
-					group.ChannelIDs = append(group.ChannelIDs[:ind], group.ChannelIDs[ind+1:]...)
+					found = append(found, group.Children[ind])
+					group.Children = append(group.Children[:ind], group.Children[ind+1:]...)
 					break
 				}
 			}
-		}
-
-		if len(group.ChannelIDs) == 0 {
-			user.ChannelGroups = append(user.ChannelGroups[:index], user.ChannelGroups[index+1:]...)
 		}
 
 		if len(found) > 0 {
@@ -194,35 +200,21 @@ func (us *UserSettings) findGroup(name string) (*Group, int) {
 	return nil, -1
 }
 
-func (us *UserSettings) groupsByChannelID(channelID string) []*Group {
-	var (
-		groups = make([]*Group, 0)
-	)
-
-	for _, g := range us.ChannelGroups {
-		for _, c := range g.ChannelIDs {
-			if c == channelID {
-				groups = append(groups, g)
-			}
+func (us *UserSettings) findParent(parent string) (*Group, int) {
+	for ind, group := range us.ChannelGroups {
+		if group.Parent == parent {
+			return group, ind
 		}
 	}
 
-	return groups
+	return nil, -1
 }
 
-func (us *UserSettings) Channels(id string) map[string]bool {
-	var (
-		m = make(map[string]bool)
-	)
+func (us *UserSettings) Channels(parent string) []string {
+	g, _ := us.findParent(parent)
 
-	gs := us.groupsByChannelID(id)
-	for _, g := range gs {
-		for _, c := range g.ChannelIDs {
-			if c != id {
-				m[c] = true
-			}
-		}
+	if g != nil {
+		return g.Children
 	}
-
-	return m
+	return nil
 }

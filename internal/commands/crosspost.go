@@ -30,15 +30,7 @@ func init() {
 func groups(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
 	user := database.DB.FindUser(m.Author.ID)
 	if user == nil {
-		return fmt.Errorf("user settings not found, create create a group first with the following command: ``bt!create <group name> [channel IDs]``")
-	}
-
-	var sb strings.Builder
-
-	for _, g := range user.ChannelGroups {
-		sb.WriteString(fmt.Sprintf("***Group %v:***\n%v\n", g.Name, utils.Map(g.ChannelIDs, func(s string) string {
-			return fmt.Sprintf("<#%v>", s)
-		})))
+		return fmt.Errorf("user settings not found, create create a group first with the following command: ``bt!create <group name> <parent ID>``")
 	}
 
 	embed := &discordgo.MessageEmbed{
@@ -48,8 +40,18 @@ func groups(s *discordgo.Session, m *discordgo.MessageCreate, args []string) err
 		Thumbnail: &discordgo.MessageEmbedThumbnail{URL: m.Author.AvatarURL("")},
 	}
 
-	embed.Description = sb.String()
-	if embed.Description == "" {
+	for _, g := range user.ChannelGroups {
+		if len(g.Children) > 0 {
+			children := utils.Map(g.Children, func(str string) string {
+				return fmt.Sprintf("<#%v>", str)
+			})
+			embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{Name: g.Name, Value: fmt.Sprintf("**Parent:** [<#%v>]\n**Children:** %v", g.Parent, children)})
+		} else {
+			embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{Name: g.Name, Value: fmt.Sprintf("**Parent:** [<#%v>]\n**Children:** -", g.Parent)})
+		}
+	}
+
+	if len(embed.Fields) == 0 {
 		embed.Description = ":gun:🤠 *This town ain't big enough for the both of us!*\n"
 		embed.Image = &discordgo.MessageEmbedImage{URL: "https://thumbs.gfycat.com/InconsequentialPerfumedGadwall-size_restricted.gif"}
 	}
@@ -60,7 +62,7 @@ func groups(s *discordgo.Session, m *discordgo.MessageCreate, args []string) err
 
 func createGroup(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
 	if len(args) < 2 {
-		return fmt.Errorf("``bt!create`` requires at least two arguments. Usage: ``bt!create Touhou #lewdtouhouart``")
+		return fmt.Errorf("``bt!create`` requires two arguments. Example: ``bt!create touhou #lewdtouhouart``")
 	}
 
 	user := database.DB.FindUser(m.Author.ID)
@@ -72,26 +74,19 @@ func createGroup(s *discordgo.Session, m *discordgo.MessageCreate, args []string
 		}
 	}
 
-	groupName := args[0]
-	channelsMap := make(map[string]bool, 0)
-	for _, id := range args[1:] {
-		channelsMap[id] = true
+	var (
+		groupName = args[0]
+		ch        = args[1]
+	)
+
+	if strings.HasPrefix(ch, "<#") {
+		ch = strings.Trim(ch, "<#>")
+	}
+	if _, err := s.State.Channel(ch); err != nil {
+		return fmt.Errorf("unable to find channel ``%v``. Make sure Boe Tea is present on the server and able to read the channel", ch)
 	}
 
-	channels := make([]string, 0)
-	for ch := range channelsMap {
-		if strings.HasPrefix(ch, "<#") {
-			ch = strings.Trim(ch, "<#>")
-		}
-
-		if _, err := s.State.Channel(ch); err != nil {
-			return fmt.Errorf("unable to find channel ``%v``. Make sure Boe Tea is present on the server and able to read the channel", ch)
-		}
-
-		channels = append(channels, ch)
-	}
-
-	err := database.DB.CreateGroup(m.Author.ID, groupName, channels...)
+	err := database.DB.CreateGroup(m.Author.ID, groupName, ch)
 	if err != nil {
 		return fmt.Errorf("Fatal database error: %v", err)
 	}
@@ -101,11 +96,8 @@ func createGroup(s *discordgo.Session, m *discordgo.MessageCreate, args []string
 		Color:     utils.EmbedColor,
 		Timestamp: utils.EmbedTimestamp(),
 		Thumbnail: &discordgo.MessageEmbedThumbnail{URL: utils.DefaultEmbedImage},
-		Fields: []*discordgo.MessageEmbedField{{Name: "Name", Value: groupName}, {Name: "Channels", Value: fmt.Sprintf("%v", utils.Map(channels, func(s string) string {
-			return fmt.Sprintf("<#%v>", s)
-		}))}},
+		Fields:    []*discordgo.MessageEmbedField{{Name: "Name", Value: groupName}, {Name: "Parent channel", Value: fmt.Sprintf("<#%v>", ch)}},
 	})
-
 	return nil
 }
 
@@ -227,20 +219,30 @@ func addToGroup(s *discordgo.Session, m *discordgo.MessageCreate, args []string)
 		channels = append(channels, ch)
 	}
 
-	err := database.DB.AddToGroup(m.Author.ID, groupName, channels...)
+	added, err := database.DB.AddToGroup(m.Author.ID, groupName, channels...)
 	if err != nil {
 		return fmt.Errorf("Fatal database error: %v", err)
 	}
 
-	s.ChannelMessageSendEmbed(m.ChannelID, &discordgo.MessageEmbed{
-		Title:     "✅ Sucessfully added channels to a cross-post group!",
-		Color:     utils.EmbedColor,
-		Timestamp: utils.EmbedTimestamp(),
-		Thumbnail: &discordgo.MessageEmbedThumbnail{URL: utils.DefaultEmbedImage},
-		Fields: []*discordgo.MessageEmbedField{{Name: "Name", Value: args[0]}, {Name: "Channels", Value: strings.Join(utils.Map(channels, func(s string) string {
-			return fmt.Sprintf("<#%v>", s)
-		}), " ")}},
-	})
+	if len(added) > 0 {
+		s.ChannelMessageSendEmbed(m.ChannelID, &discordgo.MessageEmbed{
+			Title:     "✅ Sucessfully added channels to a cross-post group!",
+			Color:     utils.EmbedColor,
+			Timestamp: utils.EmbedTimestamp(),
+			Thumbnail: &discordgo.MessageEmbedThumbnail{URL: utils.DefaultEmbedImage},
+			Fields: []*discordgo.MessageEmbedField{{Name: "Name", Value: args[0]}, {Name: "Channels", Value: strings.Join(utils.Map(added, func(s string) string {
+				return fmt.Sprintf("<#%v>", s)
+			}), " ")}},
+		})
+	} else {
+		s.ChannelMessageSendEmbed(m.ChannelID, &discordgo.MessageEmbed{
+			Title:     "❎ Failed to add channels to a cross-post group!",
+			Color:     utils.EmbedColor,
+			Timestamp: utils.EmbedTimestamp(),
+			Thumbnail: &discordgo.MessageEmbedThumbnail{URL: utils.DefaultEmbedImage},
+			Fields:    []*discordgo.MessageEmbedField{{Name: "Group name", Value: args[0]}, {Name: "Reason", Value: "No valid channels were found"}},
+		})
+	}
 
 	return nil
 }
