@@ -190,13 +190,29 @@ func (b *Bot) prefixless(s *discordgo.Session, m *discordgo.MessageCreate, cross
 			}
 
 			if prompt {
+				var (
+					embeds = make([]*discordgo.Message, 0)
+					keys   = make([]string, 0)
+				)
+				keys = append(keys, m.Message.ID)
+
 				for _, t := range tweets {
 					for _, send := range t {
-						_, err := s.ChannelMessageSendComplex(m.ChannelID, send)
+						embed, err := s.ChannelMessageSendComplex(m.ChannelID, send)
 						if err != nil {
 							log.Warnln(err)
 						}
+
+						if embed != nil {
+							keys = append(keys, embed.ID)
+							embeds = append(embeds, embed)
+						}
 					}
+				}
+
+				c := &cachedMessage{m.Message, embeds}
+				for _, key := range keys {
+					messageCache.Set(key, c)
 				}
 			}
 		}
