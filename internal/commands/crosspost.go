@@ -84,10 +84,6 @@ func createGroup(s *discordgo.Session, m *discordgo.MessageCreate, args []string
 			ch = strings.Trim(ch, "<#>")
 		}
 
-		if g := user.GroupByChannelID(ch); g != nil {
-			return fmt.Errorf("Channel %v is already a part of group %v", ch, g.Name)
-		}
-
 		if _, err := s.State.Channel(ch); err != nil {
 			return fmt.Errorf("unable to find channel ``%v``. Make sure Boe Tea is present on the server and able to read the channel", ch)
 		}
@@ -222,10 +218,6 @@ func addToGroup(s *discordgo.Session, m *discordgo.MessageCreate, args []string)
 	for ch := range channelsMap {
 		if strings.HasPrefix(ch, "<#") {
 			ch = strings.Trim(ch, "<#>")
-		}
-
-		if g := user.GroupByChannelID(ch); g != nil {
-			return fmt.Errorf("Channel <#%v> is already a part of group **%v**", ch, g.Name)
 		}
 
 		if _, err := s.State.Channel(ch); err != nil {

@@ -194,24 +194,35 @@ func (us *UserSettings) findGroup(name string) (*Group, int) {
 	return nil, -1
 }
 
-func (us *UserSettings) GroupByChannelID(channelID string) *Group {
+func (us *UserSettings) groupsByChannelID(channelID string) []*Group {
+	var (
+		groups = make([]*Group, 0)
+	)
+
 	for _, g := range us.ChannelGroups {
 		for _, c := range g.ChannelIDs {
 			if c == channelID {
-				return g
+				groups = append(groups, g)
 			}
 		}
 	}
-	return nil
+
+	return groups
 }
 
-func (us *UserSettings) Channels(id string) []string {
-	for _, g := range us.ChannelGroups {
+func (us *UserSettings) Channels(id string) map[string]bool {
+	var (
+		m = make(map[string]bool)
+	)
+
+	gs := us.groupsByChannelID(id)
+	for _, g := range gs {
 		for _, c := range g.ChannelIDs {
-			if c == id {
-				return g.ChannelIDs
+			if c != id {
+				m[c] = true
 			}
 		}
 	}
-	return nil
+
+	return m
 }

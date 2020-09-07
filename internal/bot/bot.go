@@ -216,13 +216,9 @@ func (b *Bot) messageCreated(s *discordgo.Session, m *discordgo.MessageCreate) {
 		user := database.DB.FindUser(m.Author.ID)
 
 		if user != nil {
-			originalID := m.ChannelID
 			channels := user.Channels(m.ChannelID)
-			for _, id := range channels {
-				if id == originalID {
-					continue
-				}
-
+			log.Infof("channels: %v", channels)
+			for id := range channels {
 				ch, err := s.State.Channel(id)
 				if err != nil {
 					log.Warnf("prefixless(): %v", err)
