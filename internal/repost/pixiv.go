@@ -181,7 +181,7 @@ func createPixivEmbeds(a *ArtPost, excluded map[int]bool, guild *database.GuildS
 
 	if a.Crosspost {
 		for _, m := range messages {
-			m.Embed.Fields = append(m.Embed.Fields, &discordgo.MessageEmbedField{Name: "Cross-post", Value: fmt.Sprintf("Requested by %v", a.event.Author.Mention())})
+			m.Embed.Author = &discordgo.MessageEmbedAuthor{Name: fmt.Sprintf("Crosspost requested by %v", a.event.Author.String()), IconURL: a.event.Author.AvatarURL("")}
 		}
 	}
 
