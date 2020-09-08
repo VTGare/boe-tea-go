@@ -104,6 +104,31 @@ func (d *Database) CreateGroup(userID string, groupName string, parentID string)
 	return nil
 }
 
+func (d *Database) PushGroup(userID string, group *Group) error {
+	user := d.FindUser(userID)
+	if user == nil {
+		return fmt.Errorf("User not found: %v", userID)
+	}
+
+	for _, g := range user.ChannelGroups {
+		if g.Name == group.Name {
+			return fmt.Errorf("Group %v already exists", group.Name)
+		}
+
+		if g.Parent == group.Parent {
+			return fmt.Errorf("Group with a parent channel ID [%v] already exists", group.Parent)
+		}
+	}
+
+	user.ChannelGroups = append(user.ChannelGroups, group)
+	res := d.UserSettings.FindOneAndReplace(context.Background(), bson.M{"user_id": userID}, user)
+	if res.Err() != nil {
+		return res.Err()
+	}
+
+	return nil
+}
+
 func (d *Database) DeleteGroup(userID string, groupName string) error {
 	user := d.FindUser(userID)
 	if user == nil {

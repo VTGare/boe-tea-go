@@ -36,19 +36,18 @@ Current documentation is out of date. All these commands still work as documente
 -   `bt!twitter` - reposts all images from a tweet, useful for mobile that doesn't support all images natively.
     -   _Usage_: `bt!twitter <required tweet link>`
 -   `bt!deepfry` - deepfries an image for le epic memes.
-    -   _Usage_: ``bt!deepfry <image link> <times deepfried>
+    -   _Usage_: `bt!deepfry <image link> <times deepfried>`
     -   _image link_: optional if image is attached, link is prioritized if both are present.
     -   _times deepfried_: optional, fries even deeper, up to 5 times.
     -   _Example_: `bt!deepfry https://imgur.com/image.png 5`
 -   `bt!help` - displays Boe Tea's command documentation
+    -   _Advanced usage_: `bt!help <group name>` for the list of group's commands. `bt!help <group> <command>` for documentation of a specific command.
 -   `bt!set` - displays current guild settings or changes them (e.g `bt!set prefix uwu`)
-    -   _prefix_: prefix to invoke Boe Tea's commands. String up to 5 characters, if last character is a letter whitespace is assumed.
-    -   _largeset_: amount of images considered a large set that procs a confirmation prompt.
-    -   _pixiv_: boolean value, switches reposting functionality. Accepts _t, true, f, false_.
-    -   _reversesearch_: default reverse image search engine. Accepts **SauceNAO** or **ASCII2D**.
+    -   _prefix_: bot's prefix. String up to 5 characters, if last character is a letter whitespace is assumed.
+    -   _pixiv_ | _twitter_ | _crosspost_: switches corresponding feature server-wide. Accepted parameters: [_enabled, on, t,true_]  [_disabled, off, f, false_]
+    -   _reversesearch_: default reverse image search engine for `bt!sauce` command. Accepted parameters: [**saucenao**, **wait**]
     -   _repost_: Configures repost checker behaviour. Accepts **enabled**, **disabled**, or **strict** parameters.
-    -   _limit_: Hard limit to album size. If you attempt to repost a post/bulk-repost posts with more images it'll fail.
-    -   _promptemoji_: Custom prompt emoji. Only local guild and standard emojis are supported as of now.
+    -   _limit_: Album size limit. If album exceeds the limit only first image of every separate post will be send.
 -   `bt!ping` - checks if Boe Tea online and sends its ping back
 -   `bt!nhentai` - sends detailed information about an nhentai book.
     - _Usage_: `bt!nhentai <magic number>`

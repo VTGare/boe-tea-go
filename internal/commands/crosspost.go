@@ -25,6 +25,9 @@ func init() {
 
 	push := cp.AddCommand("push", addToGroup, gumi.CommandDescription("Adds channels to a cross-post group."), gumi.WithAliases("add"))
 	push.Help.AddField("Usage", "bt!push <group name> [channel IDs or mentions]", false)
+
+	copyc := cp.AddCommand("copy", copyGroup, gumi.CommandDescription("Copies a cross-post group."), gumi.WithAliases("cp", "clone"))
+	copyc.Help.AddField("Usage", "bt!copy <source group name> <destination group name> <parent ID>", false)
 }
 
 func groups(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
@@ -185,7 +188,7 @@ func removeFromGroup(s *discordgo.Session, m *discordgo.MessageCreate, args []st
 
 func addToGroup(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
 	if len(args) < 2 {
-		return fmt.Errorf("``bt!add`` requires at least two arguments.\n**Usage:** ``bt!push hololive #marine-booty``")
+		return fmt.Errorf("``bt!push`` requires at least two arguments.\n**Usage:** ``bt!push hololive #marine-booty``")
 	}
 
 	user := database.DB.FindUser(m.Author.ID)
@@ -243,6 +246,114 @@ func addToGroup(s *discordgo.Session, m *discordgo.MessageCreate, args []string)
 			Fields:    []*discordgo.MessageEmbedField{{Name: "Group name", Value: args[0]}, {Name: "Reason", Value: "No valid channels were found"}},
 		})
 	}
+
+	return nil
+}
+
+func copyGroup(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
+	if len(args) < 3 {
+		return fmt.Errorf("``bt!copy`` requires at least three arguments.\n**Usage:** ``bt!copy <source> <destination> <new parent channel>``")
+	}
+
+	user := database.DB.FindUser(m.Author.ID)
+	if user == nil {
+		s.ChannelMessageSendEmbed(m.ChannelID, &discordgo.MessageEmbed{
+			Title:     "❎ Failed to copy a cross-post group!",
+			Color:     utils.EmbedColor,
+			Timestamp: utils.EmbedTimestamp(),
+			Thumbnail: &discordgo.MessageEmbedThumbnail{URL: utils.DefaultEmbedImage},
+			Fields:    []*discordgo.MessageEmbedField{{Name: "Reason", Value: "You have no cross-post groups yet."}},
+		})
+		return nil
+	}
+
+	var (
+		group    *database.Group
+		src      = args[0]
+		dest     = args[1]
+		exists   bool
+		parent   = strings.Trim(args[2], "<#>")
+		isParent bool
+	)
+
+	if _, err := s.State.Channel(parent); err != nil {
+		return fmt.Errorf("unable to find channel ``%v``. Make sure Boe Tea is present on the server and able to read the channel", parent)
+	}
+
+	for _, g := range user.ChannelGroups {
+		if g.Name == src {
+			group = g
+		}
+
+		if g.Name == dest {
+			exists = true
+		}
+
+		if g.Parent == parent {
+			isParent = true
+		}
+	}
+
+	if group == nil {
+		s.ChannelMessageSendEmbed(m.ChannelID, &discordgo.MessageEmbed{
+			Title:     "❎ Failed to copy a cross-post group!",
+			Color:     utils.EmbedColor,
+			Timestamp: utils.EmbedTimestamp(),
+			Thumbnail: &discordgo.MessageEmbedThumbnail{URL: utils.DefaultEmbedImage},
+			Fields:    []*discordgo.MessageEmbedField{{Name: "Reason", Value: "Couldn't find a source group ``" + src + "``"}},
+		})
+		return nil
+	}
+
+	if isParent {
+		s.ChannelMessageSendEmbed(m.ChannelID, &discordgo.MessageEmbed{
+			Title:     "❎ Failed to copy a cross-post group!",
+			Color:     utils.EmbedColor,
+			Timestamp: utils.EmbedTimestamp(),
+			Thumbnail: &discordgo.MessageEmbedThumbnail{URL: utils.DefaultEmbedImage},
+			Fields:    []*discordgo.MessageEmbedField{{Name: "Reason", Value: fmt.Sprintf("Channel <#%v> is already a parent channel", parent)}},
+		})
+		return nil
+	}
+
+	if exists {
+		s.ChannelMessageSendEmbed(m.ChannelID, &discordgo.MessageEmbed{
+			Title:     "❎ Failed to copy a cross-post group!",
+			Color:     utils.EmbedColor,
+			Timestamp: utils.EmbedTimestamp(),
+			Thumbnail: &discordgo.MessageEmbedThumbnail{URL: utils.DefaultEmbedImage},
+			Fields:    []*discordgo.MessageEmbedField{{Name: "Reason", Value: fmt.Sprintf("Group name %v is already taken", dest)}},
+		})
+		return nil
+	}
+
+	new := &database.Group{
+		Name:     dest,
+		Parent:   parent,
+		Children: make([]string, len(group.Children)),
+	}
+
+	copy(new.Children, group.Children)
+	for ind, c := range new.Children {
+		if c == parent {
+			new.Children[ind] = group.Parent
+		}
+	}
+
+	err := database.DB.PushGroup(m.Author.ID, new)
+	if err != nil {
+		return fmt.Errorf("Fatal database error: %v", err)
+	}
+
+	s.ChannelMessageSendEmbed(m.ChannelID, &discordgo.MessageEmbed{
+		Title:     "✅ Sucessfully copied a cross-post group!",
+		Color:     utils.EmbedColor,
+		Timestamp: utils.EmbedTimestamp(),
+		Thumbnail: &discordgo.MessageEmbedThumbnail{URL: utils.DefaultEmbedImage},
+		Fields: []*discordgo.MessageEmbedField{{Name: "Name", Value: new.Name}, {Name: "Parent", Value: fmt.Sprintf("<#%v>", new.Parent)}, {Name: "Channels", Value: strings.Join(utils.Map(new.Children, func(s string) string {
+			return fmt.Sprintf("<#%v>", s)
+		}), " ")}},
+	})
 
 	return nil
 }
