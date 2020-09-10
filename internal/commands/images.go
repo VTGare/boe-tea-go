@@ -65,14 +65,14 @@ func init() {
 		},
 	}
 
-	pixivCmd := ig.AddCommand(&gumi.Command{
-		Name:        "pixiv",
+	excludeCmd := ig.AddCommand(&gumi.Command{
+		Name:        "exclude",
 		Description: "Exclude pictures from a large Pixiv album using this command",
-		Aliases:     []string{},
-		Exec:        pixiv,
+		Aliases:     []string{"excl"},
+		Exec:        exclude,
 		Cooldown:    5 * time.Second,
 	})
-	pixivCmd.Help = gumi.NewHelpSettings().AddField("Usage", "bt!pixiv <post link> [optional excluded images]", false).AddField("excluded images", "Indexes must be separated by whitespace (e.g. 1 2 4 6 10 45)", false)
+	excludeCmd.Help = gumi.NewHelpSettings().AddField("Usage", "bt!pixiv <post link> [optional excluded images]", false).AddField("excluded images", "Indexes must be separated by whitespace (e.g. 1 2 4 6 10 45)", false)
 
 	dfCmd := ig.AddCommand(&gumi.Command{
 		Name:        "deepfry",
@@ -106,15 +106,15 @@ func init() {
 	jpegCmd.Help = gumi.NewHelpSettings()
 	jpegCmd.Help.AddField("Usage", "bt!jpeg <image quality> <image url>", false).AddField("image quality", "Optional integer from 0 to 100", false).AddField("image url", "Optional if attachment is present. Attachment is prioritized.", false)
 
-	excludeCmd := ig.AddCommand(&gumi.Command{
-		Name:        "exclude",
+	crosspostCmd := ig.AddCommand(&gumi.Command{
+		Name:        "crosspost",
 		Description: "Excludes provided channels from cross-posting a Twitter or Pixiv post.",
-		Aliases:     []string{"excl"},
-		Exec:        exclude,
+		Aliases:     []string{},
+		Exec:        crosspost,
 		Cooldown:    5 * time.Second,
 		Help:        gumi.NewHelpSettings(),
 	})
-	excludeCmd.Help.AddField("Usage", "bt!exclude <twitter or pixiv link> [excluded channels]", false).AddField("Excluded channels", "IDs or mentions of channels you'd like to exclude from crossposting", false)
+	crosspostCmd.Help.AddField("Usage", "bt!crosspost <twitter or pixiv link> [excluded channels]", false).AddField("Excluded channels", "IDs or mentions of channels you'd like to exclude from crossposting. Omit argument or give ``all`` to skip crossposting", false)
 }
 
 func sauce(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
@@ -365,7 +365,7 @@ func findRecentImage(messages []*discordgo.Message) string {
 	return ""
 }
 
-func pixiv(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
+func exclude(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
 	if len(args) == 0 {
 		return utils.ErrNotEnoughArguments
 	}
@@ -424,9 +424,9 @@ func pixiv(s *discordgo.Session, m *discordgo.MessageCreate, args []string) erro
 	return nil
 }
 
-func exclude(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
-	if len(args) < 2 {
-		return fmt.Errorf("bt!exclude requires at least two arguments. **Usage:** bt!exclude <pixiv link> [channel IDs]")
+func crosspost(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
+	if len(args) < 1 {
+		return fmt.Errorf("bt!exclude requires at least one argument. **Usage:** bt!exclude <pixiv link> [channel IDs]")
 	}
 
 	guild := database.GuildCache[m.GuildID]
@@ -571,28 +571,34 @@ func exclude(s *discordgo.Session, m *discordgo.MessageCreate, args []string) er
 		return err
 	}
 
-	channels := utils.Filter(user.Channels(m.ChannelID), func(str string) bool {
-		for _, a := range args[1:] {
-			a = strings.Trim(a, "<#>")
-			if a == str {
-				return false
+	if len(args) >= 2 {
+		if args[1] == "all" {
+			return nil
+		}
+
+		channels := utils.Filter(user.Channels(m.ChannelID), func(str string) bool {
+			for _, a := range args[1:] {
+				a = strings.Trim(a, "<#>")
+				if a == str {
+					return false
+				}
 			}
-		}
-		return true
-	})
+			return true
+		})
 
-	for _, ch := range channels {
-		c, err := s.State.Channel(ch)
-		if err != nil {
-			continue
-		}
+		for _, ch := range channels {
+			c, err := s.State.Channel(ch)
+			if err != nil {
+				continue
+			}
 
-		m.ChannelID = c.ID
-		m.GuildID = c.GuildID
+			m.ChannelID = c.ID
+			m.GuildID = c.GuildID
 
-		err = post(m, true)
-		if err != nil {
-			return err
+			err = post(m, true)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
