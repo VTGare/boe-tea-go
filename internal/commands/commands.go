@@ -2,6 +2,7 @@ package commands
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/VTGare/boe-tea-go/internal/database"
 	"github.com/VTGare/boe-tea-go/utils"
@@ -42,14 +43,29 @@ func init() {
 	}))
 
 	generalGroup := CommandFramework.Groups["general"]
-	generalGroup.AddCommand("ping", ping, gumi.CommandDescription("Checks if Boe Tea is online and sends response back"))
+	generalGroup.AddCommand(&gumi.Command{
+		Name:        "ping",
+		Description: "Checks if Boe Tea is online",
+		Exec:        ping,
+	})
 
 	feedbackHelp := gumi.NewHelpSettings()
 	feedbackHelp.AddField("Usage", "``bt!feedback [feedback message]``. Please use this command to report bugs or suggest new features only. If you misuse this command you'll get blacklisted!", false)
 	feedbackHelp.AddField("feedback message", "While suggestions can be plain text, bug reports are expected to be formatted in a specific way. Template shown below:\n```**Summary:** -\n**Reproduction:** -\n**Expected result:** -\n**Actual result:** -```\nYou can provide images as links or a single image as an attachment to the feedback message!", false)
 
-	generalGroup.AddCommand("feedback", feedback, gumi.CommandDescription("Sends a feedback message to bot's author. Use ``bt!help general feedback`` to see bugreport template"), gumi.WithHelp(feedbackHelp))
-	generalGroup.AddCommand("invite", invite, gumi.CommandDescription("Sends Boe Tea's invite link!"))
+	generalGroup.AddCommand(&gumi.Command{
+		Name:        "feedback",
+		Description: "Reach out to bot's author! Use ``bt!help feedback`` to get a template",
+		Exec:        feedback,
+		Help:        feedbackHelp,
+	})
+
+	generalGroup.AddCommand(&gumi.Command{
+		Name:        "invite",
+		Aliases:     []string{"link"},
+		Description: "Returns Boe Tea's invite link",
+		Exec:        invite,
+	})
 
 	setHelp := gumi.NewHelpSettings()
 	setHelp.ExtendedHelp = []*discordgo.MessageEmbedField{
@@ -86,6 +102,19 @@ func init() {
 			Value: "Confirmation prompt emoji. Only unicode or local server emoji's are allowed.",
 		},
 	}
-	generalGroup.AddCommand("set", set, gumi.CommandDescription("Show or change server's settings."), gumi.WithHelp(setHelp), gumi.GuildOnly(), gumi.WithAliases("config", "cfg", "settings"))
-	generalGroup.AddCommand("support", support, gumi.CommandDescription("Sends a support server invite link"))
+
+	generalGroup.AddCommand(&gumi.Command{
+		Name:        "set",
+		Aliases:     []string{"config", "cfg", "settings"},
+		Description: "Show or change server's settings",
+		Help:        setHelp,
+		GuildOnly:   true,
+		Cooldown:    5 * time.Second,
+	})
+
+	generalGroup.AddCommand(&gumi.Command{
+		Name:        "support",
+		Exec:        support,
+		Description: "Returns Boe Tee's support server invite link",
+	})
 }

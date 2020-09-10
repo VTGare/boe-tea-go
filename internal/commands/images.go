@@ -36,8 +36,20 @@ var (
 )
 
 func init() {
-	ig := CommandFramework.AddGroup("images", gumi.GroupDescription("Main bot's functionality, source image commands and magick commands"))
-	sauceCmd := ig.AddCommand("sauce", sauce, gumi.CommandDescription("Tries to find sauce of an anime picture."))
+	ig := CommandFramework.AddGroup(&gumi.Group{
+		Name:        "images",
+		Description: "Source, repost and image manipulation commands",
+		IsVisible:   true,
+	})
+
+	sauceCmd := ig.AddCommand(&gumi.Command{
+		Name:        "sauce",
+		Description: "Finds source of an anime image",
+		Aliases:     []string{},
+		Exec:        sauce,
+		Cooldown:    5 * time.Second,
+		Help:        gumi.NewHelpSettings(),
+	})
 	sauceCmd.Help.ExtendedHelp = []*discordgo.MessageEmbedField{
 		{
 			Name:  "Usage",
@@ -53,24 +65,55 @@ func init() {
 		},
 	}
 
-	pixivCmd := ig.AddCommand("pixiv", pixiv, gumi.CommandDescription("Advanced pixiv repost command that lets you exclude images from an album"))
+	pixivCmd := ig.AddCommand(&gumi.Command{
+		Name:        "pixiv",
+		Description: "Exclude pictures from a large Pixiv album using this command",
+		Aliases:     []string{},
+		Exec:        pixiv,
+		Cooldown:    5 * time.Second,
+	})
 	pixivCmd.Help = gumi.NewHelpSettings().AddField("Usage", "bt!pixiv <post link> [optional excluded images]", false).AddField("excluded images", "Indexes must be separated by whitespace (e.g. 1 2 4 6 10 45)", false)
 
-	dfCmd := ig.AddCommand("deepfry", deepfry, gumi.CommandDescription("Deepfries an image, itadakimasu"))
+	dfCmd := ig.AddCommand(&gumi.Command{
+		Name:        "deepfry",
+		Description: "Deepfries an image, itadakimasu!",
+		Aliases:     []string{},
+		Exec:        deepfry,
+		Cooldown:    15 * time.Second,
+	})
 	dfCmd.Help = gumi.NewHelpSettings()
 	dfCmd.Help.AddField("Usage", "bt!deepfry <optional times deepfried> <image link>", false)
 	dfCmd.Help.AddField("times deepfried", "Repeats deepfrying process given amount of times, up to 5.", false)
 
-	tCmd := ig.AddCommand("twitter", twitter, gumi.CommandDescription("Reposts each twitter post's image separately. Useful for mobile."))
+	tCmd := ig.AddCommand(&gumi.Command{
+		Name:        "twitter",
+		Description: "Embeds a Twitter link. Useful for posts with multiple images for mobile users",
+		Aliases:     []string{},
+		Exec:        twitter,
+		Cooldown:    5 * time.Second,
+	})
 	tCmd.Help = gumi.NewHelpSettings()
 	tCmd.Help.AddField("Usage", "bt!twitter <twitter link>", false)
 	tCmd.Help.AddField("Twitter link", "Must look something like this: https://twitter.com/mhy_shima/status/1258684420011069442", false)
 
-	jpegCmd := ig.AddCommand("jpeg", jpegify, gumi.CommandDescription("Gives image a soul. Extremely redpilled command."))
+	jpegCmd := ig.AddCommand(&gumi.Command{
+		Name:        "jpeg",
+		Description: "Gives a provided image soul. 🙏",
+		Aliases:     []string{"soul", "jpegify"},
+		Exec:        jpegify,
+		Cooldown:    15 * time.Second,
+	})
 	jpegCmd.Help = gumi.NewHelpSettings()
 	jpegCmd.Help.AddField("Usage", "bt!jpeg <image quality> <image url>", false).AddField("image quality", "Optional integer from 0 to 100", false).AddField("image url", "Optional if attachment is present. Attachment is prioritized.", false)
 
-	excludeCmd := ig.AddCommand("exclude", exclude, gumi.CommandDescription("Cross-posts a pixiv or a twitter post to every children channel except included in this command."))
+	excludeCmd := ig.AddCommand(&gumi.Command{
+		Name:        "exclude",
+		Description: "Excludes provided channels from cross-posting a Twitter or Pixiv post.",
+		Aliases:     []string{"excl"},
+		Exec:        sauce,
+		Cooldown:    5 * time.Second,
+		Help:        gumi.NewHelpSettings(),
+	})
 	excludeCmd.Help.AddField("Usage", "bt!exclude <twitter or pixiv link> [excluded channels]", false).AddField("Excluded channels", "IDs or mentions of channels you'd like to exclude from crossposting", false)
 }
 

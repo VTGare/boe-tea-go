@@ -10,17 +10,28 @@ import (
 
 	"github.com/VTGare/boe-tea-go/internal/database"
 	"github.com/VTGare/boe-tea-go/utils"
+	"github.com/VTGare/gumi"
 	"github.com/bwmarrin/discordgo"
 	"go.mongodb.org/mongo-driver/bson"
 )
 
 func init() {
-	dg := CommandFramework.AddGroup("dev")
+	dg := CommandFramework.AddGroup(&gumi.Group{
+		Name: "dev",
+	})
 	dg.IsVisible = false
-	dg.AddCommand("update", updateDB)
-	//dg.AddCommand("test", test)
-	dg.AddCommand("message", message)
-	dg.AddCommand("stats", devstats)
+	dg.AddCommand(&gumi.Command{
+		Name: "update",
+		Exec: updateDB,
+	})
+	dg.AddCommand(&gumi.Command{
+		Name: "message",
+		Exec: message,
+	})
+	dg.AddCommand(&gumi.Command{
+		Name: "stats",
+		Exec: devstats,
+	})
 }
 
 func message(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {

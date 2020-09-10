@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/VTGare/boe-tea-go/pkg/nozoki"
 	"github.com/VTGare/boe-tea-go/utils"
@@ -17,8 +18,21 @@ var (
 )
 
 func init() {
-	nsfwG := CommandFramework.AddGroup("nsfw", gumi.GroupDescription("All NSFW commands dwell here."), gumi.GroupNSFW())
-	nhCmd := nsfwG.AddCommand("nhentai", nhentai, gumi.CommandDescription("Posts detailed info about nhentai book"), gumi.WithAliases("nh"))
+	nsfwG := CommandFramework.AddGroup(&gumi.Group{
+		Name:        "nsfw",
+		Description: "Exquisite commands for real men of culture.",
+		NSFW:        true,
+		IsVisible:   true,
+	})
+
+	nhCmd := nsfwG.AddCommand(&gumi.Command{
+		Name:        "nhentai",
+		Description: "Sends a detailed description of an nhentai entry",
+		Aliases:     []string{"nh"},
+		Exec:        nhentai,
+		Cooldown:    5 * time.Second,
+		Help:        gumi.NewHelpSettings(),
+	})
 	nhCmd.Help.ExtendedHelp = []*discordgo.MessageEmbedField{
 		{
 			Name:  "Usage",

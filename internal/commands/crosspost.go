@@ -3,6 +3,7 @@ package commands
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/VTGare/boe-tea-go/internal/database"
 	"github.com/VTGare/boe-tea-go/utils"
@@ -11,22 +12,66 @@ import (
 )
 
 func init() {
-	cp := CommandFramework.AddGroup("crosspost", gumi.GroupDescription("Cross-posting feature settings"))
-	cr := cp.AddCommand("create", createGroup, gumi.CommandDescription("Creates a new cross-post group."))
+	cp := CommandFramework.AddGroup(&gumi.Group{
+		Name:        "crosspost",
+		Description: "Cross-posting feature settings",
+		IsVisible:   true,
+	})
+
+	cr := cp.AddCommand(&gumi.Command{
+		Name:        "create",
+		Description: "Creates a new cross-post group",
+		Exec:        createGroup,
+		Cooldown:    5 * time.Second,
+		Help:        gumi.NewHelpSettings(),
+	})
 	cr.Help.AddField("Usage", "bt!create <group name> [channel IDs or mentions]", false)
 
-	dl := cp.AddCommand("delete", deleteGroup, gumi.CommandDescription("Deletes a cross-post group."))
+	dl := cp.AddCommand(&gumi.Command{
+		Name:        "delete",
+		Description: "Deletes a cross-post group",
+		Exec:        deleteGroup,
+		Cooldown:    5 * time.Second,
+		Help:        gumi.NewHelpSettings(),
+	})
 	dl.Help.AddField("Usage", "bt!delete <group name>", false)
 
-	cp.AddCommand("groups", groups, gumi.CommandDescription("Lists all your cross-post groups."), gumi.WithAliases("list", "allgroups", "ls"))
+	cp.AddCommand(&gumi.Command{
+		Name:        "list",
+		Aliases:     []string{"ls", "groups"},
+		Description: "List all your cross-post groups",
+		Exec:        groups,
+		Help:        gumi.NewHelpSettings(),
+	})
 
-	pop := cp.AddCommand("pop", removeFromGroup, gumi.CommandDescription("Removes channels from a cross-post group."), gumi.WithAliases("remove"))
+	pop := cp.AddCommand(&gumi.Command{
+		Name:        "pop",
+		Aliases:     []string{"remove"},
+		Description: "Removes a channel from a group",
+		Exec:        removeFromGroup,
+		Cooldown:    5 * time.Second,
+		Help:        gumi.NewHelpSettings(),
+	})
 	pop.Help.AddField("Usage", "bt!pop <group name> [channel IDs or mentions]", false)
 
-	push := cp.AddCommand("push", addToGroup, gumi.CommandDescription("Adds channels to a cross-post group."), gumi.WithAliases("add"))
+	push := cp.AddCommand(&gumi.Command{
+		Name:        "push",
+		Aliases:     []string{"add"},
+		Description: "Adds a channel to a group",
+		Exec:        addToGroup,
+		Cooldown:    5 * time.Second,
+		Help:        gumi.NewHelpSettings(),
+	})
 	push.Help.AddField("Usage", "bt!push <group name> [channel IDs or mentions]", false)
 
-	copyc := cp.AddCommand("copy", copyGroup, gumi.CommandDescription("Copies a cross-post group."), gumi.WithAliases("cp", "clone"))
+	copyc := cp.AddCommand(&gumi.Command{
+		Name:        "copy",
+		Aliases:     []string{"cp", "clone"},
+		Description: "Copies a cross-post group",
+		Exec:        copyGroup,
+		Cooldown:    5 * time.Second,
+		Help:        gumi.NewHelpSettings(),
+	})
 	copyc.Help.AddField("Usage", "bt!copy <source group name> <destination group name> <parent ID>", false)
 }
 

@@ -2,15 +2,24 @@ package commands
 
 import (
 	"github.com/VTGare/boe-tea-go/utils"
+	"github.com/VTGare/gumi"
 	"github.com/bwmarrin/discordgo"
 )
 
 func init() {
-	memes := CommandFramework.AddGroup("memes")
+	memes := CommandFramework.AddGroup(&gumi.Group{
+		Name: "memes",
+	})
 	memes.IsVisible = false
 
-	memes.AddCommand("borgar", borgar)
-	memes.AddCommand("brainpower", brainpower)
+	memes.AddCommand(&gumi.Command{
+		Name: "borgar",
+		Exec: borgar,
+	})
+	memes.AddCommand(&gumi.Command{
+		Name: "brainpower",
+		Exec: brainpower,
+	})
 }
 
 func borgar(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
