@@ -110,7 +110,7 @@ func init() {
 		Name:        "exclude",
 		Description: "Excludes provided channels from cross-posting a Twitter or Pixiv post.",
 		Aliases:     []string{"excl"},
-		Exec:        sauce,
+		Exec:        exclude,
 		Cooldown:    5 * time.Second,
 		Help:        gumi.NewHelpSettings(),
 	})
