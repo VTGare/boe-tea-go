@@ -52,7 +52,11 @@ func (n *Nozoki) GetBook(id string) (*NHBook, error) {
 		return nil, err
 	}
 
-	book := raw.toBook()
+	book, err := raw.toBook()
+	if err != nil {
+		return nil, err
+	}
+
 	if n.maxCacheSize != 0 {
 		n.push(book)
 	}

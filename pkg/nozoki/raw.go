@@ -3,6 +3,8 @@ package nozoki
 import (
 	"fmt"
 	"strconv"
+
+	"github.com/sirupsen/logrus"
 )
 
 type rawNHBook struct {
@@ -10,8 +12,8 @@ type rawNHBook struct {
 	MediaID    string      `json:"media_id"`
 	Titles     NHTitle     `json:"title"`
 	Tags       []rawNHTag  `json:"tags"`
-	Pages      int         `json:"num_pages"`
-	Favourites int         `json:"num_favorites"`
+	Pages      interface{} `json:"num_pages"`
+	Favourites interface{} `json:"num_favorites"`
 }
 
 type rawNHTag struct {
@@ -29,18 +31,32 @@ type NHTitle struct {
 	Pretty   string `json:"pretty"`
 }
 
-func (raw *rawNHBook) toBook() *NHBook {
+func (raw *rawNHBook) toBook() (*NHBook, error) {
 	artists, tags := raw.sortTags()
+
+	id, err := interfaceToInt(raw.ID)
+	if err != nil {
+		logrus.Warnf("nozoki.toBook(): %v", err)
+	}
+	favourites, err := interfaceToInt(raw.Favourites)
+	if err != nil {
+		logrus.Warnf("nozoki.toBook(): %v", err)
+	}
+	pages, err := interfaceToInt(raw.Pages)
+	if err != nil {
+		logrus.Warnf("nozoki.toBook(): %v", err)
+	}
+
 	return &NHBook{
-		ID:         raw.id(),
+		ID:         id,
 		Titles:     raw.Titles,
 		Artists:    artists,
 		Tags:       tags,
-		URL:        fmt.Sprintf("https://nhentai.net/g/%v/", raw.id()),
+		URL:        fmt.Sprintf("https://nhentai.net/g/%v/", id),
 		Cover:      fmt.Sprintf("https://t.nhentai.net/galleries/%v/cover.jpg", raw.MediaID),
-		Pages:      raw.Pages,
-		Favourites: raw.Favourites,
-	}
+		Pages:      pages,
+		Favourites: favourites,
+	}, nil
 }
 
 func (raw *rawNHBook) sortTags() (artists []string, tags []string) {
@@ -60,13 +76,35 @@ func (raw *rawNHBook) sortTags() (artists []string, tags []string) {
 	return
 }
 
-func (raw *rawNHBook) id() int {
-	if id, ok := raw.ID.(int); ok {
-		return id
-	} else if id, ok := raw.ID.(string); ok {
-		intID, _ := strconv.Atoi(id)
-		return intID
-	} else {
-		return 0
+func interfaceToInt(i interface{}) (int, error) {
+	switch v := i.(type) {
+	case int:
+		return v, nil
+	case uint:
+		return int(v), nil
+	case int8:
+		return int(v), nil
+	case uint8:
+		return int(v), nil
+	case int16:
+		return int(v), nil
+	case uint16:
+		return int(v), nil
+	case int32:
+		return int(v), nil
+	case uint32:
+		return int(v), nil
+	case int64:
+		return int(v), nil
+	case uint64:
+		return int(v), nil
+	case float32:
+		return int(v), nil
+	case float64:
+		return int(v), nil
+	case string:
+		return strconv.Atoi(v)
+	default:
+		return 0, fmt.Errorf("failed to convert an ID: %v", v)
 	}
 }
