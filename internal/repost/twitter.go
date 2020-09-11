@@ -59,7 +59,7 @@ func (a *ArtPost) fetchTwitterPosts() ([]*tsuita.Tweet, error) {
 	for t := range a.TwitterMatches {
 		go func(t string) {
 			defer wg.Done()
-			tweet, err := tsuita.GetTweet(t)
+			tweet, err := tsuita.GetTweet(fmt.Sprintf("https://twitter.com/i/web/status/%v", t))
 			if err != nil {
 				errChan <- err
 			} else {

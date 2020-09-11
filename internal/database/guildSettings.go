@@ -23,6 +23,7 @@ type GuildSettings struct {
 	Pixiv         bool      `bson:"pixiv" json:"pixiv"`
 	Twitter       bool      `bson:"twitter" json:"twitter"`
 	Crosspost     bool      `bson:"crosspost" json:"crosspost"`
+	NSFW          bool      `bson:"nsfw" json:"nsfw"`
 	Repost        string    `bson:"repost" json:"repost"`
 	CreatedAt     time.Time `bson:"created_at" json:"created_at"`
 	UpdatedAt     time.Time `bson:"updated_at" json:"updated_at"`
@@ -38,6 +39,7 @@ func DefaultGuildSettings(guildID string) *GuildSettings {
 		Pixiv:         true,
 		Twitter:       false,
 		Crosspost:     true,
+		NSFW:          true,
 		Repost:        "disabled",
 		CreatedAt:     time.Now(),
 		UpdatedAt:     time.Now(),

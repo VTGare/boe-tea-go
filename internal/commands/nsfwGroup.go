@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/VTGare/boe-tea-go/internal/database"
 	"github.com/VTGare/boe-tea-go/pkg/nozoki"
 	"github.com/VTGare/boe-tea-go/utils"
 	"github.com/VTGare/gumi"
@@ -18,7 +19,7 @@ var (
 )
 
 func init() {
-	nsfwG := CommandFramework.AddGroup(&gumi.Group{
+	nsfwG := Router.AddGroup(&gumi.Group{
 		Name:        "nsfw",
 		Description: "Exquisite commands for real men of culture.",
 		NSFW:        true,
@@ -48,6 +49,18 @@ func init() {
 func nhentai(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
 	if len(args) == 0 {
 		return utils.ErrNotEnoughArguments
+	}
+
+	g := database.GuildCache[m.GuildID]
+	if !g.NSFW {
+		s.ChannelMessageSendEmbed(m.ChannelID, &discordgo.MessageEmbed{
+			Title:     "❎ Failed to execute a command.",
+			Color:     utils.EmbedColor,
+			Thumbnail: &discordgo.MessageEmbedThumbnail{URL: utils.DefaultEmbedImage},
+			Timestamp: utils.EmbedTimestamp(),
+			Fields:    []*discordgo.MessageEmbedField{{"Reason", "You're trying to execute an NSFW command. The server prohibits NSFW content.", false}},
+		})
+		return nil
 	}
 
 	if _, err := strconv.Atoi(args[0]); err != nil {

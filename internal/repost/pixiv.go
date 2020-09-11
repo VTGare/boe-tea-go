@@ -93,20 +93,34 @@ func (a *ArtPost) SendPixiv(s *discordgo.Session, opts ...SendPixivOptions) ([]*
 		}
 	}
 
-	ch, err := s.Channel(a.event.ChannelID)
-	if err != nil {
-		return nil, err
-	}
-	if isNSFW(a.posts) && !ch.NSFW {
-		prompt := utils.CreatePrompt(s, &a.event, &utils.PromptOptions{
-			Actions: map[string]bool{
-				"👌": true,
-			},
-			Message: fmt.Sprintf("You're trying to send an NSFW post in a SFW channel, are you sure about that?"),
-			Timeout: 15 * time.Second,
-		})
-		if !prompt {
+	if isNSFW(a.posts) {
+		if !guild.NSFW {
+			s.ChannelMessageSendEmbed(a.event.ChannelID, &discordgo.MessageEmbed{
+				Title:     "❎ Pixiv post has not been reposted.",
+				Color:     utils.EmbedColor,
+				Thumbnail: &discordgo.MessageEmbedThumbnail{URL: utils.DefaultEmbedImage},
+				Timestamp: utils.EmbedTimestamp(),
+				Fields:    []*discordgo.MessageEmbedField{{"Reason", "An NSFW post has been detected. The server prohibits NSFW content.", false}},
+			})
+
 			return nil, nil
+		}
+		ch, err := s.Channel(a.event.ChannelID)
+		if err != nil {
+			return nil, err
+		}
+
+		if !ch.NSFW {
+			prompt := utils.CreatePrompt(s, &a.event, &utils.PromptOptions{
+				Actions: map[string]bool{
+					"👌": true,
+				},
+				Message: fmt.Sprintf("You're trying to send an NSFW post in a SFW channel, are you sure about that?"),
+				Timeout: 15 * time.Second,
+			})
+			if !prompt {
+				return nil, nil
+			}
 		}
 	}
 
@@ -137,10 +151,17 @@ func joinTags(elems []string, sep string) string {
 
 func createPixivEmbeds(a *ArtPost, excluded map[int]bool, guild *database.GuildSettings) []*discordgo.MessageSend {
 	var (
-		easterEgg    = rand.Intn(len(embedWarning))
+		easterEgg    *embedMessage
 		createdCount = 0
 		messages     = make([]*discordgo.MessageSend, 0)
 	)
+
+	g := database.GuildCache[a.event.GuildID]
+	if !g.NSFW {
+		easterEgg = sfwEmbedMessages[rand.Intn(len(sfwEmbedMessages))]
+	} else {
+		easterEgg = embedMessages[rand.Intn(len(embedMessages))]
+	}
 
 	count := countPages(a.posts) - len(excluded)
 	for _, post := range a.posts {
@@ -188,7 +209,7 @@ func createPixivEmbeds(a *ArtPost, excluded map[int]bool, guild *database.GuildS
 	return messages
 }
 
-func createPixivEmbed(post *ugoira.PixivPost, thumbnail, original string, ind, easterEgg int) *discordgo.MessageSend {
+func createPixivEmbed(post *ugoira.PixivPost, thumbnail, original string, ind int, easter *embedMessage) *discordgo.MessageSend {
 	title := ""
 
 	if len(post.LargeImages) == 1 {
@@ -219,7 +240,7 @@ func createPixivEmbed(post *ugoira.PixivPost, thumbnail, original string, ind, e
 				URL: thumbnail,
 			},
 			Footer: &discordgo.MessageEmbedFooter{
-				Text: embedWarning[easterEgg],
+				Text: easter.Content,
 			},
 		},
 	}
@@ -235,7 +256,7 @@ func createPixivEmbed(post *ugoira.PixivPost, thumbnail, original string, ind, e
 	return send
 }
 
-func createUgoiraEmbed(post *ugoira.PixivPost, easterEgg int) *discordgo.MessageSend {
+func createUgoiraEmbed(post *ugoira.PixivPost, easter *embedMessage) *discordgo.MessageSend {
 	title := fmt.Sprintf("%v by %v", post.Title, post.Author)
 	send := &discordgo.MessageSend{
 		Embed: &discordgo.MessageEmbed{
@@ -256,7 +277,7 @@ func createUgoiraEmbed(post *ugoira.PixivPost, easterEgg int) *discordgo.Message
 				},
 			},
 			Footer: &discordgo.MessageEmbedFooter{
-				Text: embedWarning[easterEgg],
+				Text: easter.Content,
 			},
 		},
 	}

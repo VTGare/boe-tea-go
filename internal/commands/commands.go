@@ -11,11 +11,11 @@ import (
 )
 
 var (
-	CommandFramework *gumi.Gumi
+	Router *gumi.Gumi
 )
 
 func init() {
-	CommandFramework = gumi.NewGumi(gumi.WithErrorHandler(func(e error) *discordgo.MessageSend {
+	Router = gumi.NewGumi(gumi.WithErrorHandler(func(e error) *discordgo.MessageSend {
 		if e != nil {
 			embed := &discordgo.MessageEmbed{
 				Title: "Oops, something went wrong!",
@@ -42,7 +42,7 @@ func init() {
 		return []string{"bt!", "bt ", "bt.", "<@!" + s.State.User.ID + ">"}
 	}))
 
-	generalGroup := CommandFramework.Groups["general"]
+	generalGroup := Router.Groups["general"]
 	generalGroup.AddCommand(&gumi.Command{
 		Name:        "ping",
 		Description: "Checks if Boe Tea is online",
@@ -108,6 +108,7 @@ func init() {
 		Aliases:     []string{"config", "cfg", "settings"},
 		Description: "Show or change server's settings",
 		Help:        setHelp,
+		Exec:        set,
 		GuildOnly:   true,
 		Cooldown:    5 * time.Second,
 	})

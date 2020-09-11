@@ -12,20 +12,20 @@ import (
 )
 
 func init() {
-	cp := CommandFramework.AddGroup(&gumi.Group{
+	cp := Router.AddGroup(&gumi.Group{
 		Name:        "crosspost",
 		Description: "Cross-posting feature settings",
 		IsVisible:   true,
 	})
 
-	cr := cp.AddCommand(&gumi.Command{
+	mk := cp.AddCommand(&gumi.Command{
 		Name:        "create",
 		Description: "Creates a new cross-post group",
 		Exec:        createGroup,
 		Cooldown:    5 * time.Second,
 		Help:        gumi.NewHelpSettings(),
 	})
-	cr.Help.AddField("Usage", "bt!create <group name> [channel IDs or mentions]", false)
+	mk.Help.AddField("Usage", "bt!create <group name> [channel IDs or mentions]", false)
 
 	dl := cp.AddCommand(&gumi.Command{
 		Name:        "delete",

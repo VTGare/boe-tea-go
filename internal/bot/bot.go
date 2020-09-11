@@ -212,7 +212,7 @@ func (b *Bot) messageCreated(s *discordgo.Session, m *discordgo.MessageCreate) {
 		return
 	}
 
-	isCommand := commands.CommandFramework.Handle(s, m)
+	isCommand := commands.Router.Handle(s, m)
 	if !isCommand && m.GuildID != "" {
 		err := b.prefixless(s, m, false)
 		user := database.DB.FindUser(m.Author.ID)
@@ -232,7 +232,7 @@ func (b *Bot) messageCreated(s *discordgo.Session, m *discordgo.MessageCreate) {
 			}
 		}
 
-		commands.CommandFramework.ErrorHandler(err)
+		commands.Router.ErrorHandler(err)
 	}
 }
 

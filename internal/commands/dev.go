@@ -16,7 +16,7 @@ import (
 )
 
 func init() {
-	dg := CommandFramework.AddGroup(&gumi.Group{
+	dg := Router.AddGroup(&gumi.Group{
 		Name: "dev",
 	})
 	dg.IsVisible = false
@@ -63,7 +63,7 @@ func updateDB(s *discordgo.Session, m *discordgo.MessageCreate, args []string) e
 	c := database.DB.GuildSettings
 	res, err := c.UpdateMany(context.Background(), bson.M{}, bson.M{
 		"$set": bson.M{
-			"crosspost": true,
+			"nsfw": true,
 		},
 	})
 	if err != nil {

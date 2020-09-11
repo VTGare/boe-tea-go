@@ -16,8 +16,42 @@ import (
 )
 
 var (
-	embedWarning = []string{"Boe Tea has a support server now! Use bt!support command to get an invite link.", "POMF POMF KIMOCHI", "https://www.youtube.com/watch?v=899kstdMUoQ", "Do you believe in gravity?", "Shit waifu, ngl.", "Watch Monogatari.", "Is this thing on?", "Haruhi is a goddess", "My creator's waifu is 2B", "If you're reading this you're epic.", "If you react ❌ to a pixiv embed it'll be removed", "bt!nhentai 271920, enjoy", "This embed was sponsored by Raid Shadow Legends", "There are several hidden meme commands, try to find them", "Love, from Shamiko-chan", "bt!twitter is useful for mobile users", "Ramiel best girl", "PM the creator of this bot lolis.", "If you wrap a link in <> Discord won't embed it", "Who's Rem", "Every 60 seconds one minute passes in Africa", "People die when they're killed", "You thought it was a useful message, but it was me DIO!", "Enable strict mode to remove filthy reposts."}
+	embedMessages = []*embedMessage{
+		{"Come join Boe Tea's support server. Use bt!support command to get an invite link.", false},
+		{"POMF POMF KIMOCHI", true},
+		{"https://www.youtube.com/watch?v=899kstdMUoQ", false},
+		{"Do you believe in gravity?", false},
+		{"Shit waifu, ngl", false},
+		{"Watch Monogatari.", false},
+		{"Is this thing on?", false},
+		{"I believe in Haruhiism", false},
+		{"My author's waifu is 2B, hope she doesn't kill me.", false},
+		{"If you're reading this you're epic.", false},
+		{"React ❌ to an embed to remove it.", false},
+		{"bt!nh 271920, don't thank me.", true},
+		{"This embed was sponsored by Said Rhadow Legends", false},
+		{"bt!borgar 🦎🍔", false},
+		{"Love. From Shamiko-chan", false},
+		{"Use bt!twitter to embed a Twitter post", false},
+		{"Ramiel - best waifu.", false},
+		{"DM creator of this bot lolis", true},
+		{"Wrapping a link in <> prevents Discord from embedding it", false},
+		{"Who's Rem", false},
+		{"Every 60 seconds, a minute passes in Africa.", false},
+		{"People die when they're killed", false},
+		{"You thought it was a funny message, but it was me JOJO REFERENCE", false},
+		{"Strict repost mode removes reposts no questions asked.", false},
+	}
+	sfwEmbedMessages = make([]*embedMessage, 0)
 )
+
+func init() {
+	for _, m := range embedMessages {
+		if !m.NSFW {
+			sfwEmbedMessages = append(sfwEmbedMessages, m)
+		}
+	}
+}
 
 type ArtPost struct {
 	TwitterMatches map[string]bool
@@ -32,6 +66,11 @@ type ArtPost struct {
 type SendPixivOptions struct {
 	SkipPrompt bool
 	Exclude    map[int]bool
+}
+
+type embedMessage struct {
+	Content string
+	NSFW    bool
 }
 
 func (a *ArtPost) PixivReposts() int {
@@ -160,8 +199,8 @@ func NewPost(m discordgo.MessageCreate, crosspost bool, content ...string) *ArtP
 		m.Content = content[0]
 	}
 
-	for _, str := range tsuita.TwitterRegex.FindAllString(m.Content, len(m.Content)+1) {
-		twitter[str] = true
+	for _, match := range tsuita.TwitterRegex.FindAllStringSubmatch(m.Content, len(m.Content)+1) {
+		twitter[match[1]] = true
 	}
 
 	pixiv := utils.PixivRegex.FindAllStringSubmatch(m.Content, len(m.Content)+1)

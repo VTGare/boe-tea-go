@@ -7,7 +7,7 @@ import (
 )
 
 func init() {
-	memes := CommandFramework.AddGroup(&gumi.Group{
+	memes := Router.AddGroup(&gumi.Group{
 		Name: "memes",
 	})
 	memes.IsVisible = false

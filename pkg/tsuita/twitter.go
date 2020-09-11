@@ -2,6 +2,7 @@ package tsuita
 
 import (
 	"errors"
+	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
@@ -13,7 +14,7 @@ import (
 )
 
 var (
-	TwitterRegex = regexp.MustCompile(`https?://twitter.com/(\S+)/status/(\d+)`)
+	TwitterRegex = regexp.MustCompile(`https?://(?:mobile.)?twitter.com/(?:\S+)/status/(\d+)(?:\?s=\d\d)?`)
 
 	twitterCache *ttlcache.Cache
 	nitterURL    = "https://nitter.net"
@@ -42,21 +43,21 @@ type TwitterMedia struct {
 
 func GetTweet(uri string) (*Tweet, error) {
 	var (
-		res = &Tweet{URL: uri, Gallery: make([]TwitterMedia, 0)}
-		str = TwitterRegex.FindString(uri)
+		res   = &Tweet{URL: uri, Gallery: make([]TwitterMedia, 0)}
+		match = TwitterRegex.FindStringSubmatch(uri)
 	)
 
-	if cache, ok := twitterCache.Get(uri); ok {
-		logrus.Infof("Found a cached tweet with URL: %v", uri)
-		return cache.(*Tweet), nil
-	}
-
-	if str == "" {
+	if len(match) == 0 {
 		return nil, errors.New("invalid twitter url")
 	}
 
+	if cache, ok := twitterCache.Get(match[1]); ok {
+		logrus.Infof("Found a cached tweet. Snowflake: %v", uri)
+		return cache.(*Tweet), nil
+	}
+
 	logrus.Infof("Fetching a tweet by URL: %v", uri)
-	nitter := strings.ReplaceAll(str, "twitter.com", "nitter.net")
+	nitter := fmt.Sprintf("https://nitter.net/i/status/%v", match[1])
 	c := colly.NewCollector()
 
 	c.OnHTML(".main-tweet .still-image", func(e *colly.HTMLElement) {
@@ -120,7 +121,7 @@ func GetTweet(uri string) (*Tweet, error) {
 	c.Wait()
 
 	logrus.Infof("Fetched a tweet successfully. URL: %v. Images: %v", res.URL, len(res.Gallery))
-	twitterCache.Set(uri, res)
+	twitterCache.Set(match[1], res)
 
 	return res, nil
 }

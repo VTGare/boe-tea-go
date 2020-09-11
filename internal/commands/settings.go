@@ -19,6 +19,7 @@ var (
 )
 
 func init() {
+	settingMap["nsfw"] = setBool
 	settingMap["pixiv"] = setBool
 	settingMap["twitter"] = setBool
 	settingMap["crosspost"] = setBool
@@ -93,7 +94,7 @@ func showGuildSettings(s *discordgo.Session, m *discordgo.MessageCreate, setting
 		Fields: []*discordgo.MessageEmbedField{
 			{
 				Name:  "Basic",
-				Value: fmt.Sprintf("**Prefix:** %v", settings.Prefix),
+				Value: fmt.Sprintf("**Prefix:** %v | **NSFW:** %v", settings.Prefix, utils.FormatBool(settings.NSFW)),
 			},
 			{
 				Name:  "Features",

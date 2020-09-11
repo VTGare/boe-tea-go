@@ -36,7 +36,7 @@ var (
 )
 
 func init() {
-	ig := CommandFramework.AddGroup(&gumi.Group{
+	ig := Router.AddGroup(&gumi.Group{
 		Name:        "images",
 		Description: "Source, repost and image manipulation commands",
 		IsVisible:   true,
