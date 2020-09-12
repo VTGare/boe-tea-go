@@ -61,18 +61,19 @@ func init() {
 		},
 		{
 			Name:  "image link",
-			Value: "Required. Link must have one of the following suffixes:  *jpg*, *jpeg*, *png*, *gif*, *webp*.\nURL parameters after the link are acceptable (e.g. <link>.jpg***?width=441&height=441***)",
+			Value: "Required. Link must have one of the following suffixes:  *jpg*, *jpeg*, *png*, *gif*, *webp*.\nURL parameters (e.g. <link>.jpg***?width=441&height=441***) are fine too.",
 		},
 	}
 
 	excludeCmd := ig.AddCommand(&gumi.Command{
 		Name:        "exclude",
 		Description: "Exclude pictures from a large Pixiv album using this command",
-		Aliases:     []string{"excl"},
+		Aliases:     []string{"excl", "pixiv"},
 		Exec:        exclude,
 		Cooldown:    5 * time.Second,
 	})
-	excludeCmd.Help = gumi.NewHelpSettings().AddField("Usage", "bt!pixiv <post link> [optional excluded images]", false).AddField("excluded images", "Indexes must be separated by whitespace (e.g. 1 2 4 6 10 45)", false)
+	excludeCmd.Help = gumi.NewHelpSettings().AddField("Usage", "bt!exclude <post link> [optional excluded images]", false)
+	excludeCmd.Help.AddField("excluded images", "Integer numbers separated by whitespace (e.g. 1 3 5). Supports ranges like this 1-10. Ranges are inclusive.", false)
 
 	dfCmd := ig.AddCommand(&gumi.Command{
 		Name:        "deepfry",

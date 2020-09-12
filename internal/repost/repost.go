@@ -18,6 +18,7 @@ import (
 var (
 	embedMessages = []*embedMessage{
 		{"Come join Boe Tea's support server. Use bt!support command to get an invite link.", false},
+		{"Interested in latest updates? Join our support server. bt!support", false},
 		{"POMF POMF KIMOCHI", true},
 		{"https://www.youtube.com/watch?v=899kstdMUoQ", false},
 		{"Do you believe in gravity?", false},
@@ -41,6 +42,9 @@ var (
 		{"People die when they're killed", false},
 		{"You thought it was a funny message, but it was me JOJO REFERENCE", false},
 		{"Strict repost mode removes reposts no questions asked.", false},
+		{"A cat is fine too.", true},
+		{"If you want to buy me a coffee: https://ko-fi.com/vtgare", false},
+		{"If you want to buy me a coffee: https://ko-fi.com/vtgare", false},
 	}
 	sfwEmbedMessages = make([]*embedMessage, 0)
 )
