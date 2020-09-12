@@ -44,7 +44,6 @@ var (
 		{"Strict repost mode removes reposts no questions asked.", false},
 		{"A cat is fine too.", true},
 		{"If you want to buy me a coffee: https://ko-fi.com/vtgare", false},
-		{"If you want to buy me a coffee: https://ko-fi.com/vtgare", false},
 	}
 	sfwEmbedMessages = make([]*embedMessage, 0)
 )
