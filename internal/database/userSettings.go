@@ -155,12 +155,16 @@ func (d *Database) AddToGroup(userID string, groupName string, channelIDs ...str
 		added = make([]string, 0)
 	)
 
+	if len(channelIDs) == 0 {
+		return nil, fmt.Errorf("no valid channel IDs were found")
+	}
+
 	user := d.FindUser(userID)
 	if user == nil {
 		return nil, fmt.Errorf("User not found: %v", userID)
 	}
 
-	group, _ := user.findGroup(groupName)
+	group, _ := user.FindGroup(groupName)
 	if group == nil {
 		return nil, fmt.Errorf("Group doesn't exist: %v", groupName)
 	}
@@ -191,7 +195,7 @@ func (d *Database) RemoveFromGroup(userID string, groupName string, channelID ..
 		return nil, fmt.Errorf("User not found: %v", userID)
 	}
 
-	group, _ := user.findGroup(groupName)
+	group, _ := user.FindGroup(groupName)
 	if group != nil {
 		for _, id := range channelID {
 			for ind, channel := range group.Children {
@@ -215,7 +219,7 @@ func (d *Database) RemoveFromGroup(userID string, groupName string, channelID ..
 	return found, nil
 }
 
-func (us *UserSettings) findGroup(name string) (*Group, int) {
+func (us *UserSettings) FindGroup(name string) (*Group, int) {
 	for ind, group := range us.ChannelGroups {
 		if group.Name == name {
 			return group, ind

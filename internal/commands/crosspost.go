@@ -255,6 +255,15 @@ func addToGroup(s *discordgo.Session, m *discordgo.MessageCreate, args []string)
 	}
 
 	channels := make([]string, 0)
+
+	group, _ := user.FindGroup(groupName)
+
+	existsMap := make(map[string]bool, 0)
+	existsMap[group.Parent] = true
+	for _, id := range group.Children {
+		existsMap[id] = true
+	}
+
 	for ch := range channelsMap {
 		if strings.HasPrefix(ch, "<#") {
 			ch = strings.Trim(ch, "<#>")
@@ -262,6 +271,17 @@ func addToGroup(s *discordgo.Session, m *discordgo.MessageCreate, args []string)
 
 		if _, err := s.State.Channel(ch); err != nil {
 			return fmt.Errorf("unable to find channel ``%v``. Make sure Boe Tea is present on the server and able to read the channel", ch)
+		}
+
+		if _, ok := existsMap[ch]; ok {
+			s.ChannelMessageSendEmbed(m.ChannelID, &discordgo.MessageEmbed{
+				Title:     "❎ Failed to add to a cross-post group!",
+				Color:     utils.EmbedColor,
+				Timestamp: utils.EmbedTimestamp(),
+				Thumbnail: &discordgo.MessageEmbedThumbnail{URL: utils.DefaultEmbedImage},
+				Fields:    []*discordgo.MessageEmbedField{{Name: "Reason", Value: fmt.Sprintf("Channel <#%v> is already part of group %v", ch, groupName)}},
+			})
+			return nil
 		}
 
 		channels = append(channels, ch)
