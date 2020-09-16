@@ -47,6 +47,15 @@ func (d *Database) InsertManyPosts(posts []interface{}) error {
 	return nil
 }
 
+func (d *Database) CountPosts() (int, error) {
+	count, err := d.posts.CountDocuments(context.Background(), bson.M{})
+	if err != nil {
+		return 0, err
+	}
+
+	return int(count), nil
+}
+
 func (d *Database) IsRepost(channelID, content string) (*ImagePost, error) {
 	res := d.posts.FindOne(context.Background(), bson.D{{"channel_id", channelID}, {"content", content}})
 
