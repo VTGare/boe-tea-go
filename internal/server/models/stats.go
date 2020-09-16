@@ -25,14 +25,16 @@ func init() {
 	}
 	cachedStats.PostCount = postCount
 
-	for range time.NewTicker(15 * time.Second).C {
-		postCount, err := database.DB.CountPosts()
-		if err != nil {
-			logrus.Warnln("CountPosts(): ", err)
-		} else {
-			cachedStats.PostCount = postCount
+	go func() {
+		for range time.NewTicker(15 * time.Second).C {
+			postCount, err := database.DB.CountPosts()
+			if err != nil {
+				logrus.Warnln("CountPosts(): ", err)
+			} else {
+				cachedStats.PostCount = postCount
+			}
 		}
-	}
+	}()
 }
 
 func NewStats(s *discordgo.Session) *Stats {
