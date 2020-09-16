@@ -17,18 +17,19 @@ import (
 
 var (
 	botMention string
+	BoeTea     *Bot
 )
 
 type Bot struct {
-	s *discordgo.Session
+	Session *discordgo.Session
 }
 
 func (b *Bot) Run() error {
-	if err := b.s.Open(); err != nil {
+	if err := b.Session.Open(); err != nil {
 		return err
 	}
 
-	defer b.s.Close()
+	defer b.Session.Close()
 	sc := make(chan os.Signal, 1)
 	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, syscall.SIGSEGV, syscall.SIGHUP)
 	<-sc
@@ -50,6 +51,8 @@ func NewBot(token string) (*Bot, error) {
 	dg.AddHandler(bot.guildCreated)
 	dg.AddHandler(bot.guildDeleted)
 	dg.Identify.Intents = discordgo.MakeIntent(discordgo.IntentsAllWithoutPrivileged)
+
+	BoeTea = bot
 	return bot, nil
 }
 
