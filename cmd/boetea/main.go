@@ -12,6 +12,7 @@ import (
 var (
 	token = os.Getenv("BOT_TOKEN")
 	pwd   = os.Getenv("SERVER_PASSWORD")
+	port  = os.Getenv("PORT")
 )
 
 func main() {
@@ -23,7 +24,7 @@ func main() {
 	b, err := bot.NewBot(token)
 
 	go func() {
-		server.StartServer(pwd)
+		server.StartServer(pwd, port)
 	}()
 
 	err = b.Run()

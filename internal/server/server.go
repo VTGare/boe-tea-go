@@ -14,7 +14,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func StartServer(pwd string) {
+func StartServer(pwd, port string) {
 	app := fiber.New()
 	s := bot.BoeTea.Session
 	app.Use("/ws", func(c *fiber.Ctx) error {
@@ -64,5 +64,9 @@ func StartServer(pwd string) {
 		}
 	}))
 
-	logrus.Fatalln(app.Listen(":8080"))
+	if port == "" {
+		logrus.Println("Unknown port, setting to 8080")
+		port = "8080"
+	}
+	logrus.Fatalln(app.Listen(":" + port))
 }
