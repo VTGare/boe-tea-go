@@ -257,6 +257,16 @@ func addToGroup(s *discordgo.Session, m *discordgo.MessageCreate, args []string)
 	channels := make([]string, 0)
 
 	group, _ := user.FindGroup(groupName)
+	if group == nil {
+		s.ChannelMessageSendEmbed(m.ChannelID, &discordgo.MessageEmbed{
+			Title:     "❎ Failed to add to a cross-post group!",
+			Color:     utils.EmbedColor,
+			Timestamp: utils.EmbedTimestamp(),
+			Thumbnail: &discordgo.MessageEmbedThumbnail{URL: utils.DefaultEmbedImage},
+			Fields:    []*discordgo.MessageEmbedField{{Name: "Reason", Value: fmt.Sprintf("Cross-post group **%v** has not been found.", groupName)}},
+		})
+		return nil
+	}
 
 	existsMap := make(map[string]bool, 0)
 	existsMap[group.Parent] = true
