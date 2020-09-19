@@ -298,11 +298,9 @@ func (b *Bot) guildCreated(s *discordgo.Session, g *discordgo.GuildCreate) {
 }
 
 func (b *Bot) guildDeleted(s *discordgo.Session, g *discordgo.GuildDelete) {
-	/*err := database.DB.RemoveGuild(g.ID)
-	if err != nil {
-		log.Println(err)
+	if !g.Unavailable {
+		log.Infoln("Kicked/banned from a guild. ID: ", g.ID)
+	} else {
+		log.Infoln("Guild outage. ID: ", g.ID)
 	}
-
-	delete(database.GuildCache, g.ID)*/
-	log.Infoln("Kicked or banned from", g.Guild.Name, g.ID)
 }
