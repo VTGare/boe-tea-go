@@ -55,7 +55,7 @@ func (a *ArtPost) fetchPixivPosts() ([]*ugoira.PixivPost, error) {
 func countPages(posts []*ugoira.PixivPost) int {
 	count := 0
 	for _, p := range posts {
-		count += utils.Max(len(p.LargeImages), len(p.OriginalImages))
+		count += p.Len()
 	}
 	return count
 }
@@ -169,7 +169,7 @@ func createPixivEmbeds(a *ArtPost, excluded map[int]bool, guild *database.GuildS
 			break
 		}
 
-		for ind, thumbnail := range post.LargeImages {
+		for ind := range post.Images.Original {
 			if _, ok := excluded[ind+1]; ok {
 				continue
 			}
@@ -180,13 +180,13 @@ func createPixivEmbeds(a *ArtPost, excluded map[int]bool, guild *database.GuildS
 				err := post.DownloadUgoira()
 				if err != nil {
 					logrus.Warnln(err)
-					ms = createPixivEmbed(post, thumbnail, post.OriginalImages[ind], ind, easterEgg)
+					ms = createPixivEmbed(post, ind, easterEgg)
 				} else {
 					a.HasUgoira = true
 					ms = createUgoiraEmbed(post, easterEgg)
 				}
 			} else {
-				ms = createPixivEmbed(post, thumbnail, post.OriginalImages[ind], ind, easterEgg)
+				ms = createPixivEmbed(post, ind, easterEgg)
 			}
 			messages = append(messages, ms)
 
@@ -209,14 +209,19 @@ func createPixivEmbeds(a *ArtPost, excluded map[int]bool, guild *database.GuildS
 	return messages
 }
 
-func createPixivEmbed(post *ugoira.PixivPost, thumbnail, original string, ind int, easter *embedMessage) *discordgo.MessageSend {
+func createPixivEmbed(post *ugoira.PixivPost, ind int, easter *embedMessage) *discordgo.MessageSend {
 	title := ""
 
-	if len(post.LargeImages) == 1 {
+	if post.Len() == 1 {
 		title = fmt.Sprintf("%v by %v", post.Title, post.Author)
 	} else {
-		title = fmt.Sprintf("%v by %v. Page %v/%v", post.Title, post.Author, ind+1, len(post.LargeImages))
+		title = fmt.Sprintf("%v by %v. Page %v/%v", post.Title, post.Author, ind+1, post.Len())
 	}
+
+	var (
+		original = post.Images.Original[ind].PixivCat
+		preview  = post.Images.Preview[ind].PixivCat
+	)
 
 	send := &discordgo.MessageSend{
 		Embed: &discordgo.MessageEmbed{
@@ -237,7 +242,7 @@ func createPixivEmbed(post *ugoira.PixivPost, thumbnail, original string, ind in
 				},
 			},
 			Image: &discordgo.MessageEmbedImage{
-				URL: thumbnail,
+				URL: preview,
 			},
 			Footer: &discordgo.MessageEmbedFooter{
 				Text: easter.Content,

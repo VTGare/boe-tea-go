@@ -1,6 +1,7 @@
 package ugoira
 
 import (
+	"fmt"
 	"os"
 	"strconv"
 	"strings"
@@ -12,17 +13,6 @@ import (
 )
 
 var (
-	//Kotori is a switch for Pixiv reverse proxy engine. In case if one breaks it would be possible to switch it from outside.
-	Kotori = false
-
-	reverseProxy = map[bool]func(string) string{
-		true: func(s string) string {
-			return kotoriBase + strings.TrimPrefix(s, "https://")
-		},
-		false: func(s string) string {
-			return strings.Replace(s, "i.pximg.net", "i.pixiv.cat", 1)
-		},
-	}
 	kotoriBase = "https://api.kotori.love/pixiv/image/"
 	app        *pixiv.AppPixivAPI
 	pixivCache *ttlcache.Cache
@@ -30,18 +20,43 @@ var (
 )
 
 type PixivPost struct {
-	ID             string
-	Type           string
-	Author         string
-	Title          string
-	Likes          int
-	Pages          int
-	Ugoira         *Ugoira
-	Tags           []string
-	LargeImages    []string
-	OriginalImages []string
-	NSFW           bool
-	GoodWaifu      bool
+	ID        string
+	Type      string
+	Author    string
+	Title     string
+	Likes     int
+	Pages     int
+	Ugoira    *Ugoira
+	Tags      []string
+	Images    *PixivImages
+	NSFW      bool
+	GoodWaifu bool
+}
+
+type PixivImages struct {
+	Preview  []*PixivImage
+	Original []*PixivImage
+}
+
+type PixivImage struct {
+	Kotori        string
+	PixivCat      string
+	PixivCatProxy string
+}
+
+func newPixivImage(url string, id uint64, manga bool, page int) *PixivImage {
+	pixivCat := ""
+	if manga {
+		pixivCat = fmt.Sprintf("https://pixiv.cat/%v-%v.png", id, page+1)
+	} else {
+		pixivCat = fmt.Sprintf("https://pixiv.cat/%v.png", id)
+	}
+
+	return &PixivImage{
+		Kotori:        kotoriBase + strings.TrimPrefix(url, "https://"),
+		PixivCat:      pixivCat,
+		PixivCatProxy: strings.Replace(url, "i.pximg.net", "i.pixiv.cat", 1),
+	}
 }
 
 func init() {
@@ -81,15 +96,14 @@ func (p *PixivPost) DownloadUgoira() error {
 
 //GetPixivPost perfoms a Pixiv API call and returns an array of high-resolution image URLs
 func GetPixivPost(id string) (*PixivPost, error) {
-	var (
-		largeImages    = make([]string, 0)
-		originalImages = make([]string, 0)
-	)
-
 	if post, ok := pixivCache.Get(id); ok {
 		log.Infof("Found cached pixiv post %s", id)
 		return post.(*PixivPost), nil
 	}
+
+	var (
+		images = &PixivImages{make([]*PixivImage, 0), make([]*PixivImage, 0)}
+	)
 
 	pid, err := strconv.ParseUint(id, 10, 0)
 	if err != nil {
@@ -104,17 +118,17 @@ func GetPixivPost(id string) (*PixivPost, error) {
 	}
 
 	if illust.MetaSinglePage.OriginalImageURL != "" {
-		firstPage := reverseProxy[Kotori](illust.MetaSinglePage.OriginalImageURL)
-		originalImages = append(originalImages, firstPage)
-		firstpageLarge := reverseProxy[Kotori](illust.Images.Large)
-		largeImages = append(largeImages, firstpageLarge)
+		original := newPixivImage(illust.MetaSinglePage.OriginalImageURL, illust.ID, false, 0)
+		images.Original = append(images.Original, original)
+		preview := newPixivImage(illust.Images.Large, illust.ID, false, 0)
+		images.Preview = append(images.Preview, preview)
 	}
 
-	for _, page := range illust.MetaPages {
-		originalLink := reverseProxy[Kotori](page.Images.Original)
-		largeLink := reverseProxy[Kotori](page.Images.Large)
-		largeImages = append(largeImages, largeLink)
-		originalImages = append(originalImages, originalLink)
+	for ind, page := range illust.MetaPages {
+		original := newPixivImage(page.Images.Original, illust.ID, true, ind)
+		preview := newPixivImage(page.Images.Large, illust.ID, true, ind)
+		images.Original = append(images.Original, original)
+		images.Preview = append(images.Preview, preview)
 	}
 
 	nsfw := false
@@ -133,17 +147,16 @@ func GetPixivPost(id string) (*PixivPost, error) {
 	}
 
 	post := &PixivPost{
-		ID:             id,
-		Author:         illust.User.Name,
-		Type:           illust.Type,
-		Title:          illust.Title,
-		Tags:           tags,
-		Pages:          illust.PageCount,
-		LargeImages:    largeImages,
-		OriginalImages: originalImages,
-		Likes:          illust.TotalBookmarks,
-		NSFW:           nsfw,
-		GoodWaifu:      goodwaifu,
+		ID:        id,
+		Author:    illust.User.Name,
+		Type:      illust.Type,
+		Title:     illust.Title,
+		Tags:      tags,
+		Pages:     illust.PageCount,
+		Images:    images,
+		Likes:     illust.TotalBookmarks,
+		NSFW:      nsfw,
+		GoodWaifu: goodwaifu,
 	}
 
 	pixivCache.Set(id, post)
@@ -162,4 +175,8 @@ func getIllust(id uint64) (*pixiv.Illust, error) {
 
 func getExtension(i *pixiv.Illust) string {
 	return string(i.Images.Large[len(i.Images.Large)-3:])
+}
+
+func (p *PixivPost) Len() int {
+	return len(p.Images.Original)
 }
