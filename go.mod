@@ -10,10 +10,6 @@ require (
 	github.com/disintegration/gift v1.2.1
 	github.com/everpcpc/pixiv v0.0.0-20200407035647-9a31a1508c38
 	github.com/gocolly/colly/v2 v2.1.0
-	github.com/gofiber/fiber/v2 v2.0.1
-	github.com/gofiber/websocket/v2 v2.0.0
-	github.com/gorilla/websocket v1.4.2 // indirect
-	github.com/klauspost/compress v1.11.0 // indirect
 	github.com/sirupsen/logrus v1.6.0
 	github.com/valyala/fasthttp v1.16.0
 	go.mongodb.org/mongo-driver v1.4.1

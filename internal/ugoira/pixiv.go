@@ -12,7 +12,18 @@ import (
 )
 
 var (
-	baseURL    = "https://api.kotori.love/pixiv/image/"
+	//Kotori is a switch for Pixiv reverse proxy engine. In case if one breaks it would be possible to switch it from outside.
+	Kotori = false
+
+	reverseProxy = map[bool]func(string) string{
+		true: func(s string) string {
+			return kotoriBase + strings.TrimPrefix(s, "https://")
+		},
+		false: func(s string) string {
+			return strings.Replace(s, "i.pximg.net", "i.pixiv.cat", 1)
+		},
+	}
+	kotoriBase = "https://api.kotori.love/pixiv/image/"
 	app        *pixiv.AppPixivAPI
 	pixivCache *ttlcache.Cache
 	goodWaifus = map[string]bool{"すいせい": true, "ヨルハ二号B型": true, "2B": true, "牧瀬紅莉栖": true, "宝鐘マリン": true}
@@ -93,15 +104,15 @@ func GetPixivPost(id string) (*PixivPost, error) {
 	}
 
 	if illust.MetaSinglePage.OriginalImageURL != "" {
-		firstPage := baseURL + strings.TrimPrefix(illust.MetaSinglePage.OriginalImageURL, "https://")
+		firstPage := reverseProxy[Kotori](illust.MetaSinglePage.OriginalImageURL)
 		originalImages = append(originalImages, firstPage)
-		firstpageLarge := baseURL + strings.TrimPrefix(illust.Images.Large, "https://")
+		firstpageLarge := reverseProxy[Kotori](illust.Images.Large)
 		largeImages = append(largeImages, firstpageLarge)
 	}
 
 	for _, page := range illust.MetaPages {
-		originalLink := baseURL + strings.TrimPrefix(page.Images.Original, "https://")
-		largeLink := baseURL + strings.TrimPrefix(page.Images.Large, "https://")
+		originalLink := reverseProxy[Kotori](page.Images.Original)
+		largeLink := reverseProxy[Kotori](page.Images.Large)
 		largeImages = append(largeImages, largeLink)
 		originalImages = append(originalImages, originalLink)
 	}
