@@ -26,8 +26,8 @@ If you ran into a problem or have a suggestion create an issue here, use bt!feed
 
 Current documentation is out of date. All these commands still work as documented, but there are more undocumented commands or missed features on documented ones. Also their behaviour is subject to change soon. I'll make sure Boe Tea is fully documented when I finally release its own fansy website.
 
--   `bt!sauce` - tries to find original image source on SauceNAO or ASCII2D search engine.
-    -   _Usage_: `bt!sauce <optional reverse search engine> <optional link>`. If reverse search engine is not present uses guild's default. If link is not present looks up for an attachment.
+-   `bt!sauce` - tries to find original image source on SauceNAO search engine.
+    -   _Usage_: `bt!sauce <optional link>`. If link is not present looks up for an attachment.
 -   `bt!pixiv` - advanced pixiv command, let's you exclude certain pictures.
     -   _Usage_: `bt!pixiv <pixiv link> [excluded pictures]`
     -   _pixiv link_: Required link to a pixiv post.
@@ -45,7 +45,6 @@ Current documentation is out of date. All these commands still work as documente
 -   `bt!set` - displays current guild settings or changes them (e.g `bt!set prefix uwu`)
     -   _prefix_: bot's prefix. String up to 5 characters, if last character is a letter whitespace is assumed.
     -   _pixiv_ | _twitter_ | _crosspost_: switches corresponding feature server-wide. Accepted parameters: [_enabled, on, t,true_]  [_disabled, off, f, false_]
-    -   _reversesearch_: default reverse image search engine for `bt!sauce` command. Accepted parameters: [**saucenao**, **wait**]
     -   _repost_: Configures repost checker behaviour. Accepts **enabled**, **disabled**, or **strict** parameters.
     -   _limit_: Album size limit. If album exceeds the limit only first image of every separate post will be send.
 -   `bt!ping` - checks if Boe Tea online and sends its ping back

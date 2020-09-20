@@ -26,7 +26,6 @@ func init() {
 	settingMap["prefix"] = setPrefix
 	settingMap["limit"] = setInt
 	settingMap["repost"] = setRepost
-	settingMap["reversesearch"] = setReverseSearch
 }
 
 func set(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
@@ -98,7 +97,7 @@ func showGuildSettings(s *discordgo.Session, m *discordgo.MessageCreate, setting
 			},
 			{
 				Name:  "Features",
-				Value: fmt.Sprintf("**Pixiv:** %v | **Twitter:** %v | **Reverse search:** %v | **Repost:** %v | **Crosspost**: %v", utils.FormatBool(settings.Pixiv), utils.FormatBool(settings.Twitter), settings.ReverseSearch, settings.Repost, utils.FormatBool(settings.Crosspost)),
+				Value: fmt.Sprintf("**Pixiv:** %v | **Twitter:** %v | **Repost:** %v | **Crosspost**: %v", utils.FormatBool(settings.Pixiv), utils.FormatBool(settings.Twitter), settings.Repost, utils.FormatBool(settings.Crosspost)),
 			},
 			{
 				Name:  "Pixiv settings",
@@ -179,13 +178,5 @@ func setRepost(s *discordgo.Session, m *discordgo.MessageCreate, str string) (in
 		}
 		return nil, errors.New("cancelled enabling repost checker, ignore this error")
 	}
-	return str, nil
-}
-
-func setReverseSearch(s *discordgo.Session, m *discordgo.MessageCreate, str string) (interface{}, error) {
-	if str != "saucenao" && str != "wait" {
-		return nil, errors.New("unknown option. reversesearch only accepts wait and saucenao options")
-	}
-
 	return str, nil
 }
