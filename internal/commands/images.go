@@ -88,13 +88,23 @@ func init() {
 
 	excludeCmd := ig.AddCommand(&gumi.Command{
 		Name:        "exclude",
-		Description: "Exclude pictures from a large Pixiv album using this command",
+		Description: "Exclude selected images from a Pixiv album.",
 		Aliases:     []string{"excl", "pixiv"},
 		Exec:        exclude,
 		Cooldown:    5 * time.Second,
 	})
 	excludeCmd.Help = gumi.NewHelpSettings().AddField("Usage", "bt!exclude <post link> [optional excluded images]", false)
 	excludeCmd.Help.AddField("excluded images", "Integer numbers separated by whitespace (e.g. 1 3 5). Supports ranges like this 1-10. Ranges are inclusive.", false)
+
+	includeCmd := ig.AddCommand(&gumi.Command{
+		Name:        "include",
+		Description: "Include only selected images from a Pixiv album.",
+		Aliases:     []string{"incl"},
+		Exec:        include,
+		Cooldown:    5 * time.Second,
+	})
+	includeCmd.Help = gumi.NewHelpSettings().AddField("Usage", "bt!exclude <post link> [optional excluded images]", false)
+	excludeCmd.Help.AddField("included images", "Integer numbers separated by whitespace (e.g. 1 3 5). Supports ranges like this 1-10. Ranges are inclusive.", false)
 
 	dfCmd := ig.AddCommand(&gumi.Command{
 		Name:        "deepfry",
@@ -399,58 +409,186 @@ func exclude(s *discordgo.Session, m *discordgo.MessageCreate, args []string) er
 	if len(args) == 0 {
 		return utils.ErrNotEnoughArguments
 	}
-	guild := database.GuildCache[m.GuildID]
 
-	rep := repost.NewPost(*m, false, args[0])
-	if rep.Len() == 0 {
-		return errors.New("first arguments must be a pixiv link")
-	}
-	if guild.Repost == "strict" {
-		rep.FindReposts()
-		if len(rep.Reposts) != 0 {
-			_, err := s.ChannelMessageSendEmbed(m.ChannelID, rep.RepostEmbed())
-			if err != nil {
-				log.Warnln(err)
-			}
-			return nil
+	var (
+		url     = args[0]
+		indexes = args[1:]
+	)
+
+	post := func(m *discordgo.MessageCreate, crosspost bool) error {
+		rep := repost.NewPost(*m, crosspost, url)
+		if rep.Len() == 0 {
+			return errors.New("first arguments must be a pixiv link")
 		}
-	}
 
-	args = args[1:]
-	excludes := make(map[int]bool)
-	for _, arg := range args {
-		if strings.Contains(arg, "-") {
-			ran, err := utils.NewRange(arg)
-			if err != nil {
-				return err
+		guild := database.GuildCache[m.GuildID]
+		if guild.Repost == "strict" {
+			rep.FindReposts()
+			if len(rep.Reposts) != 0 {
+				_, err := s.ChannelMessageSendEmbed(m.ChannelID, rep.RepostEmbed())
+				if err != nil {
+					log.Warnln(err)
+				}
+				return nil
 			}
-
-			for i := ran.Low; i <= ran.High; i++ {
-				excludes[i] = true
-			}
-		} else {
-			num, err := strconv.Atoi(arg)
-			if err != nil {
-				return utils.ErrParsingArgument
-			}
-			excludes[num] = true
 		}
+
+		indexMap := make(map[int]bool)
+		for _, arg := range indexes {
+			if strings.Contains(arg, "-") {
+				ran, err := utils.NewRange(arg)
+				if err != nil {
+					return err
+				}
+
+				for i := ran.Low; i <= ran.High; i++ {
+					indexMap[i] = true
+				}
+			} else {
+				num, err := strconv.Atoi(arg)
+				if err != nil {
+					return utils.ErrParsingArgument
+				}
+				indexMap[num] = true
+			}
+		}
+
+		messages, err := rep.SendPixiv(s, repost.SendPixivOptions{
+			IndexMap: indexMap,
+		})
+		if err != nil {
+			return err
+		}
+
+		for _, mes := range messages {
+			s.ChannelMessageSendComplex(m.ChannelID, mes)
+		}
+
+		if rep.HasUgoira {
+			rep.Cleanup()
+		}
+
+		return nil
 	}
 
-	messages, err := rep.SendPixiv(s, repost.SendPixivOptions{
-		Exclude: excludes,
-	})
+	err := post(m, false)
 	if err != nil {
 		return err
 	}
 
-	for _, mes := range messages {
-		s.ChannelMessageSendComplex(m.ChannelID, mes)
+	if user := database.DB.FindUser(m.Author.ID); user != nil {
+		channels := user.Channels(m.ChannelID)
+		for _, ch := range channels {
+			c, err := s.State.Channel(ch)
+			if err != nil {
+				log.Warnln(err)
+				continue
+			}
+			m.ChannelID = ch
+			m.GuildID = c.GuildID
+
+			err = post(m, true)
+			if err != nil {
+				log.Warnln(err)
+			}
+		}
 	}
 
-	if rep.HasUgoira {
-		rep.Cleanup()
+	return nil
+}
+
+func include(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
+	if len(args) == 0 {
+		return utils.ErrNotEnoughArguments
 	}
+
+	var (
+		url     = args[0]
+		indexes = args[1:]
+	)
+
+	post := func(m *discordgo.MessageCreate, crosspost bool) error {
+		rep := repost.NewPost(*m, crosspost, url)
+		if rep.Len() == 0 {
+			return errors.New("first argument must be a pixiv link")
+		}
+
+		guild := database.GuildCache[m.GuildID]
+		if guild.Repost == "strict" {
+			rep.FindReposts()
+			if len(rep.Reposts) != 0 {
+				_, err := s.ChannelMessageSendEmbed(m.ChannelID, rep.RepostEmbed())
+				if err != nil {
+					log.Warnln(err)
+				}
+				return nil
+			}
+		}
+
+		indexMap := make(map[int]bool)
+		for _, arg := range indexes {
+			if strings.Contains(arg, "-") {
+				ran, err := utils.NewRange(arg)
+				if err != nil {
+					return err
+				}
+
+				for i := ran.Low; i <= ran.High; i++ {
+					indexMap[i] = true
+				}
+			} else {
+				num, err := strconv.Atoi(arg)
+				if err != nil {
+					return utils.ErrParsingArgument
+				}
+				indexMap[num] = true
+			}
+		}
+
+		messages, err := rep.SendPixiv(s, repost.SendPixivOptions{
+			IndexMap: indexMap,
+			Include:  true,
+		})
+		if err != nil {
+			return err
+		}
+
+		for _, mes := range messages {
+			s.ChannelMessageSendComplex(m.ChannelID, mes)
+		}
+
+		if rep.HasUgoira {
+			rep.Cleanup()
+		}
+
+		return nil
+	}
+
+	err := post(m, false)
+	if err != nil {
+		return err
+	}
+
+	if user := database.DB.FindUser(m.Author.ID); user != nil {
+		channels := user.Channels(m.ChannelID)
+		for _, ch := range channels {
+			c, err := s.State.Channel(ch)
+			if err != nil {
+				log.Warnln(err)
+				continue
+			}
+
+			log.Infof("channel name: %v, channel id: %v", c.Name, c.ID)
+			m.ChannelID = c.ID
+			m.GuildID = c.GuildID
+
+			err = post(m, true)
+			if err != nil {
+				log.Warnln(err)
+			}
+		}
+	}
+
 	return nil
 }
 

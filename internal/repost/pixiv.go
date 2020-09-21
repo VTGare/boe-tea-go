@@ -71,14 +71,16 @@ func isNSFW(posts []*ugoira.PixivPost) bool {
 
 func (a *ArtPost) SendPixiv(s *discordgo.Session, opts ...SendPixivOptions) ([]*discordgo.MessageSend, error) {
 	var (
-		guild   = database.GuildCache[a.event.GuildID]
-		exclude = make(map[int]bool)
+		guild    = database.GuildCache[a.event.GuildID]
+		indexMap = make(map[int]bool)
+		include  bool
 
 		err error
 	)
 	if len(opts) != 0 {
-		if opts[0].Exclude != nil {
-			exclude = opts[0].Exclude
+		if opts[0].IndexMap != nil {
+			indexMap = opts[0].IndexMap
+			include = opts[0].Include
 		}
 	}
 
@@ -87,9 +89,9 @@ func (a *ArtPost) SendPixiv(s *discordgo.Session, opts ...SendPixivOptions) ([]*
 		return nil, err
 	}
 
-	for excl := range exclude {
+	for excl := range indexMap {
 		if excl < 0 || excl > countPages(a.posts) {
-			delete(exclude, excl)
+			delete(indexMap, excl)
 		}
 	}
 
@@ -124,7 +126,7 @@ func (a *ArtPost) SendPixiv(s *discordgo.Session, opts ...SendPixivOptions) ([]*
 		}
 	}
 
-	return createPixivEmbeds(a, exclude, guild), nil
+	return createPixivEmbeds(a, indexMap, include, guild), nil
 }
 
 func joinTags(elems []string, sep string) string {
@@ -149,7 +151,7 @@ func joinTags(elems []string, sep string) string {
 	return b.String()
 }
 
-func createPixivEmbeds(a *ArtPost, excluded map[int]bool, guild *database.GuildSettings) []*discordgo.MessageSend {
+func createPixivEmbeds(a *ArtPost, indexMap map[int]bool, include bool, guild *database.GuildSettings) []*discordgo.MessageSend {
 	var (
 		easterEgg    *embedMessage
 		createdCount = 0
@@ -163,14 +165,14 @@ func createPixivEmbeds(a *ArtPost, excluded map[int]bool, guild *database.GuildS
 		easterEgg = embedMessages[rand.Intn(len(embedMessages))]
 	}
 
-	count := countPages(a.posts) - len(excluded)
+	count := countPages(a.posts) - len(indexMap)
 	for _, post := range a.posts {
 		if createdCount == guild.Limit {
 			break
 		}
 
 		for ind := range post.Images.Original {
-			if _, ok := excluded[ind+1]; ok {
+			if _, ok := indexMap[ind+1]; ok != include {
 				continue
 			}
 			createdCount++

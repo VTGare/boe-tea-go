@@ -68,7 +68,8 @@ type ArtPost struct {
 
 type SendPixivOptions struct {
 	SkipPrompt bool
-	Exclude    map[int]bool
+	IndexMap   map[int]bool
+	Include    bool
 }
 
 type embedMessage struct {
