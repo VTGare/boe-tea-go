@@ -33,8 +33,8 @@ var (
 		Description: "Unfortunately Boe Tea couldn't find source of the provided image.\n\nOther reverse search engines are WIP, for now please consider using one of the following websites manually.",
 		Fields: []*discordgo.MessageEmbedField{
 			{"iqDB", "[Click here desu~](https://iqdb.org)", true},
-			{"ASCII2D", "[Click here desu~](https://saucenao.com)", true},
-			{"SauceNAO", "[Click here desu~](https://ascii2d.net)", true}},
+			{"ASCII2D", "[Click here desu~](https://ascii2d.net)", true},
+			{"SauceNAO", "[Click here desu~](https://saucenao.com)", true}},
 		Timestamp: utils.EmbedTimestamp(),
 		Thumbnail: &discordgo.MessageEmbedThumbnail{URL: utils.DefaultEmbedImage},
 		Color:     utils.EmbedColor,
