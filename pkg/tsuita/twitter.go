@@ -26,7 +26,9 @@ func init() {
 }
 
 type Tweet struct {
-	Author    string
+	FullName  string
+	Username  string
+	Snowflake string
 	URL       string
 	Content   string
 	Timestamp string
@@ -43,7 +45,7 @@ type TwitterMedia struct {
 
 func GetTweet(uri string) (*Tweet, error) {
 	var (
-		res   = &Tweet{URL: uri, Gallery: make([]TwitterMedia, 0)}
+		res   = &Tweet{Gallery: make([]TwitterMedia, 0)}
 		match = TwitterRegex.FindStringSubmatch(uri)
 	)
 
@@ -51,13 +53,14 @@ func GetTweet(uri string) (*Tweet, error) {
 		return nil, errors.New("invalid twitter url")
 	}
 
-	if cache, ok := twitterCache.Get(match[1]); ok {
-		logrus.Infof("Found a cached tweet. Snowflake: %v", uri)
+	res.Snowflake = match[1]
+	if cache, ok := twitterCache.Get(res.Snowflake); ok {
+		logrus.Infof("Found a cached tweet. Snowflake: %v", res.Snowflake)
 		return cache.(*Tweet), nil
 	}
 
-	logrus.Infof("Fetching a tweet by URL: %v", uri)
-	nitter := fmt.Sprintf("https://nitter.net/i/status/%v", match[1])
+	logrus.Infof("Fetching a tweet. Snowflake: %v", res.Snowflake)
+	nitter := fmt.Sprintf("https://nitter.net/i/status/%v", res.Snowflake)
 	c := colly.NewCollector()
 
 	c.OnHTML(".main-tweet .still-image", func(e *colly.HTMLElement) {
@@ -109,7 +112,11 @@ func GetTweet(uri string) (*Tweet, error) {
 	})
 
 	c.OnHTML(".main-tweet .fullname", func(e *colly.HTMLElement) {
-		res.Author = e.Text
+		res.FullName = e.Text
+	})
+
+	c.OnHTML(".main-tweet .username", func(e *colly.HTMLElement) {
+		res.Username = e.Text
 	})
 
 	err := c.Visit(nitter)
@@ -123,5 +130,6 @@ func GetTweet(uri string) (*Tweet, error) {
 	logrus.Infof("Fetched a tweet successfully. URL: %v. Images: %v", res.URL, len(res.Gallery))
 	twitterCache.Set(match[1], res)
 
+	res.URL = fmt.Sprintf("https://twitter.com/%v/status/%v", strings.TrimLeft(res.Username, "@"), res.Snowflake)
 	return res, nil
 }

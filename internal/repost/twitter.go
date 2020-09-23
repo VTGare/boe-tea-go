@@ -39,6 +39,10 @@ func (a *ArtPost) SendTwitter(s *discordgo.Session, skipFirst bool) ([][]*discor
 	if len(t) > 0 {
 		for _, m := range t {
 			embeds, err := a.tweetToEmbeds(m, skipFirst)
+			if a.Crosspost {
+				embeds[0].Content = fmt.Sprintf("<%v>", m.URL)
+			}
+
 			if err != nil {
 				return nil, err
 			}
@@ -111,9 +115,9 @@ func (a *ArtPost) tweetToEmbeds(tweet *tsuita.Tweet, skipFirst bool) ([]*discord
 
 		title := ""
 		if len(tweet.Gallery) > 1 {
-			title = fmt.Sprintf("%v's tweet | Page %v/%v", tweet.Author, ind+1, len(tweet.Gallery))
+			title = fmt.Sprintf("%v (%v) | Page %v/%v", tweet.FullName, tweet.Username, ind+1, len(tweet.Gallery))
 		} else {
-			title = fmt.Sprintf("%v's tweet", tweet.Author)
+			title = fmt.Sprintf("%v (%v)", tweet.FullName, tweet.Username)
 		}
 
 		embed := discordgo.MessageEmbed{
@@ -123,13 +127,13 @@ func (a *ArtPost) tweetToEmbeds(tweet *tsuita.Tweet, skipFirst bool) ([]*discord
 			Color:     utils.EmbedColor,
 			Fields: []*discordgo.MessageEmbedField{
 				{
-					Name:   "Likes",
-					Value:  strconv.Itoa(tweet.Likes),
+					Name:   "Retweets",
+					Value:  strconv.Itoa(tweet.Retweets),
 					Inline: true,
 				},
 				{
-					Name:   "Retweets",
-					Value:  strconv.Itoa(tweet.Retweets),
+					Name:   "Likes",
+					Value:  strconv.Itoa(tweet.Likes),
 					Inline: true,
 				},
 			},
