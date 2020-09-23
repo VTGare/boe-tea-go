@@ -605,7 +605,7 @@ func crosspost(s *discordgo.Session, m *discordgo.MessageCreate, args []string) 
 	user.Channels(m.ChannelID)
 
 	post := func(m *discordgo.MessageCreate, crosspost bool) error {
-		art := repost.NewPost(*m, false, args[0])
+		art := repost.NewPost(*m, crosspost, args[0])
 		if art.Len() == 0 {
 			return errors.New("first arguments must be a pixiv or a twitter link")
 		}
