@@ -160,6 +160,7 @@ func GetPixivPost(id string) (*PixivPost, error) {
 	}
 
 	pixivCache.Set(id, post)
+
 	log.Infof("Fetched successfully! ID: %v. Pages: %v", post.ID, post.Pages)
 	return post, nil
 }

@@ -15,15 +15,15 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func (a *ArtPost) fetchPixivPosts() ([]*ugoira.PixivPost, error) {
+func (a *ArtPost) fetchPixivPosts(IDs map[string]bool) ([]*ugoira.PixivPost, error) {
 	var (
 		errChan  = make(chan error)
 		postChan = make(chan *ugoira.PixivPost, len(a.PixivMatches))
 		wg       sync.WaitGroup
 	)
 
-	wg.Add(len(a.PixivMatches))
-	for id := range a.PixivMatches {
+	wg.Add(len(IDs))
+	for id := range IDs {
 		go func(id string) {
 			defer wg.Done()
 			px, err := ugoira.GetPixivPost(id)
@@ -69,33 +69,41 @@ func isNSFW(posts []*ugoira.PixivPost) bool {
 	return false
 }
 
-func (a *ArtPost) SendPixiv(s *discordgo.Session, opts ...SendPixivOptions) ([]*discordgo.MessageSend, error) {
+func (a *ArtPost) SendPixiv(s *discordgo.Session, IDs map[string]bool, opts ...SendPixivOptions) ([]*discordgo.MessageSend, []*ugoira.PixivPost, error) {
 	var (
-		guild    = database.GuildCache[a.event.GuildID]
-		indexMap = make(map[int]bool)
-		include  bool
-
-		err error
+		guild      = database.GuildCache[a.event.GuildID]
+		indexMap   = make(map[int]bool)
+		include    bool
+		skipUgoira bool
+		err        error
 	)
+
 	if len(opts) != 0 {
 		if opts[0].IndexMap != nil {
 			indexMap = opts[0].IndexMap
 			include = opts[0].Include
 		}
+		skipUgoira = opts[0].SkipUgoira
 	}
 
-	a.posts, err = a.fetchPixivPosts()
+	posts, err := a.fetchPixivPosts(IDs)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
+	}
+
+	if len(opts) != 0 {
+		if opts[0].SkipUgoira {
+
+		}
 	}
 
 	for excl := range indexMap {
-		if excl < 0 || excl > countPages(a.posts) {
+		if excl < 0 || excl > countPages(posts) {
 			delete(indexMap, excl)
 		}
 	}
 
-	if isNSFW(a.posts) {
+	if isNSFW(posts) {
 		if !guild.NSFW {
 			s.ChannelMessageSendEmbed(a.event.ChannelID, &discordgo.MessageEmbed{
 				Title:     "❎ Pixiv post has not been reposted.",
@@ -105,15 +113,15 @@ func (a *ArtPost) SendPixiv(s *discordgo.Session, opts ...SendPixivOptions) ([]*
 				Fields:    []*discordgo.MessageEmbedField{{"Reason", "An NSFW post has been detected. The server prohibits NSFW content.", false}},
 			})
 
-			return nil, nil
+			return nil, nil, nil
 		}
 		ch, err := s.Channel(a.event.ChannelID)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		if !ch.NSFW {
-			prompt := utils.CreatePrompt(s, &a.event, &utils.PromptOptions{
+			prompt := utils.CreatePrompt(s, a.event, &utils.PromptOptions{
 				Actions: map[string]bool{
 					"👌": true,
 				},
@@ -121,12 +129,12 @@ func (a *ArtPost) SendPixiv(s *discordgo.Session, opts ...SendPixivOptions) ([]*
 				Timeout: 15 * time.Second,
 			})
 			if !prompt {
-				return nil, nil
+				return nil, nil, nil
 			}
 		}
 	}
 
-	return createPixivEmbeds(a, indexMap, include, guild), nil
+	return createPixivEmbeds(a, posts, indexMap, include, skipUgoira, guild), posts, nil
 }
 
 func joinTags(elems []string, sep string) string {
@@ -151,7 +159,7 @@ func joinTags(elems []string, sep string) string {
 	return b.String()
 }
 
-func createPixivEmbeds(a *ArtPost, indexMap map[int]bool, include bool, guild *database.GuildSettings) []*discordgo.MessageSend {
+func createPixivEmbeds(a *ArtPost, posts []*ugoira.PixivPost, indexMap map[int]bool, include, skipUgoira bool, guild *database.GuildSettings) []*discordgo.MessageSend {
 	var (
 		easterEgg    *embedMessage
 		createdCount = 0
@@ -165,8 +173,8 @@ func createPixivEmbeds(a *ArtPost, indexMap map[int]bool, include bool, guild *d
 		easterEgg = embedMessages[rand.Intn(len(embedMessages))]
 	}
 
-	count := countPages(a.posts) - len(indexMap)
-	for _, post := range a.posts {
+	count := countPages(posts) - len(indexMap)
+	for _, post := range posts {
 		if createdCount == guild.Limit {
 			break
 		}
@@ -178,7 +186,7 @@ func createPixivEmbeds(a *ArtPost, indexMap map[int]bool, include bool, guild *d
 			createdCount++
 
 			var ms *discordgo.MessageSend
-			if post.Type == "ugoira" {
+			if post.Type == "ugoira" && !skipUgoira {
 				err := post.DownloadUgoira()
 				if err != nil {
 					logrus.Warnln(err)
@@ -202,7 +210,7 @@ func createPixivEmbeds(a *ArtPost, indexMap map[int]bool, include bool, guild *d
 		messages[0].Content = fmt.Sprintf("```Album size (%v) is larger than limit set on this server (%v), only first image of every post is reposted.```", count, guild.Limit)
 	}
 
-	if a.Crosspost {
+	if a.IsCrosspost {
 		for _, m := range messages {
 			if strings.Contains(m.Embed.Title, "Page 1") || !strings.Contains(m.Embed.Title, "Page") {
 				m.Content = fmt.Sprintf("<%v>", m.Embed.URL)

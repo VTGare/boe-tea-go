@@ -16,12 +16,12 @@ var (
 	twitterLogo = "https://abs.twimg.com/icons/apple-touch-icon-192x192.png"
 )
 
-func (a *ArtPost) SendTwitter(s *discordgo.Session, skipFirst bool) ([][]*discordgo.MessageSend, error) {
+func (a *ArtPost) SendTwitter(s *discordgo.Session, tweetMap map[string]bool, skipFirst bool) ([][]*discordgo.MessageSend, error) {
 	var (
 		tweets = make([][]*discordgo.MessageSend, 0)
 	)
 
-	t, err := a.fetchTwitterPosts()
+	t, err := a.fetchTwitterPosts(tweetMap)
 	if err != nil {
 		return nil, err
 	}
@@ -39,28 +39,30 @@ func (a *ArtPost) SendTwitter(s *discordgo.Session, skipFirst bool) ([][]*discor
 	if len(t) > 0 {
 		for _, m := range t {
 			embeds, err := a.tweetToEmbeds(m, skipFirst)
-			if a.Crosspost {
-				embeds[0].Content = fmt.Sprintf("<%v>", m.URL)
-			}
+			if len(embeds) > 0 {
+				if a.IsCrosspost {
+					embeds[0].Content = fmt.Sprintf("<%v>", m.URL)
+				}
 
-			if err != nil {
-				return nil, err
+				if err != nil {
+					return nil, err
+				}
+				tweets = append(tweets, embeds)
 			}
-			tweets = append(tweets, embeds)
 		}
 	}
 	return tweets, nil
 }
 
-func (a *ArtPost) fetchTwitterPosts() ([]*tsuita.Tweet, error) {
+func (a *ArtPost) fetchTwitterPosts(tweets map[string]bool) ([]*tsuita.Tweet, error) {
 	var (
-		tweetChan = make(chan *tsuita.Tweet, len(a.TwitterMatches))
+		tweetChan = make(chan *tsuita.Tweet, len(tweets))
 		errChan   = make(chan error)
 		wg        = &sync.WaitGroup{}
 	)
 
-	wg.Add(len(a.TwitterMatches))
-	for t := range a.TwitterMatches {
+	wg.Add(len(tweets))
+	for t := range tweets {
 		go func(t string) {
 			defer wg.Done()
 			tweet, err := tsuita.GetTweet(fmt.Sprintf("https://twitter.com/i/web/status/%v", t))
@@ -167,7 +169,7 @@ func (a *ArtPost) tweetToEmbeds(tweet *tsuita.Tweet, skipFirst bool) ([]*discord
 		}
 		msg.Embed = &embed
 
-		if a.Crosspost {
+		if a.IsCrosspost {
 			msg.Embed.Author = &discordgo.MessageEmbedAuthor{Name: fmt.Sprintf("Crosspost requested by %v", a.event.Author.String()), IconURL: a.event.Author.AvatarURL("")}
 		}
 		messages = append(messages, msg)

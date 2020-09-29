@@ -3,7 +3,6 @@ package repost
 import (
 	"fmt"
 	"os"
-	"strings"
 	"sync"
 	"time"
 
@@ -31,13 +30,13 @@ var (
 		{"bt!nh 271920, don't thank me.", true},
 		{"This embed was sponsored by Asacoco.", false},
 		{"bt!borgar 🦎🍔", false},
-		{"Love. From Shamiko-chan", false},
-		{"Use bt!twitter to embed a Twitter post", false},
+		{"\"Love\" © Shamiko-chan", false},
+		{"Use bt!twitter to embed a Twitter post.", false},
 		{"Ramiel best waifu.", false},
-		{"I love Amelia", false},
-		{"I'm horni", true},
-		{"Not sure what image you posted, but you go to horny jail", true},
-		{"DM creator of this bot lolis", true},
+		{"I love Amelia.", false},
+		{"I'm horni.", true},
+		{"Not sure what image you posted, but you go to horny jail.", true},
+		{"I swear she's legal, she said she's 600 years old.", true},
 		{"Wrapping a link in <> prevents Discord from embedding it", false},
 		{"Who's Rem", false},
 		{"Every 60 seconds, a minute passes in Africa.", false},
@@ -64,17 +63,15 @@ func init() {
 type ArtPost struct {
 	TwitterMatches map[string]bool
 	PixivMatches   map[string]bool
-	Reposts        []*database.ImagePost
 	HasUgoira      bool
-	Crosspost      bool
-	event          discordgo.MessageCreate
-	posts          []*ugoira.PixivPost
+	IsCrosspost    bool
+	event          *discordgo.MessageCreate
 }
 
 type SendPixivOptions struct {
-	SkipPrompt bool
 	IndexMap   map[int]bool
 	Include    bool
+	SkipUgoira bool
 }
 
 type embedMessage struct {
@@ -82,10 +79,10 @@ type embedMessage struct {
 	NSFW    bool
 }
 
-func (a *ArtPost) PixivReposts() int {
+func (a *ArtPost) PixivReposts(reposts []*database.ImagePost) int {
 	count := 0
-	for _, rep := range a.Reposts {
-		if !strings.Contains(rep.Content, "twitter") {
+	for _, rep := range reposts {
+		if len(rep.Content) <= 8 {
 			count++
 		}
 	}
@@ -102,17 +99,19 @@ func (a *ArtPost) PixivArray() []string {
 	return arr
 }
 
-func (a *ArtPost) RepostEmbed() *discordgo.MessageEmbed {
+func (a *ArtPost) RepostEmbed(reposts []*database.ImagePost) *discordgo.MessageEmbed {
 	embed := &discordgo.MessageEmbed{
-		Title: "General Reposti!",
+		Title:       "General Reposti!",
+		Description: "***Reminder:*** you can look up if things you post have already been posted using Discord's search feature.\nBoe Tea recommeds to check reposts by post's unique identifier (picrelated)",
 		Thumbnail: &discordgo.MessageEmbedThumbnail{
 			URL: utils.DefaultEmbedImage,
 		},
+		Image:     &discordgo.MessageEmbedImage{URL: "https://i.imgur.com/mEjZ9LO.gif"},
 		Timestamp: utils.EmbedTimestamp(),
 		Color:     utils.EmbedColor,
 	}
 
-	for _, rep := range a.Reposts {
+	for _, rep := range reposts {
 		dur := rep.CreatedAt.Add(86400 * time.Second).Sub(time.Now())
 		content := &discordgo.MessageEmbedField{
 			Name:   "Content",
@@ -135,7 +134,7 @@ func (a *ArtPost) RepostEmbed() *discordgo.MessageEmbed {
 	return embed
 }
 
-func (a *ArtPost) FindReposts() {
+func (a *ArtPost) FindReposts(guildID, channelID string) []*database.ImagePost {
 	var (
 		wg      sync.WaitGroup
 		matches = make([]string, 0)
@@ -154,11 +153,11 @@ func (a *ArtPost) FindReposts() {
 	for _, match := range matches {
 		go func(match string) {
 			defer wg.Done()
-			rep, _ := database.DB.IsRepost(a.event.ChannelID, match)
+			rep, _ := database.DB.IsRepost(channelID, match)
 			if rep.Content != "" {
 				resChan <- rep
 			} else {
-				database.DB.NewRepostDetection(a.event.Author.Username, a.event.GuildID, a.event.ChannelID, a.event.ID, match)
+				database.DB.NewRepostDetection(a.event.Author.Username, guildID, channelID, a.event.ID, match)
 			}
 		}(match)
 	}
@@ -168,9 +167,12 @@ func (a *ArtPost) FindReposts() {
 		close(resChan)
 	}()
 
+	reposts := make([]*database.ImagePost, 0)
 	for r := range resChan {
-		a.Reposts = append(a.Reposts, r)
+		reposts = append(reposts, r)
 	}
+
+	return reposts
 }
 
 //Len returns a total lenght of Pixiv and Twitter matches
@@ -179,16 +181,28 @@ func (a *ArtPost) Len() int {
 }
 
 //RemoveReposts removes all reposts from Pixiv and Twitter matches
-func (a *ArtPost) RemoveReposts() {
-	for _, r := range a.Reposts {
-		delete(a.PixivMatches, r.Content)
-		delete(a.TwitterMatches, r.Content)
+func (a *ArtPost) RemoveReposts(reposts []*database.ImagePost) (pixiv, twitter map[string]bool) {
+	pixiv = make(map[string]bool)
+	twitter = make(map[string]bool)
+	for k, v := range a.PixivMatches {
+		pixiv[k] = v
 	}
+
+	for k, v := range a.TwitterMatches {
+		twitter[k] = v
+	}
+
+	for _, r := range reposts {
+		delete(pixiv, r.Content)
+		delete(twitter, r.Content)
+	}
+
+	return
 }
 
 //Cleanup removes Ugoira files if any
-func (a *ArtPost) Cleanup() {
-	for _, p := range a.posts {
+func (a *ArtPost) Cleanup(posts []*ugoira.PixivPost) {
+	for _, p := range posts {
 		if p.Ugoira != nil && p.Ugoira.File != nil {
 			logrus.Infoln("Removing Ugoira file.")
 			p.Ugoira.File.Close()
@@ -197,8 +211,192 @@ func (a *ArtPost) Cleanup() {
 	}
 }
 
+func (a *ArtPost) Post(s *discordgo.Session, pixivOpts ...SendPixivOptions) error {
+	var (
+		m       = a.event
+		pixiv   = make(map[string]bool)
+		twitter = make(map[string]bool)
+	)
+
+	guild := database.GuildCache[m.GuildID]
+	for k, v := range a.PixivMatches {
+		pixiv[k] = v
+	}
+	for k, v := range a.TwitterMatches {
+		twitter[k] = v
+	}
+
+	if guild.Repost != "disabled" {
+		reposts := a.FindReposts(m.GuildID, m.ChannelID)
+		if len(reposts) > 0 {
+			if guild.Repost == "strict" {
+				pixiv, twitter = a.RemoveReposts(reposts)
+
+				s.ChannelMessageSendEmbed(m.ChannelID, a.RepostEmbed(reposts))
+				perm, err := utils.MemberHasPermission(s, m.GuildID, s.State.User.ID, 8|8192)
+				if err != nil {
+					return err
+				}
+
+				if !perm {
+					s.ChannelMessageSend(m.ChannelID, "Please enable Manage Messages permission to remove reposts with strict mode on, otherwise strict mode is useless.")
+				} else if a.Len() == 0 {
+					s.ChannelMessageDelete(m.ChannelID, m.ID)
+				}
+			} else if guild.Repost == "enabled" {
+				if a.PixivReposts(reposts) > 0 && guild.Pixiv {
+					prompt := utils.CreatePromptWithMessage(s, m, &discordgo.MessageSend{
+						Content: "Following posts are reposts, react 👌 to post them.",
+						Embed:   a.RepostEmbed(reposts),
+					})
+					if !prompt {
+						return nil
+					}
+				} else {
+					s.ChannelMessageSendEmbed(m.ChannelID, a.RepostEmbed(reposts))
+				}
+			}
+		}
+	}
+
+	var posts []*ugoira.PixivPost
+	if guild.Pixiv && len(pixiv) > 0 {
+		var (
+			messages []*discordgo.MessageSend
+			err      error
+		)
+
+		messages, posts, err = a.SendPixiv(s, pixiv, pixivOpts...)
+		if err != nil {
+			return err
+		}
+
+		for _, message := range messages {
+			s.ChannelMessageSendComplex(m.ChannelID, message)
+		}
+	}
+
+	if guild.Twitter && len(twitter) > 0 {
+		tweets, err := a.SendTwitter(s, twitter, true)
+		if err != nil {
+			return err
+		}
+
+		if len(tweets) > 0 {
+			msg := ""
+			if len(tweets) == 1 {
+				msg = "Detected a tweet with more than one image, would you like to send embeds of other images for mobile users?"
+			} else {
+				msg = "Detected tweets with more than one image, would you like to send embeds of other images for mobile users?"
+			}
+
+			prompt := true
+			prompt = utils.CreatePrompt(s, m, &utils.PromptOptions{
+				Actions: map[string]bool{
+					"👌": true,
+				},
+				Message: msg,
+				Timeout: 10 * time.Second,
+			})
+
+			if prompt {
+				for _, t := range tweets {
+					for _, send := range t {
+						_, err := s.ChannelMessageSendComplex(m.ChannelID, send)
+						if err != nil {
+							logrus.Warnln(err)
+						}
+					}
+				}
+			}
+		}
+	}
+
+	if a.HasUgoira {
+		a.Cleanup(posts)
+	}
+
+	return nil
+}
+
+func (a *ArtPost) Crosspost(s *discordgo.Session, channels []string, pixivOpts ...SendPixivOptions) error {
+	var (
+		m       = a.event
+		pixiv   = make(map[string]bool)
+		twitter = make(map[string]bool)
+	)
+	a.IsCrosspost = true
+
+	for _, id := range channels {
+		ch, err := s.State.Channel(id)
+		if err != nil {
+			logrus.Warnf("prefixless(): %v", err)
+			continue
+		}
+
+		m.ChannelID = id
+		m.GuildID = ch.GuildID
+		for k, v := range a.PixivMatches {
+			pixiv[k] = v
+		}
+		for k, v := range a.TwitterMatches {
+			twitter[k] = v
+		}
+
+		guild := database.GuildCache[m.GuildID]
+		if guild.Repost != "disabled" {
+			reposts := a.FindReposts(m.GuildID, m.ChannelID)
+			pixiv, twitter = a.RemoveReposts(reposts)
+		}
+
+		if len(pixiv) > 0 {
+			var (
+				messages []*discordgo.MessageSend
+				err      error
+			)
+
+			if len(pixivOpts) > 0 {
+				pixivOpts[0].SkipUgoira = true
+				messages, _, err = a.SendPixiv(s, pixiv, pixivOpts[0])
+			} else {
+				messages, _, err = a.SendPixiv(s, pixiv, SendPixivOptions{
+					SkipUgoira: true,
+				})
+			}
+
+			if err != nil {
+				return err
+			}
+
+			for _, message := range messages {
+				s.ChannelMessageSendComplex(m.ChannelID, message)
+			}
+		}
+
+		if len(twitter) > 0 {
+			tweets, err := a.SendTwitter(s, twitter, false)
+			if err != nil {
+				return err
+			}
+
+			if len(tweets) > 0 {
+				for _, t := range tweets {
+					for _, send := range t {
+						_, err := s.ChannelMessageSendComplex(m.ChannelID, send)
+						if err != nil {
+							logrus.Warnln(err)
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
 //NewPost creates an ArtPost from discordgo message create event.
-func NewPost(m discordgo.MessageCreate, crosspost bool, content ...string) *ArtPost {
+func NewPost(m *discordgo.MessageCreate, content ...string) *ArtPost {
 	var (
 		twitter = make(map[string]bool)
 		IDs     = make(map[string]bool)
@@ -221,7 +419,6 @@ func NewPost(m discordgo.MessageCreate, crosspost bool, content ...string) *ArtP
 
 	return &ArtPost{
 		event:          m,
-		Crosspost:      crosspost,
 		TwitterMatches: twitter,
 		PixivMatches:   IDs,
 	}

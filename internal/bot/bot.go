@@ -5,7 +5,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/VTGare/boe-tea-go/internal/commands"
 	"github.com/VTGare/boe-tea-go/internal/database"
@@ -78,135 +77,23 @@ func handleError(s *discordgo.Session, m *discordgo.MessageCreate, err error) {
 	}
 }
 
-func (b *Bot) prefixless(s *discordgo.Session, m *discordgo.MessageCreate, crosspost bool) error {
-	guild := database.GuildCache[m.GuildID]
-	if !guild.Crosspost && crosspost {
-		return nil
+func (b *Bot) prefixless(s *discordgo.Session, m *discordgo.MessageCreate) error {
+	var (
+		art = repost.NewPost(m)
+	)
+
+	err := art.Post(s)
+	if err != nil {
+		return err
 	}
 
-	art := repost.NewPost(*m, crosspost)
-
-	if guild.Repost != "disabled" {
-		art.FindReposts()
-		if len(art.Reposts) > 0 {
-			if guild.Repost == "strict" {
-				art.RemoveReposts()
-				if crosspost {
-					log.Infoln("found a repost while crossposting")
-				}
-
-				if !crosspost {
-					s.ChannelMessageSendEmbed(m.ChannelID, art.RepostEmbed())
-					perm, err := utils.MemberHasPermission(s, m.GuildID, s.State.User.ID, 8|8192)
-					if err != nil {
-						return err
-					}
-
-					if !perm {
-						s.ChannelMessageSend(m.ChannelID, "Please enable Manage Messages permission to remove reposts with strict mode on, otherwise strict mode is useless.")
-					} else if art.Len() == 0 {
-						s.ChannelMessageDelete(m.ChannelID, m.ID)
-					}
-				}
-			} else if guild.Repost == "enabled" && !crosspost {
-				if art.PixivReposts() > 0 && guild.Pixiv {
-					prompt := utils.CreatePromptWithMessage(s, m, &discordgo.MessageSend{
-						Content: "Following posts are reposts, react 👌 to post them.",
-						Embed:   art.RepostEmbed(),
-					})
-					if !prompt {
-						return nil
-					}
-				} else {
-					s.ChannelMessageSendEmbed(m.ChannelID, art.RepostEmbed())
-				}
-			}
-		}
-	}
-
-	if guild.Pixiv && len(art.PixivMatches) > 0 {
-		messages, err := art.SendPixiv(s)
+	if user := database.DB.FindUser(m.Author.ID); user != nil {
+		channels := user.Channels(m.ChannelID)
+		err := art.Crosspost(s, channels)
 		if err != nil {
 			return err
 		}
-
-		embeds := make([]*discordgo.Message, 0)
-		keys := make([]string, 0)
-		keys = append(keys, m.Message.ID)
-
-		for _, message := range messages {
-			embed, _ := s.ChannelMessageSendComplex(m.ChannelID, message)
-
-			if embed != nil {
-				keys = append(keys, embed.ID)
-				embeds = append(embeds, embed)
-			}
-		}
-
-		if art.HasUgoira {
-			art.Cleanup()
-		}
-
-		c := &utils.CachedMessage{m.Message, embeds}
-		for _, key := range keys {
-			utils.MessageCache.Set(key, c)
-		}
 	}
-
-	if (guild.Twitter || crosspost) && len(art.TwitterMatches) > 0 {
-		tweets, err := art.SendTwitter(s, !crosspost)
-		if err != nil {
-			return err
-		}
-
-		if len(tweets) > 0 {
-			msg := ""
-			if len(tweets) == 1 {
-				msg = "Detected a tweet with more than one image, would you like to send embeds of other images for mobile users?"
-			} else {
-				msg = "Detected tweets with more than one image, would you like to send embeds of other images for mobile users?"
-			}
-
-			prompt := true
-			if !crosspost {
-				prompt = utils.CreatePrompt(s, m, &utils.PromptOptions{
-					Actions: map[string]bool{
-						"👌": true,
-					},
-					Message: msg,
-					Timeout: 10 * time.Second,
-				})
-			}
-
-			if prompt {
-				var (
-					embeds = make([]*discordgo.Message, 0)
-					keys   = make([]string, 0)
-				)
-				keys = append(keys, m.Message.ID)
-
-				for _, t := range tweets {
-					for _, send := range t {
-						embed, err := s.ChannelMessageSendComplex(m.ChannelID, send)
-						if err != nil {
-							log.Warnln(err)
-						}
-
-						if embed != nil {
-							keys = append(keys, embed.ID)
-							embeds = append(embeds, embed)
-						}
-					}
-				}
-
-				c := &utils.CachedMessage{m.Message, embeds}
-				for _, key := range keys {
-					utils.MessageCache.Set(key, c)
-				}
-			}
-		}
-	}
-
 	return nil
 }
 
@@ -217,30 +104,13 @@ func (b *Bot) messageCreated(s *discordgo.Session, m *discordgo.MessageCreate) {
 
 	isCommand := commands.Router.Handle(s, m)
 	if !isCommand && m.GuildID != "" {
-		err := b.prefixless(s, m, false)
-		user := database.DB.FindUser(m.Author.ID)
-
-		if user != nil {
-			channels := user.Channels(m.ChannelID)
-			for _, id := range channels {
-				ch, err := s.State.Channel(id)
-				if err != nil {
-					log.Warnf("prefixless(): %v", err)
-					return
-				}
-
-				m.ChannelID = id
-				m.GuildID = ch.GuildID
-				b.prefixless(s, m, true)
-			}
-		}
-
+		err := b.prefixless(s, m)
 		commands.Router.ErrorHandler(err)
 	}
 }
 
 func (b *Bot) reactCreated(s *discordgo.Session, r *discordgo.MessageReactionAdd) {
-	if utils.MessageCache.Count() > 0 && r.Emoji.APIName() == "❌" {
+	/*if utils.MessageCache.Count() > 0 && r.Emoji.APIName() == "❌" {
 		if m, ok := utils.MessageCache.Get(r.MessageID); ok {
 			c := m.(*utils.CachedMessage)
 			if r.UserID == c.Parent.Author.ID {
@@ -257,31 +127,11 @@ func (b *Bot) reactCreated(s *discordgo.Session, r *discordgo.MessageReactionAdd
 				}
 			}
 		}
-	}
+	}*/
 }
 
 func (b *Bot) messageDeleted(s *discordgo.Session, m *discordgo.MessageDelete) {
-	if utils.MessageCache.Count() > 0 {
-		if mes, ok := utils.MessageCache.Get(m.ID); ok {
-			c := mes.(*utils.CachedMessage)
-			if c.Parent.ID == m.ID {
-				s.ChannelMessageDelete(c.Parent.ChannelID, c.Parent.ID)
-				utils.MessageCache.Remove(c.Parent.ID)
-				for _, child := range c.Children {
-					s.ChannelMessageDelete(child.ChannelID, child.ID)
-					utils.MessageCache.Remove(child.ID)
-				}
-			} else {
-				for ind, child := range c.Children {
-					if child.ID == m.ID {
-						utils.MessageCache.Remove(child.ID)
-						c.Children = append(c.Children[:ind], c.Children[ind+1:]...)
-						break
-					}
-				}
-			}
-		}
-	}
+
 }
 
 func (b *Bot) guildCreated(s *discordgo.Session, g *discordgo.GuildCreate) {

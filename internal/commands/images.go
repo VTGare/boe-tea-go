@@ -415,82 +415,44 @@ func exclude(s *discordgo.Session, m *discordgo.MessageCreate, args []string) er
 		indexes = args[1:]
 	)
 
-	post := func(m *discordgo.MessageCreate, crosspost bool) error {
-		rep := repost.NewPost(*m, crosspost, url)
-		if rep.Len() == 0 {
-			return errors.New("first arguments must be a pixiv link")
-		}
-
-		guild := database.GuildCache[m.GuildID]
-		if guild.Repost == "strict" {
-			rep.FindReposts()
-			if len(rep.Reposts) != 0 {
-				_, err := s.ChannelMessageSendEmbed(m.ChannelID, rep.RepostEmbed())
-				if err != nil {
-					log.Warnln(err)
-				}
-				return nil
-			}
-		}
-
-		indexMap := make(map[int]bool)
-		for _, arg := range indexes {
-			if strings.Contains(arg, "-") {
-				ran, err := utils.NewRange(arg)
-				if err != nil {
-					return err
-				}
-
-				for i := ran.Low; i <= ran.High; i++ {
-					indexMap[i] = true
-				}
-			} else {
-				num, err := strconv.Atoi(arg)
-				if err != nil {
-					return utils.ErrParsingArgument
-				}
-				indexMap[num] = true
-			}
-		}
-
-		messages, err := rep.SendPixiv(s, repost.SendPixivOptions{
-			IndexMap: indexMap,
-		})
-		if err != nil {
-			return err
-		}
-
-		for _, mes := range messages {
-			s.ChannelMessageSendComplex(m.ChannelID, mes)
-		}
-
-		if rep.HasUgoira {
-			rep.Cleanup()
-		}
-
-		return nil
+	art := repost.NewPost(m, url)
+	if art.Len() == 0 {
+		return errors.New("First argument **must** be a Pixiv link.")
 	}
 
-	err := post(m, false)
+	indexMap := make(map[int]bool)
+	for _, arg := range indexes {
+		if strings.Contains(arg, "-") {
+			ran, err := utils.NewRange(arg)
+			if err != nil {
+				return err
+			}
+
+			for i := ran.Low; i <= ran.High; i++ {
+				indexMap[i] = true
+			}
+		} else {
+			num, err := strconv.Atoi(arg)
+			if err != nil {
+				return utils.ErrParsingArgument
+			}
+			indexMap[num] = true
+		}
+	}
+
+	opts := repost.SendPixivOptions{
+		IndexMap: indexMap,
+	}
+	err := art.Post(s, opts)
 	if err != nil {
 		return err
 	}
 
 	if user := database.DB.FindUser(m.Author.ID); user != nil {
 		channels := user.Channels(m.ChannelID)
-		for _, ch := range channels {
-			c, err := s.State.Channel(ch)
-			if err != nil {
-				log.Warnln(err)
-				continue
-			}
-			m.ChannelID = ch
-			m.GuildID = c.GuildID
-
-			err = post(m, true)
-			if err != nil {
-				log.Warnln(err)
-			}
+		err := art.Crosspost(s, channels, opts)
+		if err != nil {
+			return err
 		}
 	}
 
@@ -507,85 +469,45 @@ func include(s *discordgo.Session, m *discordgo.MessageCreate, args []string) er
 		indexes = args[1:]
 	)
 
-	post := func(m *discordgo.MessageCreate, crosspost bool) error {
-		rep := repost.NewPost(*m, crosspost, url)
-		if rep.Len() == 0 {
-			return errors.New("first argument must be a pixiv link")
-		}
-
-		guild := database.GuildCache[m.GuildID]
-		if guild.Repost == "strict" {
-			rep.FindReposts()
-			if len(rep.Reposts) != 0 {
-				_, err := s.ChannelMessageSendEmbed(m.ChannelID, rep.RepostEmbed())
-				if err != nil {
-					log.Warnln(err)
-				}
-				return nil
-			}
-		}
-
-		indexMap := make(map[int]bool)
-		for _, arg := range indexes {
-			if strings.Contains(arg, "-") {
-				ran, err := utils.NewRange(arg)
-				if err != nil {
-					return err
-				}
-
-				for i := ran.Low; i <= ran.High; i++ {
-					indexMap[i] = true
-				}
-			} else {
-				num, err := strconv.Atoi(arg)
-				if err != nil {
-					return utils.ErrParsingArgument
-				}
-				indexMap[num] = true
-			}
-		}
-
-		messages, err := rep.SendPixiv(s, repost.SendPixivOptions{
-			IndexMap: indexMap,
-			Include:  true,
-		})
-		if err != nil {
-			return err
-		}
-
-		for _, mes := range messages {
-			s.ChannelMessageSendComplex(m.ChannelID, mes)
-		}
-
-		if rep.HasUgoira {
-			rep.Cleanup()
-		}
-
-		return nil
+	art := repost.NewPost(m, url)
+	if art.Len() == 0 {
+		return errors.New("First argument **must** be a Pixiv link.")
 	}
 
-	err := post(m, false)
+	indexMap := make(map[int]bool)
+	for _, arg := range indexes {
+		if strings.Contains(arg, "-") {
+			ran, err := utils.NewRange(arg)
+			if err != nil {
+				return err
+			}
+
+			for i := ran.Low; i <= ran.High; i++ {
+				indexMap[i] = true
+			}
+		} else {
+			num, err := strconv.Atoi(arg)
+			if err != nil {
+				return utils.ErrParsingArgument
+			}
+			indexMap[num] = true
+		}
+	}
+
+	opts := repost.SendPixivOptions{
+		IndexMap: indexMap,
+		Include:  true,
+	}
+	err := art.Post(s, opts)
 	if err != nil {
 		return err
 	}
 
 	if user := database.DB.FindUser(m.Author.ID); user != nil {
 		channels := user.Channels(m.ChannelID)
-		for _, ch := range channels {
-			c, err := s.State.Channel(ch)
-			if err != nil {
-				log.Warnln(err)
-				continue
-			}
-
-			log.Infof("channel name: %v, channel id: %v", c.Name, c.ID)
-			m.ChannelID = c.ID
-			m.GuildID = c.GuildID
-
-			err = post(m, true)
-			if err != nil {
-				log.Warnln(err)
-			}
+		err := art.Crosspost(s, channels, opts)
+		if err != nil {
+			return err
 		}
 	}
 
@@ -594,151 +516,21 @@ func include(s *discordgo.Session, m *discordgo.MessageCreate, args []string) er
 
 func crosspost(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
 	if len(args) < 1 {
-		return fmt.Errorf("bt!exclude requires at least one argument. **Usage:** bt!exclude <pixiv link> [channel IDs]")
+		return fmt.Errorf("bt!crosspost requires at least one argument. **Usage:** bt!crosspost <pixiv link> [channel IDs]")
 	}
 
-	guild := database.GuildCache[m.GuildID]
-	user := database.DB.FindUser(m.Author.ID)
+	var (
+		user = database.DB.FindUser(m.Author.ID)
+		art  = repost.NewPost(m)
+	)
 	if user == nil {
 		return fmt.Errorf("You have no cross-post groups. Please create one using a following command: ``bt!create <group name> <parent id>``")
 	}
-	user.Channels(m.ChannelID)
 
-	post := func(m *discordgo.MessageCreate, crosspost bool) error {
-		art := repost.NewPost(*m, crosspost, args[0])
-		if art.Len() == 0 {
-			return errors.New("first arguments must be a pixiv or a twitter link")
-		}
-
-		if guild.Repost != "disabled" {
-			art.FindReposts()
-			if len(art.Reposts) > 0 {
-				if guild.Repost == "strict" {
-					art.RemoveReposts()
-					if crosspost {
-						log.Infoln("found a repost while crossposting")
-					}
-
-					if !crosspost {
-						s.ChannelMessageSendEmbed(m.ChannelID, art.RepostEmbed())
-						perm, err := utils.MemberHasPermission(s, m.GuildID, s.State.User.ID, 8|8192)
-						if err != nil {
-							return err
-						}
-
-						if !perm {
-							s.ChannelMessageSend(m.ChannelID, "Please enable Manage Messages permission to remove reposts with strict mode on, otherwise strict mode is useless.")
-						} else if art.Len() == 0 {
-							s.ChannelMessageDelete(m.ChannelID, m.ID)
-						}
-					}
-				} else if guild.Repost == "enabled" && !crosspost {
-					if art.PixivReposts() > 0 && guild.Pixiv {
-						prompt := utils.CreatePromptWithMessage(s, m, &discordgo.MessageSend{
-							Content: "Following posts are reposts, react 👌 to post them.",
-							Embed:   art.RepostEmbed(),
-						})
-						if !prompt {
-							return nil
-						}
-					} else {
-						s.ChannelMessageSendEmbed(m.ChannelID, art.RepostEmbed())
-					}
-				}
-			}
-		}
-
-		if guild.Pixiv && len(art.PixivMatches) > 0 {
-			messages, err := art.SendPixiv(s)
-			if err != nil {
-				return err
-			}
-
-			embeds := make([]*discordgo.Message, 0)
-			keys := make([]string, 0)
-			keys = append(keys, m.Message.ID)
-
-			for _, message := range messages {
-				embed, _ := s.ChannelMessageSendComplex(m.ChannelID, message)
-
-				if embed != nil {
-					keys = append(keys, embed.ID)
-					embeds = append(embeds, embed)
-				}
-			}
-
-			if art.HasUgoira {
-				art.Cleanup()
-			}
-
-			c := &utils.CachedMessage{m.Message, embeds}
-			for _, key := range keys {
-				utils.MessageCache.Set(key, c)
-			}
-		}
-
-		if (guild.Twitter || crosspost) && len(art.TwitterMatches) > 0 {
-			tweets, err := art.SendTwitter(s, !crosspost)
-			if err != nil {
-				return err
-			}
-
-			if len(tweets) > 0 {
-				msg := ""
-				if len(tweets) == 1 {
-					msg = "Detected a tweet with more than one image, would you like to send embeds of other images for mobile users?"
-				} else {
-					msg = "Detected tweets with more than one image, would you like to send embeds of other images for mobile users?"
-				}
-
-				prompt := true
-				if !crosspost {
-					prompt = utils.CreatePrompt(s, m, &utils.PromptOptions{
-						Actions: map[string]bool{
-							"👌": true,
-						},
-						Message: msg,
-						Timeout: 10 * time.Second,
-					})
-				}
-
-				if prompt {
-					var (
-						embeds = make([]*discordgo.Message, 0)
-						keys   = make([]string, 0)
-					)
-					keys = append(keys, m.Message.ID)
-
-					for _, t := range tweets {
-						for _, send := range t {
-							embed, err := s.ChannelMessageSendComplex(m.ChannelID, send)
-							if err != nil {
-								log.Warnln(err)
-							}
-
-							if embed != nil {
-								keys = append(keys, embed.ID)
-								embeds = append(embeds, embed)
-							}
-						}
-					}
-
-					c := &utils.CachedMessage{m.Message, embeds}
-					for _, key := range keys {
-						utils.MessageCache.Set(key, c)
-					}
-				}
-			}
-		}
-
-		return nil
-	}
-
-	err := post(m, false)
+	err := art.Post(s)
 	if err != nil {
 		return err
 	}
-
 	if len(args) >= 2 {
 		if args[1] == "all" {
 			return nil
@@ -753,20 +545,9 @@ func crosspost(s *discordgo.Session, m *discordgo.MessageCreate, args []string) 
 			}
 			return true
 		})
-
-		for _, ch := range channels {
-			c, err := s.State.Channel(ch)
-			if err != nil {
-				continue
-			}
-
-			m.ChannelID = c.ID
-			m.GuildID = c.GuildID
-
-			err = post(m, true)
-			if err != nil {
-				return err
-			}
+		err := art.Crosspost(s, channels)
+		if err != nil {
+			return err
 		}
 	}
 
@@ -779,19 +560,19 @@ func twitter(s *discordgo.Session, m *discordgo.MessageCreate, args []string) er
 	}
 
 	guild := database.GuildCache[m.GuildID]
-	a := repost.NewPost(*m, false, args[0])
+	a := repost.NewPost(m, args[0])
 
 	if guild.Repost != "disabled" {
-		a.FindReposts()
-		if len(a.Reposts) > 0 {
+		reposts := a.FindReposts(m.GuildID, m.ChannelID)
+		if len(reposts) > 0 {
 			switch guild.Repost {
 			case "strict":
-				s.ChannelMessageSendEmbed(m.ChannelID, a.RepostEmbed())
+				s.ChannelMessageSendEmbed(m.ChannelID, a.RepostEmbed(reposts))
 				return nil
 			case "enabled":
 				f := utils.CreatePromptWithMessage(s, m, &discordgo.MessageSend{
 					Content: "Tweet you're trying to post is a repost. Are you sure about that?",
-					Embed:   a.RepostEmbed(),
+					Embed:   a.RepostEmbed(reposts),
 				})
 				if !f {
 					return nil
@@ -800,7 +581,7 @@ func twitter(s *discordgo.Session, m *discordgo.MessageCreate, args []string) er
 		}
 	}
 
-	tweets, err := a.SendTwitter(s, false)
+	tweets, err := a.SendTwitter(s, a.TwitterMatches, false)
 	if err != nil {
 		return err
 	}
