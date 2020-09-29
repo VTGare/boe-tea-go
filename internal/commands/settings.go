@@ -22,6 +22,7 @@ func init() {
 	settingMap["nsfw"] = setBool
 	settingMap["pixiv"] = setBool
 	settingMap["twitter"] = setBool
+	settingMap["twitterprompt"] = setBool
 	settingMap["crosspost"] = setBool
 	settingMap["prefix"] = setPrefix
 	settingMap["limit"] = setInt
@@ -45,6 +46,11 @@ func set(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error 
 
 		setting := args[0]
 		newSetting := strings.ToLower(args[1])
+
+		switch setting {
+		case "prompt":
+			setting = "twitterprompt"
+		}
 
 		if new, ok := settingMap[setting]; ok {
 			n, err := new(s, m, newSetting)
@@ -92,16 +98,20 @@ func showGuildSettings(s *discordgo.Session, m *discordgo.MessageCreate, setting
 		Color:       utils.EmbedColor,
 		Fields: []*discordgo.MessageEmbedField{
 			{
-				Name:  "Basic",
+				Name:  "General",
 				Value: fmt.Sprintf("**Prefix:** %v | **NSFW:** %v", settings.Prefix, utils.FormatBool(settings.NSFW)),
 			},
 			{
 				Name:  "Features",
-				Value: fmt.Sprintf("**Pixiv:** %v | **Twitter:** %v | **Repost:** %v | **Crosspost**: %v", utils.FormatBool(settings.Pixiv), utils.FormatBool(settings.Twitter), settings.Repost, utils.FormatBool(settings.Crosspost)),
+				Value: fmt.Sprintf("**Repost:** %v | **Crosspost**: %v", settings.Repost, utils.FormatBool(settings.Crosspost)),
 			},
 			{
 				Name:  "Pixiv settings",
-				Value: fmt.Sprintf("**Limit**: %v", settings.Limit),
+				Value: fmt.Sprintf("**Auto-repost**: %v | **Limit**: %v", utils.FormatBool(settings.Pixiv), settings.Limit),
+			},
+			{
+				Name:  "Twitter settings",
+				Value: fmt.Sprintf("**Auto-repost**: %v | **Prompt**: %v", utils.FormatBool(settings.Twitter), settings.TwitterPrompt),
 			},
 		},
 		Thumbnail: &discordgo.MessageEmbedThumbnail{

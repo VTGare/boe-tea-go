@@ -16,31 +16,33 @@ var (
 
 //GuildSettings is a database model for per guild bot settings
 type GuildSettings struct {
-	ID        string    `bson:"guild_id" json:"guild_id"`
-	Prefix    string    `bson:"prefix" json:"prefix"`
-	Limit     int       `bson:"limit" json:"limit"`
-	Pixiv     bool      `bson:"pixiv" json:"pixiv"`
-	Twitter   bool      `bson:"twitter" json:"twitter"`
-	Crosspost bool      `bson:"crosspost" json:"crosspost"`
-	NSFW      bool      `bson:"nsfw" json:"nsfw"`
-	Repost    string    `bson:"repost" json:"repost"`
-	CreatedAt time.Time `bson:"created_at" json:"created_at"`
-	UpdatedAt time.Time `bson:"updated_at" json:"updated_at"`
+	ID            string    `bson:"guild_id" json:"guild_id"`
+	Prefix        string    `bson:"prefix" json:"prefix"`
+	Limit         int       `bson:"limit" json:"limit"`
+	Pixiv         bool      `bson:"pixiv" json:"pixiv"`
+	Twitter       bool      `bson:"twitter" json:"twitter"`
+	TwitterPrompt bool      `bson:"twitterprompt" json:"twitterprompt"`
+	Crosspost     bool      `bson:"crosspost" json:"crosspost"`
+	NSFW          bool      `bson:"nsfw" json:"nsfw"`
+	Repost        string    `bson:"repost" json:"repost"`
+	CreatedAt     time.Time `bson:"created_at" json:"created_at"`
+	UpdatedAt     time.Time `bson:"updated_at" json:"updated_at"`
 }
 
 //DefaultGuildSettings returns a default GuildSettings struct.
 func DefaultGuildSettings(guildID string) *GuildSettings {
 	return &GuildSettings{
-		ID:        guildID,
-		Prefix:    "bt!",
-		Limit:     10,
-		Pixiv:     true,
-		Twitter:   false,
-		Crosspost: true,
-		NSFW:      true,
-		Repost:    "disabled",
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
+		ID:            guildID,
+		Prefix:        "bt!",
+		Limit:         10,
+		Pixiv:         true,
+		Twitter:       false,
+		TwitterPrompt: false,
+		Crosspost:     true,
+		NSFW:          true,
+		Repost:        "disabled",
+		CreatedAt:     time.Now(),
+		UpdatedAt:     time.Now(),
 	}
 }
 

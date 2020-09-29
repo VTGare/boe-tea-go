@@ -102,11 +102,10 @@ func (a *ArtPost) PixivArray() []string {
 func (a *ArtPost) RepostEmbed(reposts []*database.ImagePost) *discordgo.MessageEmbed {
 	embed := &discordgo.MessageEmbed{
 		Title:       "General Reposti!",
-		Description: "***Reminder:*** you can look up if things you post have already been posted using Discord's search feature.\nBoe Tea recommeds to check reposts by post's unique identifier (picrelated)",
+		Description: "***Reminder:*** you can look up if things you post have already been posted using Discord's search feature.\nI recommend to check reposts by post's unique identifier.",
 		Thumbnail: &discordgo.MessageEmbedThumbnail{
 			URL: utils.DefaultEmbedImage,
 		},
-		Image:     &discordgo.MessageEmbedImage{URL: "https://i.imgur.com/mEjZ9LO.gif"},
 		Timestamp: utils.EmbedTimestamp(),
 		Color:     utils.EmbedColor,
 	}
@@ -284,20 +283,23 @@ func (a *ArtPost) Post(s *discordgo.Session, pixivOpts ...SendPixivOptions) erro
 
 		if len(tweets) > 0 {
 			msg := ""
-			if len(tweets) == 1 {
-				msg = "Detected a tweet with more than one image, would you like to send embeds of other images for mobile users?"
-			} else {
-				msg = "Detected tweets with more than one image, would you like to send embeds of other images for mobile users?"
-			}
 
 			prompt := true
-			prompt = utils.CreatePrompt(s, m, &utils.PromptOptions{
-				Actions: map[string]bool{
-					"👌": true,
-				},
-				Message: msg,
-				Timeout: 10 * time.Second,
-			})
+			if guild.TwitterPrompt {
+				if len(tweets) == 1 {
+					msg = "Detected a tweet with more than one image, would you like to send embeds of other images for mobile users?"
+				} else {
+					msg = "Detected tweets with more than one image, would you like to send embeds of other images for mobile users?"
+				}
+
+				prompt = utils.CreatePrompt(s, m, &utils.PromptOptions{
+					Actions: map[string]bool{
+						"👌": true,
+					},
+					Message: msg,
+					Timeout: 10 * time.Second,
+				})
+			}
 
 			if prompt {
 				for _, t := range tweets {
