@@ -239,7 +239,7 @@ func (a *ArtPost) Post(s *discordgo.Session, pixivOpts ...SendPixivOptions) erro
 
 				if !perm {
 					s.ChannelMessageSend(m.ChannelID, "Please enable Manage Messages permission to remove reposts with strict mode on, otherwise strict mode is useless.")
-				} else if a.Len() == 0 {
+				} else if len(pixiv)+len(twitter) == 0 {
 					s.ChannelMessageDelete(m.ChannelID, m.ID)
 				}
 			} else if guild.Repost == "enabled" {

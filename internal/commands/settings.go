@@ -107,11 +107,11 @@ func showGuildSettings(s *discordgo.Session, m *discordgo.MessageCreate, setting
 			},
 			{
 				Name:  "Pixiv settings",
-				Value: fmt.Sprintf("**Auto-repost**: %v | **Limit**: %v", utils.FormatBool(settings.Pixiv), settings.Limit),
+				Value: fmt.Sprintf("**Auto-repost (pixiv)**: %v | **Limit**: %v", utils.FormatBool(settings.Pixiv), settings.Limit),
 			},
 			{
 				Name:  "Twitter settings",
-				Value: fmt.Sprintf("**Auto-repost**: %v | **Prompt**: %v", utils.FormatBool(settings.Twitter), settings.TwitterPrompt),
+				Value: fmt.Sprintf("**Auto-repost (twitter)**: %v | **Prompt**: %v", utils.FormatBool(settings.Twitter), utils.FormatBool(settings.TwitterPrompt)),
 			},
 		},
 		Thumbnail: &discordgo.MessageEmbedThumbnail{
