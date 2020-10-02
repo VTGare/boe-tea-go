@@ -22,7 +22,7 @@ func init() {
 				Thumbnail: &discordgo.MessageEmbedThumbnail{
 					URL: utils.DefaultEmbedImage,
 				},
-				Description: fmt.Sprintf("***Error message:***\n%v\n\nPlease contact bot's author using bt!feedback command or directly at VTGare#3370 if you can't understand the error. ", e),
+				Description: fmt.Sprintf("***Error message:***\n%v\n\nPlease contact bot's author using bt!feedback command or directly at VTGare#3599 if you can't understand the error. ", e),
 				Color:       utils.EmbedColor,
 				Timestamp:   utils.EmbedTimestamp(),
 			}

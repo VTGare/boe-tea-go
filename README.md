@@ -20,7 +20,7 @@ To invite him please follow the link above. It requires following permissions to
 -   Add reactions
 -   Use external Emojis
 
-If you ran into a problem or have a suggestion create an issue here, use bt!feedback command or contact me on Discord at _VTGare#3370_.
+If you ran into a problem or have a suggestion create an issue here, use bt!feedback command or contact me on Discord at _VTGare#3599_.
 
 ## Documentation
 
