@@ -2,7 +2,7 @@
 
 [![Invite](https://img.shields.io/badge/Invite%20Link-%40Boe%20Tea-brightgreen)](https://discord.com/api/oauth2/authorize?client_id=636468907049353216&permissions=537259072&scope=bot)
 
-<img align="center" src="https://cdn.discordapp.com/avatars/636468907049353216/f22aa4bf930d9743dd40a10287de8b04.png?size=256">
+<img align="center" src="https://cdn.discordapp.com/avatars/636468907049353216/9bba642061fe0d500e92987098fdcf85.png?size=256">
 
 **Boe Tea** is a source image bot that reposts Pixiv, Twitter images, detects reposts and searches sauce for you!
 
