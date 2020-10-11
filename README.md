@@ -1,6 +1,6 @@
 # boe-tea-go
 
-[![Invite](https://img.shields.io/badge/Invite%20Link-%40Boe%20Tea-brightgreen)](https://discordapp.com/api/oauth2/authorize?client_id=636468907049353216&permissions=537250880&scope=bot)
+[![Invite](https://img.shields.io/badge/Invite%20Link-%40Boe%20Tea-brightgreen)](https://discord.com/api/oauth2/authorize?client_id=636468907049353216&permissions=537259072&scope=bot)
 
 <img align="center" src="https://cdn.discordapp.com/avatars/636468907049353216/f22aa4bf930d9743dd40a10287de8b04.png?size=256">
 
@@ -8,12 +8,13 @@
 
 ## Getting started
 
-[![Invite](https://img.shields.io/badge/Invite%20Link-%40Boe%20Tea-brightgreen)](https://discordapp.com/api/oauth2/authorize?client_id=636468907049353216&permissions=537250880&scope=bot)
+[![Invite](https://img.shields.io/badge/Invite%20Link-%40Boe%20Tea-brightgreen)](https://discord.com/api/oauth2/authorize?client_id=636468907049353216&permissions=537259072&scope=bot)
 
 To invite him please follow the link above. It requires following permissions to work correctly.
--   Manage webhooks (for future functionality)
+-   Manage webhooks
 -   Read messages
 -   Send messages
+-   Manage messages
 -   Embed links
 -   Attach files
 -   Read Message History
