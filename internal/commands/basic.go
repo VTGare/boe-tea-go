@@ -49,7 +49,7 @@ func feedback(s *discordgo.Session, m *discordgo.MessageCreate, args []string) e
 }
 
 func invite(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
-	_, err := s.ChannelMessageSend(m.ChannelID, "**Here's my invitation link, spread the word:** https://discordapp.com/api/oauth2/authorize?client_id=636468907049353216&permissions=537250880&scope=bot")
+	_, err := s.ChannelMessageSend(m.ChannelID, "Thanks for inviting me to more places! https://discord.com/api/oauth2/authorize?client_id=636468907049353216&permissions=537259072&scope=bot")
 	if err != nil {
 		return err
 	}

@@ -14,6 +14,7 @@ import (
 	"github.com/VTGare/boe-tea-go/internal/database"
 	"github.com/VTGare/boe-tea-go/internal/images"
 	"github.com/VTGare/boe-tea-go/internal/repost"
+	"github.com/VTGare/boe-tea-go/internal/widget"
 	"github.com/VTGare/boe-tea-go/pkg/chotto"
 	"github.com/VTGare/boe-tea-go/pkg/seieki"
 	"github.com/VTGare/boe-tea-go/utils"
@@ -160,14 +161,22 @@ func saucenao(s *discordgo.Session, m *discordgo.MessageCreate, args []string) e
 	}
 
 	log.Infof("Searching source on SauceNAO. Image URL: %s", url)
-	embed, err := saucenaoEmbed(url)
+	embeds, err := saucenaoEmbeds(url)
 	if err != nil {
 		return err
 	}
 
-	_, err = s.ChannelMessageSendEmbed(m.ChannelID, embed)
-	if err != nil {
-		return err
+	if len(embeds) > 1 {
+		w := widget.NewWidget(s, m.Author.ID, embeds)
+		err := w.Start(m.ChannelID)
+		if err != nil {
+			return err
+		}
+	} else {
+		_, err = s.ChannelMessageSendEmbed(m.ChannelID, embeds[0])
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -277,6 +286,8 @@ func namedLink(uri string) string {
 		return fmt.Sprintf("[Pixiv](%v)", uri)
 	case strings.Contains(uri, "twitter"):
 		return fmt.Sprintf("[Twitter](%v)", uri)
+	case strings.Contains(uri, "yande.re"):
+		return fmt.Sprintf("[Yande.re](%v)", uri)
 	default:
 		return uri
 	}
@@ -297,22 +308,48 @@ func joinSauceURLs(urls []string, sep string) string {
 	return sb.String()
 }
 
-func saucenaoEmbed(link string) (*discordgo.MessageEmbed, error) {
+func saucenaoEmbeds(link string) ([]*discordgo.MessageEmbed, error) {
 	res, err := sei.Sauce(link)
 	if err != nil && res == nil {
 		return nil, err
 	}
 
 	res.FilterLowSimilarity(60.0)
-	if len(res.Results) == 0 {
-		return noSauceEmbed, nil
+
+	l := len(res.Results)
+	if l == 0 {
+		return []*discordgo.MessageEmbed{noSauceEmbed}, nil
 	}
 
-	source := res.Results[0]
-	log.Infof("Found source. Author: %v. Title: %v. URL: %v", source.Author(), source.Title(), source.URL())
+	log.Infof("Found source. Results: %v", l)
 
-	embed := &discordgo.MessageEmbed{
-		Title:     fmt.Sprintf("Source found! Title: %v", source.Title()),
+	embeds := make([]*discordgo.MessageEmbed, l)
+	for ind, source := range res.Results {
+		embed := saucenaoToEmbed(source, ind, l)
+		if s := source.URL(); s != "" {
+			if _, err := url.ParseRequestURI(embed.URL); err != nil && len(source.Data.URLs) > 0 {
+				embed.URL = source.Data.URLs[0]
+			}
+		} else {
+			embed.Fields = embed.Fields[1:]
+		}
+
+		embeds[ind] = embed
+	}
+
+	return embeds, nil
+}
+
+func saucenaoToEmbed(source *seieki.Sauce, index, lenght int) *discordgo.MessageEmbed {
+	title := ""
+	if lenght > 1 {
+		title = fmt.Sprintf("[%v/%v] Title: %v", index+1, lenght, source.Title())
+	} else {
+		title = fmt.Sprintf("Title: %v", source.Title())
+	}
+
+	return &discordgo.MessageEmbed{
+		Title:     title,
 		Timestamp: utils.EmbedTimestamp(),
 		Color:     utils.EmbedColor,
 		Thumbnail: &discordgo.MessageEmbedThumbnail{
@@ -337,16 +374,6 @@ func saucenaoEmbed(link string) (*discordgo.MessageEmbed, error) {
 			},
 		},
 	}
-
-	if s := source.URL(); s != "" {
-		if _, err := url.ParseRequestURI(embed.URL); err != nil && len(source.Data.URLs) > 0 {
-			embed.URL = source.Data.URLs[0]
-		}
-	} else {
-		embed.Fields = embed.Fields[1:]
-	}
-
-	return embed, nil
 }
 
 func waitEmbed(link string) (*discordgo.MessageEmbed, error) {

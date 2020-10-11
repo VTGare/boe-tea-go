@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/VTGare/boe-tea-go/internal/database"
+	"github.com/VTGare/boe-tea-go/internal/widget"
 	"github.com/VTGare/boe-tea-go/utils"
 	"github.com/VTGare/gumi"
 	"github.com/bwmarrin/discordgo"
@@ -31,6 +32,10 @@ func init() {
 	dg.AddCommand(&gumi.Command{
 		Name: "stats",
 		Exec: devstats,
+	})
+	dg.AddCommand(&gumi.Command{
+		Name: "test",
+		Exec: test,
 	})
 }
 
@@ -75,12 +80,12 @@ func updateDB(s *discordgo.Session, m *discordgo.MessageCreate, args []string) e
 }
 
 func test(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
-	if m.Author.ID != utils.AuthorID {
-		return nil
-	}
+	embeds := []*discordgo.MessageEmbed{{Title: "1", Description: ":2BPog:"}, {Title: "2", Description: ":2BVoHiYo:"}}
 
-	if len(args) == 0 {
-		return utils.ErrNotEnoughArguments
+	widget := widget.NewWidget(s, m.Author.ID, embeds)
+	err := widget.Start(m.ChannelID)
+	if err != nil {
+		return err
 	}
 
 	return nil
