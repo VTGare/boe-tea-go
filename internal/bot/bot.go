@@ -110,24 +110,35 @@ func (b *Bot) messageCreated(s *discordgo.Session, m *discordgo.MessageCreate) {
 }
 
 func (b *Bot) reactCreated(s *discordgo.Session, r *discordgo.MessageReactionAdd) {
-	/*if utils.MessageCache.Count() > 0 && r.Emoji.APIName() == "❌" {
-		if m, ok := utils.MessageCache.Get(r.MessageID); ok {
-			c := m.(*utils.CachedMessage)
-			if r.UserID == c.Parent.Author.ID {
-				if r.MessageID == c.Parent.ID {
-					s.ChannelMessageDelete(c.Parent.ChannelID, c.Parent.ID)
-					utils.MessageCache.Remove(c.Parent.ID)
-					for _, child := range c.Children {
-						s.ChannelMessageDelete(child.ChannelID, child.ID)
-						utils.MessageCache.Remove(child.ID)
-					}
-				} else {
-					s.ChannelMessageDelete(r.ChannelID, r.MessageID)
-					utils.MessageCache.Remove(r.MessageID)
+	if r.UserID == s.State.User.ID {
+		return
+	}
+
+	if repost.MsgCache.Count() > 0 {
+		key := r.ChannelID + r.MessageID
+		cache, ok := repost.MsgCache.Get(key)
+		if ok {
+			cache := cache.(*repost.CachedMessage)
+			if cache.OriginalMessage.Author.ID != r.UserID {
+				return
+			}
+
+			switch r.Emoji.APIName() {
+			case "🔄":
+				_, err := s.ChannelMessageEditEmbed(cache.SentMessage.ChannelID, cache.SentMessage.ID, cache.OriginalEmbed.Embed)
+				if err != nil {
+					log.Warnf("ChannelMessageDelete(): %v", err)
+				}
+
+				s.MessageReactionRemove(cache.SentMessage.ChannelID, cache.SentMessage.ID, "🔄", r.UserID)
+			case "❌":
+				err := s.ChannelMessageDelete(cache.SentMessage.ChannelID, cache.SentMessage.ID)
+				if err != nil {
+					log.Warnf("ChannelMessageDelete(): %v", err)
 				}
 			}
 		}
-	}*/
+	}
 }
 
 func (b *Bot) messageDeleted(s *discordgo.Session, m *discordgo.MessageDelete) {

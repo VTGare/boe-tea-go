@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ReneKroon/ttlcache"
 	"github.com/VTGare/boe-tea-go/internal/database"
 	"github.com/VTGare/boe-tea-go/internal/ugoira"
 	"github.com/VTGare/boe-tea-go/pkg/tsuita"
@@ -50,6 +51,8 @@ var (
 		{"If you want to support me: https://patreon.com/vtgare", false},
 	}
 	sfwEmbedMessages = make([]*embedMessage, 0)
+
+	MsgCache *ttlcache.Cache
 )
 
 func init() {
@@ -58,6 +61,9 @@ func init() {
 			sfwEmbedMessages = append(sfwEmbedMessages, m)
 		}
 	}
+
+	MsgCache = ttlcache.NewCache()
+	MsgCache.SetTTL(2 * time.Hour)
 }
 
 type ArtPost struct {
@@ -77,6 +83,12 @@ type SendPixivOptions struct {
 type embedMessage struct {
 	Content string
 	NSFW    bool
+}
+
+type CachedMessage struct {
+	OriginalEmbed   *discordgo.MessageSend
+	OriginalMessage *discordgo.MessageCreate
+	SentMessage     *discordgo.Message
 }
 
 func (a *ArtPost) PixivReposts(reposts []*database.ImagePost) int {
@@ -210,6 +222,16 @@ func (a *ArtPost) Cleanup(posts []*ugoira.PixivPost) {
 	}
 }
 
+func sendMessage(s *discordgo.Session, m *discordgo.MessageCreate, send *discordgo.MessageSend) {
+	msg, err := s.ChannelMessageSendComplex(m.ChannelID, send)
+	if err != nil {
+		logrus.Warnln(err)
+	} else {
+		MsgCache.Set(msg.ChannelID+msg.ID, &CachedMessage{send, m, msg})
+		s.MessageReactionAdd(msg.ChannelID, msg.ID, "🔄")
+	}
+}
+
 func (a *ArtPost) Post(s *discordgo.Session, pixivOpts ...SendPixivOptions) error {
 	var (
 		m       = a.event
@@ -271,7 +293,7 @@ func (a *ArtPost) Post(s *discordgo.Session, pixivOpts ...SendPixivOptions) erro
 		}
 
 		for _, message := range messages {
-			s.ChannelMessageSendComplex(m.ChannelID, message)
+			sendMessage(s, m, message)
 		}
 	}
 
@@ -304,10 +326,7 @@ func (a *ArtPost) Post(s *discordgo.Session, pixivOpts ...SendPixivOptions) erro
 			if prompt {
 				for _, t := range tweets {
 					for _, send := range t {
-						_, err := s.ChannelMessageSendComplex(m.ChannelID, send)
-						if err != nil {
-							logrus.Warnln(err)
-						}
+						sendMessage(s, m, send)
 					}
 				}
 			}
@@ -371,7 +390,7 @@ func (a *ArtPost) Crosspost(s *discordgo.Session, channels []string, pixivOpts .
 			}
 
 			for _, message := range messages {
-				s.ChannelMessageSendComplex(m.ChannelID, message)
+				sendMessage(s, m, message)
 			}
 		}
 
@@ -384,10 +403,7 @@ func (a *ArtPost) Crosspost(s *discordgo.Session, channels []string, pixivOpts .
 			if len(tweets) > 0 {
 				for _, t := range tweets {
 					for _, send := range t {
-						_, err := s.ChannelMessageSendComplex(m.ChannelID, send)
-						if err != nil {
-							logrus.Warnln(err)
-						}
+						sendMessage(s, m, send)
 					}
 				}
 			}
