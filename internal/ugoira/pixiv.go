@@ -16,7 +16,7 @@ var (
 	kotoriBase = "https://api.kotori.love/pixiv/image/"
 	app        *pixiv.AppPixivAPI
 	pixivCache *ttlcache.Cache
-	goodWaifus = map[string]bool{"すいせい": true, "ヨルハ二号B型": true, "2B": true, "牧瀬紅莉栖": true, "宝鐘マリン": true}
+	goodWaifus = map[string]bool{"星街すいせい": true, "ヨルハ二号B型": true, "2B": true, "牧瀬紅莉栖": true, "宝鐘マリン": true}
 )
 
 type PixivPost struct {
@@ -126,8 +126,8 @@ func GetPixivPost(id string) (*PixivPost, error) {
 
 	for ind, page := range illust.MetaPages {
 		original := newPixivImage(page.Images.Original, illust.ID, true, ind)
-		preview := newPixivImage(page.Images.Large, illust.ID, true, ind)
 		images.Original = append(images.Original, original)
+		preview := newPixivImage(page.Images.Large, illust.ID, true, ind)
 		images.Preview = append(images.Preview, preview)
 	}
 

@@ -232,8 +232,8 @@ func createPixivEmbed(post *ugoira.PixivPost, ind int, easter *embedMessage) *di
 	}
 
 	var (
-		original = post.Images.Original[ind].PixivCatProxy
-		preview  = post.Images.Preview[ind].PixivCatProxy
+		original = post.Images.Original[ind].Kotori
+		preview  = post.Images.Preview[ind].Kotori
 	)
 
 	send := &discordgo.MessageSend{

@@ -63,7 +63,13 @@ func init() {
 	}
 
 	MsgCache = ttlcache.NewCache()
-	MsgCache.SetTTL(2 * time.Hour)
+	MsgCache.SetTTL(10 * time.Minute)
+	MsgCache.SetExpirationCallback(func(key string, value interface{}) {
+		cache := value.(*CachedMessage)
+		m := cache.SentMessage
+
+		cache.session.MessageReactionRemove(m.ChannelID, m.ID, "🔄", cache.session.State.User.ID)
+	})
 }
 
 type ArtPost struct {
@@ -86,6 +92,7 @@ type embedMessage struct {
 }
 
 type CachedMessage struct {
+	session         *discordgo.Session
 	OriginalEmbed   *discordgo.MessageSend
 	OriginalMessage *discordgo.MessageCreate
 	SentMessage     *discordgo.Message
@@ -227,7 +234,7 @@ func sendMessage(s *discordgo.Session, m *discordgo.MessageCreate, send *discord
 	if err != nil {
 		logrus.Warnln(err)
 	} else {
-		MsgCache.Set(msg.ChannelID+msg.ID, &CachedMessage{send, m, msg})
+		MsgCache.Set(msg.ChannelID+msg.ID, &CachedMessage{s, send, m, msg})
 		s.MessageReactionAdd(msg.ChannelID, msg.ID, "🔄")
 	}
 }
