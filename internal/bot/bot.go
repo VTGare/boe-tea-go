@@ -84,7 +84,7 @@ func (b *Bot) prefixless(s *discordgo.Session, m *discordgo.MessageCreate) error
 
 	err := art.Post(s)
 	if err != nil {
-		return err
+		log.Warnln("art.Post():", err)
 	}
 
 	if user := database.DB.FindUser(m.Author.ID); user != nil {

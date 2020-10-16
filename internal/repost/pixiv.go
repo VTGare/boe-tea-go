@@ -1,6 +1,7 @@
 package repost
 
 import (
+	"errors"
 	"fmt"
 	"math/rand"
 	"strconv"
@@ -70,6 +71,10 @@ func isNSFW(posts []*ugoira.PixivPost) bool {
 }
 
 func (a *ArtPost) SendPixiv(s *discordgo.Session, IDs map[string]bool, opts ...SendPixivOptions) ([]*discordgo.MessageSend, []*ugoira.PixivPost, error) {
+	if !utils.IsPixivUp {
+		return nil, nil, errors.New("pixiv api is down")
+	}
+
 	var (
 		guild      = database.GuildCache[a.event.GuildID]
 		indexMap   = make(map[int]bool)

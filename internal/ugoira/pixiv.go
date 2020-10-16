@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ReneKroon/ttlcache"
+	"github.com/VTGare/boe-tea-go/utils"
 	"github.com/everpcpc/pixiv"
 	log "github.com/sirupsen/logrus"
 )
@@ -72,9 +73,11 @@ func init() {
 
 	_, err := pixiv.Login(pixivEmail, pixivPassword)
 	if err != nil {
-		log.Fatalln(err)
+		log.Warnln("pixiv.Login():", err)
+	} else {
+		app = pixiv.NewApp()
+		utils.IsPixivUp = true
 	}
-	app = pixiv.NewApp()
 
 	pixivCache = ttlcache.NewCache()
 	pixivCache.SetTTL(60 * time.Minute)
