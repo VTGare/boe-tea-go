@@ -9,7 +9,7 @@ import (
 
 	"github.com/ReneKroon/ttlcache"
 	"github.com/VTGare/boe-tea-go/utils"
-	"github.com/everpcpc/pixiv"
+	"github.com/VTGare/pixiv"
 	log "github.com/sirupsen/logrus"
 )
 
