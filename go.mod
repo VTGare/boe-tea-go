@@ -5,7 +5,7 @@ go 1.14
 require (
 	github.com/ReneKroon/ttlcache v1.7.0
 	github.com/VTGare/gumi v0.2.2
-	github.com/VTGare/pixiv v0.0.3
+	github.com/VTGare/pixiv v0.0.6
 	github.com/antchfx/xpath v1.1.10 // indirect
 	github.com/bwmarrin/discordgo v0.22.0
 	github.com/disintegration/gift v1.2.1

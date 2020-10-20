@@ -91,7 +91,7 @@ func (b *Bot) prefixless(s *discordgo.Session, m *discordgo.MessageCreate) error
 		channels := user.Channels(m.ChannelID)
 		err := art.Crosspost(s, channels)
 		if err != nil {
-			return err
+			log.Warnln("art.Crosspost():", err)
 		}
 	}
 	return nil

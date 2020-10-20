@@ -20,7 +20,7 @@ var (
 
 func init() {
 	settingMap["nsfw"] = setBool
-	//settingMap["pixiv"] = setBool
+	settingMap["pixiv"] = setBool
 	settingMap["twitter"] = setBool
 	settingMap["twitterprompt"] = setBool
 	settingMap["crosspost"] = setBool
