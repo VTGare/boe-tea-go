@@ -17,7 +17,7 @@ var (
 	TwitterRegex = regexp.MustCompile(`https?://(?:mobile.)?twitter.com/(?:\S+)/status/(\d+)(?:\?s=\d\d)?`)
 
 	twitterCache *ttlcache.Cache
-	nitterURL    = "https://nitter.net"
+	nitterURL    = "https://nitter.snopyta.org"
 )
 
 func init() {
