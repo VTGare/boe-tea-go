@@ -2,15 +2,16 @@ package ugoira
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"io"
 	"math"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
+	"github.com/VTGare/pixiv"
 	"github.com/valyala/fasthttp"
 )
 
@@ -19,40 +20,25 @@ var (
 )
 
 type Ugoira struct {
-	ID      string
-	File    *os.File
-	Error   bool       `json:"error"`
-	Message string     `json:"message"`
-	Body    UgoiraBody `json:"body"`
-}
-
-type UgoiraBody struct {
-	Source         string        `json:"src"`
-	OriginalSource string        `json:"originalSrc"`
-	MIME           string        `json:"mime_type"`
-	Frames         []UgoiraFrame `json:"frames"`
-}
-
-type UgoiraFrame struct {
-	File  string `json:"file"`
-	Delay int    `json:"delay"`
+	ID       string
+	File     *os.File
+	Error    bool   `json:"error"`
+	Message  string `json:"message"`
+	Metadata *pixiv.UgoiraMetadataClass
 }
 
 func NewUgoira(id string) (*Ugoira, error) {
-	uri := fmt.Sprintf("https://www.pixiv.net/ajax/illust/%v/ugoira_meta", id)
-	resp, err := fasthttpGet(uri, id)
+	intID, err := strconv.Atoi(id)
 	if err != nil {
 		return nil, err
 	}
 
-	var res Ugoira
-	err = json.Unmarshal(resp, &res)
+	metadata, err := app.UgoiraMetadata(uint64(intID))
 	if err != nil {
 		return nil, err
 	}
-	res.ID = id
 
-	return &res, nil
+	return &Ugoira{id, nil, false, "", &metadata.UgoiraMetadataUgoiraMetadata}, nil
 }
 
 func (u *Ugoira) toWebm() error {
@@ -85,7 +71,7 @@ func (u *Ugoira) toWebm() error {
 }
 
 func (u *Ugoira) Duration() float64 {
-	return float64(len(u.Body.Frames)) / float64(u.FPS())
+	return float64(len(u.Metadata.Frames)) / float64(u.FPS())
 }
 
 func (u *Ugoira) FPS() int {
@@ -93,11 +79,11 @@ func (u *Ugoira) FPS() int {
 		ms = 0.0
 	)
 
-	for _, frame := range u.Body.Frames {
+	for _, frame := range u.Metadata.Frames {
 		ms += float64(frame.Delay)
 	}
 
-	l := len(u.Body.Frames)
+	l := len(u.Metadata.Frames)
 	fps := 1.0 / ((ms / float64(l)) / 1000.0)
 	return int(math.Floor(fps + 0.5))
 }
@@ -119,15 +105,15 @@ func fasthttpGet(uri, id string) ([]byte, error) {
 	}
 
 	if resp.StatusCode() != 200 {
-		return nil, fmt.Errorf("status code %v", resp.StatusCode())
+		return nil, fmt.Errorf("fasthttpGet(): Status Code %v", resp.StatusCode())
 	}
 	return resp.Body(), nil
 }
 
 func downloadZIP(ugoira *Ugoira) (*os.File, error) {
-	body, err := fasthttpGet(ugoira.Body.OriginalSource, ugoira.ID)
+	body, err := fasthttpGet(ugoira.Metadata.ZipURLs.Medium, ugoira.ID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("downloadZIP(): %v", err)
 	}
 
 	file, err := os.Create(fmt.Sprintf("temp_%v_%v.zip", time.Now().Format("15-04-05"), ugoira.ID))

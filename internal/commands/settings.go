@@ -50,8 +50,6 @@ func set(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error 
 		switch setting {
 		case "prompt":
 			setting = "twitterprompt"
-		case "pixiv":
-			s.ChannelMessageSend(m.ChannelID, "Please don't change this setting. Pixiv API is currently down and it's not in my power to fix it. Sorry for inconvenience...")
 		}
 
 		if new, ok := settingMap[setting]; ok {
