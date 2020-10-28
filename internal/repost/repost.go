@@ -49,6 +49,8 @@ var (
 		{"Strict repost mode removes reposts no questions asked.", false},
 		{"A cat is fine too.", true},
 		{"If you want to support me: https://patreon.com/vtgare", false},
+		{"BOOBA!", false},
+		{"YEP COCK", false},
 		{"今昔物語集", false},
 		{"⑨ ⑨ ⑨ ⑨ ⑨ ⑨ ⑨ ⑨ ⑨", false},
 	}
