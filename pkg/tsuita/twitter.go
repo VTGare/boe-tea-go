@@ -65,6 +65,9 @@ func GetTweet(uri string) (*Tweet, error) {
 
 	c.OnHTML(".main-tweet .still-image", func(e *colly.HTMLElement) {
 		imageURL := nitterURL + e.Attr("href")
+
+		imageURL = strings.Replace(imageURL, nitterURL+"/pic/media%2F", "https://pbs.twimg.com/media/", 1)
+		imageURL = strings.TrimSuffix(imageURL, "%3Fname%3Dorig")
 		res.Gallery = append(res.Gallery, TwitterMedia{
 			URL:      imageURL,
 			Animated: false,
