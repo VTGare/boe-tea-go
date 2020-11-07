@@ -120,11 +120,13 @@ func GetPixivPost(id string) (*PixivPost, error) {
 		return nil, err
 	}
 
-	if illust.MetaSinglePage.OriginalImageURL != "" {
-		original := newPixivImage(illust.MetaSinglePage.OriginalImageURL, illust.ID, false, 0)
-		images.Original = append(images.Original, original)
-		preview := newPixivImage(illust.Images.Large, illust.ID, false, 0)
-		images.Preview = append(images.Preview, preview)
+	if illust.MetaSinglePage != nil {
+		if illust.MetaSinglePage.OriginalImageURL != "" {
+			original := newPixivImage(illust.MetaSinglePage.OriginalImageURL, illust.ID, false, 0)
+			images.Original = append(images.Original, original)
+			preview := newPixivImage(illust.Images.Large, illust.ID, false, 0)
+			images.Preview = append(images.Preview, preview)
+		}
 	}
 
 	for ind, page := range illust.MetaPages {
