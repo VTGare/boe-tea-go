@@ -284,17 +284,13 @@ func saucenaoToEmbed(source *sengoku.Sauce, index, length int) *discordgo.Messag
 		Thumbnail: &discordgo.MessageEmbedThumbnail{
 			URL: source.Thumbnail,
 		},
-		Fields: []*discordgo.MessageEmbedField{
-			{
-				Name:  "Source",
-				Value: source.URLs.Source,
-			},
-			{
-				Name:  "Similarity",
-				Value: fmt.Sprintf("%v", source.Similarity),
-			},
-		},
+		Fields: []*discordgo.MessageEmbedField{},
 	}
+
+	if source.URLs.Source != "" {
+		embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{Name: "Source", Value: source.URLs.Source})
+	}
+	embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{Name: "Similarity", Value: fmt.Sprintf("%v", source.Similarity)})
 
 	if source.Author != nil {
 		str := ""
