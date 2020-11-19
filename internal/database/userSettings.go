@@ -316,9 +316,8 @@ func (d *Database) CreateFavourite(userID string, favourite *Favourite) (bool, e
 }
 
 func (d *Database) DeleteFavouriteURL(userID, url string) (bool, error) {
-	if user := d.FindUser(userID); user == nil {
-		user = NewUserSettings(userID)
-		err := d.InsertOneUser(user)
+	if d.FindUser(userID) == nil {
+		err := d.InsertOneUser(NewUserSettings(userID))
 		if err != nil {
 			return false, err
 		}
@@ -327,12 +326,12 @@ func (d *Database) DeleteFavouriteURL(userID, url string) (bool, error) {
 	res := d.UserSettings.FindOneAndUpdate(
 		context.Background(),
 		bson.D{{"user_id", userID}, {"favourites.url", url}},
-		bson.D{{"$pull", bson.D{{"favourites.url", url}}}},
+		bson.D{{"$pull", bson.D{{"favourites", bson.D{{"url", url}}}}}},
 		options.FindOneAndUpdate().SetReturnDocument(options.After),
 	)
 
-	if res.Err() == nil {
-		var user *UserSettings
+	if err := res.Err(); err == nil {
+		var user = &UserSettings{}
 		res.Decode(user)
 
 		userCache[userID] = user
@@ -352,12 +351,12 @@ func (d *Database) DeleteFavouriteID(userID string, id int) (bool, error) {
 	res := d.UserSettings.FindOneAndUpdate(
 		context.Background(),
 		bson.D{{"user_id", userID}, {"favourites.id", id}},
-		bson.D{{"$pull", bson.D{{"favourites.url", id}}}},
+		bson.D{{"$pull", bson.D{{"favourites", bson.D{{"id", id}}}}}},
 		options.FindOneAndUpdate().SetReturnDocument(options.After),
 	)
 
-	if res.Err() == nil {
-		var user *UserSettings
+	if err := res.Err(); err == nil {
+		var user = &UserSettings{}
 		res.Decode(user)
 
 		userCache[userID] = user

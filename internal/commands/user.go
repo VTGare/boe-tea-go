@@ -146,7 +146,7 @@ func favourites(s *discordgo.Session, m *discordgo.MessageCreate, args []string)
 	ch, _ := s.Channel(m.ChannelID)
 	if !ch.NSFW && mode == modeNSFW || mode == modeAll {
 		if f := utils.CreatePromptWithMessage(s, m, &discordgo.MessageSend{
-			Content: "The command will show all your favourites, including NSFW ones. Are you sure about that?",
+			Content: "The result may contain NSFW images, are you sure about that?",
 		}); f == false {
 			return nil
 		}
@@ -247,5 +247,42 @@ func unfavourite(s *discordgo.Session, m *discordgo.MessageCreate, args []string
 		}
 	}
 
+	if len(args) == 0 {
+		return utils.ErrNotEnoughArguments
+	}
+
+	var (
+		err     error
+		removed = false
+	)
+
+	if id, err := strconv.Atoi(args[0]); err == nil {
+		removed, err = database.DB.DeleteFavouriteID(user.ID, id)
+	} else {
+		removed, err = database.DB.DeleteFavouriteURL(user.ID, args[0])
+	}
+
+	if err != nil {
+		s.ChannelMessageSendEmbed(m.ChannelID, &discordgo.MessageEmbed{
+			Title:       "❎ An error occurred",
+			Color:       utils.EmbedColor,
+			Timestamp:   utils.EmbedTimestamp(),
+			Description: fmt.Sprintf("Error message: ``%v``\n\nPlease report the error to the developer using ``bt!feedback`` command", err),
+		})
+	} else if removed {
+		s.ChannelMessageSendEmbed(m.ChannelID, &discordgo.MessageEmbed{
+			Title:       "✅ Successfully removed a favourite",
+			Color:       utils.EmbedColor,
+			Timestamp:   utils.EmbedTimestamp(),
+			Description: fmt.Sprintf("Removed item: %v", args[0]),
+		})
+	} else {
+		s.ChannelMessageSendEmbed(m.ChannelID, &discordgo.MessageEmbed{
+			Title:       "❎ Failed to remove a favourite",
+			Color:       utils.EmbedColor,
+			Timestamp:   utils.EmbedTimestamp(),
+			Description: fmt.Sprintf("Couldn't find an item: %v", args[0]),
+		})
+	}
 	return nil
 }
