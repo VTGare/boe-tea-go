@@ -1,6 +1,7 @@
 # boe-tea-go
 
 [![Invite](https://img.shields.io/badge/Invite%20Link-%40Boe%20Tea-brightgreen)](https://discord.com/api/oauth2/authorize?client_id=636468907049353216&permissions=537259072&scope=bot)
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2FVTGare%2Fboe-tea-go.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2FVTGare%2Fboe-tea-go?ref=badge_shield)
 
 <img align="center" src="https://cdn.discordapp.com/avatars/636468907049353216/9bba642061fe0d500e92987098fdcf85.png?size=256">
 
@@ -60,3 +61,6 @@ Current documentation is out of date. All these commands still work as documente
 - ffmpeg
 
 Soon there will be a guide how build and deploy your own Boe Tea but until then you can go through the source code to figure it out yourself Kappa
+
+## License
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2FVTGare%2Fboe-tea-go.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2FVTGare%2Fboe-tea-go?ref=badge_large)
