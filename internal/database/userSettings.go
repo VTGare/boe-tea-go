@@ -3,8 +3,10 @@ package database
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 var (
@@ -12,9 +14,22 @@ var (
 )
 
 type UserSettings struct {
-	ID            string   `json:"user_id" bson:"user_id"`
-	Crosspost     bool     `json:"crosspost" bson:"crosspost"`
-	ChannelGroups []*Group `json:"channel_groups" bson:"channel_groups"`
+	ID            string       `json:"user_id" bson:"user_id"`
+	Crosspost     bool         `json:"crosspost" bson:"crosspost"`
+	Favourites    []*Favourite `json:"favourites" bson:"favourites"`
+	ChannelGroups []*Group     `json:"channel_groups" bson:"channel_groups"`
+	CreatedAt     time.Time    `json:"created_at" bson:"created_at"`
+	UpdatedAt     time.Time    `json:"updated_at" bson:"updated_at"`
+}
+
+type Favourite struct {
+	ID        int       `json:"id" bson:"id"`
+	Title     string    `json:"title" bson:"title"`
+	Author    string    `json:"author" bson:"author"`
+	Thumbnail string    `json:"thumbnail" bson:"thumbnail"`
+	URL       string    `json:"url" bson:"url"`
+	NSFW      bool      `json:"nsfw" bson:"nsfw"`
+	CreatedAt time.Time `json:"created_at" bson:"created_at"`
 }
 
 type Group struct {
@@ -27,7 +42,10 @@ func NewUserSettings(id string) *UserSettings {
 	return &UserSettings{
 		ID:            id,
 		Crosspost:     true,
+		Favourites:    make([]*Favourite, 0),
 		ChannelGroups: make([]*Group, 0),
+		CreatedAt:     time.Now(),
+		UpdatedAt:     time.Now(),
 	}
 }
 
@@ -96,6 +114,7 @@ func (d *Database) CreateGroup(userID string, groupName string, parentID string)
 	}
 
 	user.ChannelGroups = append(user.ChannelGroups, &Group{groupName, parentID, make([]string, 0)})
+	user.UpdatedAt = time.Now()
 	res := d.UserSettings.FindOneAndReplace(context.Background(), bson.M{"user_id": userID}, user)
 	if res.Err() != nil {
 		return res.Err()
@@ -122,6 +141,7 @@ func (d *Database) PushGroup(userID string, group *Group) error {
 
 	user.ChannelGroups = append(user.ChannelGroups, group)
 	res := d.UserSettings.FindOneAndReplace(context.Background(), bson.M{"user_id": userID}, user)
+	user.UpdatedAt = time.Now()
 	if res.Err() != nil {
 		return res.Err()
 	}
@@ -143,6 +163,7 @@ func (d *Database) DeleteGroup(userID string, groupName string) error {
 	}
 
 	res := d.UserSettings.FindOneAndReplace(context.Background(), bson.M{"user_id": userID}, user)
+	user.UpdatedAt = time.Now()
 	if res.Err() != nil {
 		return res.Err()
 	}
@@ -177,6 +198,7 @@ func (d *Database) AddToGroup(userID string, groupName string, channelIDs ...str
 	}
 
 	res := d.UserSettings.FindOneAndReplace(context.Background(), bson.M{"user_id": userID}, user)
+	user.UpdatedAt = time.Now()
 	if res.Err() != nil {
 		return nil, res.Err()
 	}
@@ -209,6 +231,7 @@ func (d *Database) RemoveFromGroup(userID string, groupName string, channelID ..
 
 		if len(found) > 0 {
 			res := d.UserSettings.FindOneAndReplace(context.Background(), bson.M{"user_id": userID}, user)
+			user.UpdatedAt = time.Now()
 			if res.Err() != nil {
 				return nil, res.Err()
 			}
@@ -246,4 +269,99 @@ func (us *UserSettings) Channels(parent string) []string {
 		return g.Children
 	}
 	return nil
+}
+
+func (d *Database) CreateFavourite(userID string, favourite *Favourite) (bool, error) {
+	var user *UserSettings
+	if user = d.FindUser(userID); user == nil {
+		user = NewUserSettings(userID)
+		err := d.InsertOneUser(user)
+		if err != nil {
+			return false, err
+		}
+	}
+
+	greatest := 0
+	exists := false
+	for _, fav := range user.Favourites {
+		if fav.URL == favourite.URL {
+			exists = true
+			break
+		}
+
+		if fav.ID > greatest {
+			greatest = fav.ID
+		}
+	}
+
+	if exists {
+		return false, nil
+	}
+
+	favourite.ID = greatest + 1
+
+	res := d.UserSettings.FindOneAndUpdate(
+		context.Background(),
+		bson.D{{"user_id", userID}},
+		bson.D{{"$push", bson.D{{"favourites", favourite}}}},
+		options.FindOneAndUpdate().SetReturnDocument(options.After),
+	)
+
+	var updated = &UserSettings{}
+	if err := res.Decode(updated); err != nil {
+		return false, err
+	}
+	userCache[userID] = updated
+	return false, nil
+}
+
+func (d *Database) DeleteFavouriteURL(userID, url string) (bool, error) {
+	if user := d.FindUser(userID); user == nil {
+		user = NewUserSettings(userID)
+		err := d.InsertOneUser(user)
+		if err != nil {
+			return false, err
+		}
+	}
+
+	res := d.UserSettings.FindOneAndUpdate(
+		context.Background(),
+		bson.D{{"user_id", userID}, {"favourites.url", url}},
+		bson.D{{"$pull", bson.D{{"favourites.url", url}}}},
+		options.FindOneAndUpdate().SetReturnDocument(options.After),
+	)
+
+	if res.Err() == nil {
+		var user *UserSettings
+		res.Decode(user)
+
+		userCache[userID] = user
+		return true, nil
+	}
+	return false, nil
+}
+
+func (d *Database) DeleteFavouriteID(userID string, id int) (bool, error) {
+	if d.FindUser(userID) == nil {
+		err := d.InsertOneUser(NewUserSettings(userID))
+		if err != nil {
+			return false, err
+		}
+	}
+
+	res := d.UserSettings.FindOneAndUpdate(
+		context.Background(),
+		bson.D{{"user_id", userID}, {"favourites.id", id}},
+		bson.D{{"$pull", bson.D{{"favourites.url", id}}}},
+		options.FindOneAndUpdate().SetReturnDocument(options.After),
+	)
+
+	if res.Err() == nil {
+		var user *UserSettings
+		res.Decode(user)
+
+		userCache[userID] = user
+		return true, nil
+	}
+	return false, nil
 }

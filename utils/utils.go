@@ -21,9 +21,10 @@ type Range struct {
 
 //PromptOptions is a struct that defines prompt's behaviour.
 type PromptOptions struct {
-	Actions map[string]bool
-	Message string
-	Timeout time.Duration
+	Actions         map[string]bool
+	Message         string
+	Timeout         time.Duration
+	TimeoutCallback TimeoutCallback
 }
 
 var (
@@ -170,8 +171,13 @@ func CreatePrompt(s *discordgo.Session, m *discordgo.MessageCreate, opts *Prompt
 		case k := <-nextMessageReactionAdd(s):
 			reaction = k.MessageReaction
 		case <-time.After(opts.Timeout):
-			s.ChannelMessageDelete(prompt.ChannelID, prompt.ID)
-			return false
+			if opts.TimeoutCallback != nil {
+				opts.TimeoutCallback(s, prompt)
+				return false
+			} else {
+				s.ChannelMessageDelete(prompt.ChannelID, prompt.ID)
+				return false
+			}
 		}
 
 		if _, ok := opts.Actions[reaction.Emoji.APIName()]; !ok {
@@ -186,6 +192,8 @@ func CreatePrompt(s *discordgo.Session, m *discordgo.MessageCreate, opts *Prompt
 		return opts.Actions[reaction.Emoji.APIName()]
 	}
 }
+
+type TimeoutCallback func(s *discordgo.Session, m *discordgo.Message)
 
 //CreatePromptWithMessage sends a prompt message to a discord channel
 func CreatePromptWithMessage(s *discordgo.Session, m *discordgo.MessageCreate, message *discordgo.MessageSend) bool {

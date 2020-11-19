@@ -20,6 +20,10 @@ func init() {
 		Name: "brainpower",
 		Exec: brainpower,
 	})
+	memes.AddCommand(&gumi.Command{
+		Name: "minesweeper",
+		Exec: minesweeper,
+	})
 }
 
 func borgar(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
@@ -36,5 +40,13 @@ func borgar(s *discordgo.Session, m *discordgo.MessageCreate, args []string) err
 
 func brainpower(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
 	s.ChannelMessageSend(m.ChannelID, "O-oooooooooo AAAAE-A-A-I-A-U- JO-oooooooooooo AAE-O-A-A-U-U-A- E-eee-ee-eee AAAAE-A-E-I-E-A-JO-ooo-oo-oo-oo EEEEO-A-AAA-AAAA")
+	return nil
+}
+
+func minesweeper(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
+	ms := &Minesweeper{}
+	ms.generateField()
+
+	s.ChannelMessageSend(m.ChannelID, ms.String())
 	return nil
 }

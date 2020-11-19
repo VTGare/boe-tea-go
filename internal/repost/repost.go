@@ -68,12 +68,6 @@ func init() {
 
 	MsgCache = ttlcache.NewCache()
 	MsgCache.SetTTL(10 * time.Minute)
-	MsgCache.SetExpirationCallback(func(key string, value interface{}) {
-		cache := value.(*CachedMessage)
-		m := cache.SentMessage
-
-		cache.session.MessageReactionRemove(m.ChannelID, m.ID, "🔄", cache.session.State.User.ID)
-	})
 }
 
 type ArtPost struct {
@@ -239,7 +233,8 @@ func sendMessage(s *discordgo.Session, m *discordgo.MessageCreate, send *discord
 		logrus.Warnln(err)
 	} else {
 		MsgCache.Set(msg.ChannelID+msg.ID, &CachedMessage{s, send, m, msg})
-		s.MessageReactionAdd(msg.ChannelID, msg.ID, "🔄")
+		s.MessageReactionAdd(msg.ChannelID, msg.ID, "💖")
+		s.MessageReactionAdd(msg.ChannelID, msg.ID, "🤤")
 	}
 }
 
@@ -264,7 +259,12 @@ func (a *ArtPost) Post(s *discordgo.Session, pixivOpts ...SendPixivOptions) erro
 			if guild.Repost == "strict" {
 				pixiv, twitter = a.RemoveReposts(reposts)
 
-				s.ChannelMessageSendEmbed(m.ChannelID, a.RepostEmbed(reposts))
+				repostMessage, _ := s.ChannelMessageSendEmbed(m.ChannelID, a.RepostEmbed(reposts))
+				go func() {
+					time.Sleep(15 * time.Second)
+					s.ChannelMessageDelete(repostMessage.ChannelID, repostMessage.ID)
+				}()
+
 				perm, err := utils.MemberHasPermission(s, m.GuildID, s.State.User.ID, 8|8192)
 				if err != nil {
 					return err
@@ -327,10 +327,16 @@ func (a *ArtPost) Post(s *discordgo.Session, pixivOpts ...SendPixivOptions) erro
 
 				prompt = utils.CreatePrompt(s, m, &utils.PromptOptions{
 					Actions: map[string]bool{
-						"👌": true,
+						"✅": true,
+						"❎": false,
 					},
 					Message: msg,
 					Timeout: 10 * time.Second,
+					TimeoutCallback: func(s *discordgo.Session, m *discordgo.Message) {
+						s.MessageReactionRemove(m.ChannelID, m.ID, "✅", s.State.User.ID)
+						s.MessageReactionRemove(m.ChannelID, m.ID, "❎", s.State.User.ID)
+						s.ChannelMessageEdit(m.ChannelID, m.ID, "<:AmeliaPhone:778148172203687947> Attention all mobile users! Tweet above has multiple images.")
+					},
 				})
 			}
 

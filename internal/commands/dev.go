@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/VTGare/boe-tea-go/internal/database"
-	"github.com/VTGare/boe-tea-go/internal/widget"
 	"github.com/VTGare/boe-tea-go/utils"
 	"github.com/VTGare/gumi"
 	"github.com/bwmarrin/discordgo"
@@ -32,10 +31,6 @@ func init() {
 	dg.AddCommand(&gumi.Command{
 		Name: "stats",
 		Exec: devstats,
-	})
-	dg.AddCommand(&gumi.Command{
-		Name: "test",
-		Exec: test,
 	})
 }
 
@@ -65,7 +60,7 @@ func updateDB(s *discordgo.Session, m *discordgo.MessageCreate, args []string) e
 		return nil
 	}
 
-	c := database.DB.GuildSettings
+	c := database.DB.UserSettings
 	res, err := c.UpdateMany(context.Background(), bson.M{}, bson.M{
 		"$set": bson.M{
 			"nsfw": true,
@@ -76,18 +71,6 @@ func updateDB(s *discordgo.Session, m *discordgo.MessageCreate, args []string) e
 	}
 
 	s.ChannelMessageSend(m.ChannelID, "Modified: "+strconv.FormatInt(res.ModifiedCount, 10))
-	return nil
-}
-
-func test(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
-	embeds := []*discordgo.MessageEmbed{{Title: "1", Description: ":2BPog:"}, {Title: "2", Description: ":2BVoHiYo:"}}
-
-	widget := widget.NewWidget(s, m.Author.ID, embeds)
-	err := widget.Start(m.ChannelID)
-	if err != nil {
-		return err
-	}
-
 	return nil
 }
 

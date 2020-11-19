@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
+	"time"
 
 	"github.com/VTGare/boe-tea-go/internal/commands"
 	"github.com/VTGare/boe-tea-go/internal/database"
@@ -114,30 +116,76 @@ func (b *Bot) reactCreated(s *discordgo.Session, r *discordgo.MessageReactionAdd
 		return
 	}
 
-	if repost.MsgCache.Count() > 0 {
-		key := r.ChannelID + r.MessageID
-		cache, ok := repost.MsgCache.Get(key)
-		if ok {
-			cache := cache.(*repost.CachedMessage)
-			if cache.OriginalMessage.Author.ID != r.UserID {
+	addFavourite := func(nsfw bool) {
+		user := database.DB.FindUser(r.UserID)
+		if user == nil {
+			user = database.NewUserSettings(r.UserID)
+			database.DB.InsertOneUser(user)
+		}
+
+		if msg, err := s.ChannelMessage(r.ChannelID, r.MessageID); err != nil {
+			log.Warnf("reactCreated() -> s.ChannelMessage(): %v", err)
+		} else {
+			if msg.Author.ID != s.State.User.ID || len(msg.Embeds) == 0 {
 				return
 			}
 
-			switch r.Emoji.APIName() {
-			case "🔄":
-				_, err := s.ChannelMessageEditEmbed(cache.SentMessage.ChannelID, cache.SentMessage.ID, cache.OriginalEmbed.Embed)
-				if err != nil {
-					log.Warnf("ChannelMessageDelete(): %v", err)
+			embed := msg.Embeds[0]
+			if embed.Footer == nil {
+				return
+			}
+
+			var favourite *database.Favourite
+			if strings.Contains(embed.URL, "twitter") && strings.Contains(embed.Footer.Text, "Twitter") {
+				favourite = &database.Favourite{
+					Author:    embed.Title[strings.Index(embed.Title, "@"):strings.LastIndex(embed.Title, ")")],
+					Thumbnail: embed.Image.URL,
+					URL:       embed.URL,
+					NSFW:      false,
+					CreatedAt: time.Now(),
+				}
+			} else if strings.Contains(embed.URL, "pixiv") && strings.Contains(embed.Title, "by") {
+				last := strings.LastIndex(embed.Title, ".")
+				if last == -1 {
+					last = len(embed.Title)
 				}
 
-				s.MessageReactionRemove(cache.SentMessage.ChannelID, cache.SentMessage.ID, "🔄", r.UserID)
-			case "❌":
+				favourite = &database.Favourite{
+					Title:     embed.Title[:strings.LastIndex(embed.Title, " by ")],
+					Author:    embed.Title[strings.LastIndex(embed.Title, " by ")+4 : last],
+					Thumbnail: embed.Image.URL,
+					URL:       embed.URL,
+					NSFW:      nsfw,
+					CreatedAt: time.Now(),
+				}
+			}
+
+			if favourite != nil {
+				database.DB.CreateFavourite(r.UserID, favourite)
+			}
+		}
+	}
+
+	switch r.Emoji.APIName() {
+	case "❌":
+		if repost.MsgCache.Count() > 0 {
+			key := r.ChannelID + r.MessageID
+			cache, ok := repost.MsgCache.Get(key)
+			if ok {
+				cache := cache.(*repost.CachedMessage)
+				if cache.OriginalMessage.Author.ID != r.UserID {
+					return
+				}
 				err := s.ChannelMessageDelete(cache.SentMessage.ChannelID, cache.SentMessage.ID)
 				if err != nil {
 					log.Warnf("ChannelMessageDelete(): %v", err)
 				}
 			}
 		}
+	case "💖":
+		addFavourite(false)
+	case "🤤":
+		addFavourite(true)
 	}
 }
 
