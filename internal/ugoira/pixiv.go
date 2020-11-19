@@ -151,9 +151,15 @@ func GetPixivPost(id string) (*PixivPost, error) {
 		tags = append(tags, t.Name)
 	}
 
+	author := ""
+	if illust.User != nil {
+		author = illust.User.Name
+	} else {
+		author = "Unknown"
+	}
 	post := &PixivPost{
 		ID:        id,
-		Author:    illust.User.Name,
+		Author:    author,
 		Type:      illust.Type,
 		Title:     illust.Title,
 		Tags:      tags,
