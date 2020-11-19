@@ -141,7 +141,7 @@ func (b *Bot) reactCreated(s *discordgo.Session, r *discordgo.MessageReactionAdd
 					Author:    embed.Title[strings.Index(embed.Title, "@"):strings.LastIndex(embed.Title, ")")],
 					Thumbnail: embed.Image.URL,
 					URL:       embed.URL,
-					NSFW:      false,
+					NSFW:      nsfw,
 					CreatedAt: time.Now(),
 				}
 			} else if strings.Contains(embed.URL, "pixiv") && strings.Contains(embed.Title, "by") {
