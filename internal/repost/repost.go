@@ -297,13 +297,6 @@ func (a *ArtPost) Post(s *discordgo.Session, pixivOpts ...SendPixivOptions) erro
 		}
 	}
 
-	if len(a.PixivMatches) > 0 {
-		if guild.Reactions {
-			s.MessageReactionAdd(a.event.ChannelID, a.event.ID, "💖")
-			s.MessageReactionAdd(a.event.ChannelID, a.event.ID, "🤤")
-		}
-	}
-
 	var posts []*ugoira.PixivPost
 	if guild.Pixiv && len(pixiv) > 0 {
 		var (
