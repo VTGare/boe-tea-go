@@ -2,6 +2,7 @@ package commands
 
 import (
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -11,6 +12,13 @@ import (
 	"github.com/VTGare/boe-tea-go/utils"
 	"github.com/VTGare/gumi"
 	"github.com/bwmarrin/discordgo"
+)
+
+var (
+	userSettingMap = map[string]settingFunc{
+		"crosspost": setBool,
+		"dm":        setBool,
+	}
 )
 
 func init() {
@@ -54,6 +62,17 @@ func init() {
 	unfavCmd.Help = gumi.NewHelpSettings().AddField("Usage", "bt!unfavourite <art link or ID>", false)
 	unfavCmd.Help.AddField("Art link", "A Twitter or Pixiv post link. It should match the link in your favourites list. For ease of use I recommend using IDs instead.", false)
 	unfavCmd.Help.AddField("ID", "Favourite ID, can be retrieved from favourite list. Use ``bt!fav`` command", false)
+
+	usersetCmd := ug.AddCommand(&gumi.Command{
+		Name:        "userset",
+		Aliases:     []string{""},
+		Description: "Show or change user settings",
+		Exec:        userset,
+		Cooldown:    5 * time.Second,
+	})
+
+	usersetCmd.Help = gumi.NewHelpSettings().AddField("Usage", "bt!userset <setting> <new setting>", false).AddField("Settings", "__Not required.__ Accepts: [crosspost, dm]", false)
+
 }
 
 func profile(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
@@ -70,10 +89,17 @@ func profile(s *discordgo.Session, m *discordgo.MessageCreate, args []string) er
 	for _, fav := range user.Favourites {
 		artists[fav.Author]++
 	}
+
+	keys := make([]string, 0, len(artists))
+	for key := range artists {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
 	favourite := ""
 	greatest := 0
-	for key, val := range artists {
-		if val > greatest {
+	for _, key := range keys {
+		if val := artists[key]; val > greatest {
 			favourite = key
 			greatest = val
 		}
@@ -267,7 +293,7 @@ func compactFavourites(fav []*database.Favourite) []*discordgo.MessageEmbed {
 	embeds[page] = defaultEmbed()
 	count := 0
 	for ind, f := range fav {
-		sb.WriteString(fmt.Sprintf("``%v | ID: %v.`` [%v](%v)\n", ind+1, f.ID, f.Title+" ("+f.Author+")", f.URL))
+		sb.WriteString(fmt.Sprintf("`%v | ID: %v.` [%v](%v)\n", ind+1, f.ID, f.Title+" ("+f.Author+")", f.URL))
 		count++
 
 		if count == perPage {
@@ -339,4 +365,68 @@ func unfavourite(s *discordgo.Session, m *discordgo.MessageCreate, args []string
 		})
 	}
 	return nil
+}
+
+func userset(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
+	user := database.DB.FindUser(m.Author.ID)
+
+	if user != nil {
+		if length := len(args); length == 0 {
+			showUserSettings(s, m, user)
+		} else if length >= 2 {
+			setting := args[0]
+			newSetting := strings.ToLower(args[1])
+
+			if new, ok := userSettingMap[setting]; ok {
+				n, err := new(s, m, newSetting)
+				if err != nil {
+					return err
+				}
+				err = database.DB.ChangeUserSetting(m.Author.ID, setting, n)
+				if err != nil {
+					return err
+				}
+				embed := &discordgo.MessageEmbed{
+					Title: "✅ Successfully changed a setting!",
+					Fields: []*discordgo.MessageEmbedField{
+						{
+							Name:   "Setting",
+							Value:  setting,
+							Inline: true,
+						},
+						{
+							Name:   "New value",
+							Value:  newSetting,
+							Inline: true,
+						},
+					},
+					Color:     utils.EmbedColor,
+					Timestamp: utils.EmbedTimestamp(),
+				}
+				s.ChannelMessageSendEmbed(m.ChannelID, embed)
+			} else {
+				return fmt.Errorf("invalid setting name: %v", setting)
+			}
+		}
+	}
+
+	return nil
+}
+
+func showUserSettings(s *discordgo.Session, m *discordgo.MessageCreate, user *database.UserSettings) {
+	s.ChannelMessageSendEmbed(m.ChannelID, &discordgo.MessageEmbed{
+		Title:       "User settings",
+		Description: m.Author.String(),
+		Color:       utils.EmbedColor,
+		Fields: []*discordgo.MessageEmbedField{
+			{
+				Name:  "General",
+				Value: fmt.Sprintf("**Crosspost:** %v | **DM:** %v", utils.FormatBool(user.Crosspost), utils.FormatBool(user.DM)),
+			},
+		},
+		Thumbnail: &discordgo.MessageEmbedThumbnail{
+			URL: m.Author.AvatarURL(""),
+		},
+		Timestamp: utils.EmbedTimestamp(),
+	})
 }

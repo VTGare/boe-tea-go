@@ -15,6 +15,7 @@ var (
 
 type UserSettings struct {
 	ID            string       `json:"user_id" bson:"user_id"`
+	DM            bool         `json:"dm" bson:"dm"`
 	Crosspost     bool         `json:"crosspost" bson:"crosspost"`
 	Favourites    []*Favourite `json:"favourites" bson:"favourites"`
 	ChannelGroups []*Group     `json:"channel_groups" bson:"channel_groups"`
@@ -364,4 +365,24 @@ func (d *Database) DeleteFavouriteID(userID string, id int) (bool, error) {
 		return true, nil
 	}
 	return false, nil
+}
+
+func (d *Database) ChangeUserSetting(userID, setting string, newSetting interface{}) error {
+	res := d.UserSettings.FindOneAndUpdate(context.Background(), bson.M{
+		"user_id": userID,
+	}, bson.M{
+		"$set": bson.M{
+			setting:      newSetting,
+			"updated_at": time.Now(),
+		},
+	}, options.FindOneAndUpdate().SetReturnDocument(options.After))
+
+	user := &UserSettings{}
+	err := res.Decode(user)
+	if err != nil {
+		return err
+	}
+
+	userCache[userID] = user
+	return nil
 }

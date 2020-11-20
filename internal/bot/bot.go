@@ -201,17 +201,19 @@ func (b *Bot) reactCreated(s *discordgo.Session, r *discordgo.MessageReactionAdd
 					log.Warnf("databas.DB.CreateFavourite() -> Error while adding a favourite: %v", err)
 				}
 
-				if success {
+				if success && user.DM {
 					ch, err := s.UserChannelCreate(user.ID)
 					if err != nil {
 						log.Warnf("s.UserChannelCreate -> %v", err)
 					} else {
-						s.ChannelMessageSendEmbed(ch.ID, &discordgo.MessageEmbed{
-							Title:       "✅ Sucessfully added an artwork to favourites",
-							Timestamp:   utils.EmbedTimestamp(),
-							Color:       utils.EmbedColor,
-							Thumbnail:   &discordgo.MessageEmbedThumbnail{URL: favourite.Thumbnail},
-							Description: fmt.Sprintf("```\nID: %v\nURL: %v\nNSFW: %v```", favourite.ID, favourite.URL, favourite.NSFW),
+						s.ChannelMessageSendComplex(ch.ID, &discordgo.MessageSend{
+							Embed: &discordgo.MessageEmbed{
+								Title:       "✅ Sucessfully added an artwork to favourites",
+								Timestamp:   utils.EmbedTimestamp(),
+								Color:       utils.EmbedColor,
+								Thumbnail:   &discordgo.MessageEmbedThumbnail{URL: favourite.Thumbnail},
+								Description: fmt.Sprintf("Don't like DMs? Execute `bt!userset dm disabled`\n```\nID: %v\nURL: %v\nNSFW: %v```", favourite.ID, favourite.URL, favourite.NSFW),
+							},
 						})
 					}
 				}
@@ -305,16 +307,18 @@ func (b *Bot) reactRemoved(s *discordgo.Session, r *discordgo.MessageReactionRem
 					success, err := database.DB.DeleteFavouriteURL(user.ID, tweet.URL)
 					if err != nil {
 						logrus.Warnln("DeleteFavouriteURL -> %v", err)
-					} else if success {
+					} else if success && user.DM {
 						ch, err := s.UserChannelCreate(user.ID)
 						if err != nil {
 							log.Warnf("s.UserChannelCreate -> %v", err)
 						} else {
-							s.ChannelMessageSendEmbed(ch.ID, &discordgo.MessageEmbed{
-								Title:       "✅ Sucessfully removed an artwork from favourites",
-								Timestamp:   utils.EmbedTimestamp(),
-								Color:       utils.EmbedColor,
-								Description: fmt.Sprintf("```\nURL: %v```", twitterURL),
+							s.ChannelMessageSendComplex(ch.ID, &discordgo.MessageSend{
+								Embed: &discordgo.MessageEmbed{
+									Title:       "✅ Sucessfully removed an artwork from favourites",
+									Timestamp:   utils.EmbedTimestamp(),
+									Color:       utils.EmbedColor,
+									Description: fmt.Sprintf("Don't like DMs? Execute `bt!userset dm disabled`\n```\nURL: %v```", twitterURL),
+								},
 							})
 						}
 					}
