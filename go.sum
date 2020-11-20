@@ -26,6 +26,7 @@ github.com/VTGare/sengoku v0.1.2 h1:5z/9N/HqzYQ/XD5Yrhl29zOX2KymZOOn3K3oC8MGkTc=
 github.com/VTGare/sengoku v0.1.2/go.mod h1:zJ6kmJNQrvLP73knCFl9hPSs/A6k812d9duax+fMLaI=
 github.com/VTGare/sengoku v0.1.3 h1:s6t+jjIzUP2JbWoSl8IT3lLEZUzbd8DeoxWShCOsv1k=
 github.com/VTGare/sengoku v0.1.3/go.mod h1:zJ6kmJNQrvLP73knCFl9hPSs/A6k812d9duax+fMLaI=
+github.com/VTGare/sengoku v0.1.4 h1:gzotJ8u/ziw4er44DyrsunfqbqlpzNE8Kdmde6OGeYw=
 github.com/VTGare/sengoku v0.1.4/go.mod h1:zJ6kmJNQrvLP73knCFl9hPSs/A6k812d9duax+fMLaI=
 github.com/andybalholm/brotli v1.0.0 h1:7UCwP93aiSfvWpapti8g88vVVGp2qqtGyePsSuDafo4=
 github.com/andybalholm/brotli v1.0.0/go.mod h1:loMXtMfwqflxFJPmdbJO0a3KNoPuLBgiu3qAvBg8x/Y=

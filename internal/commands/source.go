@@ -293,14 +293,15 @@ func saucenaoToEmbed(source *sengoku.Sauce, index, length int) *discordgo.Messag
 	embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{Name: "Similarity", Value: fmt.Sprintf("%v", source.Similarity)})
 
 	if source.Author != nil {
-		str := ""
-		if source.Author.URL != "" {
-			str = fmt.Sprintf("[%v](%v)", source.Author.Name, source.Author.URL)
-		} else {
-			str = source.Author.Name
+		if source.Author.Name != "" {
+			str := ""
+			if source.Author.URL != "" {
+				str = fmt.Sprintf("[%v](%v)", source.Author.Name, source.Author.URL)
+			} else {
+				str = source.Author.Name
+			}
+			embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{Name: "Author", Value: str})
 		}
-
-		embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{Name: "Author", Value: str})
 	}
 
 	if str := joinSauceURLs(source.URLs.ExternalURLs, " • "); str != "" {
