@@ -458,6 +458,9 @@ func iqdbEmbed(source *iqdbgo.Match, best bool, index, length int) *discordgo.Me
 		matchType = "Possible match"
 	}
 
+	if strings.HasPrefix(source.URL, "http:") {
+		source.URL = strings.Replace(source.URL, "http:", "https:", 1)
+	}
 	if !strings.HasPrefix(source.URL, "https:") {
 		source.URL = "https:" + source.URL
 	}
