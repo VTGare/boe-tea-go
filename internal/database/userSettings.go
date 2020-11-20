@@ -311,8 +311,9 @@ func (d *Database) CreateFavourite(userID string, favourite *Favourite) (bool, e
 	if err := res.Decode(updated); err != nil {
 		return false, err
 	}
+
 	userCache[userID] = updated
-	return false, nil
+	return true, nil
 }
 
 func (d *Database) DeleteFavouriteURL(userID, url string) (bool, error) {

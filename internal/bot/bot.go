@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 	"time"
 
@@ -15,6 +14,7 @@ import (
 	"github.com/VTGare/boe-tea-go/pkg/tsuita"
 	"github.com/VTGare/boe-tea-go/utils"
 	"github.com/bwmarrin/discordgo"
+	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -118,24 +118,29 @@ func (b *Bot) reactCreated(s *discordgo.Session, r *discordgo.MessageReactionAdd
 		return
 	}
 
-	if user, _ := s.User(r.UserID); user != nil {
-		if user.Bot {
-			return
-		}
-	}
-
 	addFavourite := func(nsfw bool) {
+		log.Infof("Adding a favourite. NSFW: %v", nsfw)
 		user := database.DB.FindUser(r.UserID)
 		if user == nil {
+			log.Infof("User not found. Adding a new user. User ID: %v", r.UserID)
 			user = database.NewUserSettings(r.UserID)
-			database.DB.InsertOneUser(user)
+			err := database.DB.InsertOneUser(user)
+			if err != nil {
+				log.Warnf("User while adding a user. User ID: %v. Err: %v", r.UserID, err)
+				return
+			}
 		}
 
 		if msg, err := s.ChannelMessage(r.ChannelID, r.MessageID); err != nil {
 			log.Warnf("reactCreated() -> s.ChannelMessage(): %v", err)
 		} else {
+			if len(msg.Embeds) != 0 && msg.Author.ID == s.State.User.ID {
+				if msg.Embeds[0].URL != "" {
+					msg.Content = msg.Embeds[0].URL
+				}
+			}
 			art := repost.NewPost(&discordgo.MessageCreate{msg})
-			if len(msg.Embeds) == 0 && art.Len() == 0 {
+			if art.Len() == 0 {
 				return
 			}
 
@@ -148,6 +153,7 @@ func (b *Bot) reactCreated(s *discordgo.Session, r *discordgo.MessageReactionAdd
 					break
 				}
 
+				log.Infof("Detected Pixiv art to favourite. User ID: %v. Pixiv ID: %v", r.UserID, pixivID)
 				pixiv, err := ugoira.GetPixivPost(pixivID)
 				if err != nil {
 					log.Warnf("addFavorite -> GetPixivPost: %v", err)
@@ -170,6 +176,7 @@ func (b *Bot) reactCreated(s *discordgo.Session, r *discordgo.MessageReactionAdd
 					break
 				}
 
+				log.Infof("Detected Twitter art to favourite. User ID: %v. Tweet: %v", r.UserID, twitterURL)
 				tweet, err := tsuita.GetTweet(twitterURL)
 				if err != nil {
 					log.Warnf("addFavorite -> GetTwitterPost: %v", err)
@@ -186,36 +193,28 @@ func (b *Bot) reactCreated(s *discordgo.Session, r *discordgo.MessageReactionAdd
 						CreatedAt: time.Now(),
 					}
 				}
-			case len(msg.Embeds) != 0:
-				embed := msg.Embeds[0]
-				switch {
-				case strings.Contains(embed.URL, "twitter") && strings.Contains(embed.Footer.Text, "Twitter"):
-					favourite = &database.Favourite{
-						Author:    embed.Title[strings.Index(embed.Title, "@")+1 : strings.LastIndex(embed.Title, ")")],
-						Thumbnail: embed.Image.URL,
-						URL:       embed.URL,
-						NSFW:      nsfw,
-						CreatedAt: time.Now(),
-					}
-				case strings.Contains(embed.URL, "pixiv") && strings.Contains(embed.Title, "by"):
-					last := strings.LastIndex(embed.Title, ".")
-					if last == -1 {
-						last = len(embed.Title)
-					}
-
-					favourite = &database.Favourite{
-						Title:     embed.Title[:strings.LastIndex(embed.Title, " by ")],
-						Author:    embed.Title[strings.LastIndex(embed.Title, " by ")+4 : last],
-						Thumbnail: embed.Image.URL,
-						URL:       embed.URL,
-						NSFW:      nsfw,
-						CreatedAt: time.Now(),
-					}
-				}
 			}
 
 			if favourite != nil {
-				database.DB.CreateFavourite(r.UserID, favourite)
+				success, err := database.DB.CreateFavourite(r.UserID, favourite)
+				if err != nil {
+					log.Warnf("databas.DB.CreateFavourite() -> Error while adding a favourite: %v", err)
+				}
+
+				if success {
+					ch, err := s.UserChannelCreate(user.ID)
+					if err != nil {
+						log.Warnf("s.UserChannelCreate -> %v", err)
+					} else {
+						s.ChannelMessageSendEmbed(ch.ID, &discordgo.MessageEmbed{
+							Title:       "✅ Sucessfully added an artwork to favourites",
+							Timestamp:   utils.EmbedTimestamp(),
+							Color:       utils.EmbedColor,
+							Thumbnail:   &discordgo.MessageEmbedThumbnail{URL: favourite.Thumbnail},
+							Description: fmt.Sprintf("```\nID: %v\nURL: %v\nNSFW: %v```", favourite.ID, favourite.URL, favourite.NSFW),
+						})
+					}
+				}
 			}
 		}
 	}
@@ -248,59 +247,77 @@ func (b *Bot) reactRemoved(s *discordgo.Session, r *discordgo.MessageReactionRem
 		return
 	}
 
-	if user, _ := s.User(r.UserID); user != nil {
-		if user.Bot {
-			return
-		}
-	}
-
-	if r.Emoji.APIName() != "💖" && r.Emoji.APIName() != "🤤" {
-		return
-	}
-
-	user := database.DB.FindUser(r.UserID)
-	if user != nil {
-		if msg, err := s.ChannelMessage(r.ChannelID, r.MessageID); err != nil {
-			log.Warnf("reactCreated() -> s.ChannelMessage(): %v", err)
-		} else {
-			art := repost.NewPost(&discordgo.MessageCreate{msg})
-			if len(msg.Embeds) == 0 && art.Len() == 0 {
-				return
-			}
-
-			switch {
-			case len(art.PixivMatches) > 0:
-				pixivID := ""
-				for k := range art.PixivMatches {
-					pixivID = k
-					break
+	if r.Emoji.APIName() == "💖" || r.Emoji.APIName() == "🤤" {
+		log.Infof("Removing a favourite. User ID: %s", r.UserID)
+		user := database.DB.FindUser(r.UserID)
+		if user != nil {
+			if msg, err := s.ChannelMessage(r.ChannelID, r.MessageID); err != nil {
+				log.Warnf("reactCreated() -> s.ChannelMessage(): %v", err)
+			} else {
+				if len(msg.Embeds) != 0 && msg.Author.ID == s.State.User.ID {
+					if msg.Embeds[0].URL != "" {
+						msg.Content = msg.Embeds[0].URL
+					}
 				}
-
-				if f, _ := database.DB.DeleteFavouriteURL(user.ID, "https://pixiv.net/en/artworks/"+pixivID); !f {
-					database.DB.DeleteFavouriteURL(user.ID, "https://pixiv.net/artworks/"+pixivID)
-				}
-			case len(art.TwitterMatches) > 0:
-				twitterURL := ""
-				for k := range art.TwitterMatches {
-					twitterURL = "https://twitter.com/i/status/" + k
-					break
-				}
-
-				tweet, err := tsuita.GetTweet(twitterURL)
-				if err != nil {
-					log.Warnf("reactRemoved -> GetTweet: %v", err)
-					s.ChannelMessageSendComplex(r.ChannelID, commands.Router.ErrorHandler(fmt.Errorf("Error while adding a favourite: %v", err)))
+				art := repost.NewPost(&discordgo.MessageCreate{msg})
+				if art.Len() == 0 {
 					return
 				}
 
-				database.DB.DeleteFavouriteURL(user.ID, tweet.URL)
-			case len(msg.Embeds) != 0:
-				embed := msg.Embeds[0]
 				switch {
-				case strings.Contains(embed.URL, "twitter") && strings.Contains(embed.Footer.Text, "Twitter"):
-					database.DB.DeleteFavouriteURL(user.ID, embed.URL)
-				case strings.Contains(embed.URL, "pixiv") && strings.Contains(embed.Title, "by"):
-					database.DB.DeleteFavouriteURL(user.ID, embed.URL)
+				case len(art.PixivMatches) > 0:
+					pixivURL := ""
+					for k := range art.PixivMatches {
+						pixivURL = "https://pixiv.net/en/artworks/" + k
+						break
+					}
+
+					success, err := database.DB.DeleteFavouriteURL(user.ID, pixivURL)
+					if err != nil {
+						logrus.Warnln("DeleteFavouriteURL -> %v", err)
+					} else if success {
+						ch, err := s.UserChannelCreate(user.ID)
+						if err != nil {
+							log.Warnf("s.UserChannelCreate -> %v", err)
+						} else {
+							s.ChannelMessageSendEmbed(ch.ID, &discordgo.MessageEmbed{
+								Title:       "✅ Sucessfully removed an artwork from favourites",
+								Timestamp:   utils.EmbedTimestamp(),
+								Color:       utils.EmbedColor,
+								Description: fmt.Sprintf("```\nURL: %v```", pixivURL),
+							})
+						}
+					}
+				case len(art.TwitterMatches) > 0:
+					twitterURL := ""
+					for k := range art.TwitterMatches {
+						twitterURL = "https://twitter.com/i/status/" + k
+						break
+					}
+
+					tweet, err := tsuita.GetTweet(twitterURL)
+					if err != nil {
+						log.Warnf("reactRemoved -> GetTweet: %v", err)
+						s.ChannelMessageSendComplex(r.ChannelID, commands.Router.ErrorHandler(fmt.Errorf("Error while adding a favourite: %v", err)))
+						return
+					}
+
+					success, err := database.DB.DeleteFavouriteURL(user.ID, tweet.URL)
+					if err != nil {
+						logrus.Warnln("DeleteFavouriteURL -> %v", err)
+					} else if success {
+						ch, err := s.UserChannelCreate(user.ID)
+						if err != nil {
+							log.Warnf("s.UserChannelCreate -> %v", err)
+						} else {
+							s.ChannelMessageSendEmbed(ch.ID, &discordgo.MessageEmbed{
+								Title:       "✅ Sucessfully removed an artwork from favourites",
+								Timestamp:   utils.EmbedTimestamp(),
+								Color:       utils.EmbedColor,
+								Description: fmt.Sprintf("```\nURL: %v```", twitterURL),
+							})
+						}
+					}
 				}
 			}
 		}
