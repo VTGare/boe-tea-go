@@ -21,6 +21,7 @@ type GuildSettings struct {
 	Limit         int       `bson:"limit" json:"limit"`
 	Pixiv         bool      `bson:"pixiv" json:"pixiv"`
 	Twitter       bool      `bson:"twitter" json:"twitter"`
+	Reactions     bool      `bson:"reactions" json:"reactions"`
 	TwitterPrompt bool      `bson:"twitterprompt" json:"twitterprompt"`
 	Crosspost     bool      `bson:"crosspost" json:"crosspost"`
 	NSFW          bool      `bson:"nsfw" json:"nsfw"`
@@ -38,6 +39,7 @@ func DefaultGuildSettings(guildID string) *GuildSettings {
 		Pixiv:         true,
 		Twitter:       false,
 		TwitterPrompt: false,
+		Reactions:     true,
 		Crosspost:     true,
 		NSFW:          true,
 		Repost:        "disabled",

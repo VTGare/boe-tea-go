@@ -199,7 +199,7 @@ type TimeoutCallback func(s *discordgo.Session, m *discordgo.Message)
 func CreatePromptWithMessage(s *discordgo.Session, m *discordgo.MessageCreate, message *discordgo.MessageSend) bool {
 	var (
 		timeout = 45 * time.Second
-		actions = map[string]bool{"👌": true, "🙅‍♂️": false}
+		actions = map[string]bool{"✅": true, "❎": false}
 	)
 
 	prompt, err := s.ChannelMessageSendComplex(m.ChannelID, message)

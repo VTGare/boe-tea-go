@@ -459,7 +459,7 @@ func twitter(s *discordgo.Session, m *discordgo.MessageCreate, args []string) er
 				log.Warnln(err)
 			}
 
-			if msg != nil {
+			if msg != nil && guild.Reactions {
 				s.MessageReactionAdd(msg.ChannelID, msg.ID, "💖")
 				s.MessageReactionAdd(msg.ChannelID, msg.ID, "🤤")
 			}

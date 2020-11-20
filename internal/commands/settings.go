@@ -22,6 +22,7 @@ func init() {
 	settingMap["nsfw"] = setBool
 	settingMap["pixiv"] = setBool
 	settingMap["twitter"] = setBool
+	settingMap["reactions"] = setBool
 	settingMap["twitterprompt"] = setBool
 	settingMap["crosspost"] = setBool
 	settingMap["prefix"] = setPrefix
@@ -103,7 +104,7 @@ func showGuildSettings(s *discordgo.Session, m *discordgo.MessageCreate, setting
 			},
 			{
 				Name:  "Features",
-				Value: fmt.Sprintf("**Repost:** %v | **Crosspost**: %v", settings.Repost, utils.FormatBool(settings.Crosspost)),
+				Value: fmt.Sprintf("**Repost:** %v | **Crosspost**: %v | **Auto-react (reactions):** %v", settings.Repost, utils.FormatBool(settings.Crosspost), utils.FormatBool(settings.Reactions)),
 			},
 			{
 				Name:  "Pixiv settings",

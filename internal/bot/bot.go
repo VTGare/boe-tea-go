@@ -118,6 +118,12 @@ func (b *Bot) reactCreated(s *discordgo.Session, r *discordgo.MessageReactionAdd
 		return
 	}
 
+	if user, _ := s.User(r.UserID); user != nil {
+		if user.Bot {
+			return
+		}
+	}
+
 	addFavourite := func(nsfw bool) {
 		user := database.DB.FindUser(r.UserID)
 		if user == nil {
@@ -166,7 +172,7 @@ func (b *Bot) reactCreated(s *discordgo.Session, r *discordgo.MessageReactionAdd
 
 				tweet, err := tsuita.GetTweet(twitterURL)
 				if err != nil {
-					log.Warnf("addFavorite -> GetPixivPost: %v", err)
+					log.Warnf("addFavorite -> GetTwitterPost: %v", err)
 					s.ChannelMessageSendComplex(r.ChannelID, commands.Router.ErrorHandler(fmt.Errorf("Error while adding a favourite: %v", err)))
 					return
 				}
@@ -240,6 +246,12 @@ func (b *Bot) reactCreated(s *discordgo.Session, r *discordgo.MessageReactionAdd
 func (b *Bot) reactRemoved(s *discordgo.Session, r *discordgo.MessageReactionRemove) {
 	if r.UserID == s.State.User.ID {
 		return
+	}
+
+	if user, _ := s.User(r.UserID); user != nil {
+		if user.Bot {
+			return
+		}
 	}
 
 	if r.Emoji.APIName() != "💖" && r.Emoji.APIName() != "🤤" {

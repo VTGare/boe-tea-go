@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/VTGare/boe-tea-go/internal/database"
 	"github.com/VTGare/boe-tea-go/pkg/tsuita"
 	"github.com/VTGare/boe-tea-go/utils"
 	"github.com/bwmarrin/discordgo"
@@ -19,11 +20,25 @@ var (
 func (a *ArtPost) SendTwitter(s *discordgo.Session, tweetMap map[string]bool, skipFirst bool) ([][]*discordgo.MessageSend, error) {
 	var (
 		tweets = make([][]*discordgo.MessageSend, 0)
+		guild  = database.GuildCache[a.event.GuildID]
 	)
 
 	t, err := a.fetchTwitterPosts(tweetMap)
 	if err != nil {
 		return nil, err
+	}
+
+	var flag bool
+	for _, tweet := range t {
+		if len(tweet.Gallery) > 0 {
+			flag = true
+			break
+		}
+	}
+
+	if flag && a.event != nil && guild.Reactions {
+		s.MessageReactionAdd(a.event.ChannelID, a.event.ID, "💖")
+		s.MessageReactionAdd(a.event.ChannelID, a.event.ID, "🤤")
 	}
 
 	if skipFirst {

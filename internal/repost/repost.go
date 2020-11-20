@@ -233,8 +233,12 @@ func sendMessage(s *discordgo.Session, m *discordgo.MessageCreate, send *discord
 		logrus.Warnln(err)
 	} else {
 		MsgCache.Set(msg.ChannelID+msg.ID, &CachedMessage{s, send, m, msg})
-		s.MessageReactionAdd(msg.ChannelID, msg.ID, "💖")
-		s.MessageReactionAdd(msg.ChannelID, msg.ID, "🤤")
+		if g, ok := database.GuildCache[m.GuildID]; ok {
+			if g.Reactions {
+				s.MessageReactionAdd(msg.ChannelID, msg.ID, "💖")
+				s.MessageReactionAdd(msg.ChannelID, msg.ID, "🤤")
+			}
+		}
 	}
 }
 
@@ -280,7 +284,7 @@ func (a *ArtPost) Post(s *discordgo.Session, pixivOpts ...SendPixivOptions) erro
 			} else if guild.Repost == "enabled" {
 				if a.PixivReposts(reposts) > 0 && guild.Pixiv {
 					prompt := utils.CreatePromptWithMessage(s, m, &discordgo.MessageSend{
-						Content: "Following posts are reposts, react 👌 to post them.",
+						Content: "Following posts are reposts, react ✅ to post them.",
 						Embed:   a.RepostEmbed(reposts),
 					})
 					if !prompt {
@@ -293,9 +297,11 @@ func (a *ArtPost) Post(s *discordgo.Session, pixivOpts ...SendPixivOptions) erro
 		}
 	}
 
-	if a.Len() > 0 {
-		s.MessageReactionAdd(a.event.ChannelID, a.event.ID, "💖")
-		s.MessageReactionAdd(a.event.ChannelID, a.event.ID, "🤤")
+	if len(a.PixivMatches) > 0 {
+		if guild.Reactions {
+			s.MessageReactionAdd(a.event.ChannelID, a.event.ID, "💖")
+			s.MessageReactionAdd(a.event.ChannelID, a.event.ID, "🤤")
+		}
 	}
 
 	var posts []*ugoira.PixivPost
