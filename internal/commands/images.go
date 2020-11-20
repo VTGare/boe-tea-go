@@ -454,9 +454,14 @@ func twitter(s *discordgo.Session, m *discordgo.MessageCreate, args []string) er
 
 	for _, t := range tweets {
 		for _, send := range t {
-			_, err := s.ChannelMessageSendComplex(m.ChannelID, send)
+			msg, err := s.ChannelMessageSendComplex(m.ChannelID, send)
 			if err != nil {
 				log.Warnln(err)
+			}
+
+			if msg != nil {
+				s.MessageReactionAdd(msg.ChannelID, msg.ID, "💖")
+				s.MessageReactionAdd(msg.ChannelID, msg.ID, "🤤")
 			}
 		}
 	}

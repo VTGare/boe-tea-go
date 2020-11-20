@@ -19,7 +19,7 @@ import (
 func init() {
 	sg := Router.AddGroup(&gumi.Group{
 		Name:        "source",
-		Description: "Source, repost and image manipulation commands",
+		Description: "Reverse search engines",
 		IsVisible:   true,
 	})
 

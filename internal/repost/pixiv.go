@@ -258,6 +258,10 @@ func createPixivEmbed(post *ugoira.PixivPost, ind int, easter *embedMessage) *di
 					Value:  fmt.Sprintf("[Click here desu~](%v)", original),
 					Inline: true,
 				},
+				{
+					Name:  "Bookmarking guide",
+					Value: fmt.Sprintf("💖 - bookmark as sfw | 🤤 - bookmark as nsfw"),
+				},
 			},
 			Image: &discordgo.MessageEmbedImage{
 				URL: preview,

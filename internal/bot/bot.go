@@ -11,6 +11,8 @@ import (
 	"github.com/VTGare/boe-tea-go/internal/commands"
 	"github.com/VTGare/boe-tea-go/internal/database"
 	"github.com/VTGare/boe-tea-go/internal/repost"
+	"github.com/VTGare/boe-tea-go/internal/ugoira"
+	"github.com/VTGare/boe-tea-go/pkg/tsuita"
 	"github.com/VTGare/boe-tea-go/utils"
 	"github.com/bwmarrin/discordgo"
 	log "github.com/sirupsen/logrus"
@@ -48,9 +50,9 @@ func NewBot(token string) (*Bot, error) {
 	dg.AddHandler(bot.messageCreated)
 	dg.AddHandler(bot.onReady)
 	dg.AddHandler(bot.reactCreated)
-	dg.AddHandler(bot.messageDeleted)
 	dg.AddHandler(bot.guildCreated)
 	dg.AddHandler(bot.guildDeleted)
+	dg.AddHandler(bot.reactRemoved)
 	dg.Identify.Intents = discordgo.MakeIntent(discordgo.IntentsAllWithoutPrivileged)
 
 	BoeTea = bot
@@ -126,37 +128,83 @@ func (b *Bot) reactCreated(s *discordgo.Session, r *discordgo.MessageReactionAdd
 		if msg, err := s.ChannelMessage(r.ChannelID, r.MessageID); err != nil {
 			log.Warnf("reactCreated() -> s.ChannelMessage(): %v", err)
 		} else {
-			if msg.Author.ID != s.State.User.ID || len(msg.Embeds) == 0 {
-				return
-			}
-
-			embed := msg.Embeds[0]
-			if embed.Footer == nil {
+			art := repost.NewPost(&discordgo.MessageCreate{msg})
+			if len(msg.Embeds) == 0 && art.Len() == 0 {
 				return
 			}
 
 			var favourite *database.Favourite
-			if strings.Contains(embed.URL, "twitter") && strings.Contains(embed.Footer.Text, "Twitter") {
-				favourite = &database.Favourite{
-					Author:    embed.Title[strings.Index(embed.Title, "@"):strings.LastIndex(embed.Title, ")")],
-					Thumbnail: embed.Image.URL,
-					URL:       embed.URL,
-					NSFW:      nsfw,
-					CreatedAt: time.Now(),
+			switch {
+			case len(art.PixivMatches) > 0:
+				pixivID := ""
+				for k := range art.PixivMatches {
+					pixivID = k
+					break
 				}
-			} else if strings.Contains(embed.URL, "pixiv") && strings.Contains(embed.Title, "by") {
-				last := strings.LastIndex(embed.Title, ".")
-				if last == -1 {
-					last = len(embed.Title)
+
+				pixiv, err := ugoira.GetPixivPost(pixivID)
+				if err != nil {
+					log.Warnf("addFavorite -> GetPixivPost: %v", err)
+					s.ChannelMessageSendComplex(r.ChannelID, commands.Router.ErrorHandler(fmt.Errorf("Error while adding a favourite: %v", err)))
+					return
 				}
 
 				favourite = &database.Favourite{
-					Title:     embed.Title[:strings.LastIndex(embed.Title, " by ")],
-					Author:    embed.Title[strings.LastIndex(embed.Title, " by ")+4 : last],
-					Thumbnail: embed.Image.URL,
-					URL:       embed.URL,
+					Title:     pixiv.Title,
+					Author:    pixiv.Author,
+					Thumbnail: pixiv.Images.Preview[0].Kotori,
+					URL:       fmt.Sprintf("https://pixiv.net/en/artworks/%v", pixiv.ID),
 					NSFW:      nsfw,
 					CreatedAt: time.Now(),
+				}
+			case len(art.TwitterMatches) > 0:
+				twitterURL := ""
+				for k := range art.TwitterMatches {
+					twitterURL = "https://twitter.com/i/status/" + k
+					break
+				}
+
+				tweet, err := tsuita.GetTweet(twitterURL)
+				if err != nil {
+					log.Warnf("addFavorite -> GetPixivPost: %v", err)
+					s.ChannelMessageSendComplex(r.ChannelID, commands.Router.ErrorHandler(fmt.Errorf("Error while adding a favourite: %v", err)))
+					return
+				}
+
+				if len(tweet.Gallery) > 0 {
+					favourite = &database.Favourite{
+						Author:    tweet.Username,
+						Thumbnail: tweet.Gallery[0].URL,
+						URL:       tweet.URL,
+						NSFW:      nsfw,
+						CreatedAt: time.Now(),
+					}
+				}
+			case len(msg.Embeds) != 0:
+				embed := msg.Embeds[0]
+				switch {
+				case strings.Contains(embed.URL, "twitter") && strings.Contains(embed.Footer.Text, "Twitter"):
+					favourite = &database.Favourite{
+						Author:    embed.Title[strings.Index(embed.Title, "@")+1 : strings.LastIndex(embed.Title, ")")],
+						Thumbnail: embed.Image.URL,
+						URL:       embed.URL,
+						NSFW:      nsfw,
+						CreatedAt: time.Now(),
+					}
+				case strings.Contains(embed.URL, "pixiv") && strings.Contains(embed.Title, "by"):
+					last := strings.LastIndex(embed.Title, ".")
+					if last == -1 {
+						last = len(embed.Title)
+					}
+
+					favourite = &database.Favourite{
+						Title:     embed.Title[:strings.LastIndex(embed.Title, " by ")],
+						Author:    embed.Title[strings.LastIndex(embed.Title, " by ")+4 : last],
+						Thumbnail: embed.Image.URL,
+						URL:       embed.URL,
+						NSFW:      nsfw,
+						CreatedAt: time.Now(),
+					}
 				}
 			}
 
@@ -189,8 +237,62 @@ func (b *Bot) reactCreated(s *discordgo.Session, r *discordgo.MessageReactionAdd
 	}
 }
 
-func (b *Bot) messageDeleted(s *discordgo.Session, m *discordgo.MessageDelete) {
+func (b *Bot) reactRemoved(s *discordgo.Session, r *discordgo.MessageReactionRemove) {
+	if r.UserID == s.State.User.ID {
+		return
+	}
 
+	if r.Emoji.APIName() != "💖" && r.Emoji.APIName() != "🤤" {
+		return
+	}
+
+	user := database.DB.FindUser(r.UserID)
+	if user != nil {
+		if msg, err := s.ChannelMessage(r.ChannelID, r.MessageID); err != nil {
+			log.Warnf("reactCreated() -> s.ChannelMessage(): %v", err)
+		} else {
+			art := repost.NewPost(&discordgo.MessageCreate{msg})
+			if len(msg.Embeds) == 0 && art.Len() == 0 {
+				return
+			}
+
+			switch {
+			case len(art.PixivMatches) > 0:
+				pixivID := ""
+				for k := range art.PixivMatches {
+					pixivID = k
+					break
+				}
+
+				if f, _ := database.DB.DeleteFavouriteURL(user.ID, "https://pixiv.net/en/artworks/"+pixivID); !f {
+					database.DB.DeleteFavouriteURL(user.ID, "https://pixiv.net/artworks/"+pixivID)
+				}
+			case len(art.TwitterMatches) > 0:
+				twitterURL := ""
+				for k := range art.TwitterMatches {
+					twitterURL = "https://twitter.com/i/status/" + k
+					break
+				}
+
+				tweet, err := tsuita.GetTweet(twitterURL)
+				if err != nil {
+					log.Warnf("reactRemoved -> GetTweet: %v", err)
+					s.ChannelMessageSendComplex(r.ChannelID, commands.Router.ErrorHandler(fmt.Errorf("Error while adding a favourite: %v", err)))
+					return
+				}
+
+				database.DB.DeleteFavouriteURL(user.ID, tweet.URL)
+			case len(msg.Embeds) != 0:
+				embed := msg.Embeds[0]
+				switch {
+				case strings.Contains(embed.URL, "twitter") && strings.Contains(embed.Footer.Text, "Twitter"):
+					database.DB.DeleteFavouriteURL(user.ID, embed.URL)
+				case strings.Contains(embed.URL, "pixiv") && strings.Contains(embed.Title, "by"):
+					database.DB.DeleteFavouriteURL(user.ID, embed.URL)
+				}
+			}
+		}
+	}
 }
 
 func (b *Bot) guildCreated(s *discordgo.Session, g *discordgo.GuildCreate) {

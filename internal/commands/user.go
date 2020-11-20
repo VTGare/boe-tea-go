@@ -3,6 +3,7 @@ package commands
 import (
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/VTGare/boe-tea-go/internal/database"
@@ -37,7 +38,7 @@ func init() {
 
 	ug.AddCommand(&gumi.Command{
 		Name:        "favourites",
-		Aliases:     []string{"favorites", "favs"},
+		Aliases:     []string{"favorites", "favs", "fav", "bookmarks", "bm"},
 		Description: "Shows a list of your favourites.",
 		GuildOnly:   false,
 		NSFW:        false,
@@ -62,7 +63,7 @@ func init() {
 		Help: &gumi.HelpSettings{
 			IsVisible: true,
 			ExtendedHelp: []*discordgo.MessageEmbedField{
-				{Name: "Usage", Value: "bt!unfavourite <art link or ID>"},
+				{Name: "Usage", Value: "bt!unbookmark <art link or ID>"},
 				{Name: "Art link", Value: "A Twitter or Pixiv post link. It should match the link in your favourites list. For ease of use I recommend using IDs instead."},
 				{Name: "ID", Value: "Favourited art ID, retrieve one from favourites list."},
 			},
@@ -114,9 +115,10 @@ func profile(s *discordgo.Session, m *discordgo.MessageCreate, args []string) er
 type mode int
 
 const (
-	modeAll  mode = 0
-	modeSFW  mode = 1
-	modeNSFW mode = 2
+	modeAll mode = iota
+	modeSFW
+	modeNSFW
+	modeCompact
 )
 
 func favourites(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
@@ -138,6 +140,8 @@ func favourites(s *discordgo.Session, m *discordgo.MessageCreate, args []string)
 			mode = modeSFW
 		case "nsfw":
 			mode = modeNSFW
+		case "compact":
+			mode = modeCompact
 		default:
 			mode = modeSFW
 		}
@@ -152,31 +156,8 @@ func favourites(s *discordgo.Session, m *discordgo.MessageCreate, args []string)
 		}
 	}
 
-	embeds := make([]*discordgo.MessageEmbed, 0)
-	filtered := make([]*database.Favourite, 0)
-	if mode != modeAll {
-		for _, f := range user.Favourites {
-			switch mode {
-			case modeSFW:
-				if f.NSFW {
-					continue
-				}
-			case modeNSFW:
-				if !f.NSFW {
-					continue
-				}
-			}
-
-			filtered = append(filtered, f)
-		}
-	} else {
-		filtered = user.Favourites
-	}
-
-	l := len(filtered)
-	for ind, f := range filtered {
-		embeds = append(embeds, favouriteEmbed(f, ind, l))
-	}
+	embeds := favouritesToEmbeds(user.Favourites, mode)
+	l := len(embeds)
 
 	if l > 1 {
 		w := widget.NewWidget(s, m.Author.ID, embeds)
@@ -204,6 +185,43 @@ func favourites(s *discordgo.Session, m *discordgo.MessageCreate, args []string)
 	return nil
 }
 
+func favouritesToEmbeds(favourites []*database.Favourite, mode mode) []*discordgo.MessageEmbed {
+	embeds := make([]*discordgo.MessageEmbed, 0)
+	if mode != modeCompact {
+		var filter func(*database.Favourite) bool
+		switch mode {
+		case modeAll:
+			filter = func(*database.Favourite) bool {
+				return true
+			}
+		case modeSFW:
+			filter = func(f *database.Favourite) bool {
+				return !f.NSFW
+			}
+		case modeNSFW:
+			filter = func(f *database.Favourite) bool {
+				return f.NSFW
+			}
+		}
+
+		filtered := make([]*database.Favourite, 0)
+		for _, f := range favourites {
+			if filter(f) {
+				filtered = append(filtered, f)
+			}
+		}
+
+		length := len(filtered)
+		for ind, f := range filtered {
+			embeds = append(embeds, favouriteEmbed(f, ind, length))
+		}
+	} else {
+		embeds = compactFavourites(favourites)
+	}
+
+	return embeds
+}
+
 func favouriteEmbed(fav *database.Favourite, ind, l int) *discordgo.MessageEmbed {
 	title := ""
 	if l > 1 {
@@ -227,14 +245,66 @@ func favouriteEmbed(fav *database.Favourite, ind, l int) *discordgo.MessageEmbed
 		Fields: []*discordgo.MessageEmbedField{
 			{Name: "ID", Value: strconv.Itoa(fav.ID), Inline: true},
 			{Name: "Author", Value: fav.Author, Inline: true},
+			{Name: "URL", Value: fmt.Sprintf("[%v](%v)", "Click here desu~", fav.URL), Inline: true},
 			{Name: "NSFW", Value: strconv.FormatBool(fav.NSFW), Inline: true},
-			{Name: "Favourited at (GMT)", Value: fav.CreatedAt.Format("Jan 2 2006. 15:04:05"), Inline: true},
+			{Name: "Timestamp", Value: fav.CreatedAt.Format("Jan 2 2006. 15:04:05 MST"), Inline: true},
 		},
 
 		Color:     utils.EmbedColor,
 		Timestamp: utils.EmbedTimestamp(),
 	}
 	return embed
+}
+
+func compactFavourites(fav []*database.Favourite) []*discordgo.MessageEmbed {
+	perPage := 10
+	pages := len(fav) / perPage
+	if len(fav)%perPage != 0 {
+		pages++
+	}
+
+	var (
+		embeds       = make([]*discordgo.MessageEmbed, pages)
+		page         = 0
+		sb           strings.Builder
+		defaultEmbed = func() *discordgo.MessageEmbed {
+			return &discordgo.MessageEmbed{
+				Title: "Compact favourites list",
+				Fields: []*discordgo.MessageEmbedField{
+					{Name: "Total favourites", Value: "```" + strconv.Itoa(len(fav)) + "```", Inline: true},
+					{Name: "Page", Value: fmt.Sprintf("```%v / %v```", page+1, pages), Inline: true},
+				},
+				Color:     utils.EmbedColor,
+				Timestamp: utils.EmbedTimestamp(),
+			}
+		}
+	)
+
+	embeds[page] = defaultEmbed()
+	count := 0
+	for ind, f := range fav {
+		sb.WriteString(fmt.Sprintf("``%v | ID: %v.`` [%v](%v)\n", ind+1, f.ID, f.Title+" ("+f.Author+")", f.URL))
+		count++
+
+		if count == perPage {
+			embeds[page].Description = sb.String()
+			page++
+
+			if page != pages {
+				embeds[page] = defaultEmbed()
+			}
+
+			sb.Reset()
+			count = 0
+		}
+	}
+
+	if count != 0 {
+		embeds[page] = defaultEmbed()
+		embeds[page].Description = sb.String()
+	}
+
+	return embeds
 }
 
 func unfavourite(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {

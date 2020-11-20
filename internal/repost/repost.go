@@ -256,15 +256,17 @@ func (a *ArtPost) Post(s *discordgo.Session, pixivOpts ...SendPixivOptions) erro
 	if guild.Repost != "disabled" {
 		reposts := a.FindReposts(m.GuildID, m.ChannelID)
 		if len(reposts) > 0 {
-			if guild.Repost == "strict" {
-				pixiv, twitter = a.RemoveReposts(reposts)
-
+			sendRepost := func() {
 				repostMessage, _ := s.ChannelMessageSendEmbed(m.ChannelID, a.RepostEmbed(reposts))
 				go func() {
 					time.Sleep(15 * time.Second)
 					s.ChannelMessageDelete(repostMessage.ChannelID, repostMessage.ID)
 				}()
+			}
+			if guild.Repost == "strict" {
+				pixiv, twitter = a.RemoveReposts(reposts)
 
+				sendRepost()
 				perm, err := utils.MemberHasPermission(s, m.GuildID, s.State.User.ID, 8|8192)
 				if err != nil {
 					return err
@@ -285,10 +287,15 @@ func (a *ArtPost) Post(s *discordgo.Session, pixivOpts ...SendPixivOptions) erro
 						return nil
 					}
 				} else {
-					s.ChannelMessageSendEmbed(m.ChannelID, a.RepostEmbed(reposts))
+					sendRepost()
 				}
 			}
 		}
+	}
+
+	if a.Len() > 0 {
+		s.MessageReactionAdd(a.event.ChannelID, a.event.ID, "💖")
+		s.MessageReactionAdd(a.event.ChannelID, a.event.ID, "🤤")
 	}
 
 	var posts []*ugoira.PixivPost

@@ -138,6 +138,10 @@ func (a *ArtPost) tweetToEmbeds(tweet *tsuita.Tweet, skipFirst bool) ([]*discord
 					Value:  strconv.Itoa(tweet.Likes),
 					Inline: true,
 				},
+				{
+					Name:  "Bookmarking guide",
+					Value: fmt.Sprintf("💖 - bookmark as sfw | 🤤 - bookmark as nsfw"),
+				},
 			},
 			Footer: &discordgo.MessageEmbedFooter{
 				IconURL: twitterLogo,
