@@ -21,55 +21,39 @@ func init() {
 		IsVisible:   true,
 	})
 
-	ug.AddCommand(&gumi.Command{
+	profileCmd := ug.AddCommand(&gumi.Command{
 		Name:        "profile",
 		Description: "Shows your profile",
 		GuildOnly:   false,
 		NSFW:        false,
 		Exec:        profile,
-		Help: &gumi.HelpSettings{
-			IsVisible: true,
-			ExtendedHelp: []*discordgo.MessageEmbedField{
-				{Name: "Usage", Value: "bt!profile"},
-			},
-		},
-		Cooldown: 5 * time.Second,
+		Cooldown:    5 * time.Second,
 	})
+	profileCmd.Help = gumi.NewHelpSettings().AddField("Usage", "bt!profile", false).AddField("Description", "Shows your Boe Tea profile.", false)
 
-	ug.AddCommand(&gumi.Command{
+	favCmd := ug.AddCommand(&gumi.Command{
 		Name:        "favourites",
 		Aliases:     []string{"favorites", "favs", "fav", "bookmarks", "bm"},
 		Description: "Shows a list of your favourites.",
 		GuildOnly:   false,
 		NSFW:        false,
 		Exec:        favourites,
-		Help: &gumi.HelpSettings{
-			IsVisible: true,
-			ExtendedHelp: []*discordgo.MessageEmbedField{
-				{Name: "Usage", Value: "bt!favourites <type>"},
-				{Name: "type", Value: "__Not required.__ Accepts: [all, nsfw, sfw]. If not provided deducts the type from channel's NSFW status."},
-			},
-		},
-		Cooldown: 5 * time.Second,
+		Cooldown:    5 * time.Second,
 	})
+	favCmd.Help = gumi.NewHelpSettings().AddField("Usage", "bt!favourites <type>", false).AddField("type", "__Not required.__ Accepts: [all, nsfw, sfw, compact]", false)
 
-	ug.AddCommand(&gumi.Command{
+	unfavCmd := ug.AddCommand(&gumi.Command{
 		Name:        "unfavourite",
 		Aliases:     []string{"unfavourite", "unfav"},
 		Description: "Unfavourites an art by favourite ID or URL",
 		GuildOnly:   false,
 		NSFW:        false,
 		Exec:        unfavourite,
-		Help: &gumi.HelpSettings{
-			IsVisible: true,
-			ExtendedHelp: []*discordgo.MessageEmbedField{
-				{Name: "Usage", Value: "bt!unbookmark <art link or ID>"},
-				{Name: "Art link", Value: "A Twitter or Pixiv post link. It should match the link in your favourites list. For ease of use I recommend using IDs instead."},
-				{Name: "ID", Value: "Favourited art ID, retrieve one from favourites list."},
-			},
-		},
-		Cooldown: 5 * time.Second,
+		Cooldown:    5 * time.Second,
 	})
+	unfavCmd.Help = gumi.NewHelpSettings().AddField("Usage", "bt!unfavourite <art link or ID>", false)
+	unfavCmd.Help.AddField("Art link", "A Twitter or Pixiv post link. It should match the link in your favourites list. For ease of use I recommend using IDs instead.", false)
+	unfavCmd.Help.AddField("ID", "Favourite ID, can be retrieved from favourite list. Use ``bt!fav`` command", false)
 }
 
 func profile(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
