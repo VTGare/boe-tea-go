@@ -51,16 +51,17 @@ func nhentai(s *discordgo.Session, m *discordgo.MessageCreate, args []string) er
 		return utils.ErrNotEnoughArguments
 	}
 
-	g := database.GuildCache[m.GuildID]
-	if !g.NSFW {
-		s.ChannelMessageSendEmbed(m.ChannelID, &discordgo.MessageEmbed{
-			Title:     "❎ Failed to execute a command.",
-			Color:     utils.EmbedColor,
-			Thumbnail: &discordgo.MessageEmbedThumbnail{URL: utils.DefaultEmbedImage},
-			Timestamp: utils.EmbedTimestamp(),
-			Fields:    []*discordgo.MessageEmbedField{{"Reason", "You're trying to execute an NSFW command. The server prohibits NSFW content.", false}},
-		})
-		return nil
+	if g, ok := database.GuildCache[m.GuildID]; ok {
+		if !g.NSFW {
+			s.ChannelMessageSendEmbed(m.ChannelID, &discordgo.MessageEmbed{
+				Title:     "❎ Failed to execute a command.",
+				Color:     utils.EmbedColor,
+				Thumbnail: &discordgo.MessageEmbedThumbnail{URL: utils.DefaultEmbedImage},
+				Timestamp: utils.EmbedTimestamp(),
+				Fields:    []*discordgo.MessageEmbedField{{"Reason", "You're trying to execute an NSFW command. The server prohibits NSFW content.", false}},
+			})
+			return nil
+		}
 	}
 
 	if _, err := strconv.Atoi(args[0]); err != nil {
