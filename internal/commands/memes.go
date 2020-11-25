@@ -14,7 +14,7 @@ var (
 >They're eating pack of chicken nuggets while watching
 >Somehow the takeout didn't include much bbq sauce except for a half filled one
 >Sauce has been depleted after {{.Ryo}} has eaten 3 nuggets
->{{.Ryo}}: Watson, we're out of sauce. Do you have any in your fridge?
+>{{.Ryo}}: {{.Amelia}}, we're out of sauce. Do you have any in your fridge?
 >{{.Amelia}}: No sorry, I don't use any sauce
 >{{.Ryo}} tries to eat the nuggets without any sauce but she has a hard time enjoying them
 >{{.Amelia}} notices the predicament of {{.Ryo}}
