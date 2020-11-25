@@ -163,7 +163,7 @@ func (d *Database) AddFavourite(userID string, artwork *Artwork, nsfw bool) (*Ar
 	found, err := d.FindArtworkByURL(artwork.URL)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
-			_, err = d.CreateArtwork(artwork)
+			found, err = d.CreateArtwork(artwork)
 			if err != nil {
 				return nil, err
 			}
@@ -172,18 +172,24 @@ func (d *Database) AddFavourite(userID string, artwork *Artwork, nsfw bool) (*Ar
 		}
 	}
 
-	fav := &NewFavourite{found.ID, nsfw}
-	success, err := d.UserAddFavourite(userID, fav)
-	if success {
-		artwork, err := d.IncrementFavourites(fav)
+	if found != nil {
+		fav := &NewFavourite{found.ID, nsfw}
+		success, err := d.UserAddFavourite(userID, fav)
 		if err != nil {
 			return nil, err
 		}
 
-		return artwork, nil
+		if success {
+			artwork, err := d.IncrementFavourites(fav)
+			if err != nil {
+				return nil, err
+			}
+
+			return artwork, nil
+		}
 	}
 
-	return nil, err
+	return nil, ErrFavouriteNotFound
 }
 
 func (d *Database) RemoveFavouriteURL(userID, url string) (*Artwork, error) {
