@@ -119,7 +119,6 @@ func (b *Bot) reactCreated(s *discordgo.Session, r *discordgo.MessageReactionAdd
 	}
 
 	addFavourite := func(nsfw bool) {
-		log.Infof("Adding a favourite. NSFW: %v", nsfw)
 		user := database.DB.FindUser(r.UserID)
 		if user == nil {
 			log.Infof("User not found. Adding a new user. User ID: %v", r.UserID)
@@ -144,7 +143,7 @@ func (b *Bot) reactCreated(s *discordgo.Session, r *discordgo.MessageReactionAdd
 				return
 			}
 
-			var favourite *database.Favourite
+			var artwork *database.Artwork
 			switch {
 			case len(art.PixivMatches) > 0:
 				pixivID := ""
@@ -161,13 +160,13 @@ func (b *Bot) reactCreated(s *discordgo.Session, r *discordgo.MessageReactionAdd
 					return
 				}
 
-				favourite = &database.Favourite{
+				artwork = &database.Artwork{
 					Title:     pixiv.Title,
+					URL:       pixiv.URL,
 					Author:    pixiv.Author,
-					Thumbnail: pixiv.Images.Preview[0].Kotori,
-					URL:       fmt.Sprintf("https://pixiv.net/en/artworks/%v", pixiv.ID),
-					NSFW:      nsfw,
+					Images:    pixiv.Images.ToArray(),
 					CreatedAt: time.Now(),
+					UpdatedAt: time.Now(),
 				}
 			case len(art.TwitterMatches) > 0:
 				twitterURL := ""
@@ -185,23 +184,21 @@ func (b *Bot) reactCreated(s *discordgo.Session, r *discordgo.MessageReactionAdd
 				}
 
 				if len(tweet.Gallery) > 0 {
-					favourite = &database.Favourite{
+					artwork = &database.Artwork{
 						Author:    tweet.Username,
-						Thumbnail: tweet.Gallery[0].URL,
+						Images:    tweet.Images(),
 						URL:       tweet.URL,
-						NSFW:      nsfw,
 						CreatedAt: time.Now(),
+						UpdatedAt: time.Now(),
 					}
 				}
 			}
 
-			if favourite != nil {
-				success, err := database.DB.CreateFavourite(r.UserID, favourite)
+			if artwork != nil {
+				artwork, err := database.DB.AddFavourite(r.UserID, artwork, nsfw)
 				if err != nil {
-					log.Warnf("databas.DB.CreateFavourite() -> Error while adding a favourite: %v", err)
-				}
-
-				if success && user.DM {
+					log.Warnf("database.DB.AddFavourite() -> Error while adding a favourite: %v", err)
+				} else if user.DM {
 					ch, err := s.UserChannelCreate(user.ID)
 					if err != nil {
 						log.Warnf("s.UserChannelCreate -> %v", err)
@@ -211,8 +208,8 @@ func (b *Bot) reactCreated(s *discordgo.Session, r *discordgo.MessageReactionAdd
 								Title:       "✅ Sucessfully added an artwork to favourites",
 								Timestamp:   utils.EmbedTimestamp(),
 								Color:       utils.EmbedColor,
-								Thumbnail:   &discordgo.MessageEmbedThumbnail{URL: favourite.Thumbnail},
-								Description: fmt.Sprintf("Don't like DMs? Execute `bt!userset dm disabled`\n```\nID: %v\nURL: %v\nNSFW: %v```", favourite.ID, favourite.URL, favourite.NSFW),
+								Thumbnail:   &discordgo.MessageEmbedThumbnail{URL: artwork.Images[0]},
+								Description: fmt.Sprintf("Don't like DMs? Execute `bt!userset dm disabled`\n```\nID: %v\nURL: %v\nNSFW: %v```", artwork.ID, artwork.URL, nsfw),
 							},
 						})
 					}
@@ -250,7 +247,6 @@ func (b *Bot) reactRemoved(s *discordgo.Session, r *discordgo.MessageReactionRem
 	}
 
 	if r.Emoji.APIName() == "💖" || r.Emoji.APIName() == "🤤" {
-		log.Infof("Removing a favourite. User ID: %s", r.UserID)
 		user := database.DB.FindUser(r.UserID)
 		if user != nil {
 			if msg, err := s.ChannelMessage(r.ChannelID, r.MessageID); err != nil {
@@ -268,16 +264,18 @@ func (b *Bot) reactRemoved(s *discordgo.Session, r *discordgo.MessageReactionRem
 
 				switch {
 				case len(art.PixivMatches) > 0:
+					log.Infof("Removing a favourite. User ID: %s", r.UserID)
+
 					pixivURL := ""
 					for k := range art.PixivMatches {
 						pixivURL = "https://pixiv.net/en/artworks/" + k
 						break
 					}
 
-					success, err := database.DB.DeleteFavouriteURL(user.ID, pixivURL)
+					_, err := database.DB.RemoveFavouriteURL(user.ID, pixivURL)
 					if err != nil {
 						logrus.Warnln("DeleteFavouriteURL -> %v", err)
-					} else if success {
+					} else if user.DM {
 						ch, err := s.UserChannelCreate(user.ID)
 						if err != nil {
 							log.Warnf("s.UserChannelCreate -> %v", err)
@@ -291,6 +289,7 @@ func (b *Bot) reactRemoved(s *discordgo.Session, r *discordgo.MessageReactionRem
 						}
 					}
 				case len(art.TwitterMatches) > 0:
+					log.Infof("Removing a favourite. User ID: %s", r.UserID)
 					twitterURL := ""
 					for k := range art.TwitterMatches {
 						twitterURL = "https://twitter.com/i/status/" + k
@@ -304,10 +303,10 @@ func (b *Bot) reactRemoved(s *discordgo.Session, r *discordgo.MessageReactionRem
 						return
 					}
 
-					success, err := database.DB.DeleteFavouriteURL(user.ID, tweet.URL)
+					_, err = database.DB.RemoveFavouriteURL(user.ID, tweet.URL)
 					if err != nil {
 						logrus.Warnln("DeleteFavouriteURL -> %v", err)
-					} else if success && user.DM {
+					} else if user.DM {
 						ch, err := s.UserChannelCreate(user.ID)
 						if err != nil {
 							log.Warnf("s.UserChannelCreate -> %v", err)
@@ -342,9 +341,9 @@ func (b *Bot) guildCreated(s *discordgo.Session, g *discordgo.GuildCreate) {
 }
 
 func (b *Bot) guildDeleted(s *discordgo.Session, g *discordgo.GuildDelete) {
-	if !g.Unavailable {
-		log.Infoln("Kicked/banned from a guild. ID: ", g.ID)
-	} else {
+	if g.Unavailable {
 		log.Infoln("Guild outage. ID: ", g.ID)
+	} else {
+		log.Infoln("Kicked/banned from a guild. ID: ", g.ID)
 	}
 }

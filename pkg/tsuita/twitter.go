@@ -43,6 +43,17 @@ type TwitterMedia struct {
 	Animated bool
 }
 
+func (t *Tweet) Images() []string {
+	images := make([]string, 0)
+	for _, i := range t.Gallery {
+		if !i.Animated {
+			images = append(images, i.URL)
+		}
+	}
+
+	return images
+}
+
 func GetTweet(uri string) (*Tweet, error) {
 	var (
 		res   = &Tweet{Gallery: make([]TwitterMedia, 0)}

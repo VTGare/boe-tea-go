@@ -14,23 +14,18 @@ var (
 )
 
 type UserSettings struct {
-	ID            string       `json:"user_id" bson:"user_id"`
-	DM            bool         `json:"dm" bson:"dm"`
-	Crosspost     bool         `json:"crosspost" bson:"crosspost"`
-	Favourites    []*Favourite `json:"favourites" bson:"favourites"`
-	ChannelGroups []*Group     `json:"channel_groups" bson:"channel_groups"`
-	CreatedAt     time.Time    `json:"created_at" bson:"created_at"`
-	UpdatedAt     time.Time    `json:"updated_at" bson:"updated_at"`
+	ID            string          `json:"user_id" bson:"user_id"`
+	DM            bool            `json:"dm" bson:"dm"`
+	Crosspost     bool            `json:"crosspost" bson:"crosspost"`
+	NewFavourites []*NewFavourite `json:"new_favourites" bson:"new_favourites"`
+	ChannelGroups []*Group        `json:"channel_groups" bson:"channel_groups"`
+	CreatedAt     time.Time       `json:"created_at" bson:"created_at"`
+	UpdatedAt     time.Time       `json:"updated_at" bson:"updated_at"`
 }
 
-type Favourite struct {
-	ID        int       `json:"id" bson:"id"`
-	Title     string    `json:"title" bson:"title"`
-	Author    string    `json:"author" bson:"author"`
-	Thumbnail string    `json:"thumbnail" bson:"thumbnail"`
-	URL       string    `json:"url" bson:"url"`
-	NSFW      bool      `json:"nsfw" bson:"nsfw"`
-	CreatedAt time.Time `json:"created_at" bson:"created_at"`
+type NewFavourite struct {
+	ID   int  `json:"artwork_id" bson:"artwork_id"`
+	NSFW bool `json:"nsfw" bson:"nsfw"`
 }
 
 type Group struct {
@@ -43,7 +38,7 @@ func NewUserSettings(id string) *UserSettings {
 	return &UserSettings{
 		ID:            id,
 		Crosspost:     true,
-		Favourites:    make([]*Favourite, 0),
+		NewFavourites: make([]*NewFavourite, 0),
 		ChannelGroups: make([]*Group, 0),
 		CreatedAt:     time.Now(),
 		UpdatedAt:     time.Now(),
@@ -272,7 +267,7 @@ func (us *UserSettings) Channels(parent string) []string {
 	return nil
 }
 
-func (d *Database) CreateFavourite(userID string, favourite *Favourite) (bool, error) {
+func (d *Database) UserAddFavourite(userID string, fav *NewFavourite) (bool, error) {
 	var user *UserSettings
 	if user = d.FindUser(userID); user == nil {
 		user = NewUserSettings(userID)
@@ -282,29 +277,10 @@ func (d *Database) CreateFavourite(userID string, favourite *Favourite) (bool, e
 		}
 	}
 
-	greatest := 0
-	exists := false
-	for _, fav := range user.Favourites {
-		if fav.URL == favourite.URL {
-			exists = true
-			break
-		}
-
-		if fav.ID > greatest {
-			greatest = fav.ID
-		}
-	}
-
-	if exists {
-		return false, nil
-	}
-
-	favourite.ID = greatest + 1
-
 	res := d.UserSettings.FindOneAndUpdate(
 		context.Background(),
 		bson.D{{"user_id", userID}},
-		bson.D{{"$push", bson.D{{"favourites", favourite}}}},
+		bson.D{{"$addToSet", bson.D{{"new_favourites", fav}}}},
 		options.FindOneAndUpdate().SetReturnDocument(options.After),
 	)
 
@@ -317,54 +293,41 @@ func (d *Database) CreateFavourite(userID string, favourite *Favourite) (bool, e
 	return true, nil
 }
 
-func (d *Database) DeleteFavouriteURL(userID, url string) (bool, error) {
-	if d.FindUser(userID) == nil {
-		err := d.InsertOneUser(NewUserSettings(userID))
+func (d *Database) UserDeleteFavourite(userID string, artworkID int) (*NewFavourite, error) {
+	var user *UserSettings
+	if user = d.FindUser(userID); user == nil {
+		user = NewUserSettings(userID)
+		err := d.InsertOneUser(user)
 		if err != nil {
-			return false, err
+			return nil, err
 		}
 	}
 
-	res := d.UserSettings.FindOneAndUpdate(
-		context.Background(),
-		bson.D{{"user_id", userID}, {"favourites.url", url}},
-		bson.D{{"$pull", bson.D{{"favourites", bson.D{{"url", url}}}}}},
-		options.FindOneAndUpdate().SetReturnDocument(options.After),
-	)
-
-	if err := res.Err(); err == nil {
-		var user = &UserSettings{}
-		res.Decode(user)
-
-		userCache[userID] = user
-		return true, nil
-	}
-	return false, nil
-}
-
-func (d *Database) DeleteFavouriteID(userID string, id int) (bool, error) {
-	if d.FindUser(userID) == nil {
-		err := d.InsertOneUser(NewUserSettings(userID))
-		if err != nil {
-			return false, err
+	var fav *NewFavourite
+	for _, f := range user.NewFavourites {
+		if f.ID == artworkID {
+			fav = f
 		}
 	}
 
-	res := d.UserSettings.FindOneAndUpdate(
-		context.Background(),
-		bson.D{{"user_id", userID}, {"favourites.id", id}},
-		bson.D{{"$pull", bson.D{{"favourites", bson.D{{"id", id}}}}}},
-		options.FindOneAndUpdate().SetReturnDocument(options.After),
-	)
+	if fav != nil {
+		res := d.UserSettings.FindOneAndUpdate(
+			context.Background(),
+			bson.D{{"user_id", userID}, {"new_favourites.artwork_id", artworkID}},
+			bson.D{{"$pull", bson.D{{"new_favourites", bson.D{{"artwork_id", artworkID}}}}}},
+			options.FindOneAndUpdate().SetReturnDocument(options.After),
+		)
 
-	if err := res.Err(); err == nil {
-		var user = &UserSettings{}
-		res.Decode(user)
+		if err := res.Err(); err == nil {
+			var user = &UserSettings{}
+			res.Decode(user)
 
-		userCache[userID] = user
-		return true, nil
+			userCache[userID] = user
+			return fav, nil
+		}
 	}
-	return false, nil
+
+	return nil, ErrFavouriteNotFound
 }
 
 func (d *Database) ChangeUserSetting(userID, setting string, newSetting interface{}) error {

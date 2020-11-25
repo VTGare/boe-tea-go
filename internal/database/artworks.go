@@ -1,0 +1,223 @@
+package database
+
+import (
+	"context"
+	"time"
+
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
+)
+
+type Artwork struct {
+	ID         int       `json:"artwork_id" bson:"artwork_id"`
+	Title      string    `json:"title" bson:"title"`
+	Author     string    `json:"author" bson:"author"`
+	URL        string    `json:"url" bson:"url"`
+	Images     []string  `json:"images" bson:"images"`
+	Favourites int       `json:"favourites" bson:"favourites"`
+	NSFW       int       `json:"nsfw" bson:"nsfw"`
+	CreatedAt  time.Time `json:"created_at" bson:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at" bson:"updated_at"`
+}
+
+type Counter struct {
+	ID      string `json:"_id" bson:"_id"`
+	Counter int    `json:"counter" bson:"counter"`
+}
+
+func (d *Database) nextID() (int, error) {
+	sres := d.counters.FindOneAndUpdate(
+		context.Background(),
+		bson.D{{"_id", "artworks"}},
+		bson.D{{"$inc", bson.D{{"counter", 1}}}},
+		options.FindOneAndUpdate().SetReturnDocument(options.After).SetUpsert(true),
+	)
+
+	counter := &Counter{}
+	err := sres.Decode(counter)
+	if err != nil {
+		return 0, err
+	}
+
+	return counter.Counter, nil
+}
+
+func (d *Database) CreateArtwork(artwork *Artwork) (*Artwork, error) {
+	id, err := d.nextID()
+	if err != nil {
+		return nil, err
+	}
+
+	artwork.ID = id
+	artwork.Favourites = 0
+	_, err = d.artworks.InsertOne(context.Background(), artwork)
+	if err != nil {
+		return nil, err
+	}
+
+	return artwork, nil
+}
+
+func boolToInt(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
+}
+
+func (d *Database) IncrementFavourites(fav *NewFavourite) (*Artwork, error) {
+	res := d.artworks.FindOneAndUpdate(
+		context.Background(),
+		bson.D{{"artwork_id", fav.ID}},
+		bson.D{
+			{"$inc", bson.D{{"favourites", 1}, {"nsfw", boolToInt(fav.NSFW)}}},
+			{"$currentDate", bson.D{{"updated_at", true}}},
+		},
+		options.FindOneAndUpdate().SetReturnDocument(options.After),
+	)
+
+	artwork := &Artwork{}
+	err := res.Decode(artwork)
+	if err != nil {
+		return nil, err
+	}
+
+	return artwork, nil
+}
+
+func (d *Database) DecrementFavourites(fav *NewFavourite) (*Artwork, error) {
+	res := d.artworks.FindOneAndUpdate(
+		context.Background(),
+		bson.D{{"artwork_id", fav.ID}},
+		bson.D{
+			{"$inc", bson.D{{"favourites", -1}, {"nsfw", boolToInt(fav.NSFW) * -1}}},
+			{"$currentDate", bson.D{{"updated_at", true}}},
+		},
+		options.FindOneAndUpdate().SetReturnDocument(options.After),
+	)
+
+	artwork := &Artwork{}
+	err := res.Decode(artwork)
+	if err != nil {
+		return nil, err
+	}
+
+	return artwork, nil
+}
+
+func (d *Database) FindArtworkByID(id int) (*Artwork, error) {
+	res := d.artworks.FindOne(
+		context.Background(),
+		bson.D{{"artwork_id", id}},
+	)
+
+	artwork := &Artwork{}
+	err := res.Decode(artwork)
+	if err != nil {
+		return nil, err
+	}
+
+	return artwork, nil
+}
+
+func (d *Database) FindManyArtworks(favs []*NewFavourite) ([]*Artwork, error) {
+	IDs := make([]int, 0, len(favs))
+	for _, f := range favs {
+		IDs = append(IDs, f.ID)
+	}
+
+	cur, err := d.artworks.Find(
+		context.Background(),
+		bson.D{{"artwork_id", bson.D{{"$in", IDs}}}},
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	artworks := make([]*Artwork, 0, len(IDs))
+	err = cur.All(context.Background(), &artworks)
+	if err != nil {
+		return nil, err
+	}
+
+	return artworks, nil
+}
+
+func (d *Database) FindArtworkByURL(url string) (*Artwork, error) {
+	res := d.artworks.FindOne(
+		context.Background(),
+		bson.D{{"url", url}},
+	)
+
+	artwork := &Artwork{}
+	err := res.Decode(artwork)
+	if err != nil {
+		return nil, err
+	}
+
+	return artwork, nil
+}
+
+func (d *Database) AddFavourite(userID string, artwork *Artwork, nsfw bool) (*Artwork, error) {
+	found, err := d.FindArtworkByURL(artwork.URL)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			_, err = d.CreateArtwork(artwork)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			return nil, err
+		}
+	}
+
+	fav := &NewFavourite{found.ID, nsfw}
+	success, err := d.UserAddFavourite(userID, fav)
+	if success {
+		artwork, err := d.IncrementFavourites(fav)
+		if err != nil {
+			return nil, err
+		}
+
+		return artwork, nil
+	}
+
+	return nil, err
+}
+
+func (d *Database) RemoveFavouriteURL(userID, url string) (*Artwork, error) {
+	artwork, err := d.FindArtworkByURL(url)
+	if err != nil {
+		return nil, err
+	}
+
+	fav, err := d.UserDeleteFavourite(userID, artwork.ID)
+	if fav != nil {
+		artwork, err := d.DecrementFavourites(fav)
+		if err != nil {
+			return nil, err
+		}
+		return artwork, nil
+	}
+
+	return nil, err
+}
+
+func (d *Database) RemoveFavouriteID(userID string, id int) (*Artwork, error) {
+	artwork, err := d.FindArtworkByID(id)
+	if err != nil {
+		return nil, err
+	}
+
+	fav, err := d.UserDeleteFavourite(userID, artwork.ID)
+	if fav != nil {
+		artwork, err := d.DecrementFavourites(fav)
+		if err != nil {
+			return nil, err
+		}
+		return artwork, nil
+	}
+
+	return nil, err
+}

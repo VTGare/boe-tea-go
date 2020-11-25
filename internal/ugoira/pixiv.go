@@ -25,6 +25,7 @@ type PixivPost struct {
 	Type      string
 	Author    string
 	Title     string
+	URL       string
 	Likes     int
 	Pages     int
 	Ugoira    *Ugoira
@@ -37,6 +38,15 @@ type PixivPost struct {
 type PixivImages struct {
 	Preview  []*PixivImage
 	Original []*PixivImage
+}
+
+func (p *PixivImages) ToArray() []string {
+	images := make([]string, 0, len(p.Preview))
+	for _, img := range p.Preview {
+		images = append(images, img.Kotori)
+	}
+
+	return images
 }
 
 type PixivImage struct {
@@ -115,6 +125,7 @@ func GetPixivPost(id string) (*PixivPost, error) {
 
 	log.Infof("Fetching Pixiv post. ID: %v", id)
 	illust, err := getIllust(pid)
+
 	if err != nil {
 		log.Warnln(err)
 		return nil, err
@@ -159,6 +170,7 @@ func GetPixivPost(id string) (*PixivPost, error) {
 	}
 	post := &PixivPost{
 		ID:        id,
+		URL:       "https://pixiv.net/en/artworks/" + id,
 		Author:    author,
 		Type:      illust.Type,
 		Title:     illust.Title,

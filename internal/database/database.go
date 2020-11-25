@@ -38,6 +38,8 @@ type Database struct {
 	UserSettings  *mongo.Collection
 	posts         *mongo.Collection
 	stats         *mongo.Collection
+	artworks      *mongo.Collection
+	counters      *mongo.Collection
 }
 
 func (d *Database) Close() {
@@ -55,7 +57,16 @@ func NewDatabase(url, dbname string) (*Database, error) {
 
 	db := client.Database(dbname)
 
-	d := &Database{db, client, db.Collection("guildsettings"), db.Collection("user_settings"), db.Collection("image_posts"), db.Collection("stats")}
+	d := &Database{
+		db:            db,
+		client:        client,
+		GuildSettings: db.Collection("guildsettings"),
+		UserSettings:  db.Collection("user_settings"),
+		posts:         db.Collection("image_posts"),
+		stats:         db.Collection("stats"),
+		artworks:      db.Collection("artworks"),
+		counters:      db.Collection("counters"),
+	}
 	_, err = d.AllUsers()
 	_, err = d.AllGuilds()
 

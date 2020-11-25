@@ -1,18 +1,15 @@
 package commands
 
 import (
-	"context"
 	"fmt"
 	"runtime"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/VTGare/boe-tea-go/internal/database"
 	"github.com/VTGare/boe-tea-go/utils"
 	"github.com/VTGare/gumi"
 	"github.com/bwmarrin/discordgo"
-	"go.mongodb.org/mongo-driver/bson"
 )
 
 func init() {
@@ -60,17 +57,6 @@ func updateDB(s *discordgo.Session, m *discordgo.MessageCreate, args []string) e
 		return nil
 	}
 
-	c := database.DB.UserSettings
-	res, err := c.UpdateMany(context.Background(), bson.M{}, bson.M{
-		"$set": bson.M{
-			"nsfw": true,
-		},
-	})
-	if err != nil {
-		return err
-	}
-
-	s.ChannelMessageSend(m.ChannelID, "Modified: "+strconv.FormatInt(res.ModifiedCount, 10))
 	return nil
 }
 
