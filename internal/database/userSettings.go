@@ -280,7 +280,7 @@ func (d *Database) UserAddFavourite(userID string, fav *NewFavourite) (bool, err
 
 	res := d.UserSettings.FindOneAndUpdate(
 		context.Background(),
-		bson.D{{"user_id", userID}},
+		bson.D{{"user_id", userID}, {"new_favourites.artwork_id", bson.D{{"$nin", []int{fav.ID}}}}},
 		bson.D{{"$addToSet", bson.D{{"new_favourites", fav}}}},
 		options.FindOneAndUpdate().SetReturnDocument(options.After),
 	)

@@ -54,7 +54,7 @@ func (d *Database) nextID() (int, error) {
 }
 
 func (d *Database) CreateArtwork(artwork *Artwork) (*Artwork, error) {
-	logrus.Infof("Creating an artwork. URL: %s", artwork.URL)
+	logrus.Infof("Creating an artwork. URL: %v", artwork.URL)
 	id, err := d.nextID()
 	if err != nil {
 		return nil, err
@@ -78,7 +78,7 @@ func boolToInt(b bool) int {
 }
 
 func (d *Database) IncrementFavourites(fav *NewFavourite) (*Artwork, error) {
-	logrus.Infof("Incrementing a favourite count. Artwork ID: %s", fav.ID)
+	logrus.Infof("Incrementing a favourite count. Artwork ID: %v", fav.ID)
 	res := d.artworks.FindOneAndUpdate(
 		context.Background(),
 		bson.D{{"artwork_id", fav.ID}},
@@ -99,7 +99,7 @@ func (d *Database) IncrementFavourites(fav *NewFavourite) (*Artwork, error) {
 }
 
 func (d *Database) DecrementFavourites(fav *NewFavourite) (*Artwork, error) {
-	logrus.Infof("Decrementing a favourite count. Artwork ID: %s", fav.ID)
+	logrus.Infof("Decrementing a favourite count. Artwork ID: %v", fav.ID)
 	res := d.artworks.FindOneAndUpdate(
 		context.Background(),
 		bson.D{{"artwork_id", fav.ID}},
@@ -184,7 +184,7 @@ func (d *Database) FindManyArtworks(favs []*NewFavourite, sortType SortArtworks)
 }
 
 func (d *Database) FindArtworkByURL(url string) (*Artwork, error) {
-	logrus.Infof("Finding artwork by URL: %s", url)
+	logrus.Infof("Finding artwork by URL: %v", url)
 	res := d.artworks.FindOne(
 		context.Background(),
 		bson.D{{"url", url}},
@@ -200,7 +200,7 @@ func (d *Database) FindArtworkByURL(url string) (*Artwork, error) {
 }
 
 func (d *Database) AddFavourite(userID string, artwork *Artwork, nsfw bool) (*Artwork, error) {
-	logrus.Infof("Adding a favourite. User ID: %s", userID)
+	logrus.Infof("Adding a favourite. User ID: %v", userID)
 	found, err := d.FindArtworkByURL(artwork.URL)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
@@ -234,7 +234,7 @@ func (d *Database) AddFavourite(userID string, artwork *Artwork, nsfw bool) (*Ar
 }
 
 func (d *Database) RemoveFavouriteURL(userID, url string) (*Artwork, error) {
-	logrus.Infof("Removing a favourite by URL. User ID: %s. URL: %s", userID, url)
+	logrus.Infof("Removing a favourite by URL. User ID: %v. URL: %v", userID, url)
 	artwork, err := d.FindArtworkByURL(url)
 	if err != nil {
 		return nil, err
@@ -253,7 +253,7 @@ func (d *Database) RemoveFavouriteURL(userID, url string) (*Artwork, error) {
 }
 
 func (d *Database) RemoveFavouriteID(userID string, id int) (*Artwork, error) {
-	logrus.Infof("Removing a favourite by ID. User ID: %s. URL: %s", userID, id)
+	logrus.Infof("Removing a favourite by ID. User ID: %v. URL: %v", userID, id)
 	artwork, err := d.FindArtworkByID(id)
 	if err != nil {
 		return nil, err

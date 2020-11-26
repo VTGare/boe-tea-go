@@ -24,7 +24,7 @@ func unzip(src, dest string) ([]string, error) {
 		fpath := filepath.Join(dest, file.Name)
 
 		if !strings.HasPrefix(fpath, filepath.Clean(dest)+string(os.PathSeparator)) {
-			return filenames, fmt.Errorf("%s: illegal file path", fpath)
+			return filenames, fmt.Errorf("%v: illegal file path", fpath)
 		}
 
 		filenames = append(filenames, fpath)

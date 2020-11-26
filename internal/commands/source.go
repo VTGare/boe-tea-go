@@ -144,7 +144,7 @@ func sauce(s *discordgo.Session, m *discordgo.MessageCreate, args []string) erro
 		return nil
 	}
 
-	log.Infof("Searching source on SauceNAO. Image URL: %s", url)
+	log.Infof("Searching source on SauceNAO. Image URL: %v", url)
 	embeds, err := saucenaoEmbeds(url, false)
 	if err != nil {
 		log.Warnf("saucenaoEmbeds: %v", err)
@@ -166,7 +166,7 @@ func sauce(s *discordgo.Session, m *discordgo.MessageCreate, args []string) erro
 		Message: "<:peepoRainy:530050503955054593> Source couldn't be found on SauceNAO. Would you like to try __*ascii2d?*__",
 		Timeout: 15 * time.Second,
 	}); prompt == true {
-		log.Infof("Searching source on ascii2d. Image URL: %s", url)
+		log.Infof("Searching source on ascii2d. Image URL: %v", url)
 		res, err := ascii2dgo.Search(url)
 		if err != nil {
 			return err
@@ -205,7 +205,7 @@ func saucenao(s *discordgo.Session, m *discordgo.MessageCreate, args []string) e
 		return utils.ErrNotEnoughArguments
 	}
 
-	log.Infof("Searching source on SauceNAO. Image URL: %s", url)
+	log.Infof("Searching source on SauceNAO. Image URL: %v", url)
 	embeds, err := saucenaoEmbeds(url, true)
 	if err != nil {
 		return err
@@ -320,7 +320,7 @@ func wait(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error
 		return utils.ErrNotEnoughArguments
 	}
 
-	log.Infof("Searching source on trace.moe. Image URL: %s", url)
+	log.Infof("Searching source on trace.moe. Image URL: %v", url)
 	embed, err := waitEmbed(url)
 	if err != nil {
 		return err
@@ -344,7 +344,7 @@ func ascii2d(s *discordgo.Session, m *discordgo.MessageCreate, args []string) er
 		return utils.ErrNotEnoughArguments
 	}
 
-	log.Infof("Searching source on Ascii2d. Image URL: %s", url)
+	log.Infof("Searching source on Ascii2d. Image URL: %v", url)
 	res, err := ascii2dgo.Search(url)
 	if err != nil {
 		return err

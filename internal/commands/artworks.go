@@ -11,6 +11,7 @@ import (
 	"github.com/VTGare/gumi"
 	"github.com/bwmarrin/discordgo"
 	"github.com/sirupsen/logrus"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 func init() {
@@ -85,7 +86,19 @@ func artwork(s *discordgo.Session, m *discordgo.MessageCreate, args []string) er
 
 	artwork, err := database.DB.FindArtworkByID(ID)
 	if err != nil {
-		return err
+		switch err {
+		case mongo.ErrNoDocuments:
+			s.ChannelMessageSendEmbed(m.ChannelID, &discordgo.MessageEmbed{
+				Title:       fmt.Sprintf("❎ Couldn't send an artwork"),
+				Description: fmt.Sprintf("An artwork with %v ID doesn't exist", ID),
+				Timestamp:   utils.EmbedTimestamp(),
+				Color:       utils.EmbedColor,
+			})
+
+			return nil
+		default:
+			return err
+		}
 	}
 
 	percent := (float64(artwork.NSFW) / float64(artwork.Favourites)) * 100.0
@@ -99,7 +112,7 @@ func artwork(s *discordgo.Session, m *discordgo.MessageCreate, args []string) er
 		prompt := utils.CreatePromptWithMessage(s, m, &discordgo.MessageSend{
 			Embed: &discordgo.MessageEmbed{
 				Title:       fmt.Sprintf("🛑 Attention"),
-				Description: fmt.Sprintf("%v out of %v (%v%s) marked this artwork as NSFW. Please confirm the operation.", artwork.NSFW, artwork.Favourites, percent, "%"),
+				Description: fmt.Sprintf("%v out of %v (%v%v) marked this artwork as NSFW. Please confirm the operation.", artwork.NSFW, artwork.Favourites, percent, "%"),
 				Timestamp:   utils.EmbedTimestamp(),
 				Color:       utils.EmbedColor,
 			},

@@ -262,7 +262,7 @@ func (b *Bot) reactRemoved(s *discordgo.Session, r *discordgo.MessageReactionRem
 
 				switch {
 				case len(art.PixivMatches) > 0:
-					log.Infof("Removing a favourite. User ID: %s", r.UserID)
+					log.Infof("Removing a favourite. User ID: %v", r.UserID)
 
 					pixivURL := ""
 					for k := range art.PixivMatches {
@@ -287,7 +287,7 @@ func (b *Bot) reactRemoved(s *discordgo.Session, r *discordgo.MessageReactionRem
 						}
 					}
 				case len(art.TwitterMatches) > 0:
-					log.Infof("Removing a favourite. User ID: %s", r.UserID)
+					log.Infof("Removing a favourite. User ID: %v", r.UserID)
 					twitterURL := ""
 					for k := range art.TwitterMatches {
 						twitterURL = "https://twitter.com/i/status/" + k

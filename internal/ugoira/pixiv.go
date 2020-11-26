@@ -110,7 +110,7 @@ func (p *PixivPost) DownloadUgoira() error {
 //GetPixivPost perfoms a Pixiv API call and returns an array of high-resolution image URLs
 func GetPixivPost(id string) (*PixivPost, error) {
 	if post, ok := pixivCache.Get(id); ok {
-		log.Infof("Found cached pixiv post %s", id)
+		log.Infof("Found cached pixiv post %v", id)
 		return post.(*PixivPost), nil
 	}
 
