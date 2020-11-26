@@ -249,7 +249,11 @@ func (a *ArtPost) Post(s *discordgo.Session, pixivOpts ...SendPixivOptions) erro
 		twitter = make(map[string]bool)
 	)
 
-	guild := database.GuildCache[m.GuildID]
+	guild, ok := database.GuildCache[m.GuildID]
+	if !ok {
+		return nil
+	}
+	
 	for k, v := range a.PixivMatches {
 		pixiv[k] = v
 	}

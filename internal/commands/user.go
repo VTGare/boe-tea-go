@@ -201,7 +201,7 @@ func artworksToEmbeds(favs []*database.NewFavourite, mode mode) ([]*discordgo.Me
 			}
 		}
 
-		artworks, err := database.DB.FindManyArtworks(filtered)
+		artworks, err := database.DB.FindManyArtworks(filtered, database.ByID)
 		if err != nil {
 			return nil, err
 		}
@@ -210,7 +210,7 @@ func artworksToEmbeds(favs []*database.NewFavourite, mode mode) ([]*discordgo.Me
 			embeds = append(embeds, artworkEmbed(f, ind, len(artworks)))
 		}
 	} else {
-		artworks, err := database.DB.FindManyArtworks(favs)
+		artworks, err := database.DB.FindManyArtworks(favs, database.ByID)
 		if err != nil {
 			return nil, err
 		}
@@ -243,6 +243,7 @@ func artworkEmbed(art *database.Artwork, ind, l int) *discordgo.MessageEmbed {
 		Fields: []*discordgo.MessageEmbedField{
 			{Name: "ID", Value: strconv.Itoa(art.ID), Inline: true},
 			{Name: "Author", Value: art.Author, Inline: true},
+			{Name: "Favourites", Value: strconv.Itoa(art.Favourites), Inline: true},
 			{Name: "URL", Value: fmt.Sprintf("[%v](%v)", "Click here desu~", art.URL), Inline: true},
 			{Name: "Created", Value: art.CreatedAt.Format("Jan 2 2006. 15:04:05 MST"), Inline: true},
 		},

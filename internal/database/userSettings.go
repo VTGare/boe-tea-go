@@ -24,8 +24,9 @@ type UserSettings struct {
 }
 
 type NewFavourite struct {
-	ID   int  `json:"artwork_id" bson:"artwork_id"`
-	NSFW bool `json:"nsfw" bson:"nsfw"`
+	ID        int       `json:"artwork_id" bson:"artwork_id"`
+	NSFW      bool      `json:"nsfw" bson:"nsfw"`
+	CreatedAt time.Time `json:"created_at" bson:"created_at"`
 }
 
 type Group struct {

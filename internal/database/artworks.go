@@ -4,9 +4,19 @@ import (
 	"context"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+)
+
+type SortArtworks int
+
+const (
+	_ SortArtworks = iota
+	ByID
+	ByFavourites
+	ByTime
 )
 
 type Artwork struct {
@@ -44,6 +54,7 @@ func (d *Database) nextID() (int, error) {
 }
 
 func (d *Database) CreateArtwork(artwork *Artwork) (*Artwork, error) {
+	logrus.Infof("Creating an artwork. URL: %s", artwork.URL)
 	id, err := d.nextID()
 	if err != nil {
 		return nil, err
@@ -67,6 +78,7 @@ func boolToInt(b bool) int {
 }
 
 func (d *Database) IncrementFavourites(fav *NewFavourite) (*Artwork, error) {
+	logrus.Infof("Incrementing a favourite count. Artwork ID: %s", fav.ID)
 	res := d.artworks.FindOneAndUpdate(
 		context.Background(),
 		bson.D{{"artwork_id", fav.ID}},
@@ -87,6 +99,7 @@ func (d *Database) IncrementFavourites(fav *NewFavourite) (*Artwork, error) {
 }
 
 func (d *Database) DecrementFavourites(fav *NewFavourite) (*Artwork, error) {
+	logrus.Infof("Decrementing a favourite count. Artwork ID: %s", fav.ID)
 	res := d.artworks.FindOneAndUpdate(
 		context.Background(),
 		bson.D{{"artwork_id", fav.ID}},
@@ -107,6 +120,7 @@ func (d *Database) DecrementFavourites(fav *NewFavourite) (*Artwork, error) {
 }
 
 func (d *Database) FindArtworkByID(id int) (*Artwork, error) {
+	logrus.Infof("Finding an artwork by ID: %v", id)
 	res := d.artworks.FindOne(
 		context.Background(),
 		bson.D{{"artwork_id", id}},
@@ -121,15 +135,40 @@ func (d *Database) FindArtworkByID(id int) (*Artwork, error) {
 	return artwork, nil
 }
 
-func (d *Database) FindManyArtworks(favs []*NewFavourite) ([]*Artwork, error) {
+func (d *Database) FindManyArtworks(favs []*NewFavourite, sortType SortArtworks) ([]*Artwork, error) {
 	IDs := make([]int, 0, len(favs))
 	for _, f := range favs {
 		IDs = append(IDs, f.ID)
 	}
 
+	logrus.Infof("Finding many artworks. Artwork IDs: %v", IDs)
+	var (
+		sort   bson.D
+		filter bson.D
+		opts   = options.Find()
+	)
+
+	switch sortType {
+	case ByID:
+		sort = bson.D{{"artwork_id", 1}}
+	case ByFavourites:
+		sort = bson.D{{"favourites", -1}}
+	case ByTime:
+		sort = bson.D{{"created_at", 1}}
+	}
+	opts.SetSort(sort)
+
+	if len(IDs) > 0 {
+		filter = bson.D{{"artwork_id", bson.D{{"$in", IDs}}}}
+	} else {
+		filter = bson.D{}
+		opts.SetLimit(10)
+	}
+
 	cur, err := d.artworks.Find(
 		context.Background(),
-		bson.D{{"artwork_id", bson.D{{"$in", IDs}}}},
+		filter,
+		opts,
 	)
 	if err != nil {
 		return nil, err
@@ -145,6 +184,7 @@ func (d *Database) FindManyArtworks(favs []*NewFavourite) ([]*Artwork, error) {
 }
 
 func (d *Database) FindArtworkByURL(url string) (*Artwork, error) {
+	logrus.Infof("Finding artwork by URL: %s", url)
 	res := d.artworks.FindOne(
 		context.Background(),
 		bson.D{{"url", url}},
@@ -160,6 +200,7 @@ func (d *Database) FindArtworkByURL(url string) (*Artwork, error) {
 }
 
 func (d *Database) AddFavourite(userID string, artwork *Artwork, nsfw bool) (*Artwork, error) {
+	logrus.Infof("Adding a favourite. User ID: %s", userID)
 	found, err := d.FindArtworkByURL(artwork.URL)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
@@ -173,7 +214,7 @@ func (d *Database) AddFavourite(userID string, artwork *Artwork, nsfw bool) (*Ar
 	}
 
 	if found != nil {
-		fav := &NewFavourite{found.ID, nsfw}
+		fav := &NewFavourite{found.ID, nsfw, time.Now()}
 		success, err := d.UserAddFavourite(userID, fav)
 		if err != nil {
 			return nil, err
@@ -193,6 +234,7 @@ func (d *Database) AddFavourite(userID string, artwork *Artwork, nsfw bool) (*Ar
 }
 
 func (d *Database) RemoveFavouriteURL(userID, url string) (*Artwork, error) {
+	logrus.Infof("Removing a favourite by URL. User ID: %s. URL: %s", userID, url)
 	artwork, err := d.FindArtworkByURL(url)
 	if err != nil {
 		return nil, err
@@ -211,6 +253,7 @@ func (d *Database) RemoveFavouriteURL(userID, url string) (*Artwork, error) {
 }
 
 func (d *Database) RemoveFavouriteID(userID string, id int) (*Artwork, error) {
+	logrus.Infof("Removing a favourite by ID. User ID: %s. URL: %s", userID, id)
 	artwork, err := d.FindArtworkByID(id)
 	if err != nil {
 		return nil, err
