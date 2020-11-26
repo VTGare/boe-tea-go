@@ -156,7 +156,6 @@ func (b *Bot) reactCreated(s *discordgo.Session, r *discordgo.MessageReactionAdd
 				pixiv, err := ugoira.GetPixivPost(pixivID)
 				if err != nil {
 					log.Warnf("addFavorite -> GetPixivPost: %v", err)
-					s.ChannelMessageSendComplex(r.ChannelID, commands.Router.ErrorHandler(fmt.Errorf("Error while adding a favourite: %v", err)))
 					return
 				}
 
@@ -179,7 +178,6 @@ func (b *Bot) reactCreated(s *discordgo.Session, r *discordgo.MessageReactionAdd
 				tweet, err := tsuita.GetTweet(twitterURL)
 				if err != nil {
 					log.Warnf("addFavorite -> GetTwitterPost: %v", err)
-					s.ChannelMessageSendComplex(r.ChannelID, commands.Router.ErrorHandler(fmt.Errorf("Error while adding a favourite: %v", err)))
 					return
 				}
 
@@ -299,7 +297,6 @@ func (b *Bot) reactRemoved(s *discordgo.Session, r *discordgo.MessageReactionRem
 					tweet, err := tsuita.GetTweet(twitterURL)
 					if err != nil {
 						log.Warnf("reactRemoved -> GetTweet: %v", err)
-						s.ChannelMessageSendComplex(r.ChannelID, commands.Router.ErrorHandler(fmt.Errorf("Error while adding a favourite: %v", err)))
 						return
 					}
 
