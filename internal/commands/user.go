@@ -126,6 +126,17 @@ func favourites(s *discordgo.Session, m *discordgo.MessageCreate, args []string)
 		}
 	}
 
+	if len(user.NewFavourites) == 0 {
+		s.ChannelMessageSendEmbed(m.ChannelID, &discordgo.MessageEmbed{
+			Title:       "❎ Couldn't execute favourites command",
+			Description: "You have no favourites",
+			Timestamp:   utils.EmbedTimestamp(),
+			Color:       utils.EmbedColor,
+		})
+
+		return nil
+	}
+
 	var (
 		options      = database.NewFindManyOptions().Order(database.Descending)
 		defaultEmbed = &discordgo.MessageEmbed{
