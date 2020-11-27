@@ -10,13 +10,56 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-type SortArtworks int
+type FindManyOptions struct {
+	Sort         SortType
+	SortOrder    SortOrder
+	ArtworkLimit int
+	Time         time.Time
+}
+
+func NewFindManyOptions() *FindManyOptions {
+	return &FindManyOptions{
+		Sort:         ByID,
+		SortOrder:    Ascending,
+		ArtworkLimit: 0,
+		Time:         time.Time{},
+	}
+}
+
+func (o *FindManyOptions) Limit(limit int) *FindManyOptions {
+	o.ArtworkLimit = limit
+	return o
+}
+
+func (o *FindManyOptions) SortType(t SortType) *FindManyOptions {
+	o.Sort = t
+	return o
+}
+
+func (o *FindManyOptions) Order(or SortOrder) *FindManyOptions {
+	o.SortOrder = or
+	return o
+}
+
+func (o *FindManyOptions) SetTime(t time.Time) *FindManyOptions {
+	o.Time = t
+	return o
+}
+
+type SortType int
 
 const (
-	_ SortArtworks = iota
+	_ SortType = iota
 	ByID
 	ByFavourites
 	ByTime
+)
+
+type SortOrder int
+
+const (
+	Ascending  SortOrder = 1
+	Descending SortOrder = -1
 )
 
 type Artwork struct {
@@ -135,7 +178,7 @@ func (d *Database) FindArtworkByID(id int) (*Artwork, error) {
 	return artwork, nil
 }
 
-func (d *Database) FindManyArtworks(favs []*NewFavourite, sortType SortArtworks) ([]*Artwork, error) {
+func (d *Database) FindManyArtworks(favs []*NewFavourite, opts *FindManyOptions) ([]*Artwork, error) {
 	IDs := make([]int, 0, len(favs))
 	for _, f := range favs {
 		IDs = append(IDs, f.ID)
@@ -143,32 +186,39 @@ func (d *Database) FindManyArtworks(favs []*NewFavourite, sortType SortArtworks)
 
 	logrus.Infof("Finding many artworks. Artwork IDs: %v", IDs)
 	var (
-		sort   bson.D
-		filter bson.D
-		opts   = options.Find()
+		sort      = bson.D{}
+		filter    = bson.D{}
+		mongoOpts = options.Find()
 	)
 
-	switch sortType {
+	switch opts.Sort {
 	case ByID:
-		sort = bson.D{{"artwork_id", 1}}
+		sort = bson.D{{"artwork_id", opts.SortOrder}}
 	case ByFavourites:
-		sort = bson.D{{"favourites", -1}}
+		sort = bson.D{{"favourites", opts.SortOrder}}
 	case ByTime:
-		sort = bson.D{{"created_at", 1}}
+		sort = bson.D{{"created_at", opts.SortOrder}}
 	}
-	opts.SetSort(sort)
 
-	if len(IDs) > 0 {
+	if !opts.Time.IsZero() {
+		if len(IDs) > 0 {
+			filter = bson.D{{"artwork_id", bson.D{{"$in", IDs}}}, {"created_at", bson.D{{"$gte", opts.Time}}}}
+		} else {
+			filter = bson.D{{"created_at", bson.D{{"$gte", opts.Time}}}}
+		}
+	} else if len(IDs) > 0 {
 		filter = bson.D{{"artwork_id", bson.D{{"$in", IDs}}}}
-	} else {
-		filter = bson.D{}
-		opts.SetLimit(10)
 	}
 
+	mongoOpts.SetSort(sort)
+
+	if opts.ArtworkLimit > 0 {
+		mongoOpts.SetLimit(int64(opts.ArtworkLimit))
+	}
 	cur, err := d.artworks.Find(
 		context.Background(),
 		filter,
-		opts,
+		mongoOpts,
 	)
 	if err != nil {
 		return nil, err

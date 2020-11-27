@@ -46,6 +46,16 @@ func NewUserSettings(id string) *UserSettings {
 	}
 }
 
+func FilterFavourites(favourites []*NewFavourite, filter func(*NewFavourite) bool) []*NewFavourite {
+	filtered := make([]*NewFavourite, 0)
+	for _, f := range favourites {
+		if filter(f) {
+			filtered = append(filtered, f)
+		}
+	}
+	return filtered
+}
+
 func (d *Database) AllUsers() ([]*UserSettings, error) {
 	cur, err := d.UserSettings.Find(context.Background(), bson.M{})
 

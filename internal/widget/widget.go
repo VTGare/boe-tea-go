@@ -7,7 +7,7 @@ import (
 )
 
 var (
-	controls = map[string]bool{"⏪": true, "⏹": true, "⏩": true}
+	controls = map[string]bool{"⏮": true, "⏪": true, "◀": true, "⏹": true, "▶": true, "⏩": true, "⏭": true}
 )
 
 //Widget is an interactive DiscordGo widget interface
@@ -30,9 +30,13 @@ func (w *Widget) Start(channelID string) error {
 	}
 	w.m = m
 
+	w.s.MessageReactionAdd(m.ChannelID, m.ID, "⏮")
 	w.s.MessageReactionAdd(m.ChannelID, m.ID, "⏪")
+	w.s.MessageReactionAdd(m.ChannelID, m.ID, "◀")
 	w.s.MessageReactionAdd(m.ChannelID, m.ID, "⏹")
+	w.s.MessageReactionAdd(m.ChannelID, m.ID, "▶")
 	w.s.MessageReactionAdd(m.ChannelID, m.ID, "⏩")
+	w.s.MessageReactionAdd(m.ChannelID, m.ID, "⏭")
 
 	var reaction *discordgo.MessageReaction
 	for {
@@ -54,14 +58,20 @@ func (w *Widget) Start(channelID string) error {
 		}
 
 		switch reaction.Emoji.APIName() {
-		case "⏪":
-			err := w.pageDown()
+		case "⏮":
+			err := w.firstPage()
 			w.s.MessageReactionRemove(w.m.ChannelID, w.m.ID, reaction.Emoji.APIName(), reaction.UserID)
 			if err != nil {
 				return err
 			}
-		case "⏩":
-			err := w.pageUp()
+		case "⏪":
+			err := w.fivePagesDown()
+			w.s.MessageReactionRemove(w.m.ChannelID, w.m.ID, reaction.Emoji.APIName(), reaction.UserID)
+			if err != nil {
+				return err
+			}
+		case "◀":
+			err := w.pageDown()
 			w.s.MessageReactionRemove(w.m.ChannelID, w.m.ID, reaction.Emoji.APIName(), reaction.UserID)
 			if err != nil {
 				return err
@@ -69,6 +79,24 @@ func (w *Widget) Start(channelID string) error {
 		case "⏹":
 			w.s.MessageReactionsRemoveAll(w.m.ChannelID, w.m.ID)
 			return nil
+		case "▶":
+			err := w.pageUp()
+			w.s.MessageReactionRemove(w.m.ChannelID, w.m.ID, reaction.Emoji.APIName(), reaction.UserID)
+			if err != nil {
+				return err
+			}
+		case "⏩":
+			err := w.fivePagesUp()
+			w.s.MessageReactionRemove(w.m.ChannelID, w.m.ID, reaction.Emoji.APIName(), reaction.UserID)
+			if err != nil {
+				return err
+			}
+		case "⏭":
+			err := w.lastPage()
+			w.s.MessageReactionRemove(w.m.ChannelID, w.m.ID, reaction.Emoji.APIName(), reaction.UserID)
+			if err != nil {
+				return err
+			}
 		}
 	}
 }
@@ -87,12 +115,76 @@ func (w *Widget) pageUp() error {
 	return nil
 }
 
+func (w *Widget) fivePagesUp() error {
+	if w.currentPage == w.len()-1 || w.len() <= 1 {
+		return nil
+	}
+
+	w.currentPage += 5
+	if w.currentPage >= w.len() {
+		w.currentPage = w.len() - 1
+	}
+
+	_, err := w.s.ChannelMessageEditEmbed(w.m.ChannelID, w.m.ID, w.Pages[w.currentPage])
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (w *Widget) pageDown() error {
 	if w.currentPage == 0 || w.len() <= 1 {
 		return nil
 	}
 
 	w.currentPage--
+	_, err := w.s.ChannelMessageEditEmbed(w.m.ChannelID, w.m.ID, w.Pages[w.currentPage])
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (w *Widget) fivePagesDown() error {
+	if w.currentPage == 0 || w.len() <= 1 {
+		return nil
+	}
+
+	w.currentPage -= 5
+	if w.currentPage < 0 {
+		w.currentPage = 0
+	}
+
+	_, err := w.s.ChannelMessageEditEmbed(w.m.ChannelID, w.m.ID, w.Pages[w.currentPage])
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (w *Widget) lastPage() error {
+	if w.currentPage == w.len()-1 || w.len() <= 1 {
+		return nil
+	}
+
+	w.currentPage = w.len() - 1
+	_, err := w.s.ChannelMessageEditEmbed(w.m.ChannelID, w.m.ID, w.Pages[w.currentPage])
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (w *Widget) firstPage() error {
+	if w.currentPage == 0 || w.len() <= 1 {
+		return nil
+	}
+
+	w.currentPage = 0
 	_, err := w.s.ChannelMessageEditEmbed(w.m.ChannelID, w.m.ID, w.Pages[w.currentPage])
 	if err != nil {
 		return err
