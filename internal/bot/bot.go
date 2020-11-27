@@ -7,6 +7,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ReneKroon/ttlcache"
 	"github.com/VTGare/boe-tea-go/internal/commands"
 	"github.com/VTGare/boe-tea-go/internal/database"
 	"github.com/VTGare/boe-tea-go/internal/repost"
@@ -19,12 +20,18 @@ import (
 )
 
 var (
-	botMention string
-	BoeTea     *Bot
+	botMention  string
+	bannedUsers = ttlcache.NewCache()
+	BoeTea      *Bot
 )
 
 type Bot struct {
 	Session *discordgo.Session
+}
+
+func init() {
+	//bannedUsers cache makes sure banned users don't have their favourites removed
+	bannedUsers.SetTTL(15 * time.Second)
 }
 
 func (b *Bot) Run() error {
@@ -53,6 +60,7 @@ func NewBot(token string) (*Bot, error) {
 	dg.AddHandler(bot.guildCreated)
 	dg.AddHandler(bot.guildDeleted)
 	dg.AddHandler(bot.reactRemoved)
+	dg.AddHandler(bot.guildBanAdd)
 	dg.Identify.Intents = discordgo.MakeIntent(discordgo.IntentsAllWithoutPrivileged)
 
 	BoeTea = bot
@@ -244,6 +252,10 @@ func (b *Bot) reactRemoved(s *discordgo.Session, r *discordgo.MessageReactionRem
 		return
 	}
 
+	if _, f := bannedUsers.Get(r.UserID); f {
+		return
+	}
+
 	if r.Emoji.APIName() == "💖" || r.Emoji.APIName() == "🤤" {
 		user := database.DB.FindUser(r.UserID)
 		if user != nil {
@@ -343,4 +355,8 @@ func (b *Bot) guildDeleted(s *discordgo.Session, g *discordgo.GuildDelete) {
 	} else {
 		log.Infoln("Kicked/banned from a guild. ID: ", g.ID)
 	}
+}
+
+func (b *Bot) guildBanAdd(s *discordgo.Session, m *discordgo.GuildBanAdd) {
+	bannedUsers.Set(m.User.ID, m.GuildID)
 }
