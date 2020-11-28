@@ -31,13 +31,19 @@ func (w *Widget) Start(channelID string) error {
 	w.m = m
 
 	if w.len() > 1 {
-		w.s.MessageReactionAdd(m.ChannelID, m.ID, "⏮")
-		w.s.MessageReactionAdd(m.ChannelID, m.ID, "⏪")
+		if w.len() > 5 {
+			w.s.MessageReactionAdd(m.ChannelID, m.ID, "⏮")
+			w.s.MessageReactionAdd(m.ChannelID, m.ID, "⏪")
+		}
+
 		w.s.MessageReactionAdd(m.ChannelID, m.ID, "◀")
 		w.s.MessageReactionAdd(m.ChannelID, m.ID, "⏹")
 		w.s.MessageReactionAdd(m.ChannelID, m.ID, "▶")
-		w.s.MessageReactionAdd(m.ChannelID, m.ID, "⏩")
-		w.s.MessageReactionAdd(m.ChannelID, m.ID, "⏭")
+
+		if w.len() > 5 {
+			w.s.MessageReactionAdd(m.ChannelID, m.ID, "⏩")
+			w.s.MessageReactionAdd(m.ChannelID, m.ID, "⏭")
+		}
 
 		var reaction *discordgo.MessageReaction
 		for {
