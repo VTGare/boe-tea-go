@@ -1,31 +1,24 @@
 package commands
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/VTGare/boe-tea-go/internal/database"
-	"github.com/VTGare/boe-tea-go/utils"
+	"github.com/VTGare/boe-tea-go/internal/embeds"
 	"github.com/VTGare/gumi"
 	"github.com/bwmarrin/discordgo"
 )
 
 var (
+	//Router ...
 	Router *gumi.Gumi
 )
 
 func init() {
 	Router = gumi.NewGumi(gumi.WithErrorHandler(func(e error) *discordgo.MessageSend {
 		if e != nil {
-			embed := &discordgo.MessageEmbed{
-				Title: "Oops, something went wrong!",
-				Thumbnail: &discordgo.MessageEmbedThumbnail{
-					URL: utils.DefaultEmbedImage,
-				},
-				Description: fmt.Sprintf("***Error message:***\n%v\n\nPlease contact bot's author using bt!feedback command or directly at VTGare#3599 if you can't understand the error. ", e),
-				Color:       utils.EmbedColor,
-				Timestamp:   utils.EmbedTimestamp(),
-			}
+			eb := embeds.NewBuilder()
+			embed := eb.ErrorTemplate(e.Error()).Finalize()
 
 			return &discordgo.MessageSend{
 				Embed: embed,

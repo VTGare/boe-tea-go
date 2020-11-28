@@ -11,9 +11,9 @@ import (
 	"time"
 
 	"github.com/VTGare/boe-tea-go/internal/database"
+	"github.com/VTGare/boe-tea-go/internal/embeds"
 	"github.com/VTGare/boe-tea-go/internal/images"
 	"github.com/VTGare/boe-tea-go/internal/repost"
-	"github.com/VTGare/boe-tea-go/pkg/chotto"
 	"github.com/VTGare/boe-tea-go/utils"
 	"github.com/VTGare/gumi"
 	"github.com/VTGare/sengoku"
@@ -34,8 +34,8 @@ var (
 		Title:       "❎ Source material couldn't be found",
 		Description: "Unfortunately Boe Tea couldn't find source of the provided image on neither SauceNAO nor ascii2d. Please consider using one of the methods below.",
 		Fields: []*discordgo.MessageEmbedField{
-			{"iqdb", "``bt!iqdb``", true},
-			{"Google Image Search", "[Click here desu~](https://www.google.com/imghp?hl=EN)", true},
+			{Name: "iqdb", Value: "``bt!iqdb``", Inline: true},
+			{Name: "Google Image Search", Value: "[Click here desu~](https://www.google.com/imghp?hl=EN)", Inline: true},
 		},
 		Timestamp: utils.EmbedTimestamp(),
 		Thumbnail: &discordgo.MessageEmbedThumbnail{URL: utils.DefaultEmbedImage},
@@ -215,62 +215,6 @@ func joinSauceURLs(urls []string, sep string) string {
 	return sb.String()
 }
 
-func waitEmbed(link string) (*discordgo.MessageEmbed, error) {
-	res, err := chotto.SearchWait(link)
-	if err != nil {
-		return nil, err
-	}
-
-	if len(res.Documents) == 0 {
-		return noSauceEmbed, nil
-	}
-
-	anime := res.Documents[0]
-
-	description := ""
-	uri := ""
-	if anime.AnilistID != 0 && anime.MalID != 0 {
-		description = fmt.Sprintf("[AniList link](https://anilist.co/anime/%v/) | [MyAnimeList link](https://myanimelist.net/anime/%v/)", anime.AnilistID, anime.MalID)
-		uri = fmt.Sprintf("https://myanimelist.net/anime/%v/", anime.MalID)
-	} else if anime.AnilistID != 0 {
-		description = fmt.Sprintf("[AniList link](https://anilist.co/anime/%v/)", anime.AnilistID)
-		uri = fmt.Sprintf("https://anilist.co/anime/%v/", anime.AnilistID)
-	} else if anime.MalID != 0 {
-		description = fmt.Sprintf("[MyAnimeList link](https://myanimelist.net/anime/%v/)", anime.MalID)
-		uri = fmt.Sprintf("https://myanimelist.net/anime/%v/", anime.MalID)
-	} else {
-		description = "No links :shrug:"
-	}
-
-	embed := &discordgo.MessageEmbed{
-		Title:       fmt.Sprintf("%v | %v", anime.TitleEnglish, anime.TitleNative),
-		URL:         uri,
-		Description: description,
-		Color:       utils.EmbedColor,
-		Timestamp:   utils.EmbedTimestamp(),
-		Fields: []*discordgo.MessageEmbedField{
-			{
-				Name:  "Similarity",
-				Value: fmt.Sprintf("%v%%", anime.Similarity*100),
-			},
-			{
-				Name:  "Timestamp",
-				Value: fmt.Sprintf("%v", readableSeconds(anime.At)),
-			},
-			{
-				Name:  "Episode",
-				Value: fmt.Sprintf("%v", anime.Episode),
-			},
-		},
-	}
-
-	return embed, nil
-}
-
-func readableSeconds(sec float64) string {
-	return fmt.Sprintf("%v:%v", int(sec)/60, int(sec)%60)
-}
-
 func exclude(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
 	if len(args) == 0 {
 		return utils.ErrNotEnoughArguments
@@ -282,8 +226,11 @@ func exclude(s *discordgo.Session, m *discordgo.MessageCreate, args []string) er
 	)
 
 	art := repost.NewPost(m, url)
-	if art.Len() == 0 {
-		return errors.New("First argument **must** be a Pixiv link.")
+	if len(art.PixivMatches) == 0 {
+		eb := embeds.NewBuilder()
+		msg := "First argument should be a Pixiv link.\nValue received: [" + args[0] + "]"
+		s.ChannelMessageSendEmbed(m.ChannelID, eb.FailureTemplate(msg).Finalize())
+		return nil
 	}
 
 	indexMap := make(map[int]bool)
@@ -336,8 +283,11 @@ func include(s *discordgo.Session, m *discordgo.MessageCreate, args []string) er
 	)
 
 	art := repost.NewPost(m, url)
-	if art.Len() == 0 {
-		return errors.New("First argument **must** be a Pixiv link.")
+	if len(art.PixivMatches) == 0 {
+		eb := embeds.NewBuilder()
+		msg := "First argument should be a Pixiv link.\nValue received: [" + args[0] + "]"
+		s.ChannelMessageSendEmbed(m.ChannelID, eb.FailureTemplate(msg).Finalize())
+		return nil
 	}
 
 	indexMap := make(map[int]bool)
@@ -390,7 +340,10 @@ func crosspost(s *discordgo.Session, m *discordgo.MessageCreate, args []string) 
 		art  = repost.NewPost(m)
 	)
 	if user == nil {
-		return fmt.Errorf("You have no cross-post groups. Please create one using a following command: ``bt!create <group name> <parent id>``")
+		eb := embeds.NewBuilder()
+		msg := "You have no cross-post groups. Please create one using a following command: ``bt!create <group name> <parent id>``"
+		s.ChannelMessageSendEmbed(m.ChannelID, eb.FailureTemplate(msg).Finalize())
+		return nil
 	}
 
 	err := art.Post(s)

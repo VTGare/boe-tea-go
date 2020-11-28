@@ -122,11 +122,11 @@ func showGuildSettings(s *discordgo.Session, m *discordgo.MessageCreate, setting
 	})
 }
 
-func setBool(s *discordgo.Session, m *discordgo.MessageCreate, str string) (interface{}, error) {
+func setBool(_ *discordgo.Session, _ *discordgo.MessageCreate, str string) (interface{}, error) {
 	return utils.ParseBool(str)
 }
 
-func setPrefix(s *discordgo.Session, m *discordgo.MessageCreate, str string) (interface{}, error) {
+func setPrefix(s *discordgo.Session, _ *discordgo.MessageCreate, str string) (interface{}, error) {
 	if unicode.IsLetter(rune(str[len(str)-1])) {
 		str += " "
 	}
@@ -136,7 +136,7 @@ func setPrefix(s *discordgo.Session, m *discordgo.MessageCreate, str string) (in
 	return str, nil
 }
 
-func setInt(s *discordgo.Session, m *discordgo.MessageCreate, str string) (interface{}, error) {
+func setInt(_ *discordgo.Session, _ *discordgo.MessageCreate, str string) (interface{}, error) {
 	ls, err := strconv.Atoi(str)
 	if err != nil {
 		return nil, utils.ErrParsingArgument

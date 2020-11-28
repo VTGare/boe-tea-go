@@ -22,11 +22,13 @@ var (
 	}
 )
 
+//Minesweeper ...
 type Minesweeper struct {
 	Field [10][10]int
 	Bombs []*Point
 }
 
+//Point ...
 type Point struct {
 	x int
 	y int

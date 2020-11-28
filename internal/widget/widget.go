@@ -30,75 +30,79 @@ func (w *Widget) Start(channelID string) error {
 	}
 	w.m = m
 
-	w.s.MessageReactionAdd(m.ChannelID, m.ID, "⏮")
-	w.s.MessageReactionAdd(m.ChannelID, m.ID, "⏪")
-	w.s.MessageReactionAdd(m.ChannelID, m.ID, "◀")
-	w.s.MessageReactionAdd(m.ChannelID, m.ID, "⏹")
-	w.s.MessageReactionAdd(m.ChannelID, m.ID, "▶")
-	w.s.MessageReactionAdd(m.ChannelID, m.ID, "⏩")
-	w.s.MessageReactionAdd(m.ChannelID, m.ID, "⏭")
+	if w.len() > 1 {
+		w.s.MessageReactionAdd(m.ChannelID, m.ID, "⏮")
+		w.s.MessageReactionAdd(m.ChannelID, m.ID, "⏪")
+		w.s.MessageReactionAdd(m.ChannelID, m.ID, "◀")
+		w.s.MessageReactionAdd(m.ChannelID, m.ID, "⏹")
+		w.s.MessageReactionAdd(m.ChannelID, m.ID, "▶")
+		w.s.MessageReactionAdd(m.ChannelID, m.ID, "⏩")
+		w.s.MessageReactionAdd(m.ChannelID, m.ID, "⏭")
 
-	var reaction *discordgo.MessageReaction
-	for {
-		select {
-		case k := <-nextMessageReactionAdd(w.s):
-			reaction = k.MessageReaction
-		case <-time.After(2 * time.Minute):
-			return nil
-		}
+		var reaction *discordgo.MessageReaction
+		for {
+			select {
+			case k := <-nextMessageReactionAdd(w.s):
+				reaction = k.MessageReaction
+			case <-time.After(2 * time.Minute):
+				return nil
+			}
 
-		r := reaction.Emoji.APIName()
-		_, ok := controls[r]
-		if !ok {
-			continue
-		}
+			r := reaction.Emoji.APIName()
+			_, ok := controls[r]
+			if !ok {
+				continue
+			}
 
-		if reaction.MessageID != w.m.ID || w.s.State.User.ID == reaction.UserID || reaction.UserID != w.author {
-			continue
-		}
+			if reaction.MessageID != w.m.ID || w.s.State.User.ID == reaction.UserID || reaction.UserID != w.author {
+				continue
+			}
 
-		switch reaction.Emoji.APIName() {
-		case "⏮":
-			err := w.firstPage()
-			w.s.MessageReactionRemove(w.m.ChannelID, w.m.ID, reaction.Emoji.APIName(), reaction.UserID)
-			if err != nil {
-				return err
-			}
-		case "⏪":
-			err := w.fivePagesDown()
-			w.s.MessageReactionRemove(w.m.ChannelID, w.m.ID, reaction.Emoji.APIName(), reaction.UserID)
-			if err != nil {
-				return err
-			}
-		case "◀":
-			err := w.pageDown()
-			w.s.MessageReactionRemove(w.m.ChannelID, w.m.ID, reaction.Emoji.APIName(), reaction.UserID)
-			if err != nil {
-				return err
-			}
-		case "⏹":
-			w.s.MessageReactionsRemoveAll(w.m.ChannelID, w.m.ID)
-			return nil
-		case "▶":
-			err := w.pageUp()
-			w.s.MessageReactionRemove(w.m.ChannelID, w.m.ID, reaction.Emoji.APIName(), reaction.UserID)
-			if err != nil {
-				return err
-			}
-		case "⏩":
-			err := w.fivePagesUp()
-			w.s.MessageReactionRemove(w.m.ChannelID, w.m.ID, reaction.Emoji.APIName(), reaction.UserID)
-			if err != nil {
-				return err
-			}
-		case "⏭":
-			err := w.lastPage()
-			w.s.MessageReactionRemove(w.m.ChannelID, w.m.ID, reaction.Emoji.APIName(), reaction.UserID)
-			if err != nil {
-				return err
+			switch reaction.Emoji.APIName() {
+			case "⏮":
+				err := w.firstPage()
+				w.s.MessageReactionRemove(w.m.ChannelID, w.m.ID, reaction.Emoji.APIName(), reaction.UserID)
+				if err != nil {
+					return err
+				}
+			case "⏪":
+				err := w.fivePagesDown()
+				w.s.MessageReactionRemove(w.m.ChannelID, w.m.ID, reaction.Emoji.APIName(), reaction.UserID)
+				if err != nil {
+					return err
+				}
+			case "◀":
+				err := w.pageDown()
+				w.s.MessageReactionRemove(w.m.ChannelID, w.m.ID, reaction.Emoji.APIName(), reaction.UserID)
+				if err != nil {
+					return err
+				}
+			case "⏹":
+				w.s.MessageReactionsRemoveAll(w.m.ChannelID, w.m.ID)
+				return nil
+			case "▶":
+				err := w.pageUp()
+				w.s.MessageReactionRemove(w.m.ChannelID, w.m.ID, reaction.Emoji.APIName(), reaction.UserID)
+				if err != nil {
+					return err
+				}
+			case "⏩":
+				err := w.fivePagesUp()
+				w.s.MessageReactionRemove(w.m.ChannelID, w.m.ID, reaction.Emoji.APIName(), reaction.UserID)
+				if err != nil {
+					return err
+				}
+			case "⏭":
+				err := w.lastPage()
+				w.s.MessageReactionRemove(w.m.ChannelID, w.m.ID, reaction.Emoji.APIName(), reaction.UserID)
+				if err != nil {
+					return err
+				}
 			}
 		}
 	}
+
+	return nil
 }
 
 func (w *Widget) pageUp() error {

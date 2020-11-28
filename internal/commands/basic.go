@@ -5,11 +5,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/VTGare/boe-tea-go/internal/embeds"
 	"github.com/VTGare/boe-tea-go/utils"
 	"github.com/bwmarrin/discordgo"
 )
 
-func ping(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
+func ping(s *discordgo.Session, m *discordgo.MessageCreate, _ []string) error {
 	_, err := s.ChannelMessageSend(m.ChannelID, fmt.Sprintf(":ping_pong: Pong! Latency: ***%v***", s.HeartbeatLatency().Round(1*time.Millisecond)))
 	if err != nil {
 		return err
@@ -23,24 +24,14 @@ func feedback(s *discordgo.Session, m *discordgo.MessageCreate, args []string) e
 	}
 
 	message := strings.Join(args, " ")
-	embed := &discordgo.MessageEmbed{
-		Title: fmt.Sprintf("Feedback from %v", m.Author.String()),
-		Thumbnail: &discordgo.MessageEmbedThumbnail{
-			URL: m.Author.AvatarURL(""),
-		},
-		Description: message,
-		Timestamp:   utils.EmbedTimestamp(),
-		Color:       utils.EmbedColor,
-	}
-
+	eb := embeds.NewBuilder()
+	eb.Title(fmt.Sprintf("Feedback from %v", m.Author.String())).Thumbnail(m.Author.AvatarURL("")).Description(message)
 	if len(m.Attachments) >= 1 {
-		embed.Image = &discordgo.MessageEmbedImage{
-			URL: m.Attachments[0].URL,
-		}
+		eb.Image(m.Attachments[0].URL)
 	}
 
 	ch, _ := s.UserChannelCreate(utils.AuthorID)
-	_, err := s.ChannelMessageSendEmbed(ch.ID, embed)
+	_, err := s.ChannelMessageSendEmbed(ch.ID, eb.Finalize())
 	if err != nil {
 		return err
 	}
@@ -48,7 +39,7 @@ func feedback(s *discordgo.Session, m *discordgo.MessageCreate, args []string) e
 	return nil
 }
 
-func invite(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
+func invite(s *discordgo.Session, m *discordgo.MessageCreate, _ []string) error {
 	_, err := s.ChannelMessageSend(m.ChannelID, "Thanks for inviting me to more places! https://discord.com/api/oauth2/authorize?client_id=636468907049353216&permissions=537259072&scope=bot")
 	if err != nil {
 		return err
@@ -57,7 +48,7 @@ func invite(s *discordgo.Session, m *discordgo.MessageCreate, args []string) err
 	return nil
 }
 
-func support(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
+func support(s *discordgo.Session, m *discordgo.MessageCreate, _ []string) error {
 	_, err := s.ChannelMessageSend(m.ChannelID, "**Support server invite link:** https://discord.gg/hcxuHE7")
 	if err != nil {
 		return err

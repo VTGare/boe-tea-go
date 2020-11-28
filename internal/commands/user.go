@@ -8,10 +8,12 @@ import (
 	"time"
 
 	"github.com/VTGare/boe-tea-go/internal/database"
+	"github.com/VTGare/boe-tea-go/internal/embeds"
 	"github.com/VTGare/boe-tea-go/internal/widget"
 	"github.com/VTGare/boe-tea-go/utils"
 	"github.com/VTGare/gumi"
 	"github.com/bwmarrin/discordgo"
+	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -82,13 +84,13 @@ func init() {
 
 }
 
-func profile(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
+func profile(s *discordgo.Session, m *discordgo.MessageCreate, _ []string) error {
 	user := database.DB.FindUser(m.Author.ID)
 	if user == nil {
 		user = database.NewUserSettings(m.Author.ID)
 		err := database.DB.InsertOneUser(user)
 		if err != nil {
-			return fmt.Errorf("Fatal database error: %v", err)
+			return fmt.Errorf("fatal database error: %v", err)
 		}
 	}
 
@@ -122,7 +124,7 @@ func favourites(s *discordgo.Session, m *discordgo.MessageCreate, args []string)
 		user = database.NewUserSettings(m.Author.ID)
 		err := database.DB.InsertOneUser(user)
 		if err != nil {
-			return fmt.Errorf("Fatal database error: %v", err)
+			return fmt.Errorf("fatal database error: %v", err)
 		}
 	}
 
@@ -215,9 +217,11 @@ func favourites(s *discordgo.Session, m *discordgo.MessageCreate, args []string)
 
 	ch, _ := s.Channel(m.ChannelID)
 	if !ch.NSFW && mode == modeNSFW || mode == modeAll {
-		if f := utils.CreatePromptWithMessage(s, m, &discordgo.MessageSend{
+		f := utils.CreatePromptWithMessage(s, m, &discordgo.MessageSend{
 			Content: "The result may contain NSFW images, are you sure about that?",
-		}); f == false {
+		})
+
+		if !f {
 			return nil
 		}
 	}
@@ -274,7 +278,7 @@ func favourites(s *discordgo.Session, m *discordgo.MessageCreate, args []string)
 			Color:     utils.EmbedColor,
 			Thumbnail: &discordgo.MessageEmbedThumbnail{URL: utils.DefaultEmbedImage},
 			Timestamp: utils.EmbedTimestamp(),
-			Fields:    []*discordgo.MessageEmbedField{{"Reason", "Either your favourites list is empty or couldn't find favourite matching the filter", false}},
+			Fields:    []*discordgo.MessageEmbedField{{Name: "Reason", Value: "Either your favourites list is empty or couldn't find favourite matching the filter"}},
 		})
 		if err != nil {
 			return err
@@ -351,22 +355,15 @@ func favouriteEmbed(art *database.Artwork, t time.Time, ind, l int) *discordgo.M
 		}
 	}
 
-	embed := &discordgo.MessageEmbed{
-		Title: title,
-		Image: &discordgo.MessageEmbedImage{URL: art.Images[0]},
-		URL:   art.URL,
-		Fields: []*discordgo.MessageEmbedField{
-			{Name: "ID", Value: strconv.Itoa(art.ID), Inline: true},
-			{Name: "Author", Value: art.Author, Inline: true},
-			{Name: "Favourites", Value: strconv.Itoa(art.Favourites), Inline: true},
-			{Name: "URL", Value: fmt.Sprintf("[%v](%v)", "Click here desu~", art.URL), Inline: true},
-			{Name: "Added to favourites", Value: t.Format("Jan 2 2006. 15:04:05 MST"), Inline: true},
-		},
-
-		Color:     utils.EmbedColor,
-		Timestamp: utils.EmbedTimestamp(),
+	eb := embeds.NewBuilder().Title(title).URL(art.URL)
+	eb.AddField("ID", strconv.Itoa(art.ID), true).AddField("Author", art.Author, true)
+	eb.AddField("Favourites", strconv.Itoa(art.Favourites), true).AddField("URL", fmt.Sprintf("[%v](%v)", "Click here desu~", art.URL), true)
+	eb.AddField("Added to favourites", t.Format("Jan 2 2006. 15:04:05 MST"), true)
+	if len(art.Images) > 0 {
+		eb.Image(art.Images[0])
 	}
-	return embed
+
+	return eb.Finalize()
 }
 
 func compactFavourites(fav []*database.Artwork) []*discordgo.MessageEmbed {
@@ -426,7 +423,7 @@ func unfavourite(s *discordgo.Session, m *discordgo.MessageCreate, args []string
 		user = database.NewUserSettings(m.Author.ID)
 		err := database.DB.InsertOneUser(user)
 		if err != nil {
-			return fmt.Errorf("Fatal database error: %v", err)
+			return fmt.Errorf("fatal database error: %v", err)
 		}
 	}
 
@@ -440,8 +437,14 @@ func unfavourite(s *discordgo.Session, m *discordgo.MessageCreate, args []string
 
 	if id, err := strconv.Atoi(args[0]); err == nil {
 		_, err = database.DB.RemoveFavouriteID(user.ID, id)
+		if err != nil {
+			logrus.Errorf("RemoveFavouriteID() -> %v", err)
+		}
 	} else {
 		_, err = database.DB.RemoveFavouriteURL(user.ID, args[0])
+		if err != nil {
+			logrus.Errorf("RemoveFavouriteID() -> %v", err)
+		}
 	}
 
 	if err != nil {

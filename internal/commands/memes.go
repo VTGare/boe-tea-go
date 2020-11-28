@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"text/template"
 
+	"github.com/VTGare/boe-tea-go/internal/embeds"
 	"github.com/VTGare/boe-tea-go/utils"
 	"github.com/VTGare/gumi"
 	"github.com/bwmarrin/discordgo"
@@ -52,18 +53,14 @@ func init() {
 	})
 }
 
-func borgar(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
-	s.ChannelMessageSendEmbed(m.ChannelID, &discordgo.MessageEmbed{
-		Title:     "🦕🍔",
-		Timestamp: utils.EmbedTimestamp(),
-		Color:     utils.EmbedColor,
-		Image: &discordgo.MessageEmbedImage{
-			URL: "https://images-ext-2.discordapp.net/external/gRgdT4gZIPbY26qK9iM0edWQA4hYPZF5RvxVdSeXhRQ/https/i.kym-cdn.com/photos/images/original/001/568/282/ef2.gif?width=438&height=444",
-		},
-	})
+func borgar(s *discordgo.Session, m *discordgo.MessageCreate, _ []string) error {
+	eb := embeds.NewBuilder().Title("🦕🍔").Image("https://images-ext-2.discordapp.net/external/gRgdT4gZIPbY26qK9iM0edWQA4hYPZF5RvxVdSeXhRQ/https/i.kym-cdn.com/photos/images/original/001/568/282/ef2.gif?width=438&height=444")
+
+	s.ChannelMessageSendEmbed(m.ChannelID, eb.Finalize())
 	return nil
 }
 
+//NuggetsCopypasta ...
 type NuggetsCopypasta struct {
 	Amelia string
 	Ryo    string
@@ -83,12 +80,12 @@ func nuggets(s *discordgo.Session, m *discordgo.MessageCreate, args []string) er
 	return nil
 }
 
-func brainpower(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
+func brainpower(s *discordgo.Session, m *discordgo.MessageCreate, _ []string) error {
 	s.ChannelMessageSend(m.ChannelID, "O-oooooooooo AAAAE-A-A-I-A-U- JO-oooooooooooo AAE-O-A-A-U-U-A- E-eee-ee-eee AAAAE-A-E-I-E-A-JO-ooo-oo-oo-oo EEEEO-A-AAA-AAAA")
 	return nil
 }
 
-func minesweeper(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
+func minesweeper(s *discordgo.Session, m *discordgo.MessageCreate, _ []string) error {
 	ms := &Minesweeper{}
 	ms.generateField()
 

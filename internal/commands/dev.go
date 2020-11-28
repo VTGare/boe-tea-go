@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/VTGare/boe-tea-go/internal/embeds"
 	"github.com/VTGare/boe-tea-go/utils"
 	"github.com/VTGare/gumi"
 	"github.com/bwmarrin/discordgo"
@@ -52,7 +53,7 @@ func message(s *discordgo.Session, m *discordgo.MessageCreate, args []string) er
 	return nil
 }
 
-func updateDB(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
+func updateDB(_ *discordgo.Session, m *discordgo.MessageCreate, _ []string) error {
 	if m.Author.ID != utils.AuthorID {
 		return nil
 	}
@@ -60,50 +61,25 @@ func updateDB(s *discordgo.Session, m *discordgo.MessageCreate, args []string) e
 	return nil
 }
 
-func devstats(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
+func devstats(s *discordgo.Session, m *discordgo.MessageCreate, _ []string) error {
 	var (
 		mem runtime.MemStats
 	)
 	runtime.ReadMemStats(&mem)
 
 	guilds := len(s.State.Guilds)
-
 	channels := 0
 	for _, g := range s.State.Guilds {
 		channels += len(g.Channels)
 	}
 	latency := s.HeartbeatLatency().Round(1 * time.Millisecond)
 
-	s.ChannelMessageSendEmbed(m.ChannelID, &discordgo.MessageEmbed{
-		Title:     "Bot stats",
-		Color:     utils.EmbedColor,
-		Timestamp: utils.EmbedTimestamp(),
-		Thumbnail: &discordgo.MessageEmbedThumbnail{
-			URL: utils.DefaultEmbedImage,
-		},
-		Fields: []*discordgo.MessageEmbedField{
-			{
-				Name:   "Guilds",
-				Value:  strconv.Itoa(guilds),
-				Inline: true,
-			},
-			{
-				Name:   "Channels",
-				Value:  strconv.Itoa(channels),
-				Inline: true,
-			},
-			{
-				Name:   "Latency",
-				Value:  latency.String(),
-				Inline: true,
-			},
-			{
-				Name:   "Shards",
-				Value:  strconv.Itoa(s.ShardCount),
-				Inline: false,
-			},
-			{Name: "RAM used", Value: fmt.Sprintf("%v MB", mem.Alloc/1024/1024), Inline: false},
-		},
-	})
+	eb := embeds.NewBuilder()
+	eb.Title("Bot stats").Thumbnail(utils.DefaultEmbedImage)
+	eb.AddField("Guilds", strconv.Itoa(guilds), true).AddField("Channels", strconv.Itoa(channels), true)
+	eb.AddField("Latency", latency.String(), true).AddField("Shards", strconv.Itoa(s.ShardCount))
+	eb.AddField("RAM used", fmt.Sprintf("%v MB", mem.Alloc/1024/1024))
+
+	s.ChannelMessageSendEmbed(m.ChannelID, eb.Finalize())
 	return nil
 }

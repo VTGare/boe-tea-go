@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/VTGare/boe-tea-go/internal/database"
+	"github.com/VTGare/boe-tea-go/internal/embeds"
 	"github.com/VTGare/boe-tea-go/internal/widget"
 	"github.com/VTGare/boe-tea-go/utils"
 	"github.com/VTGare/gumi"
@@ -51,11 +52,7 @@ func init() {
 
 func leaderboard(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
 	var (
-		options      = database.NewFindManyOptions().Limit(10).SortType(database.ByFavourites).Order(database.Descending)
-		defaultEmbed = &discordgo.MessageEmbed{
-			Color:     utils.EmbedColor,
-			Timestamp: utils.EmbedTimestamp(),
-		}
+		options = database.NewFindManyOptions().Limit(10).SortType(database.ByFavourites).Order(database.Descending)
 	)
 
 	for _, a := range args {
@@ -65,9 +62,9 @@ func leaderboard(s *discordgo.Session, m *discordgo.MessageCreate, args []string
 			limit, err := strconv.Atoi(limitString)
 			if err != nil || limit > 100 || limit < 1 {
 				if limit > 100 || limit < 1 {
-					defaultEmbed.Title = "❎ Couldn't execute a leaderboard command"
-					defaultEmbed.Description = "Provided limit argument is either not a number or out of allowed range [1:100]"
-					s.ChannelMessageSendEmbed(m.ChannelID, defaultEmbed)
+					eb := embeds.NewBuilder()
+					msg := "Provided limit argument is either not a number or out of allowed range [1:100]"
+					s.ChannelMessageSendEmbed(m.ChannelID, eb.FailureTemplate(msg).Finalize())
 					return nil
 				}
 			}
@@ -91,14 +88,13 @@ func leaderboard(s *discordgo.Session, m *discordgo.MessageCreate, args []string
 		return err
 	}
 
-	if utils.CreatePromptWithMessage(s, m, &discordgo.MessageSend{
-		Embed: &discordgo.MessageEmbed{
-			Title:       fmt.Sprintf("🛑 Attention"),
-			Description: "The result may contain NSFW content, Boe Tea doesn't filter the leaderboard to stay true to its purpose! Please confirm the operation.",
-			Timestamp:   utils.EmbedTimestamp(),
-			Color:       utils.EmbedColor,
-		},
-	}) {
+	eb := embeds.NewBuilder()
+	msg := "The result may contain NSFW content, Boe Tea doesn't filter the leaderboard to stay true to its purpose! Please confirm the operation."
+	prompt := utils.CreatePromptWithMessage(s, m, &discordgo.MessageSend{
+		Embed: eb.WarnTemplate(msg).Finalize(),
+	})
+
+	if prompt {
 		embeds := make([]*discordgo.MessageEmbed, 0, len(artworks))
 		for ind, a := range artworks {
 			embeds = append(embeds, artworkEmbed(a, ind, len(artworks)))
@@ -133,13 +129,8 @@ func artwork(s *discordgo.Session, m *discordgo.MessageCreate, args []string) er
 	if err != nil {
 		switch err {
 		case mongo.ErrNoDocuments:
-			s.ChannelMessageSendEmbed(m.ChannelID, &discordgo.MessageEmbed{
-				Title:       fmt.Sprintf("❎ Couldn't send an artwork"),
-				Description: fmt.Sprintf("An artwork with ID [%v] doesn't exist", ID),
-				Timestamp:   utils.EmbedTimestamp(),
-				Color:       utils.EmbedColor,
-			})
-
+			eb := embeds.NewBuilder()
+			s.ChannelMessageSendEmbed(m.ChannelID, eb.FailureTemplate(fmt.Sprintf("An artwork with ID [%v] doesn't exist", ID)).Finalize())
 			return nil
 		default:
 			return err
@@ -154,15 +145,12 @@ func artwork(s *discordgo.Session, m *discordgo.MessageCreate, args []string) er
 	}
 
 	if percent >= 50.0 && !ch.NSFW {
-		prompt := utils.CreatePromptWithMessage(s, m, &discordgo.MessageSend{
-			Embed: &discordgo.MessageEmbed{
-				Title:       fmt.Sprintf("🛑 Attention"),
-				Description: fmt.Sprintf("%v out of %v (%v%v) marked this artwork as NSFW. Please confirm the operation.", artwork.NSFW, artwork.Favourites, percent, "%"),
-				Timestamp:   utils.EmbedTimestamp(),
-				Color:       utils.EmbedColor,
-			},
-		})
+		eb := embeds.NewBuilder()
 
+		msg := fmt.Sprintf("%v out of %v (%v%v) marked this artwork as NSFW. Please confirm the operation.", artwork.NSFW, artwork.Favourites, percent, "%")
+		prompt := utils.CreatePromptWithMessage(s, m, &discordgo.MessageSend{
+			Embed: eb.WarnTemplate(msg).Finalize(),
+		})
 		if !prompt {
 			return nil
 		}

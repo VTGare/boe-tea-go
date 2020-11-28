@@ -96,25 +96,6 @@ func init() {
 			Value: "Not required. If not provided, looks for images in 5 previous messages. Link should either have one of following suffixes [*jpg*, *jpeg*, *png*, *gif*, *webp*] or be a Discord message link in the following format: ``https://discord.com/channels/%GUILD_ID%/%CHANNEL_ID%/%MESSAGE_ID%``",
 		},
 	}
-
-	waitCmd := sg.AddCommand(&gumi.Command{
-		Name:        "wait",
-		Description: "Finds an anime source from a screenshot.",
-		Aliases:     []string{"trace", "tracemoe"},
-		Exec:        saucenao,
-		Cooldown:    10 * time.Second,
-		Help:        gumi.NewHelpSettings(),
-	})
-	waitCmd.Help.ExtendedHelp = []*discordgo.MessageEmbedField{
-		{
-			Name:  "Usage",
-			Value: "bt!wait <image link>",
-		},
-		{
-			Name:  "image link",
-			Value: "Not required. If not provided, looks for images in 5 previous messages. Link should either have one of following suffixes [*jpg*, *jpeg*, *png*, *gif*, *webp*] or be a Discord message link in the following format: ``https://discord.com/channels/%GUILD_ID%/%CHANNEL_ID%/%MESSAGE_ID%``",
-		},
-	}
 }
 
 func sauce(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
@@ -158,14 +139,16 @@ func sauce(s *discordgo.Session, m *discordgo.MessageCreate, args []string) erro
 		return nil
 	}
 
-	if prompt := utils.CreatePrompt(s, m, &utils.PromptOptions{
+	prompt := utils.CreatePrompt(s, m, &utils.PromptOptions{
 		Actions: map[string]bool{
 			"✅": true,
 			"❎": false,
 		},
 		Message: "<:peepoRainy:530050503955054593> Source couldn't be found on SauceNAO. Would you like to try __*ascii2d?*__",
 		Timeout: 15 * time.Second,
-	}); prompt == true {
+	})
+
+	if prompt {
 		log.Infof("Searching source on ascii2d. Image URL: %v", url)
 		res, err := ascii2dgo.Search(url)
 		if err != nil {
@@ -177,14 +160,10 @@ func sauce(s *discordgo.Session, m *discordgo.MessageCreate, args []string) erro
 		for i, s := range res.Sources {
 			embeds = append(embeds, ascii2dEmbed(s, i, l))
 		}
-		if len(embeds) > 1 {
+
+		if len(embeds) > 0 {
 			w := widget.NewWidget(s, m.Author.ID, embeds)
 			err := w.Start(m.ChannelID)
-			if err != nil {
-				return err
-			}
-		} else if len(embeds) > 0 {
-			_, err = s.ChannelMessageSendEmbed(m.ChannelID, embeds[0])
 			if err != nil {
 				return err
 			}
@@ -308,30 +287,6 @@ func saucenaoToEmbed(source *sengoku.Sauce, index, length int) *discordgo.Messag
 		embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{Name: "Other URLs", Value: str})
 	}
 	return embed
-}
-
-func wait(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
-	url, err := findImage(s, m, args)
-	if err != nil {
-		return err
-	}
-
-	if url == "" {
-		return utils.ErrNotEnoughArguments
-	}
-
-	log.Infof("Searching source on trace.moe. Image URL: %v", url)
-	embed, err := waitEmbed(url)
-	if err != nil {
-		return err
-	}
-
-	_, err = s.ChannelMessageSendEmbed(m.ChannelID, embed)
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func ascii2d(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {

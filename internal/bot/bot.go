@@ -10,17 +10,15 @@ import (
 	"github.com/ReneKroon/ttlcache"
 	"github.com/VTGare/boe-tea-go/internal/commands"
 	"github.com/VTGare/boe-tea-go/internal/database"
+	"github.com/VTGare/boe-tea-go/internal/embeds"
 	"github.com/VTGare/boe-tea-go/internal/repost"
 	"github.com/VTGare/boe-tea-go/internal/ugoira"
 	"github.com/VTGare/boe-tea-go/pkg/tsuita"
-	"github.com/VTGare/boe-tea-go/utils"
 	"github.com/bwmarrin/discordgo"
-	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 )
 
 var (
-	botMention  string
 	bannedUsers = ttlcache.NewCache()
 	BoeTea      *Bot
 )
@@ -67,26 +65,9 @@ func NewBot(token string) (*Bot, error) {
 	return bot, nil
 }
 
-func (b *Bot) onReady(s *discordgo.Session, e *discordgo.Ready) {
-	botMention = "<@!" + e.User.ID + ">"
+func (b *Bot) onReady(_ *discordgo.Session, e *discordgo.Ready) {
 	log.Infoln(e.User.String(), "is ready.")
 	log.Infof("Connected to %v guilds!", len(e.Guilds))
-}
-
-func handleError(s *discordgo.Session, m *discordgo.MessageCreate, err error) {
-	if err != nil {
-		log.Errorf("An error occured: %v", err)
-		embed := &discordgo.MessageEmbed{
-			Title: "Oops, something went wrong!",
-			Thumbnail: &discordgo.MessageEmbedThumbnail{
-				URL: utils.DefaultEmbedImage,
-			},
-			Description: fmt.Sprintf("***Error message:***\n%v\n\nPlease contact bot's author using bt!feedback command or directly at VTGare#3599 if you can't understand the error.", err),
-			Color:       utils.EmbedColor,
-			Timestamp:   utils.EmbedTimestamp(),
-		}
-		s.ChannelMessageSendEmbed(m.ChannelID, embed)
-	}
 }
 
 func (b *Bot) prefixless(s *discordgo.Session, m *discordgo.MessageCreate) error {
@@ -146,7 +127,7 @@ func (b *Bot) reactCreated(s *discordgo.Session, r *discordgo.MessageReactionAdd
 					msg.Content = msg.Embeds[0].URL
 				}
 			}
-			art := repost.NewPost(&discordgo.MessageCreate{msg})
+			art := repost.NewPost(&discordgo.MessageCreate{Message: msg})
 			if art.Len() == 0 {
 				return
 			}
@@ -209,15 +190,13 @@ func (b *Bot) reactCreated(s *discordgo.Session, r *discordgo.MessageReactionAdd
 					if err != nil {
 						log.Warnf("s.UserChannelCreate -> %v", err)
 					} else {
-						s.ChannelMessageSendComplex(ch.ID, &discordgo.MessageSend{
-							Embed: &discordgo.MessageEmbed{
-								Title:       "✅ Sucessfully added an artwork to favourites",
-								Timestamp:   utils.EmbedTimestamp(),
-								Color:       utils.EmbedColor,
-								Thumbnail:   &discordgo.MessageEmbedThumbnail{URL: artwork.Images[0]},
-								Description: fmt.Sprintf("Don't like DMs? Execute `bt!userset dm disabled`\n```\nID: %v\nURL: %v\nNSFW: %v```", artwork.ID, artwork.URL, nsfw),
-							},
-						})
+						var (
+							eb          = embeds.NewBuilder()
+							description = fmt.Sprintf("Don't like DMs? Execute `bt!userset dm disabled`\n```\nID: %v\nURL: %v\nNSFW: %v```", artwork.ID, artwork.URL, nsfw)
+						)
+						eb.Title("✅ Sucessfully added an artwork to favourites").Thumbnail(artwork.Images[0]).Description(description)
+
+						s.ChannelMessageSendEmbed(ch.ID, eb.Finalize())
 					}
 				}
 			}
@@ -267,7 +246,7 @@ func (b *Bot) reactRemoved(s *discordgo.Session, r *discordgo.MessageReactionRem
 						msg.Content = msg.Embeds[0].URL
 					}
 				}
-				art := repost.NewPost(&discordgo.MessageCreate{msg})
+				art := repost.NewPost(&discordgo.MessageCreate{Message: msg})
 				if art.Len() == 0 {
 					return
 				}
@@ -282,20 +261,19 @@ func (b *Bot) reactRemoved(s *discordgo.Session, r *discordgo.MessageReactionRem
 						break
 					}
 
-					_, err := database.DB.RemoveFavouriteURL(user.ID, pixivURL)
+					artwork, err := database.DB.RemoveFavouriteURL(user.ID, pixivURL)
 					if err != nil {
-						logrus.Warnln("DeleteFavouriteURL -> %v", err)
+						log.Warnln("DeleteFavouriteURL -> %v", err)
 					} else if user.DM {
 						ch, err := s.UserChannelCreate(user.ID)
 						if err != nil {
 							log.Warnf("s.UserChannelCreate -> %v", err)
 						} else {
-							s.ChannelMessageSendEmbed(ch.ID, &discordgo.MessageEmbed{
-								Title:       "✅ Sucessfully removed an artwork from favourites",
-								Timestamp:   utils.EmbedTimestamp(),
-								Color:       utils.EmbedColor,
-								Description: fmt.Sprintf("```\nURL: %v```", pixivURL),
-							})
+							eb := embeds.NewBuilder()
+							eb.Title("✅ Sucessfully removed an artwork from favourites")
+							eb.Description(fmt.Sprintf("```\nURL: %v```", pixivURL))
+							eb.Thumbnail(artwork.Images[0])
+							s.ChannelMessageSendEmbed(ch.ID, eb.Finalize())
 						}
 					}
 				case len(art.TwitterMatches) > 0:
@@ -312,22 +290,20 @@ func (b *Bot) reactRemoved(s *discordgo.Session, r *discordgo.MessageReactionRem
 						return
 					}
 
-					_, err = database.DB.RemoveFavouriteURL(user.ID, tweet.URL)
+					artwork, err := database.DB.RemoveFavouriteURL(user.ID, tweet.URL)
 					if err != nil {
-						logrus.Warnln("DeleteFavouriteURL -> %v", err)
+						log.Warnln("DeleteFavouriteURL -> %v", err)
 					} else if user.DM {
 						ch, err := s.UserChannelCreate(user.ID)
 						if err != nil {
 							log.Warnf("s.UserChannelCreate -> %v", err)
 						} else {
-							s.ChannelMessageSendComplex(ch.ID, &discordgo.MessageSend{
-								Embed: &discordgo.MessageEmbed{
-									Title:       "✅ Sucessfully removed an artwork from favourites",
-									Timestamp:   utils.EmbedTimestamp(),
-									Color:       utils.EmbedColor,
-									Description: fmt.Sprintf("Don't like DMs? Execute `bt!userset dm disabled`\n```\nURL: %v```", twitterURL),
-								},
-							})
+							eb := embeds.NewBuilder()
+							eb.Title("✅ Sucessfully removed an artwork from favourites")
+							eb.Thumbnail(artwork.Images[0])
+							eb.Description(fmt.Sprintf("Don't like DMs? Execute `bt!userset dm disabled`\n```\nURL: %v```", twitterURL))
+
+							s.ChannelMessageSendEmbed(ch.ID, eb.Finalize())
 						}
 					}
 				}
@@ -336,7 +312,7 @@ func (b *Bot) reactRemoved(s *discordgo.Session, r *discordgo.MessageReactionRem
 	}
 }
 
-func (b *Bot) guildCreated(s *discordgo.Session, g *discordgo.GuildCreate) {
+func (b *Bot) guildCreated(_ *discordgo.Session, g *discordgo.GuildCreate) {
 	if _, ok := database.GuildCache[g.ID]; !ok {
 		newGuild := database.DefaultGuildSettings(g.ID)
 		err := database.DB.InsertOneGuild(newGuild)
@@ -349,7 +325,7 @@ func (b *Bot) guildCreated(s *discordgo.Session, g *discordgo.GuildCreate) {
 	}
 }
 
-func (b *Bot) guildDeleted(s *discordgo.Session, g *discordgo.GuildDelete) {
+func (b *Bot) guildDeleted(_ *discordgo.Session, g *discordgo.GuildDelete) {
 	if g.Unavailable {
 		log.Infoln("Guild outage. ID: ", g.ID)
 	} else {
@@ -357,6 +333,6 @@ func (b *Bot) guildDeleted(s *discordgo.Session, g *discordgo.GuildDelete) {
 	}
 }
 
-func (b *Bot) guildBanAdd(s *discordgo.Session, m *discordgo.GuildBanAdd) {
+func (b *Bot) guildBanAdd(_ *discordgo.Session, m *discordgo.GuildBanAdd) {
 	bannedUsers.Set(m.User.ID, m.GuildID)
 }
