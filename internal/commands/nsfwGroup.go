@@ -1,7 +1,6 @@
 package commands
 
 import (
-	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -10,7 +9,6 @@ import (
 	"github.com/VTGare/boe-tea-go/internal/database"
 	"github.com/VTGare/boe-tea-go/internal/embeds"
 	"github.com/VTGare/boe-tea-go/pkg/nozoki"
-	"github.com/VTGare/boe-tea-go/utils"
 	"github.com/VTGare/gumi"
 	"github.com/bwmarrin/discordgo"
 )
@@ -54,14 +52,8 @@ func nhentai(s *discordgo.Session, m *discordgo.MessageCreate, args []string) er
 
 	if g, ok := database.GuildCache[m.GuildID]; ok {
 		if !g.NSFW {
-
-			s.ChannelMessageSendEmbed(m.ChannelID, &discordgo.MessageEmbed{
-				Title:     "❎ Failed to execute a command.",
-				Color:     utils.EmbedColor,
-				Thumbnail: &discordgo.MessageEmbedThumbnail{URL: utils.DefaultEmbedImage},
-				Timestamp: utils.EmbedTimestamp(),
-				Fields:    []*discordgo.MessageEmbedField{{Name: "Reason", Value: "You're trying to execute an NSFW command. The server prohibits NSFW content."}},
-			})
+			eb.FailureTemplate("You're trying to execute an NSFW command. The server prohibits NSFW content.")
+			s.ChannelMessageSendEmbed(m.ChannelID, eb.Finalize())
 			return nil
 		}
 	}
@@ -73,7 +65,9 @@ func nhentai(s *discordgo.Session, m *discordgo.MessageCreate, args []string) er
 	}
 
 	if _, err := strconv.Atoi(args[0]); err != nil {
-		return errors.New("invalid nhentai ID")
+		eb.FailureTemplate(fmt.Sprintf("Failed to parse [%v]. Please provide a valid number", args[0]))
+		s.ChannelMessageSendEmbed(m.ChannelID, eb.Finalize())
+		return nil
 	}
 
 	book, err := nh.GetBook(args[0])
@@ -95,32 +89,10 @@ func nhentai(s *discordgo.Session, m *discordgo.MessageCreate, args []string) er
 		tags = "-"
 	}
 
-	embed := &discordgo.MessageEmbed{
-		URL:   book.URL,
-		Title: book.Titles.Pretty,
-		Thumbnail: &discordgo.MessageEmbedThumbnail{
-			URL: book.Cover,
-		},
-		Fields: []*discordgo.MessageEmbedField{
-			{
-				Name:  "Artists",
-				Value: artists,
-			}, {
-				Name:  "Tags",
-				Value: tags,
-			}, {
-				Name:  "Favourites",
-				Value: fmt.Sprintf("%v", book.Favourites),
-			}, {
-				Name:  "Pages",
-				Value: fmt.Sprintf("%v", book.Pages),
-			},
-		},
-		Color:     utils.EmbedColor,
-		Timestamp: utils.EmbedTimestamp(),
-	}
+	eb.Title(book.Titles.Pretty).URL(book.URL).Thumbnail(book.Cover)
+	eb.AddField("Artists", artists).AddField("Tags", tags).AddField("Favourites", strconv.Itoa(book.Favourites)).AddField("Pages", strconv.Itoa(book.Pages))
 
-	_, err = s.ChannelMessageSendEmbed(m.ChannelID, embed)
+	_, err = s.ChannelMessageSendEmbed(m.ChannelID, eb.Finalize())
 	if err != nil {
 		return err
 	}

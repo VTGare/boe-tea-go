@@ -7,6 +7,7 @@ import (
 	"time"
 
 	ascii2dgo "github.com/VTGare/ascii2d-go"
+	"github.com/VTGare/boe-tea-go/internal/embeds"
 	"github.com/VTGare/boe-tea-go/internal/widget"
 	"github.com/VTGare/boe-tea-go/utils"
 	"github.com/VTGare/gumi"
@@ -255,21 +256,13 @@ func saucenaoToEmbed(source *sengoku.Sauce, index, length int) *discordgo.Messag
 		title = fmt.Sprintf("%v", source.Title)
 	}
 
-	embed := &discordgo.MessageEmbed{
-		Title:     title,
-		URL:       source.URLs.Source,
-		Timestamp: utils.EmbedTimestamp(),
-		Color:     utils.EmbedColor,
-		Thumbnail: &discordgo.MessageEmbedThumbnail{
-			URL: source.Thumbnail,
-		},
-		Fields: []*discordgo.MessageEmbedField{},
-	}
-
+	eb := embeds.NewBuilder()
+	eb.Title(title).Thumbnail(source.Thumbnail)
 	if source.URLs.Source != "" {
-		embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{Name: "Source", Value: source.URLs.Source})
+		eb.URL(source.URLs.Source)
+		eb.AddField("Source", source.URLs.Source)
 	}
-	embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{Name: "Similarity", Value: fmt.Sprintf("%v", source.Similarity)})
+	eb.AddField("Similarity", fmt.Sprintf("%v", source.Similarity))
 
 	if source.Author != nil {
 		if source.Author.Name != "" {
@@ -279,14 +272,14 @@ func saucenaoToEmbed(source *sengoku.Sauce, index, length int) *discordgo.Messag
 			} else {
 				str = source.Author.Name
 			}
-			embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{Name: "Author", Value: str})
+			eb.AddField("Author", str)
 		}
 	}
 
 	if str := joinSauceURLs(source.URLs.ExternalURLs, " • "); str != "" {
-		embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{Name: "Other URLs", Value: str})
+		eb.AddField("Other URLs", str)
 	}
-	return embed
+	return eb.Finalize()
 }
 
 func ascii2d(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
@@ -335,26 +328,10 @@ func ascii2dEmbed(source *ascii2dgo.Source, index, length int) *discordgo.Messag
 		title = fmt.Sprintf("%v", source.Title)
 	}
 
-	embed := &discordgo.MessageEmbed{
-		Title:     title,
-		URL:       source.URL,
-		Timestamp: utils.EmbedTimestamp(),
-		Color:     utils.EmbedColor,
-		Image: &discordgo.MessageEmbedImage{
-			URL: source.Thumbnail,
-		},
-		Fields: []*discordgo.MessageEmbedField{
-			{
-				Name:  "Source",
-				Value: source.URL,
-			},
-			{
-				Name:  "Author",
-				Value: fmt.Sprintf("[%v](%v)", source.Author.Name, source.Author.URL),
-			},
-		},
-	}
-	return embed
+	eb := embeds.NewBuilder()
+	eb.Title(title).URL(source.URL).Image(source.Thumbnail).AddField("Source", source.URL)
+	eb.AddField("Author", fmt.Sprintf("[%v](%v)", source.Author.Name, source.Author.URL))
+	return eb.Finalize()
 }
 
 func iqdb(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
@@ -427,29 +404,9 @@ func iqdbEmbed(source *iqdbgo.Match, best bool, index, length int) *discordgo.Me
 		title = fmt.Sprintf("%v", matchType)
 	}
 
-	embed := &discordgo.MessageEmbed{
-		Title:     title,
-		URL:       source.URL,
-		Timestamp: utils.EmbedTimestamp(),
-		Color:     utils.EmbedColor,
-		Image: &discordgo.MessageEmbedImage{
-			URL: source.Thumbnail,
-		},
-		Fields: []*discordgo.MessageEmbedField{
-			{
-				Name:  "Source",
-				Value: source.URL,
-			},
-			{
-				Name:  "Info",
-				Value: fmt.Sprintf("%v", source.Tags),
-			},
-			{
-				Name:  "Similarity",
-				Value: strconv.Itoa(source.Similarity),
-			},
-		},
-	}
+	eb := embeds.NewBuilder()
 
-	return embed
+	eb.Title(title).URL(source.URL).Image(source.Thumbnail)
+	eb.AddField("Source", source.URL).AddField("Info", fmt.Sprintf("%v", source.Tags)).AddField("Similarity", strconv.Itoa(source.Similarity))
+	return eb.Finalize()
 }

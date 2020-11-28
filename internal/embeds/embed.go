@@ -86,6 +86,12 @@ func (eb *Builder) Timestamp(ts time.Time) *Builder {
 	return eb
 }
 
+func (eb *Builder) TimestampString(ts string) *Builder {
+	eb.embed.Timestamp = ts
+
+	return eb
+}
+
 //Footer sets embed's footer
 func (eb *Builder) Footer(text, icon string) *Builder {
 	eb.embed.Footer = &discordgo.MessageEmbedFooter{Text: text, IconURL: icon}
@@ -118,5 +124,11 @@ func (eb *Builder) FailureTemplate(message string) *Builder {
 //WarnTemplate retuns an embed built over an warn message template
 func (eb *Builder) WarnTemplate(message string) *Builder {
 	eb.Title("⚠ Warning!").Description(message)
+	return eb
+}
+
+//Clear empties the embed to reuse one builder for several embeds
+func (eb *Builder) Clear() *Builder {
+	eb.embed = &discordgo.MessageEmbed{}
 	return eb
 }

@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/VTGare/boe-tea-go/internal/database"
+	"github.com/VTGare/boe-tea-go/internal/embeds"
 	"github.com/VTGare/boe-tea-go/internal/ugoira"
 	"github.com/VTGare/boe-tea-go/utils"
 	"github.com/bwmarrin/discordgo"
@@ -110,13 +110,8 @@ func (a *ArtPost) SendPixiv(s *discordgo.Session, IDs map[string]bool, opts ...S
 
 	if isNSFW(posts) {
 		if !guild.NSFW {
-			s.ChannelMessageSendEmbed(a.event.ChannelID, &discordgo.MessageEmbed{
-				Title:     "❎ Pixiv post has not been reposted.",
-				Color:     utils.EmbedColor,
-				Thumbnail: &discordgo.MessageEmbedThumbnail{URL: utils.DefaultEmbedImage},
-				Timestamp: utils.EmbedTimestamp(),
-				Fields:    []*discordgo.MessageEmbedField{{"Reason", "An NSFW post has been detected. The server prohibits NSFW content.", false}},
-			})
+			eb := embeds.NewBuilder().FailureTemplate("An NSFW post has been detected. The server prohibits NSFW content.")
+			s.ChannelMessageSendEmbed(a.event.ChannelID, eb.Finalize())
 
 			return nil, nil, nil
 		}
@@ -126,12 +121,9 @@ func (a *ArtPost) SendPixiv(s *discordgo.Session, IDs map[string]bool, opts ...S
 		}
 
 		if !ch.NSFW {
-			prompt := utils.CreatePrompt(s, a.event, &utils.PromptOptions{
-				Actions: map[string]bool{
-					"👌": true,
-				},
-				Message: fmt.Sprintf("You're trying to send an NSFW post in a SFW channel, are you sure about that?"),
-				Timeout: 15 * time.Second,
+			eb := embeds.NewBuilder().WarnTemplate("You're trying to send an NSFW post in a non-NSFW channel. Are you sure?")
+			prompt := utils.CreatePromptWithMessage(s, a.event, &discordgo.MessageSend{
+				Embed: eb.Finalize(),
 			})
 			if !prompt {
 				return nil, nil, nil
@@ -241,72 +233,35 @@ func createPixivEmbed(post *ugoira.PixivPost, ind int, easter *embedMessage) *di
 		preview  = post.Images.Preview[ind].Kotori
 	)
 
-	send := &discordgo.MessageSend{
-		Embed: &discordgo.MessageEmbed{
-			Title:     title,
-			URL:       fmt.Sprintf("https://www.pixiv.net/en/artworks/%v", post.ID),
-			Color:     utils.EmbedColor,
-			Timestamp: utils.EmbedTimestamp(),
-			Fields: []*discordgo.MessageEmbedField{
-				{
-					Name:   "Likes",
-					Value:  strconv.Itoa(post.Likes),
-					Inline: true,
-				},
-				{
-					Name:   "Original quality",
-					Value:  fmt.Sprintf("[Click here desu~](%v)", original),
-					Inline: true,
-				},
-				{
-					Name:  "Bookmarking guide",
-					Value: fmt.Sprintf("💖 - bookmark as sfw | 🤤 - bookmark as nsfw"),
-				},
-			},
-			Image: &discordgo.MessageEmbedImage{
-				URL: preview,
-			},
-			Footer: &discordgo.MessageEmbedFooter{
-				Text: easter.Content,
-			},
-		},
+	eb := embeds.NewBuilder()
+	eb.Title(title).URL(post.URL).Image(preview)
+
+	if strings.Contains(easter.Content, "Shit waifu") && post.GoodWaifu {
+		eb.Footer("Good taste, m8", "")
+	} else {
+		eb.Footer(easter.Content, "")
 	}
+
+	eb.AddField("Likes", strconv.Itoa(post.Likes), true).AddField("Original quality", fmt.Sprintf("[Click here desu~](%v)", original), true)
+	eb.AddField("Liked an artwork?", "Add it to favourites!\nReact: 💖 - as sfw | 🤤 - as nsfw")
 
 	if ind == 0 {
-		send.Embed.Description = fmt.Sprintf("**Tags**\n%v", joinTags(post.Tags, " • "))
+		eb.Description(fmt.Sprintf("**Tags**\n%v", joinTags(post.Tags, " • ")))
 	}
 
-	if post.GoodWaifu && strings.Contains(send.Embed.Footer.Text, "Shit waifu") {
-		send.Embed.Footer.Text = "Good taste, mate."
-	}
-
+	send := &discordgo.MessageSend{Embed: eb.Finalize()}
 	return send
 }
 
 func createUgoiraEmbed(post *ugoira.PixivPost, easter *embedMessage) *discordgo.MessageSend {
 	title := fmt.Sprintf("%v by %v", post.Title, post.Author)
+
+	eb := embeds.NewBuilder()
+	eb.Title(title).URL(post.URL).Footer(easter.Content, "")
+	eb.AddField("Likes", strconv.Itoa(post.Likes), true)
+	eb.AddField("Tags", joinTags(post.Tags, " • "), true)
 	send := &discordgo.MessageSend{
-		Embed: &discordgo.MessageEmbed{
-			Title:     title,
-			URL:       fmt.Sprintf("https://www.pixiv.net/en/artworks/%v", post.ID),
-			Color:     utils.EmbedColor,
-			Timestamp: utils.EmbedTimestamp(),
-			Fields: []*discordgo.MessageEmbedField{
-				{
-					Name:   "Likes",
-					Value:  strconv.Itoa(post.Likes),
-					Inline: true,
-				},
-				{
-					Name:   "Tags",
-					Value:  joinTags(post.Tags, " • "),
-					Inline: true,
-				},
-			},
-			Footer: &discordgo.MessageEmbedFooter{
-				Text: easter.Content,
-			},
-		},
+		Embed: eb.Finalize(),
 	}
 
 	send.Files = append(send.Files, &discordgo.File{

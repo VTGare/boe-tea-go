@@ -94,18 +94,13 @@ func profile(s *discordgo.Session, m *discordgo.MessageCreate, _ []string) error
 		}
 	}
 
-	embed := &discordgo.MessageEmbed{
-		Title:     fmt.Sprintf("%v's profile", m.Author.Username),
-		Thumbnail: &discordgo.MessageEmbedThumbnail{URL: m.Author.AvatarURL("")},
-		Color:     utils.EmbedColor,
-		Timestamp: utils.EmbedTimestamp(),
-		Fields: []*discordgo.MessageEmbedField{
-			{Name: "Crosspost", Value: utils.FormatBool(user.Crosspost)},
-			{Name: "Favourites", Value: strconv.Itoa(len(user.NewFavourites))},
-		},
-	}
+	eb := embeds.NewBuilder()
+	eb.Title(fmt.Sprintf("%v's profile", m.Author.Username)).Thumbnail(m.Author.AvatarURL(""))
+	eb.AddField("Crosspost", utils.FormatBool(user.Crosspost))
+	eb.AddField("DMs", utils.FormatBool(user.DM))
+	eb.AddField("Number of favourites", strconv.Itoa(len(user.NewFavourites)))
 
-	s.ChannelMessageSendEmbed(m.ChannelID, embed)
+	s.ChannelMessageSendEmbed(m.ChannelID, eb.Finalize())
 	return nil
 }
 
@@ -119,7 +114,11 @@ const (
 )
 
 func favourites(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
-	user := database.DB.FindUser(m.Author.ID)
+	var (
+		user = database.DB.FindUser(m.Author.ID)
+		eb   = embeds.NewBuilder()
+	)
+
 	if user == nil {
 		user = database.NewUserSettings(m.Author.ID)
 		err := database.DB.InsertOneUser(user)
@@ -129,22 +128,13 @@ func favourites(s *discordgo.Session, m *discordgo.MessageCreate, args []string)
 	}
 
 	if len(user.NewFavourites) == 0 {
-		s.ChannelMessageSendEmbed(m.ChannelID, &discordgo.MessageEmbed{
-			Title:       "❎ Couldn't execute favourites command",
-			Description: "You have no favourites",
-			Timestamp:   utils.EmbedTimestamp(),
-			Color:       utils.EmbedColor,
-		})
-
+		eb.FailureTemplate("Couldn't execute `favourites` command. You've got no favorites.")
+		s.ChannelMessageSendEmbed(m.ChannelID, eb.Finalize())
 		return nil
 	}
 
 	var (
-		options      = database.NewFindManyOptions().Order(database.Descending)
-		defaultEmbed = &discordgo.MessageEmbed{
-			Color:     utils.EmbedColor,
-			Timestamp: utils.EmbedTimestamp(),
-		}
+		options    = database.NewFindManyOptions().Order(database.Descending)
 		mode       = modeSFW
 		favourites = user.NewFavourites
 		sortByTime = true
@@ -157,9 +147,8 @@ func favourites(s *discordgo.Session, m *discordgo.MessageCreate, args []string)
 			limit, err := strconv.Atoi(limitString)
 			if err != nil || limit < 1 {
 				if limit < 1 {
-					defaultEmbed.Title = "❎ Couldn't execute a leaderboard command"
-					defaultEmbed.Description = "Provided limit argument is either not a number or out of allowed range [1:2^32)"
-					s.ChannelMessageSendEmbed(m.ChannelID, defaultEmbed)
+					eb.FailureTemplate("Couldn't execute `favourites` command. Provided limit argument is either not a number or out of allowed range [1:2^32).")
+					s.ChannelMessageSendEmbed(m.ChannelID, eb.Finalize())
 					return nil
 				}
 			}
@@ -217,10 +206,12 @@ func favourites(s *discordgo.Session, m *discordgo.MessageCreate, args []string)
 
 	ch, _ := s.Channel(m.ChannelID)
 	if !ch.NSFW && mode == modeNSFW || mode == modeAll {
+		eb.WarnTemplate("The result may contain NSFW images, are you sure about that?")
 		f := utils.CreatePromptWithMessage(s, m, &discordgo.MessageSend{
-			Content: "The result may contain NSFW images, are you sure about that?",
+			Embed: eb.Finalize(),
 		})
 
+		eb.Clear()
 		if !f {
 			return nil
 		}
@@ -273,13 +264,8 @@ func favourites(s *discordgo.Session, m *discordgo.MessageCreate, args []string)
 			return err
 		}
 	} else {
-		_, err := s.ChannelMessageSendEmbed(m.ChannelID, &discordgo.MessageEmbed{
-			Title:     "❎ Failed to execute a command.",
-			Color:     utils.EmbedColor,
-			Thumbnail: &discordgo.MessageEmbedThumbnail{URL: utils.DefaultEmbedImage},
-			Timestamp: utils.EmbedTimestamp(),
-			Fields:    []*discordgo.MessageEmbedField{{Name: "Reason", Value: "Either your favourites list is empty or couldn't find favourite matching the filter"}},
-		})
+		eb.FailureTemplate("Failed to execute `favourites` command. Either your favourites list is empty or couldn't find favourites matching the filter")
+		_, err := s.ChannelMessageSendEmbed(m.ChannelID, eb.Finalize())
 		if err != nil {
 			return err
 		}
@@ -300,43 +286,35 @@ func favouriteEmbeds(artworks []*database.Artwork, timeMap map[int]time.Time, co
 	return embeds
 }
 
-func artworkEmbed(art *database.Artwork, ind, l int) *discordgo.MessageEmbed {
+func artworkEmbed(artwork *database.Artwork, ind, l int) *discordgo.MessageEmbed {
 	var (
 		title   = ""
-		percent = (float64(art.NSFW) / float64(art.Favourites)) * 100.0
+		percent = (float64(artwork.NSFW) / float64(artwork.Favourites)) * 100.0
 	)
 
 	if l > 1 {
-		if art.Title == "" {
-			title = fmt.Sprintf("[%v/%v] %v", ind+1, l, art.Author)
+		if artwork.Title == "" {
+			title = fmt.Sprintf("[%v/%v] %v", ind+1, l, artwork.Author)
 		} else {
-			title = fmt.Sprintf("[%v/%v] %v", ind+1, l, art.Title)
+			title = fmt.Sprintf("[%v/%v] %v", ind+1, l, artwork.Title)
 		}
 	} else {
-		if art.Title == "" {
-			title = fmt.Sprintf("%v", art.Author)
+		if artwork.Title == "" {
+			title = fmt.Sprintf("%v", artwork.Author)
 		} else {
-			title = fmt.Sprintf("%v", art.Title)
+			title = fmt.Sprintf("%v", artwork.Title)
 		}
 	}
 
-	embed := &discordgo.MessageEmbed{
-		Title: title,
-		Image: &discordgo.MessageEmbedImage{URL: art.Images[0]},
-		URL:   art.URL,
-		Fields: []*discordgo.MessageEmbedField{
-			{Name: "ID", Value: strconv.Itoa(art.ID), Inline: true},
-			{Name: "Author", Value: art.Author, Inline: true},
-			{Name: "Favourites", Value: strconv.Itoa(art.Favourites), Inline: true},
-			{Name: "URL", Value: fmt.Sprintf("[%v](%v)", "Click here desu~", art.URL), Inline: false},
-			{Name: "Created", Value: art.CreatedAt.Format("Jan 2 2006. 15:04:05 MST"), Inline: false},
-			{Name: "Lewdmeter", Value: fmt.Sprintf("%v", percent), Inline: false},
-		},
-
-		Color:     utils.EmbedColor,
-		Timestamp: utils.EmbedTimestamp(),
+	eb := embeds.NewBuilder()
+	eb.Title(title).URL(artwork.URL)
+	if len(artwork.Images) > 0 {
+		eb.Image(artwork.Images[0])
 	}
-	return embed
+	eb.AddField("ID", strconv.Itoa(artwork.ID), true).AddField("Author", artwork.Author, true).AddField("Favourites", strconv.Itoa(artwork.Favourites), true)
+	eb.AddField("URL", fmt.Sprintf("[%v](%v)", "Click here desu~", artwork.URL)).AddField("Created", artwork.CreatedAt.Format("Jan 2 2006. 15:04:05 MST"))
+	eb.AddField("Lewdmeter", fmt.Sprintf("%.2f%s", percent, "%"))
+	return eb.Finalize()
 }
 
 func favouriteEmbed(art *database.Artwork, t time.Time, ind, l int) *discordgo.MessageEmbed {
@@ -368,40 +346,37 @@ func favouriteEmbed(art *database.Artwork, t time.Time, ind, l int) *discordgo.M
 
 func compactFavourites(fav []*database.Artwork) []*discordgo.MessageEmbed {
 	perPage := 10
-	pages := len(fav) / perPage
+	length := len(fav) / perPage
 	if len(fav)%perPage != 0 {
-		pages++
+		length++
 	}
 
 	var (
-		embeds       = make([]*discordgo.MessageEmbed, pages)
+		pages        = make([]*discordgo.MessageEmbed, length)
 		page         = 0
 		sb           strings.Builder
+		eb           = embeds.NewBuilder()
 		defaultEmbed = func() *discordgo.MessageEmbed {
-			return &discordgo.MessageEmbed{
-				Title: "Compact favourites list",
-				Fields: []*discordgo.MessageEmbedField{
-					{Name: "Total favourites", Value: "```" + strconv.Itoa(len(fav)) + "```", Inline: true},
-					{Name: "Page", Value: fmt.Sprintf("```%v / %v```", page+1, pages), Inline: true},
-				},
-				Color:     utils.EmbedColor,
-				Timestamp: utils.EmbedTimestamp(),
-			}
+			eb.Clear()
+			eb.Title("Compact favourites list")
+			eb.AddField("Total favourites", "```"+strconv.Itoa(len(fav))+"```", true)
+			eb.AddField("Page", fmt.Sprintf("```%v / %v```", page+1, length), true)
+			return eb.Finalize()
 		}
 	)
 
-	embeds[page] = defaultEmbed()
+	pages[page] = defaultEmbed()
 	count := 0
 	for ind, f := range fav {
 		sb.WriteString(fmt.Sprintf("`%v | ID: %v.` [%v](%v)\n", ind+1, f.ID, f.Title+" ("+f.Author+")", f.URL))
 		count++
 
 		if count == perPage {
-			embeds[page].Description = sb.String()
+			pages[page].Description = sb.String()
 			page++
 
-			if page != pages {
-				embeds[page] = defaultEmbed()
+			if page != length {
+				pages[page] = defaultEmbed()
 			}
 
 			sb.Reset()
@@ -410,11 +385,11 @@ func compactFavourites(fav []*database.Artwork) []*discordgo.MessageEmbed {
 	}
 
 	if count != 0 {
-		embeds[page] = defaultEmbed()
-		embeds[page].Description = sb.String()
+		pages[page] = defaultEmbed()
+		pages[page].Description = sb.String()
 	}
 
-	return embeds
+	return pages
 }
 
 func unfavourite(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
@@ -448,19 +423,11 @@ func unfavourite(s *discordgo.Session, m *discordgo.MessageCreate, args []string
 	}
 
 	if err != nil {
-		s.ChannelMessageSendEmbed(m.ChannelID, &discordgo.MessageEmbed{
-			Title:       "❎ An error occurred",
-			Color:       utils.EmbedColor,
-			Timestamp:   utils.EmbedTimestamp(),
-			Description: fmt.Sprintf("Error message: ``%v``\n\nPlease report the error to the developer using ``bt!feedback`` command", err),
-		})
+		return err
 	} else {
-		s.ChannelMessageSendEmbed(m.ChannelID, &discordgo.MessageEmbed{
-			Title:       "❎ Failed to remove a favourite",
-			Color:       utils.EmbedColor,
-			Timestamp:   utils.EmbedTimestamp(),
-			Description: fmt.Sprintf("Couldn't find an item: %v", args[0]),
-		})
+		eb := embeds.NewBuilder()
+		eb.FailureTemplate(fmt.Sprintf("Failed to remove a favourite. Couldn't find an item: %v", args[0]))
+		s.ChannelMessageSendEmbed(m.ChannelID, eb.Finalize())
 	}
 
 	return nil
@@ -485,24 +452,11 @@ func userset(s *discordgo.Session, m *discordgo.MessageCreate, args []string) er
 				if err != nil {
 					return err
 				}
-				embed := &discordgo.MessageEmbed{
-					Title: "✅ Successfully changed a setting!",
-					Fields: []*discordgo.MessageEmbedField{
-						{
-							Name:   "Setting",
-							Value:  setting,
-							Inline: true,
-						},
-						{
-							Name:   "New value",
-							Value:  newSetting,
-							Inline: true,
-						},
-					},
-					Color:     utils.EmbedColor,
-					Timestamp: utils.EmbedTimestamp(),
-				}
-				s.ChannelMessageSendEmbed(m.ChannelID, embed)
+
+				eb := embeds.NewBuilder()
+				eb.SuccessTemplate("Successfully changed a setting!")
+				eb.AddField("Setting", setting, true).AddField("New value", newSetting, true)
+				s.ChannelMessageSendEmbed(m.ChannelID, eb.Finalize())
 			} else {
 				return fmt.Errorf("invalid setting name: %v", setting)
 			}
@@ -513,19 +467,9 @@ func userset(s *discordgo.Session, m *discordgo.MessageCreate, args []string) er
 }
 
 func showUserSettings(s *discordgo.Session, m *discordgo.MessageCreate, user *database.UserSettings) {
-	s.ChannelMessageSendEmbed(m.ChannelID, &discordgo.MessageEmbed{
-		Title:       "User settings",
-		Description: m.Author.String(),
-		Color:       utils.EmbedColor,
-		Fields: []*discordgo.MessageEmbedField{
-			{
-				Name:  "General",
-				Value: fmt.Sprintf("**Crosspost:** %v | **DM:** %v", utils.FormatBool(user.Crosspost), utils.FormatBool(user.DM)),
-			},
-		},
-		Thumbnail: &discordgo.MessageEmbedThumbnail{
-			URL: m.Author.AvatarURL(""),
-		},
-		Timestamp: utils.EmbedTimestamp(),
-	})
+	eb := embeds.NewBuilder()
+	eb.Title("User settings").Description(m.Author.String()).Thumbnail(m.Author.AvatarURL(""))
+	eb.AddField("General", fmt.Sprintf("**Crosspost:** %v | **DM:** %v", utils.FormatBool(user.Crosspost), utils.FormatBool(user.DM)))
+
+	s.ChannelMessageSendEmbed(m.ChannelID, eb.Finalize())
 }

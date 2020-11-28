@@ -8,8 +8,8 @@ import (
 	"sync"
 
 	"github.com/VTGare/boe-tea-go/internal/database"
+	"github.com/VTGare/boe-tea-go/internal/embeds"
 	"github.com/VTGare/boe-tea-go/pkg/tsuita"
-	"github.com/VTGare/boe-tea-go/utils"
 	"github.com/bwmarrin/discordgo"
 )
 
@@ -137,36 +137,16 @@ func (a *ArtPost) tweetToEmbeds(tweet *tsuita.Tweet, skipFirst bool) ([]*discord
 			title = fmt.Sprintf("%v (%v)", tweet.FullName, tweet.Username)
 		}
 
-		embed := discordgo.MessageEmbed{
-			Title:     title,
-			URL:       tweet.URL,
-			Timestamp: tweet.Timestamp,
-			Color:     utils.EmbedColor,
-			Fields: []*discordgo.MessageEmbedField{
-				{
-					Name:   "Retweets",
-					Value:  strconv.Itoa(tweet.Retweets),
-					Inline: true,
-				},
-				{
-					Name:   "Likes",
-					Value:  strconv.Itoa(tweet.Likes),
-					Inline: true,
-				},
-				{
-					Name:  "Bookmarking guide",
-					Value: fmt.Sprintf("💖 - bookmark as sfw | 🤤 - bookmark as nsfw"),
-				},
-			},
-			Footer: &discordgo.MessageEmbedFooter{
-				IconURL: twitterLogo,
-				Text:    "Twitter",
-			},
-		}
+		var (
+			eb  = embeds.NewBuilder()
+			msg = &discordgo.MessageSend{}
+		)
 
-		msg := &discordgo.MessageSend{}
+		eb.Title(title).URL(tweet.URL).TimestampString(tweet.Timestamp).Footer("Twitter", twitterLogo)
+		eb.AddField("Retweets", strconv.Itoa(tweet.Retweets), true).AddField("Likes", strconv.Itoa(tweet.Likes), true)
+
 		if ind == 0 {
-			embed.Description = tweet.Content
+			eb.Description(tweet.Content)
 		}
 
 		if media.Animated {
@@ -182,15 +162,14 @@ func (a *ArtPost) tweetToEmbeds(tweet *tsuita.Tweet, skipFirst bool) ([]*discord
 				Reader: resp.Body,
 			}
 		} else {
-			embed.Image = &discordgo.MessageEmbedImage{
-				URL: media.URL,
-			}
+			eb.Image(media.URL)
 		}
-		msg.Embed = &embed
 
 		if a.IsCrosspost {
-			msg.Embed.Author = &discordgo.MessageEmbedAuthor{Name: fmt.Sprintf("Crosspost requested by %v", a.event.Author.String()), IconURL: a.event.Author.AvatarURL("")}
+			eb.Author(fmt.Sprintf("Crosspost requested by %v", a.event.Author.String()), "", a.event.Author.AvatarURL(""))
 		}
+
+		msg.Embed = eb.Finalize()
 		messages = append(messages, msg)
 	}
 

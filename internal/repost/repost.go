@@ -8,6 +8,7 @@ import (
 
 	"github.com/ReneKroon/ttlcache"
 	"github.com/VTGare/boe-tea-go/internal/database"
+	"github.com/VTGare/boe-tea-go/internal/embeds"
 	"github.com/VTGare/boe-tea-go/internal/ugoira"
 	"github.com/VTGare/boe-tea-go/pkg/tsuita"
 	"github.com/VTGare/boe-tea-go/utils"
@@ -117,37 +118,18 @@ func (a *ArtPost) PixivArray() []string {
 }
 
 func (a *ArtPost) RepostEmbed(reposts []*database.ImagePost) *discordgo.MessageEmbed {
-	embed := &discordgo.MessageEmbed{
-		Title:       "General Reposti!",
-		Description: "***Reminder:*** you can look up if things you post have already been posted using Discord's search feature.\nI recommend to check reposts by post's unique identifier.",
-		Thumbnail: &discordgo.MessageEmbedThumbnail{
-			URL: utils.DefaultEmbedImage,
-		},
-		Timestamp: utils.EmbedTimestamp(),
-		Color:     utils.EmbedColor,
-	}
+	eb := embeds.NewBuilder()
+	eb.Title("General reposti!").Description("***Reminder:*** you can look up if things you post have already been posted using Discord's search feature.")
+	eb.Thumbnail(utils.DefaultEmbedImage)
 
 	for _, rep := range reposts {
 		dur := rep.CreatedAt.Add(86400 * time.Second).Sub(time.Now())
-		content := &discordgo.MessageEmbedField{
-			Name:   "Content",
-			Value:  rep.Content,
-			Inline: true,
-		}
-		link := &discordgo.MessageEmbedField{
-			Name:   "Link to post",
-			Value:  fmt.Sprintf("[Press here desu~](https://discord.com/channels/%v/%v/%v)", rep.GuildID, rep.ChannelID, rep.MessageID),
-			Inline: true,
-		}
-		expires := &discordgo.MessageEmbedField{
-			Name:   "Expires",
-			Value:  dur.Round(time.Second).String(),
-			Inline: true,
-		}
-		embed.Fields = append(embed.Fields, content, link, expires)
+		eb.AddField("Content", rep.Content, true)
+		eb.AddField("Link to post", fmt.Sprintf("[Press here desu~](https://discord.com/channels/%v/%v/%v)", rep.GuildID, rep.ChannelID, rep.MessageID), true)
+		eb.AddField("Expires", dur.Round(time.Second).String(), true)
 	}
 
-	return embed
+	return eb.Finalize()
 }
 
 func (a *ArtPost) FindReposts(guildID, channelID string) []*database.ImagePost {
@@ -253,7 +235,7 @@ func (a *ArtPost) Post(s *discordgo.Session, pixivOpts ...SendPixivOptions) erro
 	if !ok {
 		return nil
 	}
-	
+
 	for k, v := range a.PixivMatches {
 		pixiv[k] = v
 	}
