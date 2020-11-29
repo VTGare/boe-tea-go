@@ -18,7 +18,7 @@ import (
 )
 
 var (
-	noSauceEmbed = embeds.NewBuilder().InfoTemplate("Sorry, Boe Tea couldnt find source or the image, if you haven't yet please consider using methods below").AddField("iqdb", "`bt!iqdb`", true).AddField("Google Image Search", "[Click here desu~](https://www.google.com/imghp?hl=EN)").Finalize()
+	noSauceEmbed = embeds.NewBuilder().InfoTemplate("Sorry, Boe Tea couldnt find source or the image, if you haven't yet please consider using methods below").AddField("iqdb", "`bt!iqdb`", true).AddField("ascii2d", "[Click here desu~](https://ascii2d.net)").AddField("Google Image Search", "[Click here desu~](https://www.google.com/imghp?hl=EN)").Finalize()
 )
 
 func init() {
@@ -131,26 +131,29 @@ func sauce(s *discordgo.Session, m *discordgo.MessageCreate, args []string) erro
 	}
 
 	log.Infof("Searching source on SauceNAO. Image URL: %v", url)
-	embeds, err := saucenaoEmbeds(url, false)
+	sauceEmbeds, err := saucenaoEmbeds(url, false)
 	if err != nil {
 		log.Warnf("saucenaoEmbeds: %v", err)
+		if err == sengoku.ErrRateLimitReached {
+			eb := embeds.NewBuilder().InfoTemplate("Boe Tea's getting rate limited by SauceNAO. If you want to support me, so I can afford monthly SauceNAO subscription consider becoming a patron!")
+			eb.AddField("Patreon", "[Click here desu~](https://www.patreon.com/vtgare)")
+
+			s.ChannelMessageSendEmbed(m.ChannelID, eb.Finalize())
+		}
 	}
 
-	if len(embeds) != 0 {
-		err := send(embeds...)
+	if len(sauceEmbeds) != 0 {
+		err := send(sauceEmbeds...)
 		if err != nil {
 			return err
 		}
 		return nil
 	}
 
-	prompt := utils.CreatePrompt(s, m, &utils.PromptOptions{
-		Actions: map[string]bool{
-			"✅": true,
-			"❎": false,
-		},
-		Message: "<:peepoRainy:530050503955054593> Source couldn't be found on SauceNAO. Would you like to try __*ascii2d?*__",
-		Timeout: 15 * time.Second,
+	eb := embeds.NewBuilder()
+	eb.InfoTemplate("<:peepoRainy:530050503955054593> Source couldn't be found on SauceNAO. Would you like to try your luck with ascii2d? (⚠ Boe Tea works inconsistently with it)")
+	prompt := utils.CreatePromptWithMessage(s, m, &discordgo.MessageSend{
+		Embed: eb.Finalize(),
 	})
 
 	if prompt {
@@ -161,19 +164,19 @@ func sauce(s *discordgo.Session, m *discordgo.MessageCreate, args []string) erro
 		}
 
 		var embeds = make([]*discordgo.MessageEmbed, 0)
-		l := len(res.Sources)
-		for i, s := range res.Sources {
-			embeds = append(embeds, ascii2dEmbed(s, i, l))
+		length := len(res.Sources)
+		if length == 0 {
+			s.ChannelMessageSendEmbed(m.ChannelID, noSauceEmbed)
 		}
 
-		if len(embeds) > 0 {
-			w := widget.NewWidget(s, m.Author.ID, embeds)
-			err := w.Start(m.ChannelID)
-			if err != nil {
-				return err
-			}
-		} else {
-			s.ChannelMessageSendEmbed(m.ChannelID, noSauceEmbed)
+		for i, s := range res.Sources {
+			embeds = append(embeds, ascii2dEmbed(s, i, length))
+		}
+
+		w := widget.NewWidget(s, m.Author.ID, embeds)
+		err = w.Start(m.ChannelID)
+		if err != nil {
+			return err
 		}
 	}
 	return nil
@@ -190,22 +193,21 @@ func saucenao(s *discordgo.Session, m *discordgo.MessageCreate, args []string) e
 	}
 
 	log.Infof("Searching source on SauceNAO. Image URL: %v", url)
-	embeds, err := saucenaoEmbeds(url, true)
+	sauceEmbeds, err := saucenaoEmbeds(url, true)
 	if err != nil {
+		if err == sengoku.ErrRateLimitReached {
+			eb := embeds.NewBuilder().InfoTemplate("Boe Tea's getting rate limited by SauceNAO. If you want to support me, so I can afford monthly SauceNAO subscription consider becoming a patron!")
+			eb.AddField("Patreon", "[Click here desu~](https://www.patreon.com/vtgare)")
+
+			s.ChannelMessageSendEmbed(m.ChannelID, eb.Finalize())
+		}
 		return err
 	}
 
-	if len(embeds) > 1 {
-		w := widget.NewWidget(s, m.Author.ID, embeds)
-		err := w.Start(m.ChannelID)
-		if err != nil {
-			return err
-		}
-	} else {
-		_, err = s.ChannelMessageSendEmbed(m.ChannelID, embeds[0])
-		if err != nil {
-			return err
-		}
+	w := widget.NewWidget(s, m.Author.ID, sauceEmbeds)
+	err = w.Start(m.ChannelID)
+	if err != nil {
+		return err
 	}
 
 	return nil
