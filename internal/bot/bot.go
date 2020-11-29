@@ -194,7 +194,10 @@ func (b *Bot) reactCreated(s *discordgo.Session, r *discordgo.MessageReactionAdd
 							eb          = embeds.NewBuilder()
 							description = fmt.Sprintf("Don't like DMs? Execute `bt!userset dm disabled`\n```\nID: %v\nURL: %v\nNSFW: %v```", artwork.ID, artwork.URL, nsfw)
 						)
-						eb.Title("✅ Sucessfully added an artwork to favourites").Thumbnail(artwork.Images[0]).Description(description)
+						eb.Title("✅ Sucessfully added an artwork to favourites").Description(description)
+						if len(artwork.Images) > 0 {
+							eb.Thumbnail(artwork.Images[0])
+						}
 
 						s.ChannelMessageSendEmbed(ch.ID, eb.Finalize())
 					}
@@ -210,12 +213,14 @@ func (b *Bot) reactCreated(s *discordgo.Session, r *discordgo.MessageReactionAdd
 			cache, ok := repost.MsgCache.Get(key)
 			if ok {
 				cache := cache.(*repost.CachedMessage)
-				if cache.OriginalMessage.Author.ID != r.UserID {
-					return
-				}
-				err := s.ChannelMessageDelete(cache.SentMessage.ChannelID, cache.SentMessage.ID)
-				if err != nil {
-					log.Warnf("ChannelMessageDelete(): %v", err)
+				if cache != nil {
+					if cache.OriginalMessage.Author.ID != r.UserID {
+						return
+					}
+					err := s.ChannelMessageDelete(cache.SentMessage.ChannelID, cache.SentMessage.ID)
+					if err != nil {
+						log.Warnf("ChannelMessageDelete(): %v", err)
+					}
 				}
 			}
 		}

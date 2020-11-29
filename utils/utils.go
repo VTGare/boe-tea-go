@@ -35,8 +35,6 @@ var (
 	PixivRegex = regexp.MustCompile(`(?i)http(?:s)?:\/\/(?:www\.)?pixiv\.net\/(?:en\/)?(?:artworks\/|member_illust\.php\?)(?:mode=medium\&)?(?:illust_id=)?([0-9]+)`)
 	//NumRegex is a terrible number regex. Gonna replace it with better code.
 	NumRegex = regexp.MustCompile(`([0-9]+)`)
-	//EmbedColor is a default border colour for Discord embeds
-	EmbedColor = 0x439ef1
 	//AuthorID is author's Discord ID, gonna replace it with an env variable.
 	AuthorID = "244208152776540160"
 	//ErrNotEnoughArguments is a default error when not enough arguments were given

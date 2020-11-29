@@ -17,6 +17,10 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+var (
+	noSauceEmbed = embeds.NewBuilder().InfoTemplate("Sorry, Boe Tea couldnt find source or the image, if you haven't yet please consider using methods below").AddField("iqdb", "`bt!iqdb`", true).AddField("Google Image Search", "[Click here desu~](https://www.google.com/imghp?hl=EN)").Finalize()
+)
+
 func init() {
 	sg := Router.AddGroup(&gumi.Group{
 		Name:        "source",
@@ -298,6 +302,11 @@ func ascii2d(s *discordgo.Session, m *discordgo.MessageCreate, args []string) er
 		return err
 	}
 
+	if len(res.Sources) == 0 {
+		s.ChannelMessageSendEmbed(m.ChannelID, noSauceEmbed)
+		return nil
+	}
+
 	var embeds = make([]*discordgo.MessageEmbed, 0)
 	l := len(res.Sources)
 	for i, s := range res.Sources {
@@ -350,30 +359,35 @@ func iqdb(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error
 		return err
 	}
 
-	var embeds = make([]*discordgo.MessageEmbed, 0)
-	l := len(res.PossibleMatches)
+	var messageEmbeds = make([]*discordgo.MessageEmbed, 0)
+	length := len(res.PossibleMatches)
 	if res.BestMatch != nil {
-		l++
+		length++
+	}
+
+	if length == 0 {
+		s.ChannelMessageSendEmbed(m.ChannelID, noSauceEmbed)
+		return nil
 	}
 
 	if res.BestMatch != nil {
-		embeds = append(embeds, iqdbEmbed(res.BestMatch, true, 0, l))
+		messageEmbeds = append(messageEmbeds, iqdbEmbed(res.BestMatch, true, 0, length))
 	}
 	for i, s := range res.PossibleMatches {
 		if res.BestMatch != nil {
 			i++
 		}
-		embeds = append(embeds, iqdbEmbed(s, false, i, l))
+		messageEmbeds = append(messageEmbeds, iqdbEmbed(s, false, i, length))
 	}
 
-	if len(embeds) > 1 {
-		w := widget.NewWidget(s, m.Author.ID, embeds)
+	if len(messageEmbeds) > 1 {
+		w := widget.NewWidget(s, m.Author.ID, messageEmbeds)
 		err := w.Start(m.ChannelID)
 		if err != nil {
 			return err
 		}
 	} else {
-		_, err = s.ChannelMessageSendEmbed(m.ChannelID, embeds[0])
+		_, err = s.ChannelMessageSendEmbed(m.ChannelID, messageEmbeds[0])
 		if err != nil {
 			return err
 		}

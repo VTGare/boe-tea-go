@@ -127,6 +127,11 @@ func (eb *Builder) WarnTemplate(message string) *Builder {
 	return eb
 }
 
+func (eb *Builder) InfoTemplate(message string) *Builder {
+	eb.Title("ℹ Info").Description(message)
+	return eb
+}
+
 //Clear empties the embed to reuse one builder for several embeds
 func (eb *Builder) Clear() *Builder {
 	eb.embed = &discordgo.MessageEmbed{}

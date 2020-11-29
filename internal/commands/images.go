@@ -29,18 +29,6 @@ var (
 		DB:      sengoku.All,
 		Results: 5,
 	})
-
-	noSauceEmbed = &discordgo.MessageEmbed{
-		Title:       "❎ Source material couldn't be found",
-		Description: "Unfortunately Boe Tea couldn't find source of the provided image on neither SauceNAO nor ascii2d. Please consider using one of the methods below.",
-		Fields: []*discordgo.MessageEmbedField{
-			{Name: "iqdb", Value: "``bt!iqdb``", Inline: true},
-			{Name: "Google Image Search", Value: "[Click here desu~](https://www.google.com/imghp?hl=EN)", Inline: true},
-		},
-		Timestamp: utils.EmbedTimestamp(),
-		Thumbnail: &discordgo.MessageEmbedThumbnail{URL: utils.DefaultEmbedImage},
-		Color:     utils.EmbedColor,
-	}
 )
 
 func init() {
