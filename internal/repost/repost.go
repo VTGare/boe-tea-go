@@ -248,10 +248,12 @@ func (a *ArtPost) Post(s *discordgo.Session, pixivOpts ...SendPixivOptions) erro
 		if len(reposts) > 0 {
 			sendRepost := func() {
 				repostMessage, _ := s.ChannelMessageSendEmbed(m.ChannelID, a.RepostEmbed(reposts))
-				go func() {
-					time.Sleep(15 * time.Second)
-					s.ChannelMessageDelete(repostMessage.ChannelID, repostMessage.ID)
-				}()
+				if repostMessage != nil {
+					go func() {
+						time.Sleep(15 * time.Second)
+						s.ChannelMessageDelete(repostMessage.ChannelID, repostMessage.ID)
+					}()
+				}
 			}
 			if guild.Repost == "strict" {
 				pixiv, twitter = a.RemoveReposts(reposts)
