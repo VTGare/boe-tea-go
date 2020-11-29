@@ -54,10 +54,10 @@ func init() {
 	})
 
 	generalGroup.AddCommand(&gumi.Command{
-		Name:        "invite",
-		Aliases:     []string{"link"},
-		Description: "Returns Boe Tea's invite link",
-		Exec:        invite,
+		Name:        "about",
+		Aliases:     []string{"support", "invite"},
+		Description: "Boe Tea's about page",
+		Exec:        about,
 	})
 
 	setHelp := gumi.NewHelpSettings()
@@ -104,11 +104,5 @@ func init() {
 		Exec:        set,
 		GuildOnly:   true,
 		Cooldown:    5 * time.Second,
-	})
-
-	generalGroup.AddCommand(&gumi.Command{
-		Name:        "support",
-		Exec:        support,
-		Description: "Returns Boe Tee's support server invite link",
 	})
 }

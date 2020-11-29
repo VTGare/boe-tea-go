@@ -173,10 +173,12 @@ func sauce(s *discordgo.Session, m *discordgo.MessageCreate, args []string) erro
 			embeds = append(embeds, ascii2dEmbed(s, i, length))
 		}
 
-		w := widget.NewWidget(s, m.Author.ID, embeds)
-		err = w.Start(m.ChannelID)
-		if err != nil {
-			return err
+		if len(embeds) > 0 {
+			w := widget.NewWidget(s, m.Author.ID, embeds)
+			err = w.Start(m.ChannelID)
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil
