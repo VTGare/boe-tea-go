@@ -43,7 +43,7 @@ type PixivImages struct {
 func (p *PixivImages) ToArray() []string {
 	images := make([]string, 0, len(p.Preview))
 	for _, img := range p.Preview {
-		images = append(images, img.Kotori)
+		images = append(images, img.PixivCatProxy)
 	}
 
 	return images

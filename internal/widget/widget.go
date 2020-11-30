@@ -24,6 +24,10 @@ func NewWidget(s *discordgo.Session, author string, embeds []*discordgo.MessageE
 }
 
 func (w *Widget) Start(channelID string) error {
+	if len(w.Pages) == 0 {
+		return nil
+	}
+
 	m, err := w.s.ChannelMessageSendEmbed(channelID, w.Pages[0])
 	if err != nil {
 		return err
