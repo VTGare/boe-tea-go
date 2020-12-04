@@ -122,6 +122,10 @@ func setInt(_ *discordgo.Session, _ *discordgo.MessageCreate, str string) (inter
 	return ls, nil
 }
 
+func setString(_ *discordgo.Session, _ *discordgo.MessageCreate, str string) (interface{}, error) {
+	return str, nil
+}
+
 func setRepost(s *discordgo.Session, m *discordgo.MessageCreate, str string) (interface{}, error) {
 	eb := embeds.NewBuilder()
 	if str != "disabled" && str != "enabled" && str != "strict" {

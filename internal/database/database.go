@@ -24,7 +24,7 @@ func init() {
 		os.Exit(1)
 	}
 
-	DB, err = NewDatabase(url, "boe-tea")
+	DB, err = Initialize(url, "boe-tea")
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -40,13 +40,14 @@ type Database struct {
 	stats         *mongo.Collection
 	artworks      *mongo.Collection
 	counters      *mongo.Collection
+	devSettings   *mongo.Collection
 }
 
 func (d *Database) Close() {
 	d.client.Disconnect(context.Background())
 }
 
-func NewDatabase(url, dbname string) (*Database, error) {
+func Initialize(url, dbname string) (*Database, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -66,9 +67,11 @@ func NewDatabase(url, dbname string) (*Database, error) {
 		stats:         db.Collection("stats"),
 		artworks:      db.Collection("artworks"),
 		counters:      db.Collection("counters"),
+		devSettings:   db.Collection("dev_settings"),
 	}
-	_, err = d.AllUsers()
-	_, err = d.AllGuilds()
+	_, err = d.LoadUsers()
+	_, err = d.LoadGuilds()
+	err = d.LoadSettings()
 
 	if err != nil {
 		return nil, err

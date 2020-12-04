@@ -48,8 +48,8 @@ func DefaultGuildSettings(guildID string) *GuildSettings {
 	}
 }
 
-//AllGuilds returns all guilds from a database.
-func (d *Database) AllGuilds() ([]*GuildSettings, error) {
+//LoadGuilds returns all guilds from a database.
+func (d *Database) LoadGuilds() ([]*GuildSettings, error) {
 	cur, err := d.GuildSettings.Find(context.Background(), bson.M{})
 
 	if err != nil {

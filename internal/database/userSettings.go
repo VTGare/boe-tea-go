@@ -56,7 +56,7 @@ func FilterFavourites(favourites []*NewFavourite, filter func(*NewFavourite) boo
 	return filtered
 }
 
-func (d *Database) AllUsers() ([]*UserSettings, error) {
+func (d *Database) LoadUsers() ([]*UserSettings, error) {
 	cur, err := d.UserSettings.Find(context.Background(), bson.M{})
 
 	if err != nil {

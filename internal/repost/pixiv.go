@@ -229,9 +229,21 @@ func createPixivEmbed(post *ugoira.PixivPost, ind int, easter *embedMessage) *di
 	}
 
 	var (
-		original = post.Images.Original[ind].PixivCatProxy
-		preview  = post.Images.Preview[ind].PixivCatProxy
+		original = ""
+		preview  = ""
 	)
+
+	switch database.DevSet.PixivReverseProxy {
+	case database.KotoriLove:
+		original = post.Images.Original[ind].Kotori
+		preview = post.Images.Preview[ind].Kotori
+	case database.PixivCat:
+		original = post.Images.Original[ind].PixivCat
+		preview = post.Images.Preview[ind].PixivCat
+	case database.PixivCatProxy:
+		original = post.Images.Original[ind].PixivCatProxy
+		preview = post.Images.Preview[ind].PixivCatProxy
+	}
 
 	eb := embeds.NewBuilder()
 	eb.Title(title).URL(post.URL).Image(preview)

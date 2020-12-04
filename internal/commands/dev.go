@@ -7,10 +7,18 @@ import (
 	"strings"
 	"time"
 
+	"github.com/VTGare/boe-tea-go/internal/database"
 	"github.com/VTGare/boe-tea-go/internal/embeds"
 	"github.com/VTGare/boe-tea-go/utils"
 	"github.com/VTGare/gumi"
 	"github.com/bwmarrin/discordgo"
+)
+
+var (
+	devSettingMap = map[string]settingFunc{
+		"pixiv":  setInt,
+		"nitter": setString,
+	}
 )
 
 func init() {
@@ -29,6 +37,11 @@ func init() {
 	dg.AddCommand(&gumi.Command{
 		Name: "stats",
 		Exec: devstats,
+	})
+
+	dg.AddCommand(&gumi.Command{
+		Name: "devset",
+		Exec: devset,
 	})
 }
 
@@ -82,4 +95,46 @@ func devstats(s *discordgo.Session, m *discordgo.MessageCreate, _ []string) erro
 
 	s.ChannelMessageSendEmbed(m.ChannelID, eb.Finalize())
 	return nil
+}
+
+func devset(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
+	if m.Author.ID != utils.AuthorID {
+		return nil
+	}
+
+	if length := len(args); length == 0 {
+		showDevSettings(s, m)
+	} else if length >= 2 {
+		setting := args[0]
+		newSetting := strings.ToLower(args[1])
+
+		if new, ok := devSettingMap[setting]; ok {
+			n, err := new(s, m, newSetting)
+			if err != nil {
+				return err
+			}
+
+			err = database.DB.ChangeDevSetting(setting, n)
+			if err != nil {
+				return err
+			}
+
+			eb := embeds.NewBuilder()
+			eb.SuccessTemplate("Successfully changed a setting!")
+			eb.AddField("Setting", setting, true).AddField("New value", newSetting, true)
+			s.ChannelMessageSendEmbed(m.ChannelID, eb.Finalize())
+		} else {
+			return fmt.Errorf("invalid setting name: %v", setting)
+		}
+	}
+
+	return nil
+}
+
+func showDevSettings(s *discordgo.Session, m *discordgo.MessageCreate) {
+	eb := embeds.NewBuilder()
+	eb.Title("Dev settings").Thumbnail(s.State.User.AvatarURL(""))
+	eb.AddField("Pog", fmt.Sprintf("**Pixiv:** %v | **Nitter:** %v", database.DevSet.PixivReverseProxy, database.DevSet.NitterInstance))
+
+	s.ChannelMessageSendEmbed(m.ChannelID, eb.Finalize())
 }
