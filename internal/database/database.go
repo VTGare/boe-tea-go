@@ -20,7 +20,7 @@ var (
 func init() {
 	url := os.Getenv("MONGODB_URL")
 	if url == "" {
-		fmt.Println("MONGODB_URL is empty")
+		fmt.Println("MONGODB_URL env variable doesn't exist")
 		os.Exit(1)
 	}
 

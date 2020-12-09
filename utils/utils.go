@@ -28,7 +28,7 @@ type PromptOptions struct {
 }
 
 var (
-	IsPixivUp bool
+	PixivDown bool
 	//DefaultEmbedImage is an image for embeds
 	DefaultEmbedImage = "https://i.imgur.com/OZ1Al5h.png"
 	//PixivRegex is a regular experession that detects various Pixiv links

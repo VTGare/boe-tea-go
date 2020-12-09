@@ -142,7 +142,7 @@ func (b *Bot) reactCreated(s *discordgo.Session, r *discordgo.MessageReactionAdd
 				}
 
 				log.Infof("Detected Pixiv art to favourite. User ID: %v. Pixiv ID: %v", r.UserID, pixivID)
-				pixiv, err := ugoira.GetPixivPost(pixivID)
+				pixiv, err := ugoira.PixivApp.GetPixivPost(pixivID)
 				if err != nil {
 					log.Warnf("addFavorite -> GetPixivPost: %v", err)
 					return

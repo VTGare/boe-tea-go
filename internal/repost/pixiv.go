@@ -27,7 +27,7 @@ func (a *ArtPost) fetchPixivPosts(IDs map[string]bool) ([]*ugoira.PixivPost, err
 	for id := range IDs {
 		go func(id string) {
 			defer wg.Done()
-			px, err := ugoira.GetPixivPost(id)
+			px, err := ugoira.PixivApp.GetPixivPost(id)
 			if err != nil {
 				errChan <- err
 			}
@@ -71,7 +71,7 @@ func isNSFW(posts []*ugoira.PixivPost) bool {
 }
 
 func (a *ArtPost) SendPixiv(s *discordgo.Session, IDs map[string]bool, opts ...SendPixivOptions) ([]*discordgo.MessageSend, []*ugoira.PixivPost, error) {
-	if !utils.IsPixivUp {
+	if utils.PixivDown {
 		return nil, nil, errors.New("pixiv api is down")
 	}
 
@@ -184,7 +184,7 @@ func createPixivEmbeds(a *ArtPost, posts []*ugoira.PixivPost, indexMap map[int]b
 
 			var ms *discordgo.MessageSend
 			if post.Type == "ugoira" && !skipUgoira {
-				err := post.DownloadUgoira()
+				err := ugoira.PixivApp.DownloadUgoira(post)
 				if err != nil {
 					logrus.Warnln(err)
 					ms = createPixivEmbed(post, ind, easterEgg)

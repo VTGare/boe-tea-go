@@ -27,13 +27,13 @@ type Ugoira struct {
 	Metadata *pixiv.UgoiraMetadataClass
 }
 
-func NewUgoira(id string) (*Ugoira, error) {
+func (a *App) NewUgoira(id string) (*Ugoira, error) {
 	intID, err := strconv.Atoi(id)
 	if err != nil {
 		return nil, err
 	}
 
-	metadata, err := app.UgoiraMetadata(uint64(intID))
+	metadata, err := a.app.UgoiraMetadata(uint64(intID))
 	if err != nil {
 		return nil, err
 	}
