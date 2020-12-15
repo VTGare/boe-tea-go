@@ -31,7 +31,7 @@ func init() {
 		NSFW:        false,
 		Exec:        leaderboard,
 		Help:        gumi.NewHelpSettings(),
-		Cooldown:    15 * time.Second,
+		Cooldown:    5 * time.Second,
 	})
 	lb.Help.AddField("Usage", "bt!leaderboard [flags]", false)
 	lb.Help.AddField("Flag syntax", "Flags have following syntax: `name:value`.\n_***Example:***_ `bt!leaderboard limit:100`.\nAccepted flags are listed below", false)

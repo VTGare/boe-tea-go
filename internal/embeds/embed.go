@@ -106,29 +106,30 @@ func (eb *Builder) Finalize() *discordgo.MessageEmbed {
 //ErrorTemplate retuns an embed built over an error message template
 func (eb *Builder) ErrorTemplate(message string) *Builder {
 	eb.Title("🛑 A wild error appears!").Description(message).Footer("Please use bt!feedback command if something went horribly wrong.", "")
+	eb.Color(14555148)
 	return eb
 }
 
 //SuccessTemplate retuns an embed built over an success message template
 func (eb *Builder) SuccessTemplate(message string) *Builder {
-	eb.Title("✅ Success!").Description(message)
+	eb.Title("✅ Success!").Description(message).Color(6076508)
 	return eb
 }
 
 //FailureTemplate retuns an embed built over an failure message template
 func (eb *Builder) FailureTemplate(message string) *Builder {
-	eb.Title("❎ Failure!").Description(message)
+	eb.Title("❎ Failure!").Description(message).Color(16769794)
 	return eb
 }
 
 //WarnTemplate retuns an embed built over an warn message template
 func (eb *Builder) WarnTemplate(message string) *Builder {
-	eb.Title("⚠ Warning!").Description(message)
+	eb.Title("⚠ Warning!").Description(message).Color(16769794)
 	return eb
 }
 
 func (eb *Builder) InfoTemplate(message string) *Builder {
-	eb.Title("ℹ Info").Description(message)
+	eb.Title("ℹ Info").Description(message).Color(0x439ef1)
 	return eb
 }
 
