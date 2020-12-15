@@ -266,9 +266,19 @@ func saucenaoToEmbed(source *sengoku.Sauce, index, length int) *discordgo.Messag
 
 	eb := embeds.NewBuilder()
 	eb.Title(title).Thumbnail(source.Thumbnail)
-	if source.URLs.Source != "" {
-		eb.URL(source.URLs.Source)
-		eb.AddField("Source", source.URLs.Source)
+	if src := source.URLs.Source; src != "" {
+		eb.URL(src)
+
+		if strings.Contains(src, "pximg.net") {
+			last := strings.LastIndex(src, "/")
+			if last != -1 {
+				id := strings.Trim(src[last+1:], ".jpengif")
+
+				src = "https://pixiv.net/en/artworks/" + id
+			}
+		}
+
+		eb.AddField("Source", src)
 	}
 	eb.AddField("Similarity", fmt.Sprintf("%v", source.Similarity))
 
