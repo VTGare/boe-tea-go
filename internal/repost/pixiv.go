@@ -96,12 +96,6 @@ func (a *ArtPost) SendPixiv(s *discordgo.Session, IDs map[string]bool, opts ...S
 		return nil, nil, err
 	}
 
-	if len(opts) != 0 {
-		if opts[0].SkipUgoira {
-
-		}
-	}
-
 	for excl := range indexMap {
 		if excl < 0 || excl > countPages(posts) {
 			delete(indexMap, excl)
@@ -170,7 +164,13 @@ func createPixivEmbeds(a *ArtPost, posts []*ugoira.PixivPost, indexMap map[int]b
 		easterEgg = embedMessages[rand.Intn(len(embedMessages))]
 	}
 
-	count := countPages(posts) - len(indexMap)
+	count := 0
+	if include {
+		count = len(indexMap)
+	} else {
+		count = countPages(posts) - len(indexMap)
+	}
+
 	for _, post := range posts {
 		if createdCount == guild.Limit {
 			break
@@ -197,7 +197,7 @@ func createPixivEmbeds(a *ArtPost, posts []*ugoira.PixivPost, indexMap map[int]b
 			}
 			messages = append(messages, ms)
 
-			if count >= guild.Limit {
+			if count > g.Limit {
 				break
 			}
 		}

@@ -71,24 +71,6 @@ func updateDB(s *discordgo.Session, m *discordgo.MessageCreate, _ []string) erro
 		return nil
 	}
 
-	eb := embeds.NewBuilder()
-
-	success := eb.SuccessTemplate("success").Finalize()
-	eb.Clear()
-	warn := eb.WarnTemplate("warn").Finalize()
-	eb.Clear()
-	err := eb.ErrorTemplate("error").Finalize()
-	eb.Clear()
-	fail := eb.FailureTemplate("fail").Finalize()
-	eb.Clear()
-	info := eb.InfoTemplate("info").Finalize()
-
-	s.ChannelMessageSendEmbed(m.ChannelID, success)
-	s.ChannelMessageSendEmbed(m.ChannelID, warn)
-	s.ChannelMessageSendEmbed(m.ChannelID, err)
-	s.ChannelMessageSendEmbed(m.ChannelID, fail)
-	s.ChannelMessageSendEmbed(m.ChannelID, info)
-
 	return nil
 }
 
