@@ -6,9 +6,9 @@ require (
 	github.com/ReneKroon/ttlcache v1.7.0
 	github.com/VTGare/ascii2d-go v0.1.0
 	github.com/VTGare/gumi v0.2.2
-	github.com/VTGare/iqdbgo v0.1.0
+	github.com/VTGare/iqdbgo v0.1.1
 	github.com/VTGare/pixiv v0.0.6
-	github.com/VTGare/sengoku v0.1.4
+	github.com/VTGare/sengoku v0.1.6
 	github.com/bwmarrin/discordgo v0.22.0
 	github.com/disintegration/gift v1.2.1
 	github.com/gocolly/colly/v2 v2.1.0

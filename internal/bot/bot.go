@@ -94,7 +94,6 @@ func (b *Bot) messageCreated(s *discordgo.Session, m *discordgo.MessageCreate) {
 	if m.Author.Bot {
 		return
 	}
-
 	isCommand := commands.Router.Handle(s, m)
 	if !isCommand && m.GuildID != "" {
 		err := b.prefixless(s, m)

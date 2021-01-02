@@ -88,9 +88,11 @@ func init() {
 		Name:        "iqdb",
 		Description: "Finds source of an image using iqdb reverse search engine",
 		Exec:        iqdb,
+		NSFW:        true,
 		Cooldown:    5 * time.Second,
 		Help:        gumi.NewHelpSettings(),
 	})
+
 	iqdbCmd.Help.ExtendedHelp = []*discordgo.MessageEmbedField{
 		{
 			Name:  "Usage",
