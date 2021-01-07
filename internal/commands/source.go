@@ -440,3 +440,78 @@ func iqdbEmbed(source *iqdbgo.Match, best bool, index, length int) *discordgo.Me
 	eb.AddField("Source", source.URL).AddField("Info", fmt.Sprintf("%v", source.Tags)).AddField("Similarity", strconv.Itoa(source.Similarity))
 	return eb.Finalize()
 }
+
+func findImage(s *discordgo.Session, m *discordgo.MessageCreate, args []string) (string, error) {
+	if len(args) > 0 {
+		if ImageURLRegex.MatchString(args[0]) {
+			return args[0], nil
+		} else if url, err := findImageFromMessageLink(s, args[0]); err == nil && url != "" {
+			return url, nil
+		}
+	}
+
+	if len(m.Attachments) > 0 {
+		url := m.Attachments[0].URL
+		if ImageURLRegex.MatchString(url) {
+			return url, nil
+		}
+	}
+
+	if ref := m.MessageReference; ref != nil {
+		url, err := findImageFromMessageLink(s, fmt.Sprintf("https://discord.com/channels/%s/%s/%s", ref.GuildID, ref.ChannelID, ref.MessageID))
+		if err == nil && url != "" {
+			return url, nil
+		}
+	}
+
+	if len(m.Embeds) > 0 {
+		if m.Embeds[0].Image != nil {
+			url := m.Embeds[0].Image.URL
+			if ImageURLRegex.MatchString(url) {
+				return url, nil
+			}
+		}
+	}
+
+	messages, err := s.ChannelMessages(m.ChannelID, 5, m.ID, "", "")
+	if err != nil {
+		return "", err
+	}
+	if recent := findRecentImage(messages); recent != "" {
+		return recent, nil
+	}
+
+	return "", nil
+}
+
+func findRecentImage(messages []*discordgo.Message) string {
+	for _, msg := range messages {
+		f := ImageURLRegex.FindString(msg.Content)
+		switch {
+		case f != "":
+			return f
+		case len(msg.Attachments) > 0:
+			return msg.Attachments[0].URL
+		case len(msg.Embeds) > 0:
+			if msg.Embeds[0].Image != nil {
+				return msg.Embeds[0].Image.URL
+			}
+		}
+	}
+
+	return ""
+}
+
+func findImageFromMessageLink(s *discordgo.Session, arg string) (string, error) {
+	if matches := messageLinkRegex.FindStringSubmatch(arg); matches != nil {
+		m, err := s.ChannelMessage(matches[1], matches[2])
+		if err != nil {
+			return "", err
+		}
+		if recent := findRecentImage([]*discordgo.Message{m}); recent != "" {
+			return recent, nil
+		}
+	}
+
+	return "", nil
+}

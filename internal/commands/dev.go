@@ -27,8 +27,8 @@ func init() {
 	})
 	dg.IsVisible = false
 	dg.AddCommand(&gumi.Command{
-		Name: "update",
-		Exec: updateDB,
+		Name: "test",
+		Exec: test,
 	})
 	dg.AddCommand(&gumi.Command{
 		Name: "message",
@@ -66,10 +66,21 @@ func message(s *discordgo.Session, m *discordgo.MessageCreate, args []string) er
 	return nil
 }
 
-func updateDB(s *discordgo.Session, m *discordgo.MessageCreate, _ []string) error {
+func test(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
 	if m.Author.ID != utils.AuthorID {
 		return nil
 	}
+
+	if len(args) != 2 {
+		return nil
+	}
+
+	msg, err := s.ChannelMessage(args[0], args[1])
+	if err != nil {
+		return err
+	}
+
+	println(msg.Content)
 
 	return nil
 }
