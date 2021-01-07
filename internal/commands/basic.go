@@ -48,11 +48,17 @@ func feedback(s *discordgo.Session, m *discordgo.MessageCreate, args []string) e
 		eb.Image(m.Attachments[0].URL)
 	}
 
-	ch, _ := s.UserChannelCreate(utils.AuthorID)
-	_, err := s.ChannelMessageSendEmbed(ch.ID, eb.Finalize())
+	ch, err := s.UserChannelCreate(utils.AuthorID)
 	if err != nil {
 		return err
 	}
 
+	_, err = s.ChannelMessageSendEmbed(ch.ID, eb.Finalize())
+	if err != nil {
+		return err
+	}
+
+	eb.Clear()
+	s.ChannelMessageSendEmbed(m.ChannelID, eb.SuccessTemplate("Feedback message has been sent.").Finalize())
 	return nil
 }
