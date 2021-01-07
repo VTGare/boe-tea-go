@@ -71,14 +71,15 @@ func init() {
 
 	tCmd := ig.AddCommand(&gumi.Command{
 		Name:        "twitter",
-		Description: "Embeds a Twitter link. Useful for posts with multiple images for mobile users",
+		Description: "Embeds a tweet. Useful for mobile users.",
 		Aliases:     []string{},
 		Exec:        twitter,
 		Cooldown:    5 * time.Second,
 	})
 	tCmd.Help = gumi.NewHelpSettings()
-	tCmd.Help.AddField("Usage", "bt!twitter <twitter link>", false)
-	tCmd.Help.AddField("Twitter link", "Must look something like this: https://twitter.com/mhy_shima/status/1258684420011069442", false)
+	tCmd.Help.AddField("Usage", "bt!twitter <tweet link> [excluded images]", false)
+	tCmd.Help.AddField("Tweet link", "Required. Any tweet link is supported.", false)
+	tCmd.Help.AddField("Excluded images", "Optional. Array of integer numbers. Ranges are supported (e.g. 1-3).", false)
 
 	jpegCmd := ig.AddCommand(&gumi.Command{
 		Name:        "jpeg",
@@ -267,7 +268,7 @@ func include(s *discordgo.Session, m *discordgo.MessageCreate, args []string) er
 
 	var (
 		url     = args[0]
-		indexes = args[1:]
+		indices = args[1:]
 	)
 
 	art := repost.NewPost(m, url)
@@ -279,9 +280,9 @@ func include(s *discordgo.Session, m *discordgo.MessageCreate, args []string) er
 	}
 
 	indexMap := make(map[int]bool)
-	for _, arg := range indexes {
-		if strings.Contains(arg, "-") {
-			ran, err := utils.NewRange(arg)
+	for _, ind := range indices {
+		if strings.Contains(ind, "-") {
+			ran, err := utils.NewRange(ind)
 			if err != nil {
 				return err
 			}
@@ -290,7 +291,7 @@ func include(s *discordgo.Session, m *discordgo.MessageCreate, args []string) er
 				indexMap[i] = true
 			}
 		} else {
-			num, err := strconv.Atoi(arg)
+			num, err := strconv.Atoi(ind)
 			if err != nil {
 				return utils.ErrParsingArgument
 			}
@@ -366,9 +367,39 @@ func twitter(s *discordgo.Session, m *discordgo.MessageCreate, args []string) er
 		return utils.ErrNotEnoughArguments
 	}
 
-	guild := database.GuildCache[m.GuildID]
-	a := repost.NewPost(m, args[0])
+	var (
+		guild      = database.GuildCache[m.GuildID]
+		twitterURL = args[0]
+		indices    = args[1:]
+	)
 
+	indexMap := make(map[int]bool)
+	for _, ind := range indices {
+		if strings.Contains(ind, "-") {
+			ran, err := utils.NewRange(ind)
+			if err != nil {
+				return err
+			}
+
+			for i := ran.Low; i <= ran.High; i++ {
+				indexMap[i] = true
+			}
+		} else {
+			num, err := strconv.Atoi(ind)
+			if err != nil {
+				return utils.ErrParsingArgument
+			}
+			indexMap[num] = true
+		}
+	}
+
+	for index := range indexMap {
+		if index < 1 || index > 4 {
+			delete(indexMap, index)
+		}
+	}
+
+	a := repost.NewPost(m, twitterURL)
 	if guild.Repost != "disabled" {
 		reposts := a.FindReposts(m.GuildID, m.ChannelID)
 		if len(reposts) > 0 {
@@ -394,7 +425,11 @@ func twitter(s *discordgo.Session, m *discordgo.MessageCreate, args []string) er
 	}
 
 	for _, t := range tweets {
-		for _, send := range t {
+		for ind, send := range t {
+			if _, ok := indexMap[ind+1]; ok {
+				continue
+			}
+
 			msg, err := s.ChannelMessageSendComplex(m.ChannelID, send)
 			if err != nil {
 				log.Warnln(err)

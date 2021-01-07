@@ -424,11 +424,11 @@ func unfavourite(s *discordgo.Session, m *discordgo.MessageCreate, args []string
 
 	if err != nil {
 		return err
-	} else {
-		eb := embeds.NewBuilder()
-		eb.FailureTemplate(fmt.Sprintf("Failed to remove a favourite. Couldn't find an item: %v", args[0]))
-		s.ChannelMessageSendEmbed(m.ChannelID, eb.Finalize())
 	}
+
+	eb := embeds.NewBuilder()
+	eb.FailureTemplate(fmt.Sprintf("Failed to remove a favourite. Couldn't find an item: %v", args[0]))
+	s.ChannelMessageSendEmbed(m.ChannelID, eb.Finalize())
 
 	return nil
 }

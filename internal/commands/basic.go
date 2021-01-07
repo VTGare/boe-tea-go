@@ -18,7 +18,7 @@ func ping(s *discordgo.Session, m *discordgo.MessageCreate, _ []string) error {
 	return nil
 }
 
-func about(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
+func about(s *discordgo.Session, m *discordgo.MessageCreate, _ []string) error {
 	eb := embeds.NewBuilder()
 	eb.Title("ℹ About").Thumbnail(s.State.User.AvatarURL(""))
 	eb.Description(
@@ -26,7 +26,7 @@ func about(s *discordgo.Session, m *discordgo.MessageCreate, args []string) erro
 If you want to copy an invite link, simply right click it and press Copy Link.
 
 ***Special thanks to our patron(s):***
-- Nom (Indy#4649) | 3 months
+- Nom (Indy#4649) | 4 months
 `)
 	eb.AddField("Support server", "[Click here desu~](https://discord.gg/hcxuHE7)", true)
 	eb.AddField("Invite link", "[Click here desu~](https://discord.com/api/oauth2/authorize?client_id=636468907049353216&permissions=537259072&scope=bot)", true)
