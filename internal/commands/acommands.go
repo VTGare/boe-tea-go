@@ -110,19 +110,35 @@ func init() {
 		Name:        "addchannel",
 		Aliases:     []string{""},
 		Description: "Adds an art channel.",
-		Help:        gumi.NewHelpSettings().AddField("Usage", "bt!addchannel <channel ID>", false),
-		Exec:        addArtChannel,
-		GuildOnly:   true,
-		Cooldown:    5 * time.Second,
+		Help: gumi.NewHelpSettings().AddField(
+			"Usage",
+			"bt!addchannel [channel IDs]",
+			false,
+		).AddField(
+			"Channel ID",
+			"Discord channel ID or mention. Works with category IDs.",
+			false,
+		),
+		Exec:      addArtChannel,
+		GuildOnly: true,
+		Cooldown:  5 * time.Second,
 	})
 
 	generalGroup.AddCommand(&gumi.Command{
 		Name:        "removechannel",
 		Aliases:     []string{""},
 		Description: "Removes an art channel.",
-		Help:        gumi.NewHelpSettings().AddField("Usage", "bt!removechannel <channel ID>", false),
-		Exec:        removeArtChannel,
-		GuildOnly:   true,
-		Cooldown:    5 * time.Second,
+		Help: gumi.NewHelpSettings().AddField(
+			"Usage",
+			"bt!removechannel [channel IDs]",
+			false,
+		).AddField(
+			"Channel ID",
+			"Discord channel ID or mention. Works with category IDs.",
+			false,
+		),
+		Exec:      removeArtChannel,
+		GuildOnly: true,
+		Cooldown:  5 * time.Second,
 	})
 }
