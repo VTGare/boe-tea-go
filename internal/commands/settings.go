@@ -31,6 +31,178 @@ func init() {
 	settingMap["repost"] = setRepost
 }
 
+func addArtChannel(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
+	if len(args) == 0 {
+		return utils.ErrNotEnoughArguments
+	}
+
+	var (
+		eb       = embeds.NewBuilder()
+		guild    = database.GuildCache[m.GuildID]
+		channels = make([]string, 0)
+	)
+
+	for _, arg := range args {
+		ch, err := s.Channel(strings.Trim(arg, "<#>"))
+		if err != nil {
+			return err
+		}
+
+		if ch.GuildID != guild.ID {
+			eb.FailureTemplate(fmt.Sprintf("Can't read a channel (%v) from another guild.", ch.ID))
+			s.ChannelMessageSendEmbed(m.ChannelID, eb.Finalize())
+			return nil
+		}
+
+		switch ch.Type {
+		case discordgo.ChannelTypeGuildText:
+			exists := false
+			for _, channelID := range guild.ArtChannels {
+				if channelID == ch.ID {
+					exists = true
+				}
+			}
+
+			if exists {
+				eb.FailureTemplate(fmt.Sprintf("Channel <#%v> is already an art channel.", ch.ID))
+				s.ChannelMessageSendEmbed(m.ChannelID, eb.Finalize())
+				return nil
+			}
+
+			channels = append(channels, ch.ID)
+		case discordgo.ChannelTypeGuildCategory:
+			gcs, err := s.GuildChannels(guild.ID)
+			if err != nil {
+				return err
+			}
+
+			for _, gc := range gcs {
+				if gc.Type != discordgo.ChannelTypeGuildText {
+					continue
+				}
+
+				if gc.ParentID == ch.ID {
+					exists := false
+					for _, channelID := range guild.ArtChannels {
+						if channelID == gc.ID {
+							exists = true
+						}
+					}
+
+					if exists {
+						eb.FailureTemplate(fmt.Sprintf("Channel <#%v> is already an art channel.", gc.ID))
+						s.ChannelMessageSendEmbed(m.ChannelID, eb.Finalize())
+						return nil
+					}
+
+					channels = append(channels, gc.ID)
+				}
+			}
+		default:
+			eb.FailureTemplate("Unsupported channel type.")
+			s.ChannelMessageSendEmbed(m.ChannelID, eb.Finalize())
+			return nil
+		}
+	}
+
+	err := database.DB.AddArtChannels(guild.ID, channels...)
+	if err != nil {
+		return err
+	}
+
+	eb.SuccessTemplate(fmt.Sprintf("Channels %v were added successfully.", utils.Map(channels, func(s string) string {
+		return fmt.Sprintf("<#%v>", s)
+	})))
+	s.ChannelMessageSendEmbed(m.ChannelID, eb.Finalize())
+	return nil
+}
+
+func removeArtChannel(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
+	if len(args) == 0 {
+		return utils.ErrNotEnoughArguments
+	}
+
+	var (
+		eb       = embeds.NewBuilder()
+		guild    = database.GuildCache[m.GuildID]
+		channels = make([]string, 0)
+	)
+
+	for _, arg := range args {
+		ch, err := s.Channel(strings.Trim(arg, "<#>"))
+		if err != nil {
+			return err
+		}
+
+		if ch.GuildID != guild.ID {
+			eb.FailureTemplate(fmt.Sprintf("Can't read a channel (%v) from another guild.", ch.ID))
+			s.ChannelMessageSendEmbed(m.ChannelID, eb.Finalize())
+			return nil
+		}
+
+		switch ch.Type {
+		case discordgo.ChannelTypeGuildText:
+			exists := false
+			for _, channelID := range guild.ArtChannels {
+				if channelID == ch.ID {
+					exists = true
+				}
+			}
+
+			if !exists {
+				eb.FailureTemplate(fmt.Sprintf("Channel <#%v> is not an art channel.", ch.ID))
+				s.ChannelMessageSendEmbed(m.ChannelID, eb.Finalize())
+				return nil
+			}
+
+			channels = append(channels, ch.ID)
+		case discordgo.ChannelTypeGuildCategory:
+			gcs, err := s.GuildChannels(guild.ID)
+			if err != nil {
+				return err
+			}
+
+			for _, gc := range gcs {
+				if gc.Type != discordgo.ChannelTypeGuildText {
+					continue
+				}
+
+				if gc.ParentID == ch.ID {
+					exists := false
+					for _, channelID := range guild.ArtChannels {
+						if channelID == gc.ID {
+							exists = true
+						}
+					}
+
+					if !exists {
+						eb.FailureTemplate(fmt.Sprintf("Channel <#%v> is not an art channel.", gc.ID))
+						s.ChannelMessageSendEmbed(m.ChannelID, eb.Finalize())
+						return nil
+					}
+
+					channels = append(channels, gc.ID)
+				}
+			}
+		default:
+			eb.FailureTemplate("Unsupported channel type.")
+			s.ChannelMessageSendEmbed(m.ChannelID, eb.Finalize())
+			return nil
+		}
+	}
+
+	err := database.DB.RemoveArtChannels(guild.ID, channels...)
+	if err != nil {
+		return err
+	}
+
+	eb.SuccessTemplate(fmt.Sprintf("Channels %v were removed successfully.", utils.Map(channels, func(s string) string {
+		return fmt.Sprintf("<#%v>", s)
+	})))
+	s.ChannelMessageSendEmbed(m.ChannelID, eb.Finalize())
+	return nil
+}
+
 func set(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
 	settings := database.GuildCache[m.GuildID]
 	eb := embeds.NewBuilder()
@@ -96,6 +268,15 @@ func showGuildSettings(s *discordgo.Session, m *discordgo.MessageCreate, setting
 	eb.AddField("Features", fmt.Sprintf("**Repost:** %v | **Crosspost**: %v | **Auto-react (reactions):** %v", settings.Repost, utils.FormatBool(settings.Crosspost), utils.FormatBool(settings.Reactions)))
 	eb.AddField("Pixiv settings", fmt.Sprintf("**Auto-repost (pixiv)**: %v | **Limit**: %v", utils.FormatBool(settings.Pixiv), settings.Limit))
 	eb.AddField("Twitter settings", fmt.Sprintf("**Auto-repost (twitter)**: %v | **Prompt**: %v", utils.FormatBool(settings.Twitter), utils.FormatBool(settings.TwitterPrompt)))
+
+	artChannels := strings.Join(utils.Map(settings.ArtChannels, func(s string) string {
+		return fmt.Sprintf("<#%v> | `%v`", s, s)
+	}), "\n")
+
+	if artChannels == "" {
+		artChannels = "None."
+	}
+	eb.AddField("Art channels", artChannels)
 
 	s.ChannelMessageSendEmbed(m.ChannelID, eb.Finalize())
 }

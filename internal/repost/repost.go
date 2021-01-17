@@ -227,12 +227,26 @@ func sendMessage(s *discordgo.Session, m *discordgo.MessageCreate, send *discord
 func (a *ArtPost) Post(s *discordgo.Session, pixivOpts ...SendPixivOptions) error {
 	var (
 		m       = a.event
+		flag    = true
 		pixiv   = make(map[string]bool)
 		twitter = make(map[string]bool)
 	)
 
 	guild, ok := database.GuildCache[m.GuildID]
 	if !ok {
+		return nil
+	}
+
+	if len(guild.ArtChannels) > 0 {
+		flag = false
+		for _, channel := range guild.ArtChannels {
+			if channel == m.ChannelID {
+				flag = true
+			}
+		}
+	}
+
+	if !flag {
 		return nil
 	}
 
@@ -360,7 +374,11 @@ func (a *ArtPost) Crosspost(s *discordgo.Session, channels []string, pixivOpts .
 	a.IsCrosspost = true
 
 	for _, id := range channels {
-		ch, err := s.State.Channel(id)
+		var (
+			ch, err = s.State.Channel(id)
+			flag    = true
+		)
+
 		if err != nil {
 			logrus.Warnf("prefixless(): %v", err)
 			continue
@@ -376,6 +394,19 @@ func (a *ArtPost) Crosspost(s *discordgo.Session, channels []string, pixivOpts .
 		}
 
 		guild := database.GuildCache[m.GuildID]
+		if len(guild.ArtChannels) > 0 {
+			flag = false
+			for _, channel := range guild.ArtChannels {
+				if channel == m.ChannelID {
+					flag = true
+				}
+			}
+		}
+
+		if !flag {
+			continue
+		}
+
 		if guild.Repost != "disabled" {
 			reposts := a.FindReposts(m.GuildID, m.ChannelID)
 			pixiv, twitter = a.RemoveReposts(reposts)

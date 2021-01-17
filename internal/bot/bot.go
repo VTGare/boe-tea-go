@@ -87,6 +87,7 @@ func (b *Bot) prefixless(s *discordgo.Session, m *discordgo.MessageCreate) error
 			log.Warnln("art.Crosspost():", err)
 		}
 	}
+
 	return nil
 }
 

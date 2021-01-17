@@ -73,6 +73,10 @@ func GetTweet(uri string) (*Tweet, error) {
 	logrus.Infof("Fetching a tweet. Snowflake: %v", res.Snowflake)
 	nitter := fmt.Sprintf(nitterURL+"/i/status/%v", res.Snowflake)
 	c := colly.NewCollector()
+	c.Limit(&colly.LimitRule{
+		RandomDelay: 2 * time.Second,
+		Parallelism: 4,
+	})
 
 	c.OnHTML(".main-tweet .still-image", func(e *colly.HTMLElement) {
 		imageURL := nitterURL + e.Attr("href")

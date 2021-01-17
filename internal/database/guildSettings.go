@@ -26,6 +26,7 @@ type GuildSettings struct {
 	Crosspost     bool      `bson:"crosspost" json:"crosspost"`
 	NSFW          bool      `bson:"nsfw" json:"nsfw"`
 	Repost        string    `bson:"repost" json:"repost"`
+	ArtChannels   []string  `bson:"art_channels" json:"art_channels"`
 	CreatedAt     time.Time `bson:"created_at" json:"created_at"`
 	UpdatedAt     time.Time `bson:"updated_at" json:"updated_at"`
 }
@@ -43,6 +44,7 @@ func DefaultGuildSettings(guildID string) *GuildSettings {
 		Crosspost:     true,
 		NSFW:          true,
 		Repost:        "disabled",
+		ArtChannels:   make([]string, 0),
 		CreatedAt:     time.Now(),
 		UpdatedAt:     time.Now(),
 	}
@@ -104,6 +106,50 @@ func (d *Database) ChangeSetting(guildID, setting string, newSetting interface{}
 	}, bson.M{
 		"$set": bson.M{
 			setting:      newSetting,
+			"updated_at": time.Now(),
+		},
+	}, options.FindOneAndUpdate().SetReturnDocument(options.After))
+
+	guild := &GuildSettings{}
+	err := res.Decode(guild)
+	if err != nil {
+		return err
+	}
+
+	GuildCache[guildID] = guild
+	return nil
+}
+
+func (d *Database) AddArtChannels(guildID string, channelID ...string) error {
+	res := d.GuildSettings.FindOneAndUpdate(context.Background(), bson.M{
+		"guild_id": guildID,
+	}, bson.M{
+		"$set": bson.M{
+			"updated_at": time.Now(),
+		},
+		"$addToSet": bson.M{
+			"art_channels": bson.M{"$each": channelID},
+		},
+	}, options.FindOneAndUpdate().SetReturnDocument(options.After))
+
+	guild := &GuildSettings{}
+	err := res.Decode(guild)
+	if err != nil {
+		return err
+	}
+
+	GuildCache[guildID] = guild
+	return nil
+}
+
+func (d *Database) RemoveArtChannels(guildID string, channelID ...string) error {
+	res := d.GuildSettings.FindOneAndUpdate(context.Background(), bson.M{
+		"guild_id": guildID,
+	}, bson.M{
+		"$pull": bson.M{
+			"art_channels": bson.M{"$in": channelID},
+		},
+		"$set": bson.M{
 			"updated_at": time.Now(),
 		},
 	}, options.FindOneAndUpdate().SetReturnDocument(options.After))

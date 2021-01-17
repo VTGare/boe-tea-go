@@ -105,4 +105,24 @@ func init() {
 		GuildOnly:   true,
 		Cooldown:    5 * time.Second,
 	})
+
+	generalGroup.AddCommand(&gumi.Command{
+		Name:        "addchannel",
+		Aliases:     []string{""},
+		Description: "Adds an art channel.",
+		Help:        gumi.NewHelpSettings().AddField("Usage", "bt!addchannel <channel ID>", false),
+		Exec:        addArtChannel,
+		GuildOnly:   true,
+		Cooldown:    5 * time.Second,
+	})
+
+	generalGroup.AddCommand(&gumi.Command{
+		Name:        "removechannel",
+		Aliases:     []string{""},
+		Description: "Removes an art channel.",
+		Help:        gumi.NewHelpSettings().AddField("Usage", "bt!removechannel <channel ID>", false),
+		Exec:        removeArtChannel,
+		GuildOnly:   true,
+		Cooldown:    5 * time.Second,
+	})
 }
