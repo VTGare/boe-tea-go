@@ -42,6 +42,19 @@ func addArtChannel(s *discordgo.Session, m *discordgo.MessageCreate, args []stri
 		channels = make([]string, 0)
 	)
 
+	var (
+		isAdmin, err = utils.MemberHasPermission(s, m.GuildID, m.Author.ID, discordgo.PermissionAdministrator)
+	)
+
+	if err != nil {
+		return err
+	}
+
+	if !isAdmin {
+		s.ChannelMessageSendEmbed(m.ChannelID, eb.FailureTemplate(utils.ErrNoPermission.Error()).Finalize())
+		return nil
+	}
+
 	for _, arg := range args {
 		ch, err := s.Channel(strings.Trim(arg, "<#>"))
 		if err != nil {
@@ -105,7 +118,7 @@ func addArtChannel(s *discordgo.Session, m *discordgo.MessageCreate, args []stri
 		}
 	}
 
-	err := database.DB.AddArtChannels(guild.ID, channels...)
+	err = database.DB.AddArtChannels(guild.ID, channels...)
 	if err != nil {
 		return err
 	}
@@ -127,6 +140,19 @@ func removeArtChannel(s *discordgo.Session, m *discordgo.MessageCreate, args []s
 		guild    = database.GuildCache[m.GuildID]
 		channels = make([]string, 0)
 	)
+
+	var (
+		isAdmin, err = utils.MemberHasPermission(s, m.GuildID, m.Author.ID, discordgo.PermissionAdministrator)
+	)
+
+	if err != nil {
+		return err
+	}
+
+	if !isAdmin {
+		s.ChannelMessageSendEmbed(m.ChannelID, eb.FailureTemplate(utils.ErrNoPermission.Error()).Finalize())
+		return nil
+	}
 
 	for _, arg := range args {
 		ch, err := s.Channel(strings.Trim(arg, "<#>"))
@@ -191,7 +217,7 @@ func removeArtChannel(s *discordgo.Session, m *discordgo.MessageCreate, args []s
 		}
 	}
 
-	err := database.DB.RemoveArtChannels(guild.ID, channels...)
+	err = database.DB.RemoveArtChannels(guild.ID, channels...)
 	if err != nil {
 		return err
 	}
