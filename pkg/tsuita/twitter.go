@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ReneKroon/ttlcache"
+	"github.com/VTGare/boe-tea-go/internal/database"
 	"github.com/gocolly/colly/v2"
 	"github.com/sirupsen/logrus"
 )
@@ -17,7 +18,6 @@ var (
 	TwitterRegex = regexp.MustCompile(`https?://(?:mobile.)?twitter.com/(?:\S+)/status/(\d+)(?:\?s=\d\d)?`)
 
 	twitterCache *ttlcache.Cache
-	nitterURL    = "https://nitter.snopyta.org"
 )
 
 func init() {
@@ -56,8 +56,9 @@ func (t *Tweet) Images() []string {
 
 func GetTweet(uri string) (*Tweet, error) {
 	var (
-		res   = &Tweet{Gallery: make([]TwitterMedia, 0)}
-		match = TwitterRegex.FindStringSubmatch(uri)
+		res       = &Tweet{Gallery: make([]TwitterMedia, 0)}
+		match     = TwitterRegex.FindStringSubmatch(uri)
+		nitterURL = database.DevSet.NitterInstance
 	)
 
 	if len(match) == 0 {

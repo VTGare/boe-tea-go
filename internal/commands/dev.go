@@ -117,7 +117,11 @@ func devset(s *discordgo.Session, m *discordgo.MessageCreate, args []string) err
 		showDevSettings(s, m)
 	} else if length >= 2 {
 		setting := args[0]
-		newSetting := strings.ToLower(args[1])
+		newSetting := args[1]
+
+		if setting == "nitter" {
+			newSetting = strings.TrimSuffix(newSetting, "/")
+		}
 
 		if new, ok := devSettingMap[setting]; ok {
 			n, err := new(s, m, newSetting)
