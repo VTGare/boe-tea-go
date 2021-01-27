@@ -10,6 +10,7 @@ import (
 	"github.com/VTGare/boe-tea-go/internal/database"
 	"github.com/VTGare/boe-tea-go/internal/embeds"
 	"github.com/VTGare/boe-tea-go/utils"
+	"github.com/VTGare/gumi"
 	"github.com/bwmarrin/discordgo"
 )
 
@@ -31,32 +32,21 @@ func init() {
 	settingMap["repost"] = setRepost
 }
 
-func addArtChannel(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
-	if len(args) == 0 {
+func addArtChannel(ctx *gumi.Ctx) error {
+	if ctx.Args.Len() == 0 {
 		return utils.ErrNotEnoughArguments
 	}
 
 	var (
+		s        = ctx.Session
+		m        = ctx.Event
 		eb       = embeds.NewBuilder()
 		guild    = database.GuildCache[m.GuildID]
 		channels = make([]string, 0)
 	)
 
-	var (
-		isAdmin, err = utils.MemberHasPermission(s, m.GuildID, m.Author.ID, discordgo.PermissionAdministrator)
-	)
-
-	if err != nil {
-		return err
-	}
-
-	if !isAdmin {
-		s.ChannelMessageSendEmbed(m.ChannelID, eb.FailureTemplate(utils.ErrNoPermission.Error()).Finalize())
-		return nil
-	}
-
-	for _, arg := range args {
-		ch, err := s.Channel(strings.Trim(arg, "<#>"))
+	for _, arg := range ctx.Args.Arguments {
+		ch, err := s.Channel(strings.Trim(arg.Raw, "<#>"))
 		if err != nil {
 			return err
 		}
@@ -118,7 +108,7 @@ func addArtChannel(s *discordgo.Session, m *discordgo.MessageCreate, args []stri
 		}
 	}
 
-	err = database.DB.AddArtChannels(guild.ID, channels...)
+	err := database.DB.AddArtChannels(guild.ID, channels...)
 	if err != nil {
 		return err
 	}
@@ -130,32 +120,21 @@ func addArtChannel(s *discordgo.Session, m *discordgo.MessageCreate, args []stri
 	return nil
 }
 
-func removeArtChannel(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
-	if len(args) == 0 {
+func removeArtChannel(ctx *gumi.Ctx) error {
+	if ctx.Args.Len() == 0 {
 		return utils.ErrNotEnoughArguments
 	}
 
 	var (
+		s        = ctx.Session
+		m        = ctx.Event
 		eb       = embeds.NewBuilder()
 		guild    = database.GuildCache[m.GuildID]
 		channels = make([]string, 0)
 	)
 
-	var (
-		isAdmin, err = utils.MemberHasPermission(s, m.GuildID, m.Author.ID, discordgo.PermissionAdministrator)
-	)
-
-	if err != nil {
-		return err
-	}
-
-	if !isAdmin {
-		s.ChannelMessageSendEmbed(m.ChannelID, eb.FailureTemplate(utils.ErrNoPermission.Error()).Finalize())
-		return nil
-	}
-
-	for _, arg := range args {
-		ch, err := s.Channel(strings.Trim(arg, "<#>"))
+	for _, arg := range ctx.Args.Arguments {
+		ch, err := s.Channel(strings.Trim(arg.Raw, "<#>"))
 		if err != nil {
 			return err
 		}
@@ -217,7 +196,7 @@ func removeArtChannel(s *discordgo.Session, m *discordgo.MessageCreate, args []s
 		}
 	}
 
-	err = database.DB.RemoveArtChannels(guild.ID, channels...)
+	err := database.DB.RemoveArtChannels(guild.ID, channels...)
 	if err != nil {
 		return err
 	}
@@ -229,29 +208,20 @@ func removeArtChannel(s *discordgo.Session, m *discordgo.MessageCreate, args []s
 	return nil
 }
 
-func set(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
+func set(ctx *gumi.Ctx) error {
+	var (
+		s = ctx.Session
+		m = ctx.Event
+	)
 	settings := database.GuildCache[m.GuildID]
 	eb := embeds.NewBuilder()
 
 	switch {
-	case len(args) == 0:
+	case ctx.Args.Len() == 0:
 		showGuildSettings(s, m, settings)
-	case len(args) >= 2:
-		var (
-			isAdmin, err = utils.MemberHasPermission(s, m.GuildID, m.Author.ID, discordgo.PermissionAdministrator)
-		)
-
-		if err != nil {
-			return err
-		}
-
-		if !isAdmin {
-			s.ChannelMessageSendEmbed(m.ChannelID, eb.FailureTemplate(utils.ErrNoPermission.Error()).Finalize())
-			return nil
-		}
-
-		setting := args[0]
-		newSetting := strings.ToLower(args[1])
+	case ctx.Args.Len() >= 2:
+		setting := ctx.Args.Get(0).Raw
+		newSetting := ctx.Args.Get(1).Raw
 
 		switch setting {
 		case "prompt":

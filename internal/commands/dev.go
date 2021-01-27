@@ -22,71 +22,29 @@ var (
 )
 
 func init() {
-	dg := Router.AddGroup(&gumi.Group{
-		Name: "dev",
+	groupName := "dev"
+	Commands = append(Commands, &gumi.Command{
+		Name:        "devset",
+		Group:       groupName,
+		Description: "Developer settings",
+		Usage:       "bt!devset <setting name> <new setting>",
+		Example:     "bt!devset notYour business",
+		Exec:        devset,
 	})
-	dg.IsVisible = false
-	dg.AddCommand(&gumi.Command{
-		Name: "test",
-		Exec: test,
-	})
-	dg.AddCommand(&gumi.Command{
-		Name: "message",
-		Exec: message,
-	})
-	dg.AddCommand(&gumi.Command{
-		Name: "stats",
-		Exec: devstats,
-	})
-
-	dg.AddCommand(&gumi.Command{
-		Name: "devset",
-		Exec: devset,
+	Commands = append(Commands, &gumi.Command{
+		Name:        "stats",
+		Group:       groupName,
+		Description: "Boe Tea's stats.",
+		Usage:       "bt!stats",
+		Example:     "",
+		Exec:        devstats,
 	})
 }
 
-func message(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
-	if m.Author.ID != utils.AuthorID {
-		return nil
-	}
-
-	if len(args) == 0 {
-		return nil
-	}
-
-	for _, g := range s.State.Guilds {
-		for _, ch := range g.Channels {
-			if (strings.Contains(ch.Name, "general") || strings.Contains(ch.Name, "art") || strings.Contains(ch.Name, "sfw") || strings.Contains(ch.Name, "discussion")) && ch.Type == discordgo.ChannelTypeGuildText {
-				s.ChannelMessageSend(ch.ID, strings.Join(args, " "))
-				break
-			}
-		}
-	}
-
-	return nil
-}
-
-func test(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
-	if m.Author.ID != utils.AuthorID {
-		return nil
-	}
-
-	if len(args) != 2 {
-		return nil
-	}
-
-	msg, err := s.ChannelMessage(args[0], args[1])
-	if err != nil {
-		return err
-	}
-
-	println(msg.Content)
-
-	return nil
-}
-
-func devstats(s *discordgo.Session, m *discordgo.MessageCreate, _ []string) error {
+func devstats(ctx *gumi.Ctx) error {
 	var (
+		s   = ctx.Session
+		m   = ctx.Event
 		mem runtime.MemStats
 	)
 	runtime.ReadMemStats(&mem)
@@ -108,16 +66,21 @@ func devstats(s *discordgo.Session, m *discordgo.MessageCreate, _ []string) erro
 	return nil
 }
 
-func devset(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
+func devset(ctx *gumi.Ctx) error {
+	var (
+		s = ctx.Session
+		m = ctx.Event
+	)
+
 	if m.Author.ID != utils.AuthorID {
 		return nil
 	}
 
-	if length := len(args); length == 0 {
+	if ctx.Args.Len() == 0 {
 		showDevSettings(s, m)
-	} else if length >= 2 {
-		setting := args[0]
-		newSetting := args[1]
+	} else if ctx.Args.Len() >= 2 {
+		setting := ctx.Args.Get(0).Raw
+		newSetting := ctx.Args.Get(1).Raw
 
 		if setting == "nitter" {
 			newSetting = strings.TrimSuffix(newSetting, "/")

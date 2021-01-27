@@ -7,7 +7,6 @@ import (
 	"github.com/VTGare/boe-tea-go/internal/embeds"
 	"github.com/VTGare/boe-tea-go/utils"
 	"github.com/VTGare/gumi"
-	"github.com/bwmarrin/discordgo"
 )
 
 var (
@@ -30,33 +29,46 @@ var (
 )
 
 func init() {
-	memes := Router.AddGroup(&gumi.Group{
-		Name: "memes",
-	})
-	memes.IsVisible = false
+	groupName := "memes"
 
-	memes.AddCommand(&gumi.Command{
-		Name: "borgar",
-		Exec: borgar,
+	Commands = append(Commands, &gumi.Command{
+		Name:        "borgar",
+		Description: "Dino eats borgar.",
+		Group:       groupName,
+		Usage:       "",
+		Example:     "",
+		Exec:        borgar,
 	})
-	memes.AddCommand(&gumi.Command{
-		Name: "brainpower",
-		Exec: brainpower,
+	Commands = append(Commands, &gumi.Command{
+		Name:        "minesweeper",
+		Description: "Budget minesweeper.",
+		Group:       groupName,
+		Usage:       "",
+		Example:     "",
+		Exec:        minesweeper,
 	})
-	memes.AddCommand(&gumi.Command{
-		Name: "minesweeper",
-		Exec: minesweeper,
+	Commands = append(Commands, &gumi.Command{
+		Name:        "nuggets",
+		Description: "Nuggets copypasta.",
+		Group:       groupName,
+		Usage:       "",
+		Example:     "",
+		Exec:        nuggets,
 	})
-	memes.AddCommand(&gumi.Command{
-		Name: "nuggets",
-		Exec: nuggets,
+	Commands = append(Commands, &gumi.Command{
+		Name:        "brainpower",
+		Description: "E E E x30 ADRENALINE IS PUMPING! x2",
+		Group:       groupName,
+		Usage:       "",
+		Example:     "",
+		Exec:        brainpower,
 	})
 }
 
-func borgar(s *discordgo.Session, m *discordgo.MessageCreate, _ []string) error {
+func borgar(ctx *gumi.Ctx) error {
 	eb := embeds.NewBuilder().Title("🦕🍔").Image("https://images-ext-2.discordapp.net/external/gRgdT4gZIPbY26qK9iM0edWQA4hYPZF5RvxVdSeXhRQ/https/i.kym-cdn.com/photos/images/original/001/568/282/ef2.gif?width=438&height=444")
 
-	s.ChannelMessageSendEmbed(m.ChannelID, eb.Finalize())
+	ctx.ReplyEmbed(eb.Finalize())
 	return nil
 }
 
@@ -66,29 +78,29 @@ type NuggetsCopypasta struct {
 	Ryo    string
 }
 
-func nuggets(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
-	if len(args) < 2 {
+func nuggets(ctx *gumi.Ctx) error {
+	if ctx.Args.Len() < 2 {
 		return utils.ErrNotEnoughArguments
 	}
 
-	n := &NuggetsCopypasta{Amelia: args[0], Ryo: args[1]}
+	n := &NuggetsCopypasta{Amelia: ctx.Args.Get(1).Raw, Ryo: ctx.Args.Get(0).Raw}
 
 	buf := new(bytes.Buffer)
 	nuggetsTemplate.Execute(buf, n)
 
-	s.ChannelMessageSend(m.ChannelID, buf.String())
+	ctx.Reply(buf.String())
 	return nil
 }
 
-func brainpower(s *discordgo.Session, m *discordgo.MessageCreate, _ []string) error {
-	s.ChannelMessageSend(m.ChannelID, "O-oooooooooo AAAAE-A-A-I-A-U- JO-oooooooooooo AAE-O-A-A-U-U-A- E-eee-ee-eee AAAAE-A-E-I-E-A-JO-ooo-oo-oo-oo EEEEO-A-AAA-AAAA")
+func brainpower(ctx *gumi.Ctx) error {
+	ctx.Reply("O-oooooooooo AAAAE-A-A-I-A-U- JO-oooooooooooo AAE-O-A-A-U-U-A- E-eee-ee-eee AAAAE-A-E-I-E-A-JO-ooo-oo-oo-oo EEEEO-A-AAA-AAAA")
 	return nil
 }
 
-func minesweeper(s *discordgo.Session, m *discordgo.MessageCreate, _ []string) error {
+func minesweeper(ctx *gumi.Ctx) error {
 	ms := &Minesweeper{}
 	ms.generateField()
 
-	s.ChannelMessageSend(m.ChannelID, ms.String())
+	ctx.Reply(ms.String())
 	return nil
 }

@@ -5,7 +5,7 @@ go 1.15
 require (
 	github.com/ReneKroon/ttlcache v1.7.0
 	github.com/VTGare/ascii2d-go v0.1.0
-	github.com/VTGare/gumi v0.2.2
+	github.com/VTGare/gumi v0.3.1
 	github.com/VTGare/iqdbgo v0.1.1
 	github.com/VTGare/pixiv v0.0.6
 	github.com/VTGare/sengoku v0.1.6

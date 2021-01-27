@@ -118,7 +118,7 @@ func (eb *Builder) SuccessTemplate(message string) *Builder {
 
 //FailureTemplate retuns an embed built over an failure message template
 func (eb *Builder) FailureTemplate(message string) *Builder {
-	eb.Title("❎ Failure!").Description(message).Color(16769794)
+	eb.Title("❌ Failed!").Description(message).Color(16737650)
 	return eb
 }
 

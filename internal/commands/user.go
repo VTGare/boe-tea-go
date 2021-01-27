@@ -24,67 +24,60 @@ var (
 )
 
 func init() {
-	ug := Router.AddGroup(&gumi.Group{
-		Name:        "user",
-		Description: "User profile and settings",
-		NSFW:        false,
-		IsVisible:   true,
-	})
+	groupName := "user"
 
-	profileCmd := ug.AddCommand(&gumi.Command{
+	Commands = append(Commands, &gumi.Command{
 		Name:        "profile",
-		Description: "Shows your profile",
-		GuildOnly:   false,
-		NSFW:        false,
+		Description: "Sends your Boe Tea user profile",
+		Group:       groupName,
+		Usage:       "bt!profile",
+		Example:     "bt!profile",
 		Exec:        profile,
-		Cooldown:    5 * time.Second,
 	})
-	profileCmd.Help = gumi.NewHelpSettings().AddField("Usage", "bt!profile", false).AddField("Description", "Shows your Boe Tea profile.", false)
-
-	favCmd := ug.AddCommand(&gumi.Command{
+	Commands = append(Commands, &gumi.Command{
 		Name:        "favourites",
-		Aliases:     []string{"favorites", "favs", "fav", "bookmarks", "bm"},
+		Aliases:     []string{"fav", "favs", "bookmarks", "favorites"},
 		Description: "Shows a list of your favourites.",
-		GuildOnly:   false,
-		NSFW:        false,
-		Exec:        favourites,
-		Cooldown:    5 * time.Second,
+		Group:       groupName,
+		Usage:       "bt!favourites [flags]",
+		Example:     "bt!favourites last:day limit:1 mode:nsfw order:ascending",
+		Flags: map[string]string{
+			"Flag syntax": "Flags have following syntax: `name:value`.\n_***Example***_: `bt!fav limit:100`.\nAccepted flags are listed below",
+			"mode":        "Display mode, doubles down as sfw/nsfw filter.\n_***Default:***_ either sfw or nsfw, depends on channel.\nValue should be one of the following strings:\n`[compact, sfw, nsfw, all]`.",
+			"limit":       "Number of artworks returned.\n_***Default:***_ 10.\nValue should be an _integer number from 1 to 100_",
+			"last":        "Filter artworks by date.\n_***Default:***_ no filter.\nValue should be one of the following strings:\n`[day, week, month]`.",
+			"sort":        "Sort type.\n_***Default:***_ time.\nValue should be one of the following strings:\n`[id, likes, favourites, time]`.",
+			"order":       "Sort order.\n_***Default:***_ descending.\nValue should be one of the following strings:\n`[asc, ascending, desc, descending]`.",
+		},
+		Exec: favourites,
 	})
-	favCmd.Help = gumi.NewHelpSettings()
-	favCmd.Help.AddField("Usage", "bt!favourites `[flags]`", false)
-	favCmd.Help.AddField("Flag syntax", "Flags have following syntax: `name:value`.\n_***Example***_: `bt!fav limit:100`.\nAccepted flags are listed below", false)
-	favCmd.Help.AddField("mode", "Display mode, doubles down as sfw/nsfw filter.\n_***Default:***_ either sfw or nsfw, depends on channel.\nValue should be one of the following strings:\n`[compact, sfw, nsfw, all]`.", false)
-	favCmd.Help.AddField("limit", "Number of artworks returned.\n_***Default:***_ 10.\nValue should be an _integer number from 1 to 100_", false)
-	favCmd.Help.AddField("last", "Filter artworks by date.\n_***Default:***_ no filter.\nValue should be one of the following strings:\n`[day, week, month]`.", false)
-	favCmd.Help.AddField("sort", "Sort type.\n_***Default:***_ time.\nValue should be one of the following strings:\n`[id, likes, favourites, time]`.", false)
-	favCmd.Help.AddField("order", "Sort order.\n_***Default:***_ descending.\nValue should be one of the following strings:\n`[asc, ascending, desc, descending]`.", false)
-
-	unfavCmd := ug.AddCommand(&gumi.Command{
+	Commands = append(Commands, &gumi.Command{
 		Name:        "unfavourite",
-		Aliases:     []string{"unfavourite", "unfav"},
-		Description: "Unfavourites an art by favourite ID or URL",
-		GuildOnly:   false,
-		NSFW:        false,
+		Aliases:     []string{"unfav"},
+		Description: "Unfavourites an artwork by artwprk ID or link",
+		Group:       groupName,
+		Usage:       "bt!unfav <artword ID or link>",
+		Example:     "bt!unfav 1945",
 		Exec:        unfavourite,
-		Cooldown:    5 * time.Second,
 	})
-	unfavCmd.Help = gumi.NewHelpSettings().AddField("Usage", "bt!unfavourite <art link or ID>", false)
-	unfavCmd.Help.AddField("Art link", "A Twitter or Pixiv post link. It should match the link in your favourites list. For ease of use I recommend using IDs instead.", false)
-	unfavCmd.Help.AddField("ID", "Favourite ID, can be retrieved from favourite list. Use ``bt!fav`` command", false)
-
-	usersetCmd := ug.AddCommand(&gumi.Command{
+	Commands = append(Commands, &gumi.Command{
 		Name:        "userset",
-		Aliases:     []string{""},
-		Description: "Show or change user settings",
+		Aliases:     []string{},
+		Description: "Show or change user settings.",
+		Group:       groupName,
+		Usage:       "bt!userset <setting name> <new setting>",
+		Example:     "bt!userset dms disabled",
 		Exec:        userset,
-		Cooldown:    5 * time.Second,
 	})
-
-	usersetCmd.Help = gumi.NewHelpSettings().AddField("Usage", "bt!userset <setting> <new setting>", false).AddField("Settings", "__Not required.__ Accepts: [crosspost, dm]", false)
 
 }
 
-func profile(s *discordgo.Session, m *discordgo.MessageCreate, _ []string) error {
+func profile(ctx *gumi.Ctx) error {
+	var (
+		s = ctx.Session
+		m = ctx.Event
+	)
+
 	user := database.DB.FindUser(m.Author.ID)
 	if user == nil {
 		user = database.NewUserSettings(m.Author.ID)
@@ -113,8 +106,11 @@ const (
 	modeCompact
 )
 
-func favourites(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
+func favourites(ctx *gumi.Ctx) error {
 	var (
+		s    = ctx.Session
+		m    = ctx.Event
+		args = strings.Fields(ctx.Args.Raw)
 		user = database.DB.FindUser(m.Author.ID)
 		eb   = embeds.NewBuilder()
 	)
@@ -392,7 +388,13 @@ func compactFavourites(fav []*database.Artwork) []*discordgo.MessageEmbed {
 	return pages
 }
 
-func unfavourite(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
+func unfavourite(ctx *gumi.Ctx) error {
+	var (
+		s    = ctx.Session
+		m    = ctx.Event
+		args = strings.Fields(ctx.Args.Raw)
+	)
+
 	user := database.DB.FindUser(m.Author.ID)
 	if user == nil {
 		user = database.NewUserSettings(m.Author.ID)
@@ -433,7 +435,13 @@ func unfavourite(s *discordgo.Session, m *discordgo.MessageCreate, args []string
 	return nil
 }
 
-func userset(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
+func userset(ctx *gumi.Ctx) error {
+	var (
+		s    = ctx.Session
+		m    = ctx.Event
+		args = strings.Fields(ctx.Args.Raw)
+	)
+
 	user := database.DB.FindUser(m.Author.ID)
 
 	if user != nil {

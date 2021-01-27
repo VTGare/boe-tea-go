@@ -4,9 +4,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"time"
 
-	ascii2dgo "github.com/VTGare/ascii2d-go"
 	"github.com/VTGare/boe-tea-go/internal/embeds"
 	"github.com/VTGare/boe-tea-go/internal/widget"
 	"github.com/VTGare/boe-tea-go/utils"
@@ -22,90 +20,46 @@ var (
 )
 
 func init() {
-	sg := Router.AddGroup(&gumi.Group{
-		Name:        "source",
-		Description: "Reverse search engines",
-		IsVisible:   true,
-	})
+	groupName := "source"
 
-	sauceCmd := sg.AddCommand(&gumi.Command{
+	Commands = append(Commands, &gumi.Command{
 		Name:        "sauce",
-		Description: "Finds source of an image using all reverse search engines",
 		Aliases:     []string{},
+		Description: "Finds sauce using both SauceNAO and iqdb.",
+		Group:       groupName,
+		Usage:       "bt!sauce <image attachment, link, reply or in last 5 messages>",
+		Example:     "bt!sauce https://rem.moe/cuteanimegirl.png",
+		GuildOnly:   true,
 		Exec:        sauce,
-		Cooldown:    5 * time.Second,
-		Help:        gumi.NewHelpSettings(),
 	})
-	sauceCmd.Help.ExtendedHelp = []*discordgo.MessageEmbedField{
-		{
-			Name:  "Usage",
-			Value: "bt!sauce <image link>",
-		},
-		{
-			Name:  "image link",
-			Value: "Not required. If not provided, looks for images in 5 previous messages. Link should either have one of following suffixes [*jpg*, *jpeg*, *png*, *gif*, *webp*] or be a Discord message link in the following format: ``https://discord.com/channels/%GUILD_ID%/%CHANNEL_ID%/%MESSAGE_ID%``",
-		},
-	}
 
-	saucenaoCmd := sg.AddCommand(&gumi.Command{
+	Commands = append(Commands, &gumi.Command{
 		Name:        "saucenao",
-		Description: "Finds source of an image using SauceNAO reverse search engine",
+		Aliases:     []string{"snao"},
+		Description: "Finds sauce using SauceNAO reverse search engine.",
+		Group:       groupName,
+		Usage:       "bt!sauce <image attachment, link, reply or in last 5 messages>",
+		Example:     "bt!saucenao https://ram.moe/cuteanimegirl.png",
 		Exec:        saucenao,
-		Cooldown:    5 * time.Second,
-		Help:        gumi.NewHelpSettings(),
 	})
 
-	saucenaoCmd.Help.ExtendedHelp = []*discordgo.MessageEmbedField{
-		{
-			Name:  "Usage",
-			Value: "bt!saucenao <image link>",
-		},
-		{
-			Name:  "image link",
-			Value: "Not required. If not provided, looks for images in 5 previous messages. Link should either have one of following suffixes [*jpg*, *jpeg*, *png*, *gif*, *webp*] or be a Discord message link in the following format: ``https://discord.com/channels/%GUILD_ID%/%CHANNEL_ID%/%MESSAGE_ID%``",
-		},
-	}
-
-	ascii2dCmd := sg.AddCommand(&gumi.Command{
-		Name:        "ascii2d",
-		Description: "Finds source of an image using ASCII2D reverse search engine",
-		Exec:        ascii2d,
-		Cooldown:    5 * time.Second,
-		Help:        gumi.NewHelpSettings(),
-	})
-	ascii2dCmd.Help.ExtendedHelp = []*discordgo.MessageEmbedField{
-		{
-			Name:  "Usage",
-			Value: "bt!ascii2d <image link>",
-		},
-		{
-			Name:  "image link",
-			Value: "Not required. If not provided, looks for images in 5 previous messages. Link should either have one of following suffixes [*jpg*, *jpeg*, *png*, *gif*, *webp*] or be a Discord message link in the following format: ``https://discord.com/channels/%GUILD_ID%/%CHANNEL_ID%/%MESSAGE_ID%``",
-		},
-	}
-
-	iqdbCmd := sg.AddCommand(&gumi.Command{
+	Commands = append(Commands, &gumi.Command{
 		Name:        "iqdb",
-		Description: "Finds source of an image using iqdb reverse search engine",
+		Description: "Finds sauce using iqdb reverse search engine.",
+		Group:       groupName,
+		Usage:       "bt!iqdb <image attachment, link, reply or in last 5 messages>",
+		Example:     "bt!iqdb https://emilia.moe/cuteanimegirl.png",
 		Exec:        iqdb,
-		NSFW:        true,
-		Cooldown:    5 * time.Second,
-		Help:        gumi.NewHelpSettings(),
 	})
-
-	iqdbCmd.Help.ExtendedHelp = []*discordgo.MessageEmbedField{
-		{
-			Name:  "Usage",
-			Value: "bt!iqdb <image link>",
-		},
-		{
-			Name:  "image link",
-			Value: "Not required. If not provided, looks for images in 5 previous messages. Link should either have one of following suffixes [*jpg*, *jpeg*, *png*, *gif*, *webp*] or be a Discord message link in the following format: ``https://discord.com/channels/%GUILD_ID%/%CHANNEL_ID%/%MESSAGE_ID%``",
-		},
-	}
 }
 
-func sauce(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
+func sauce(ctx *gumi.Ctx) error {
+	var (
+		s    = ctx.Session
+		m    = ctx.Event
+		args = strings.Fields(ctx.Args.Raw)
+	)
+
 	url, err := findImage(s, m, args)
 	if err != nil {
 		return err
@@ -153,26 +107,31 @@ func sauce(s *discordgo.Session, m *discordgo.MessageCreate, args []string) erro
 	}
 
 	eb := embeds.NewBuilder()
-	eb.InfoTemplate("<:peepoRainy:530050503955054593> Source couldn't be found on SauceNAO. Would you like to try your luck with ascii2d? (⚠ Boe Tea works inconsistently with it)")
+	eb.InfoTemplate("<:peepoRainy:530050503955054593> Source couldn't be found on SauceNAO. Would you like to try your luck with iqdb?")
 	prompt := utils.CreatePromptWithMessage(s, m, &discordgo.MessageSend{
 		Embed: eb.Finalize(),
 	})
 
 	if prompt {
-		log.Infof("Searching source on ascii2d. Image URL: %v", url)
-		res, err := ascii2dgo.Search(url)
+		log.Infof("Searching source on iqdb. Image URL: %v", url)
+		res, err := iqdbgo.Search(url)
 		if err != nil {
 			return err
 		}
 
 		var embeds = make([]*discordgo.MessageEmbed, 0)
-		length := len(res.Sources)
+		length := len(res.PossibleMatches)
+
+		if res.BestMatch != nil {
+			length++
+			embeds = append(embeds, iqdbEmbed(res.BestMatch, true, 0, length))
+		}
 		if length == 0 {
 			s.ChannelMessageSendEmbed(m.ChannelID, noSauceEmbed)
 		}
 
-		for i, s := range res.Sources {
-			embeds = append(embeds, ascii2dEmbed(s, i, length))
+		for i, s := range res.PossibleMatches {
+			embeds = append(embeds, iqdbEmbed(s, false, i+1, length))
 		}
 
 		if len(embeds) > 0 {
@@ -186,7 +145,13 @@ func sauce(s *discordgo.Session, m *discordgo.MessageCreate, args []string) erro
 	return nil
 }
 
-func saucenao(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
+func saucenao(ctx *gumi.Ctx) error {
+	var (
+		s    = ctx.Session
+		m    = ctx.Event
+		args = strings.Fields(ctx.Args.Raw)
+	)
+
 	url, err := findImage(s, m, args)
 	if err != nil {
 		return err
@@ -302,64 +267,13 @@ func saucenaoToEmbed(source *sengoku.Sauce, index, length int) *discordgo.Messag
 	return eb.Finalize()
 }
 
-func ascii2d(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
-	url, err := findImage(s, m, args)
-	if err != nil {
-		return err
-	}
+func iqdb(ctx *gumi.Ctx) error {
+	var (
+		s    = ctx.Session
+		m    = ctx.Event
+		args = strings.Fields(ctx.Args.Raw)
+	)
 
-	if url == "" {
-		return utils.ErrNotEnoughArguments
-	}
-
-	log.Infof("Searching source on Ascii2d. Image URL: %v", url)
-	res, err := ascii2dgo.Search(url)
-	if err != nil {
-		return err
-	}
-
-	if len(res.Sources) == 0 {
-		s.ChannelMessageSendEmbed(m.ChannelID, noSauceEmbed)
-		return nil
-	}
-
-	var embeds = make([]*discordgo.MessageEmbed, 0)
-	l := len(res.Sources)
-	for i, s := range res.Sources {
-		embeds = append(embeds, ascii2dEmbed(s, i, l))
-	}
-
-	if len(embeds) > 1 {
-		w := widget.NewWidget(s, m.Author.ID, embeds)
-		err := w.Start(m.ChannelID)
-		if err != nil {
-			return err
-		}
-	} else {
-		_, err = s.ChannelMessageSendEmbed(m.ChannelID, embeds[0])
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func ascii2dEmbed(source *ascii2dgo.Source, index, length int) *discordgo.MessageEmbed {
-	title := ""
-	if length > 1 {
-		title = fmt.Sprintf("[%v/%v] %v", index+1, length, source.Title)
-	} else {
-		title = fmt.Sprintf("%v", source.Title)
-	}
-
-	eb := embeds.NewBuilder()
-	eb.Title(title).URL(source.URL).Image(source.Thumbnail).AddField("Source", source.URL)
-	eb.AddField("Author", fmt.Sprintf("[%v](%v)", source.Author.Name, source.Author.URL))
-	return eb.Finalize()
-}
-
-func iqdb(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
 	url, err := findImage(s, m, args)
 	if err != nil {
 		return err

@@ -14,6 +14,7 @@ import (
 	"github.com/VTGare/boe-tea-go/internal/repost"
 	"github.com/VTGare/boe-tea-go/internal/ugoira"
 	"github.com/VTGare/boe-tea-go/pkg/tsuita"
+	"github.com/VTGare/gumi"
 	"github.com/bwmarrin/discordgo"
 	log "github.com/sirupsen/logrus"
 )
@@ -52,7 +53,63 @@ func NewBot(token string) (*Bot, error) {
 	}
 
 	bot := &Bot{dg}
-	dg.AddHandler(bot.messageCreated)
+
+	router := gumi.Create(&gumi.Router{
+		PrefixResolver: func(s *discordgo.Session, m *discordgo.MessageCreate) []string {
+			var (
+				guild, ok = database.GuildCache[m.GuildID]
+				mention1  = fmt.Sprintf("<@%v>", s.State.User.ID)
+				mention2  = fmt.Sprintf("<@!%v>", s.State.User.ID)
+			)
+
+			if ok {
+				return []string{guild.Prefix, mention1, mention2}
+			}
+
+			return []string{"bt!", "bt ", "bt.", mention1, mention2}
+		},
+		NotCommandCallback: prefixless,
+		OnErrorCallback: func(s *discordgo.Session, m *discordgo.MessageCreate, err error) {
+			eb := embeds.NewBuilder()
+			eb.ErrorTemplate(err.Error())
+
+			log.Errorln(err)
+			s.ChannelMessageSendEmbed(m.ChannelID, eb.Finalize())
+		},
+		OnRateLimitCallback: func(ctx *gumi.Ctx) error {
+			duration, err := ctx.Command.RateLimiter.Expires(ctx.Event.Author.ID)
+			if err != nil {
+				return err
+			}
+
+			eb := embeds.NewBuilder()
+			eb.FailureTemplate(fmt.Sprintf("Hold your horses! You're getting rate limited. Try again in **%v**", duration.Round(1*time.Second).String()))
+
+			return ctx.ReplyEmbed(eb.Finalize())
+		},
+		OnNoPermissionsCallback: func(ctx *gumi.Ctx) error {
+			eb := embeds.NewBuilder()
+			eb.FailureTemplate("You don't have enough permissions to run this command.")
+
+			return ctx.ReplyEmbed(eb.Finalize())
+		},
+		OnNSFWCallback: func(ctx *gumi.Ctx) error {
+			eb := embeds.NewBuilder()
+			eb.FailureTemplate(fmt.Sprintf("Unable to run an NSFW command `%v` in a SFW channel.", ctx.Command.Name))
+
+			return ctx.ReplyEmbed(eb.Finalize())
+		},
+		OnExecuteCallback: func(ctx *gumi.Ctx) error {
+			log.Infof("Executing command [%v]. Arguments:%v", ctx.Command.Name, ctx.Args.Raw)
+
+			return nil
+		},
+	})
+	for _, cmd := range commands.Commands {
+		router.RegisterCmd(cmd)
+	}
+	router.Initialize(dg)
+
 	dg.AddHandler(bot.onReady)
 	dg.AddHandler(bot.reactCreated)
 	dg.AddHandler(bot.guildCreated)
@@ -70,7 +127,7 @@ func (b *Bot) onReady(_ *discordgo.Session, e *discordgo.Ready) {
 	log.Infof("Connected to %v guilds!", len(e.Guilds))
 }
 
-func (b *Bot) prefixless(s *discordgo.Session, m *discordgo.MessageCreate) error {
+func prefixless(s *discordgo.Session, m *discordgo.MessageCreate) error {
 	var (
 		art = repost.NewPost(m)
 	)
@@ -89,17 +146,6 @@ func (b *Bot) prefixless(s *discordgo.Session, m *discordgo.MessageCreate) error
 	}
 
 	return nil
-}
-
-func (b *Bot) messageCreated(s *discordgo.Session, m *discordgo.MessageCreate) {
-	if m.Author.Bot {
-		return
-	}
-	isCommand := commands.Router.Handle(s, m)
-	if !isCommand && m.GuildID != "" {
-		err := b.prefixless(s, m)
-		commands.Router.ErrorHandler(err)
-	}
 }
 
 func (b *Bot) reactCreated(s *discordgo.Session, r *discordgo.MessageReactionAdd) {

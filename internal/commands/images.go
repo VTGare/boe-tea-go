@@ -1,18 +1,14 @@
 package commands
 
 import (
-	"errors"
 	"fmt"
-	"image"
 	"os"
 	"regexp"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/VTGare/boe-tea-go/internal/database"
 	"github.com/VTGare/boe-tea-go/internal/embeds"
-	"github.com/VTGare/boe-tea-go/internal/images"
 	"github.com/VTGare/boe-tea-go/internal/repost"
 	"github.com/VTGare/boe-tea-go/utils"
 	"github.com/VTGare/gumi"
@@ -32,74 +28,49 @@ var (
 )
 
 func init() {
-	ig := Router.AddGroup(&gumi.Group{
-		Name:        "images",
-		Description: "Art posting and image manipulation commands",
-		IsVisible:   true,
-	})
-
-	excludeCmd := ig.AddCommand(&gumi.Command{
-		Name:        "exclude",
-		Description: "Exclude selected images from a Pixiv album.",
-		Aliases:     []string{"excl", "pixiv"},
-		Exec:        exclude,
-		Cooldown:    5 * time.Second,
-	})
-	excludeCmd.Help = gumi.NewHelpSettings().AddField("Usage", "bt!exclude <post link> [optional excluded images]", false)
-	excludeCmd.Help.AddField("excluded images", "Integer numbers separated by whitespace (e.g. 1 3 5). Supports ranges like this 1-10. Ranges are inclusive.", false)
-
-	includeCmd := ig.AddCommand(&gumi.Command{
-		Name:        "include",
-		Description: "Include only selected images from a Pixiv album.",
-		Aliases:     []string{"incl"},
-		Exec:        include,
-		Cooldown:    5 * time.Second,
-	})
-	includeCmd.Help = gumi.NewHelpSettings().AddField("Usage", "bt!exclude <post link> [optional excluded images]", false)
-	excludeCmd.Help.AddField("included images", "Integer numbers separated by whitespace (e.g. 1 3 5). Supports ranges like this 1-10. Ranges are inclusive.", false)
-
-	dfCmd := ig.AddCommand(&gumi.Command{
-		Name:        "deepfry",
-		Description: "Deepfries an image, itadakimasu!",
-		Aliases:     []string{},
-		Exec:        deepfry,
-		Cooldown:    15 * time.Second,
-	})
-	dfCmd.Help = gumi.NewHelpSettings()
-	dfCmd.Help.AddField("Usage", "bt!deepfry <optional times deepfried> <image link>", false)
-	dfCmd.Help.AddField("times deepfried", "Repeats deepfrying process given amount of times, up to 5.", false)
-
-	tCmd := ig.AddCommand(&gumi.Command{
-		Name:        "twitter",
-		Description: "Embeds a tweet. Useful for mobile users.",
-		Aliases:     []string{},
-		Exec:        twitter,
-		Cooldown:    5 * time.Second,
-	})
-	tCmd.Help = gumi.NewHelpSettings()
-	tCmd.Help.AddField("Usage", "bt!twitter <tweet link> [excluded images]", false)
-	tCmd.Help.AddField("Tweet link", "Required. Any tweet link is supported.", false)
-	tCmd.Help.AddField("Excluded images", "Optional. Array of integer numbers. Ranges are supported (e.g. 1-3).", false)
-
-	jpegCmd := ig.AddCommand(&gumi.Command{
-		Name:        "jpeg",
-		Description: "Gives a provided image soul. 🙏",
-		Aliases:     []string{"soul", "jpegify"},
-		Exec:        jpegify,
-		Cooldown:    15 * time.Second,
-	})
-	jpegCmd.Help = gumi.NewHelpSettings()
-	jpegCmd.Help.AddField("Usage", "bt!jpeg <image quality> <image url>", false).AddField("image quality", "Optional integer from 0 to 100", false).AddField("image url", "Optional if attachment is present. Attachment is prioritized.", false)
-
-	crosspostCmd := ig.AddCommand(&gumi.Command{
+	groupName := "images"
+	Commands = append(Commands, &gumi.Command{
 		Name:        "crosspost",
-		Description: "Excludes provided channels from cross-posting a Twitter or Pixiv post.",
-		Aliases:     []string{},
+		Description: "Excludes given channels from crossposting.",
+		Group:       groupName,
+		Usage:       "bt!crosspost <artwork link> [optional channels]",
+		Example:     "bt!crosspost https://pixiv.net/artworks/1337420 #sfw",
+		Flags:       map[string]string{"Optional channels": "If no channels were provided excludes all channels instead."},
 		Exec:        crosspost,
-		Cooldown:    5 * time.Second,
-		Help:        gumi.NewHelpSettings(),
+		GuildOnly:   true,
 	})
-	crosspostCmd.Help.AddField("Usage", "bt!crosspost <twitter or pixiv link> [excluded channels]", false).AddField("Excluded channels", "IDs or mentions of channels you'd like to exclude from crossposting. Omit argument or give ``all`` to skip crossposting", false)
+
+	Commands = append(Commands, &gumi.Command{
+		Name:        "twitter",
+		Aliases:     []string{"tweet"},
+		Description: "Embeds a tweet.",
+		Group:       groupName,
+		Usage:       "bt!twitter <tweet link> [optional excluded images]",
+		Example:     "bt!twitter https://twitter.com/Zephyroh/status/1354471389496037378 1",
+		Exec:        twitter,
+	})
+
+	Commands = append(Commands, &gumi.Command{
+		Name:        "include",
+		Aliases:     []string{"incl"},
+		Group:       groupName,
+		Description: "Includes only given images from a pixiv album",
+		Usage:       "bt!include <pixiv artwork link> [included images]",
+		Example:     "bt!include https://www.pixiv.net/en/artworks/87329172 1-3",
+		Flags:       map[string]string{"included images": "Integer numbers separated by whitespace (e.g. 1 3 5). Supports ranges like this 1-10. Ranges are inclusive."},
+		Exec:        include,
+	})
+
+	Commands = append(Commands, &gumi.Command{
+		Name:        "exclude",
+		Aliases:     []string{"excl", "pixiv"},
+		Group:       groupName,
+		Description: "Excludes given images from a pixiv album",
+		Usage:       "bt!exclude <pixiv artwork link> [excluded images]",
+		Example:     "bt!exclude https://www.pixiv.net/en/artworks/87329172 1-3",
+		Flags:       map[string]string{"excluded images": "Integer numbers separated by whitespace (e.g. 1 3 5). Supports ranges like this 1-10. Ranges are inclusive."},
+		Exec:        exclude,
+	})
 }
 
 func namedLink(uri string) string {
@@ -136,14 +107,17 @@ func joinSauceURLs(urls []string, sep string) string {
 	return sb.String()
 }
 
-func exclude(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
-	if len(args) == 0 {
+func exclude(ctx *gumi.Ctx) error {
+	if ctx.Args.Len() == 0 {
 		return utils.ErrNotEnoughArguments
 	}
 
+	args := strings.Fields(ctx.Args.Raw)
 	var (
+		s       = ctx.Session
+		m       = ctx.Event
 		url     = args[0]
-		indexes = args[1:]
+		indices = args[1:]
 	)
 
 	art := repost.NewPost(m, url)
@@ -155,7 +129,7 @@ func exclude(s *discordgo.Session, m *discordgo.MessageCreate, args []string) er
 	}
 
 	indexMap := make(map[int]bool)
-	for _, arg := range indexes {
+	for _, arg := range indices {
 		if strings.Contains(arg, "-") {
 			ran, err := utils.NewRange(arg)
 			if err != nil {
@@ -193,12 +167,15 @@ func exclude(s *discordgo.Session, m *discordgo.MessageCreate, args []string) er
 	return nil
 }
 
-func include(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
-	if len(args) == 0 {
+func include(ctx *gumi.Ctx) error {
+	if ctx.Args.Len() == 0 {
 		return utils.ErrNotEnoughArguments
 	}
 
+	args := strings.Fields(ctx.Args.Raw)
 	var (
+		s       = ctx.Session
+		m       = ctx.Event
 		url     = args[0]
 		indices = args[1:]
 	)
@@ -251,12 +228,14 @@ func include(s *discordgo.Session, m *discordgo.MessageCreate, args []string) er
 	return nil
 }
 
-func crosspost(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
-	if len(args) < 1 {
+func crosspost(ctx *gumi.Ctx) error {
+	if ctx.Args.Len() < 1 {
 		return fmt.Errorf("bt!crosspost requires at least one argument. **Usage:** bt!crosspost <pixiv link> [channel IDs]")
 	}
 
 	var (
+		s    = ctx.Session
+		m    = ctx.Event
 		user = database.DB.FindUser(m.Author.ID)
 		art  = repost.NewPost(m)
 	)
@@ -271,15 +250,15 @@ func crosspost(s *discordgo.Session, m *discordgo.MessageCreate, args []string) 
 	if err != nil {
 		return err
 	}
-	if len(args) >= 2 {
-		if args[1] == "all" {
+	if ctx.Args.Len() >= 2 {
+		if ctx.Args.Get(1).Raw == "all" {
 			return nil
 		}
 
 		channels := utils.Filter(user.Channels(m.ChannelID), func(str string) bool {
-			for _, a := range args[1:] {
-				a = strings.Trim(a, "<#>")
-				if a == str {
+			for _, a := range ctx.Args.Arguments[1:] {
+				a.Raw = strings.Trim(a.Raw, "<#>")
+				if a.Raw == str {
 					return false
 				}
 			}
@@ -294,12 +273,15 @@ func crosspost(s *discordgo.Session, m *discordgo.MessageCreate, args []string) 
 	return nil
 }
 
-func twitter(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
-	if len(args) == 0 {
+func twitter(ctx *gumi.Ctx) error {
+	if ctx.Args.Len() == 0 {
 		return utils.ErrNotEnoughArguments
 	}
 
 	var (
+		m          = ctx.Event
+		s          = ctx.Session
+		args       = strings.Fields(ctx.Args.Raw)
 		guild      = database.GuildCache[m.GuildID]
 		twitterURL = args[0]
 		indices    = args[1:]
@@ -374,102 +356,5 @@ func twitter(s *discordgo.Session, m *discordgo.MessageCreate, args []string) er
 		}
 	}
 
-	return nil
-}
-
-func deepfry(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
-	if len(m.Attachments) > 0 {
-		args = append(args, m.Attachments[0].URL)
-	}
-
-	uri := ""
-	times := 0
-	switch len(args) {
-	case 2:
-		if f := ImageURLRegex.FindString(args[0]); f != "" {
-			uri = f
-		} else {
-			var err error
-			times, err = strconv.Atoi(args[0])
-			if times > 5 {
-				return errors.New("can't deepfry more than 5 times at once")
-			}
-			if err != nil {
-				return err
-			}
-			uri = ImageURLRegex.FindString(args[1])
-		}
-
-		if uri == "" {
-			return errors.New("received a non-image url")
-		}
-	case 1:
-		if f := ImageURLRegex.FindString(args[0]); f != "" {
-			uri = f
-		} else {
-			return errors.New("received a non-image url")
-		}
-	case 0:
-		return utils.ErrNotEnoughArguments
-	}
-
-	img, err := images.DownloadImage(uri)
-	if err != nil {
-		return err
-	}
-
-	deepfried := images.Deepfry(img)
-	for i := 0; i < times; i++ {
-		img, _, _ := image.Decode(deepfried)
-		deepfried = images.Deepfry(img)
-	}
-
-	s.ChannelFileSend(m.ChannelID, "deepfried.jpg", deepfried)
-	return nil
-}
-
-func jpegify(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
-	if len(m.Attachments) > 0 {
-		args = append(args, m.Attachments[0].URL)
-	}
-
-	uri := ""
-	quality := 10
-	switch len(args) {
-	case 2:
-		if f := ImageURLRegex.FindString(args[0]); f != "" {
-			uri = f
-		} else {
-			var err error
-			quality, err = strconv.Atoi(args[0])
-			if quality > 100 || quality < 1 {
-				return errors.New("quality can't be higher than 100 or lower than 1")
-			}
-			if err != nil {
-				return err
-			}
-			uri = ImageURLRegex.FindString(args[1])
-		}
-
-		if uri == "" {
-			return errors.New("received a non-image url")
-		}
-	case 1:
-		if f := ImageURLRegex.FindString(args[0]); f != "" {
-			uri = f
-		} else {
-			return errors.New("received a non-image url")
-		}
-	case 0:
-		return utils.ErrNotEnoughArguments
-	}
-
-	img, err := images.DownloadImage(uri)
-	if err != nil {
-		return err
-	}
-
-	deepfried := images.Jpegify(img, quality)
-	s.ChannelFileSend(m.ChannelID, "soul.jpg", deepfried)
 	return nil
 }

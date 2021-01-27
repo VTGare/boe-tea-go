@@ -3,81 +3,71 @@ package commands
 import (
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/VTGare/boe-tea-go/internal/database"
 	"github.com/VTGare/boe-tea-go/internal/embeds"
 	"github.com/VTGare/boe-tea-go/utils"
 	"github.com/VTGare/gumi"
-	"github.com/bwmarrin/discordgo"
 )
 
 func init() {
-	cp := Router.AddGroup(&gumi.Group{
-		Name:        "crosspost",
-		Description: "Cross-posting feature settings",
-		IsVisible:   true,
-	})
+	groupName := "crosspost"
 
-	mk := cp.AddCommand(&gumi.Command{
+	Commands = append(Commands, &gumi.Command{
 		Name:        "create",
-		Description: "Creates a new cross-post group",
+		Group:       groupName,
+		Description: "Creates a crosspost group.",
+		Usage:       "bt!create <group name> <parent channel ID>",
+		Example:     "bt!create poggers-art-group #general-art",
 		Exec:        createGroup,
-		Cooldown:    5 * time.Second,
-		Help:        gumi.NewHelpSettings(),
 	})
-	mk.Help.AddField("Usage", "bt!create <group name> [channel IDs or mentions]", false)
-
-	dl := cp.AddCommand(&gumi.Command{
+	Commands = append(Commands, &gumi.Command{
 		Name:        "delete",
-		Description: "Deletes a cross-post group",
+		Group:       groupName,
+		Description: "Deletes a crosspost group.",
+		Usage:       "bt!delete <group name>",
+		Example:     "bt!delete bad-group",
 		Exec:        deleteGroup,
-		Cooldown:    5 * time.Second,
-		Help:        gumi.NewHelpSettings(),
 	})
-	dl.Help.AddField("Usage", "bt!delete <group name>", false)
-
-	cp.AddCommand(&gumi.Command{
-		Name:        "list",
-		Aliases:     []string{"ls", "groups"},
-		Description: "List all your cross-post groups",
+	Commands = append(Commands, &gumi.Command{
+		Name:        "groups",
+		Aliases:     []string{"list"},
+		Group:       groupName,
+		Description: "Lists your crosspost groups.",
+		Usage:       "bt!list",
+		Example:     "",
 		Exec:        groups,
-		Help:        gumi.NewHelpSettings(),
 	})
-
-	pop := cp.AddCommand(&gumi.Command{
+	Commands = append(Commands, &gumi.Command{
 		Name:        "pop",
-		Aliases:     []string{"remove"},
-		Description: "Removes a channel from a group",
+		Group:       groupName,
+		Description: "Pops (removes) channels from a group.",
+		Usage:       "bt!pop <group name> [channel IDs or mentions]",
+		Example:     "bt!pop porn #general",
 		Exec:        removeFromGroup,
-		Cooldown:    5 * time.Second,
-		Help:        gumi.NewHelpSettings(),
 	})
-	pop.Help.AddField("Usage", "bt!pop <group name> [channel IDs or mentions]", false)
-
-	push := cp.AddCommand(&gumi.Command{
+	Commands = append(Commands, &gumi.Command{
 		Name:        "push",
-		Aliases:     []string{"add"},
-		Description: "Adds a channel to a group",
+		Group:       groupName,
+		Description: "Pushes (adds) channels to a group.",
+		Usage:       "bt!push <group name> [channel IDs or mentions]",
+		Example:     "bt!push hololive #hololive-sfw",
 		Exec:        addToGroup,
-		Cooldown:    5 * time.Second,
-		Help:        gumi.NewHelpSettings(),
 	})
-	push.Help.AddField("Usage", "bt!push <group name> [channel IDs or mentions]", false)
-
-	copyc := cp.AddCommand(&gumi.Command{
+	Commands = append(Commands, &gumi.Command{
 		Name:        "copy",
-		Aliases:     []string{"cp", "clone"},
-		Description: "Copies a cross-post group",
+		Group:       groupName,
+		Description: "Copies a crosspost group.",
+		Usage:       "bt!copy <source group name> <new group name> <new parent ID>",
+		Example:     "bt!copy hololive-sfw general-sfw #general-art",
 		Exec:        copyGroup,
-		Cooldown:    5 * time.Second,
-		Help:        gumi.NewHelpSettings(),
 	})
-	copyc.Help.AddField("Usage", "bt!copy <source group name> <destination group name> <parent ID>", false)
 }
 
-func groups(s *discordgo.Session, m *discordgo.MessageCreate, _ []string) error {
+func groups(ctx *gumi.Ctx) error {
 	var (
+		s    = ctx.Session
+		m    = ctx.Event
 		user = database.DB.FindUser(m.Author.ID)
 		eb   = embeds.NewBuilder()
 	)
@@ -108,13 +98,15 @@ func groups(s *discordgo.Session, m *discordgo.MessageCreate, _ []string) error 
 	return nil
 }
 
-func createGroup(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
+func createGroup(ctx *gumi.Ctx) error {
 	var (
+		s    = ctx.Session
+		m    = ctx.Event
 		user = database.DB.FindUser(m.Author.ID)
 		eb   = embeds.NewBuilder()
 	)
 
-	if len(args) < 2 {
+	if ctx.Args.Len() < 2 {
 		msg := "``bt!create`` requires two arguments. Example: ``bt!create touhou #lewdtouhouart``"
 		s.ChannelMessageSendEmbed(m.ChannelID, eb.FailureTemplate(msg).Finalize())
 		return nil
@@ -129,8 +121,8 @@ func createGroup(s *discordgo.Session, m *discordgo.MessageCreate, args []string
 	}
 
 	var (
-		groupName = args[0]
-		ch        = args[1]
+		groupName = ctx.Args.Get(0).Raw
+		ch        = ctx.Args.Get(1).Raw
 	)
 
 	ch = strings.Trim(ch, "<#>")
@@ -151,13 +143,15 @@ func createGroup(s *discordgo.Session, m *discordgo.MessageCreate, args []string
 	return nil
 }
 
-func deleteGroup(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
+func deleteGroup(ctx *gumi.Ctx) error {
 	var (
+		s    = ctx.Session
+		m    = ctx.Event
 		user = database.DB.FindUser(m.Author.ID)
 		eb   = embeds.NewBuilder()
 	)
 
-	if len(args) < 1 {
+	if ctx.Args.Len() < 1 {
 		msg := "``bt!delete`` requires at least one argument.\n**Usage:** ``bt!delete ntr``"
 		s.ChannelMessageSendEmbed(m.ChannelID, eb.FailureTemplate(msg).Finalize())
 		return nil
@@ -168,23 +162,25 @@ func deleteGroup(s *discordgo.Session, m *discordgo.MessageCreate, args []string
 		return nil
 	}
 
-	err := database.DB.DeleteGroup(m.Author.ID, args[0])
+	err := database.DB.DeleteGroup(m.Author.ID, ctx.Args.Get(0).Raw)
 	if err != nil {
 		return fmt.Errorf("fatal database error: %v", err)
 	}
 
-	eb.SuccessTemplate("Sucessfully deleted a cross-post group!").AddField("Name", args[0])
+	eb.SuccessTemplate("Sucessfully deleted a cross-post group!").AddField("Name", ctx.Args.Get(0).Raw)
 	s.ChannelMessageSendEmbed(m.ChannelID, eb.Finalize())
 	return nil
 }
 
-func removeFromGroup(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
+func removeFromGroup(ctx *gumi.Ctx) error {
 	var (
+		s    = ctx.Session
+		m    = ctx.Event
 		user = database.DB.FindUser(m.Author.ID)
 		eb   = embeds.NewBuilder()
 	)
 
-	if len(args) < 2 {
+	if ctx.Args.Len() < 2 {
 		eb.FailureTemplate("``bt!remove`` requires at least two arguments.\n**Usage:** ``bt!remove nudes #nsfw``")
 		s.ChannelMessageSendEmbed(m.ChannelID, eb.Finalize())
 		return nil
@@ -196,6 +192,7 @@ func removeFromGroup(s *discordgo.Session, m *discordgo.MessageCreate, args []st
 		return nil
 	}
 
+	args := strings.Fields(ctx.Args.Raw)
 	ids := utils.Map(args[1:], func(s string) string {
 		return strings.Trim(s, "<#>")
 	})
@@ -220,13 +217,15 @@ func removeFromGroup(s *discordgo.Session, m *discordgo.MessageCreate, args []st
 	return nil
 }
 
-func addToGroup(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
+func addToGroup(ctx *gumi.Ctx) error {
 	var (
+		s    = ctx.Session
+		m    = ctx.Event
 		user = database.DB.FindUser(m.Author.ID)
 		eb   = embeds.NewBuilder()
 	)
 
-	if len(args) < 2 {
+	if ctx.Args.Len() < 2 {
 		msg := "``bt!push`` requires at least two arguments.\n**Usage:** ``bt!push hololive #marine-booty``"
 		s.ChannelMessageSendEmbed(m.ChannelID, eb.FailureTemplate(msg).Finalize())
 		return nil
@@ -238,10 +237,12 @@ func addToGroup(s *discordgo.Session, m *discordgo.MessageCreate, args []string)
 		return nil
 	}
 
-	groupName := args[0]
+	groupName := ctx.Args.Get(0).Raw
+	ctx.Args.Remove(0)
+
 	channelsMap := make(map[string]bool)
-	for _, id := range args[1:] {
-		channelsMap[id] = true
+	for _, arg := range ctx.Args.Arguments {
+		channelsMap[arg.Raw] = true
 	}
 
 	channels := make([]string, 0)
@@ -288,23 +289,25 @@ func addToGroup(s *discordgo.Session, m *discordgo.MessageCreate, args []string)
 			return fmt.Sprintf("<#%v>", s)
 		}), " ")
 
-		eb.SuccessTemplate("Successfully added channels to a cross-post group!").AddField("Name", args[0]).AddField("Channels", channels)
+		eb.SuccessTemplate("Successfully added channels to a cross-post group!").AddField("Name", ctx.Args.Get(0).Raw).AddField("Channels", channels)
 		s.ChannelMessageSendEmbed(m.ChannelID, eb.Finalize())
 	} else {
-		eb.FailureTemplate("Failed to add channels to a cross-post group! None of the specified channels were found.").AddField("Group name", args[0])
+		eb.FailureTemplate("Failed to add channels to a cross-post group! None of the specified channels were found.").AddField("Group name", ctx.Args.Get(0).Raw)
 		s.ChannelMessageSendEmbed(m.ChannelID, eb.Finalize())
 	}
 
 	return nil
 }
 
-func copyGroup(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
+func copyGroup(ctx *gumi.Ctx) error {
 	var (
+		s    = ctx.Session
+		m    = ctx.Event
 		user = database.DB.FindUser(m.Author.ID)
 		eb   = embeds.NewBuilder()
 	)
 
-	if len(args) < 3 {
+	if ctx.Args.Len() < 3 {
 		msg := "``bt!copy`` requires at least three arguments.\n**Usage:** ``bt!copy <source> <destination> <new parent channel>``"
 		s.ChannelMessageSendEmbed(m.ChannelID, eb.FailureTemplate(msg).Finalize())
 		return nil
@@ -318,10 +321,10 @@ func copyGroup(s *discordgo.Session, m *discordgo.MessageCreate, args []string) 
 
 	var (
 		group    *database.Group
-		src      = args[0]
-		dest     = args[1]
+		src      = ctx.Args.Get(0).Raw
+		dest     = ctx.Args.Get(1).Raw
 		exists   bool
-		parent   = strings.Trim(args[2], "<#>")
+		parent   = strings.Trim(ctx.Args.Get(2).Raw, "<#>")
 		isParent bool
 	)
 

@@ -17,42 +17,42 @@ import (
 )
 
 func init() {
-	ag := Router.AddGroup(&gumi.Group{
-		Name:        "artworks",
-		Description: "Boe Tea's artworks collection and commands with it",
-		NSFW:        false,
-	})
+	groupName := "artworks"
 
-	lb := ag.AddCommand(&gumi.Command{
+	Commands = append(Commands, &gumi.Command{
 		Name:        "leaderboard",
+		Group:       groupName,
 		Aliases:     []string{"top", "lb"},
-		Description: "Leaderboard of artworks",
-		GuildOnly:   false,
-		NSFW:        false,
+		Description: "Shows a leaderboard of all saved artworks.",
+		Usage:       "bt!leaderboard [flags]",
+		Flags: map[string]string{
+			"Flag syntax": "Flags have following syntax: `name:value`. Example: `limit:10`",
+			"limit":       "Number of artworks returned. *Default:* 10. Value should be an _integer number from 1 to 100_",
+			"last":        "Filter artworks by date. *Default:* no filter. Value should be one of the following strings: `[day, week, month]`",
+		},
+		Example:     "bt!leaderboard limit:10 last:week",
+		RateLimiter: gumi.NewRateLimiter(10 * time.Second),
 		Exec:        leaderboard,
-		Help:        gumi.NewHelpSettings(),
-		Cooldown:    5 * time.Second,
 	})
-	lb.Help.AddField("Usage", "bt!leaderboard [flags]", false)
-	lb.Help.AddField("Flag syntax", "Flags have following syntax: `name:value`.\n_***Example:***_ `bt!leaderboard limit:100`.\nAccepted flags are listed below", false)
-	lb.Help.AddField("limit", "Number of artworks returned.\n_***Default:***_ 10.\nValue should be an _integer number from 1 to 100_", false)
-	lb.Help.AddField("last", "Filter artworks by date.\n_***Default:***_ no filter.\nValue should be one of the following strings:\n`[day, week, month]`.", false)
 
-	aw := ag.AddCommand(&gumi.Command{
+	Commands = append(Commands, &gumi.Command{
 		Name:        "artwork",
-		Description: "Gets an artwork by ID",
-		GuildOnly:   false,
-		NSFW:        false,
+		Group:       groupName,
+		Description: "Gets an artwork by ID.",
+		Usage:       "bt!artwork <id>",
+		Flags: map[string]string{
+			"ID": "An artwork ID, can be retrieved from your favourites list or anything in range [1:2^32)",
+		},
+		Example:     "bt!artwork 69",
+		RateLimiter: gumi.NewRateLimiter(5 * time.Second),
 		Exec:        artwork,
-		Help:        gumi.NewHelpSettings(),
-		Cooldown:    5 * time.Second,
 	})
-	aw.Help.AddField("Usage", "bt!artwork <id>", false).AddField("ID", "An artwork ID, can be retrieved from your favourites list or anything in range [1:2^32)", false)
 }
 
-func leaderboard(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
+func leaderboard(ctx *gumi.Ctx) error {
 	var (
 		options = database.NewFindManyOptions().Limit(10).SortType(database.ByFavourites).Order(database.Descending)
+		args    = strings.Fields(ctx.Args.Raw)
 	)
 
 	for _, a := range args {
@@ -64,7 +64,7 @@ func leaderboard(s *discordgo.Session, m *discordgo.MessageCreate, args []string
 				if limit > 100 || limit < 1 {
 					eb := embeds.NewBuilder()
 					msg := "Provided limit argument is either not a number or out of allowed range [1:100]"
-					s.ChannelMessageSendEmbed(m.ChannelID, eb.FailureTemplate(msg).Finalize())
+					ctx.ReplyEmbed(eb.FailureTemplate(msg).Finalize())
 					return nil
 				}
 			}
@@ -90,7 +90,7 @@ func leaderboard(s *discordgo.Session, m *discordgo.MessageCreate, args []string
 
 	eb := embeds.NewBuilder()
 	msg := "The result may contain NSFW content, Boe Tea doesn't filter the leaderboard to stay true to its purpose! Please confirm the operation."
-	prompt := utils.CreatePromptWithMessage(s, m, &discordgo.MessageSend{
+	prompt := utils.CreatePromptWithMessage(ctx.Session, ctx.Event, &discordgo.MessageSend{
 		Embed: eb.WarnTemplate(msg).Finalize(),
 	})
 
@@ -100,13 +100,13 @@ func leaderboard(s *discordgo.Session, m *discordgo.MessageCreate, args []string
 			embeds = append(embeds, artworkEmbed(a, ind, len(artworks)))
 		}
 		if len(embeds) > 1 {
-			w := widget.NewWidget(s, m.Author.ID, embeds)
-			err := w.Start(m.ChannelID)
+			w := widget.NewWidget(ctx.Session, ctx.Event.Author.ID, embeds)
+			err := w.Start(ctx.Event.ChannelID)
 			if err != nil {
 				return err
 			}
 		} else if len(embeds) == 1 {
-			_, err := s.ChannelMessageSendEmbed(m.ChannelID, embeds[0])
+			err := ctx.ReplyEmbed(embeds[0])
 			if err != nil {
 				return err
 			}
@@ -115,12 +115,12 @@ func leaderboard(s *discordgo.Session, m *discordgo.MessageCreate, args []string
 	return nil
 }
 
-func artwork(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
-	if len(args) == 0 {
+func artwork(ctx *gumi.Ctx) error {
+	if ctx.Args.Len() == 0 {
 		return utils.ErrNotEnoughArguments
 	}
 
-	ID, err := strconv.Atoi(args[0])
+	ID, err := ctx.Args.Get(0).AsInt()
 	if err != nil {
 		return err
 	}
@@ -130,7 +130,7 @@ func artwork(s *discordgo.Session, m *discordgo.MessageCreate, args []string) er
 		switch err {
 		case mongo.ErrNoDocuments:
 			eb := embeds.NewBuilder()
-			s.ChannelMessageSendEmbed(m.ChannelID, eb.FailureTemplate(fmt.Sprintf("An artwork with ID [%v] doesn't exist", ID)).Finalize())
+			ctx.ReplyEmbed(eb.FailureTemplate(fmt.Sprintf("An artwork with ID [%v] doesn't exist", ID)).Finalize())
 			return nil
 		default:
 			return err
@@ -138,7 +138,7 @@ func artwork(s *discordgo.Session, m *discordgo.MessageCreate, args []string) er
 	}
 
 	percent := (float64(artwork.NSFW) / float64(artwork.Favourites)) * 100.0
-	ch, err := s.Channel(m.ChannelID)
+	ch, err := ctx.Session.Channel(ctx.Event.ChannelID)
 	if err != nil {
 		logrus.Warnf("artwork() -> s.Channel(): %v", err)
 		ch = &discordgo.Channel{NSFW: false}
@@ -148,7 +148,7 @@ func artwork(s *discordgo.Session, m *discordgo.MessageCreate, args []string) er
 		eb := embeds.NewBuilder()
 
 		msg := fmt.Sprintf("%v out of %v (%v%v) marked this artwork as NSFW. Please confirm the operation.", artwork.NSFW, artwork.Favourites, percent, "%")
-		prompt := utils.CreatePromptWithMessage(s, m, &discordgo.MessageSend{
+		prompt := utils.CreatePromptWithMessage(ctx.Session, ctx.Event, &discordgo.MessageSend{
 			Embed: eb.WarnTemplate(msg).Finalize(),
 		})
 		if !prompt {
@@ -157,6 +157,6 @@ func artwork(s *discordgo.Session, m *discordgo.MessageCreate, args []string) er
 	}
 
 	embed := artworkEmbed(artwork, 1, 1)
-	s.ChannelMessageSendEmbed(m.ChannelID, embed)
+	ctx.ReplyEmbed(embed)
 	return nil
 }

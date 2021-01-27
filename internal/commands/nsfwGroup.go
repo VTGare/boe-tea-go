@@ -4,13 +4,11 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/VTGare/boe-tea-go/internal/database"
 	"github.com/VTGare/boe-tea-go/internal/embeds"
 	"github.com/VTGare/boe-tea-go/pkg/nozoki"
 	"github.com/VTGare/gumi"
-	"github.com/bwmarrin/discordgo"
 )
 
 var (
@@ -18,36 +16,25 @@ var (
 )
 
 func init() {
-	nsfwG := Router.AddGroup(&gumi.Group{
-		Name:        "nsfw",
-		Description: "Exquisite commands for real men of culture.",
-		NSFW:        true,
-		IsVisible:   true,
-	})
-
-	nhCmd := nsfwG.AddCommand(&gumi.Command{
+	groupName := "nsfw"
+	Commands = append(Commands, &gumi.Command{
 		Name:        "nhentai",
-		Description: "Sends a detailed description of an nhentai entry",
 		Aliases:     []string{"nh"},
+		Description: "Sends a description of a nhentai doujinshi.",
+		Group:       groupName,
+		Usage:       "bt!nhentai <six digits>",
+		Example:     "bt!nhentai 177013",
 		Exec:        nhentai,
-		Cooldown:    5 * time.Second,
-		Help:        gumi.NewHelpSettings(),
+		NSFW:        true,
 	})
-	nhCmd.Help.ExtendedHelp = []*discordgo.MessageEmbedField{
-		{
-			Name:  "Usage",
-			Value: "bt!nhentai <magic number>",
-		},
-		{
-			Name:  "magic number",
-			Value: "Typically, but not always, a 6-digit number only weebs understand.",
-		},
-	}
 }
 
-func nhentai(s *discordgo.Session, m *discordgo.MessageCreate, args []string) error {
+func nhentai(ctx *gumi.Ctx) error {
 	var (
-		eb = embeds.NewBuilder()
+		m    = ctx.Event
+		s    = ctx.Session
+		args = strings.Fields(ctx.Args.Raw)
+		eb   = embeds.NewBuilder()
 	)
 
 	if g, ok := database.GuildCache[m.GuildID]; ok {
