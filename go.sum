@@ -7,12 +7,10 @@ github.com/PuerkitoBio/goquery v1.6.0 h1:j7taAbelrdcsOlGeMenZxc2AWXD5fieT1/znArd
 github.com/PuerkitoBio/goquery v1.6.0/go.mod h1:GsLWisAFVj4WgDibEWF4pvYnkVQBpKBKeU+7zCJoLcc=
 github.com/ReneKroon/ttlcache v1.7.0 h1:8BkjFfrzVFXyrqnMtezAaJ6AHPSsVV10m6w28N/Fgkk=
 github.com/ReneKroon/ttlcache v1.7.0/go.mod h1:8BGGzdumrIjWxdRx8zpK6L3oGMWvIXdvB2GD1cfvd+I=
-github.com/VTGare/ascii2d-go v0.1.0 h1:LUsfKDz7YKy74VJ+UH5r9SDOE/Zy9UWF3Y0SWQgarOI=
-github.com/VTGare/ascii2d-go v0.1.0/go.mod h1:taXtNqAP3yXnD2SDZSk+Wmpkxr8RGzo9PpdPW93U0pc=
 github.com/VTGare/go-cloudflare-scraper v0.0.1 h1:KzA9OZZv5TY1q5kAUSMToB90/zHubxKptaRJ/PGceAA=
 github.com/VTGare/go-cloudflare-scraper v0.0.1/go.mod h1:vLpSbNh4vRcWG3zlOwBcXkxM6OpEny/qqmofCLl0CZ4=
-github.com/VTGare/gumi v0.3.1 h1:Y+X/4pNN/By/KkyyP81u0vd04+SRndDU5bq8jbmFfEg=
-github.com/VTGare/gumi v0.3.1/go.mod h1:51ik9+9yzkWVzFyBtIbpkKXwkboXs8uz98x41ZmJHYQ=
+github.com/VTGare/gumi v0.3.2 h1:pW7FUOeyaoBwBz2K6Q8RFECAjZhe/sj8KahJoG+0C64=
+github.com/VTGare/gumi v0.3.2/go.mod h1:51ik9+9yzkWVzFyBtIbpkKXwkboXs8uz98x41ZmJHYQ=
 github.com/VTGare/iqdbgo v0.1.1 h1:zBTski6p/TFrT/D3mvEzPfufr/+XaQpexn5m/GSSJTU=
 github.com/VTGare/iqdbgo v0.1.1/go.mod h1:s0K3YyaD9FuHcVN2TnTj4okzGpnL1LuFUm5e9TJuK3w=
 github.com/VTGare/pixiv v0.0.6 h1:3XkkYqeTyA7SB7pWokukADh/YLLaKmu6IKdPprzCj6U=
@@ -47,8 +45,6 @@ github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/dghubble/sling v1.3.0 h1:pZHjCJq4zJvc6qVQ5wN1jo5oNZlNE0+8T/h0XeXBUKU=
 github.com/dghubble/sling v1.3.0/go.mod h1:XXShWaBWKzNLhu2OxikSNFrlsvowtz4kyRuXUG7oQKY=
-github.com/disintegration/gift v1.2.1 h1:Y005a1X4Z7Uc+0gLpSAsKhWi4qLtsdEcMIbbdvdZ6pc=
-github.com/disintegration/gift v1.2.1/go.mod h1:Jh2i7f7Q2BM7Ezno3PhfezbR1xpUg9dUg3/RlKGr4HI=
 github.com/envoyproxy/go-control-plane v0.9.1-0.20191026205805-5f8ba28d4473/go.mod h1:YTl/9mNaCwkRvm6d1a2C3ymFceY/DCBVvsKhRF0iEA4=
 github.com/envoyproxy/protoc-gen-validate v0.1.0/go.mod h1:iSmxcyjqTsJpI2R4NaDN7+kN2VEUnK/pcBlmesArF7c=
 github.com/go-sql-driver/mysql v1.5.0/go.mod h1:DCzpHaOWr8IXmIStZouvnhqoel9Qv2LBy8hT2VhHyBg=
@@ -199,8 +195,6 @@ golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9/go.mod h1:LzIPMQfyMNhhGPh
 golang.org/x/crypto v0.0.0-20201117144127-c1f2f97bffc9 h1:phUcVbl53swtrUN8kQEXFhUxPlIlWyBfKmidCu7P95o=
 golang.org/x/crypto v0.0.0-20201117144127-c1f2f97bffc9/go.mod h1:jdWPYTVW3xRLrWPugEBEK3UY2ZEsg3UU495nc5E+M+I=
 golang.org/x/exp v0.0.0-20190121172915-509febef88a4/go.mod h1:CJ0aWSM057203Lf6IL+f9T1iT9GByDxfZKAQTCR3kQA=
-golang.org/x/image v0.0.0-20200927104501-e162460cd6b5 h1:QelT11PB4FXiDEXucrfNckHoFxwt8USGY1ajP1ZF5lM=
-golang.org/x/image v0.0.0-20200927104501-e162460cd6b5/go.mod h1:FeLwcggjj3mMvU+oOTbSwawSJRM1uh48EjtB4UJZlP0=
 golang.org/x/lint v0.0.0-20181026193005-c67002cb31c3/go.mod h1:UVdnD1Gm6xHRNCYTkRU2/jEulfH38KcIWyp/GAMgvoE=
 golang.org/x/lint v0.0.0-20190227174305-5b3e6a55c961/go.mod h1:wehouNa3lNwaWXcvxsM5YxQ5yQlVC4a0KAMCusXpPoU=
 golang.org/x/lint v0.0.0-20190313153728-d0100b6bd8b3/go.mod h1:6SW0HCj/g11FgYtHlgUYUwCkIfeOF89ocIRzGO/8vkc=
