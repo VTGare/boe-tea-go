@@ -2,6 +2,7 @@ package commands
 
 import (
 	"fmt"
+	"net/url"
 	"strconv"
 	"strings"
 
@@ -234,7 +235,9 @@ func saucenaoToEmbed(source *sengoku.Sauce, index, length int) *discordgo.Messag
 	eb := embeds.NewBuilder()
 	eb.Title(title).Thumbnail(source.Thumbnail)
 	if src := source.URLs.Source; src != "" {
-		eb.URL(src)
+		if _, err := url.Parse(src); err == nil {
+			eb.URL(src)
+		}
 
 		if strings.Contains(src, "pximg.net") {
 			last := strings.LastIndex(src, "/")
@@ -350,8 +353,21 @@ func iqdbEmbed(source *iqdbgo.Match, best bool, index, length int) *discordgo.Me
 
 	eb := embeds.NewBuilder()
 
-	eb.Title(title).URL(source.URL).Image(source.Thumbnail)
-	eb.AddField("Source", source.URL).AddField("Info", fmt.Sprintf("%v", source.Tags)).AddField("Similarity", strconv.Itoa(source.Similarity))
+	eb.Title(title).Image(source.Thumbnail)
+
+	if source.URL != "" {
+		if _, err := url.Parse(source.URL); err == nil {
+			eb.URL(source.URL)
+		}
+		eb.AddField("Source", source.URL)
+	}
+
+	if source.Tags != "" {
+		eb.AddField("Info", fmt.Sprintf("%v", source.Tags))
+	}
+
+	eb.AddField("Similarity", strconv.Itoa(source.Similarity))
+
 	return eb.Finalize()
 }
 
