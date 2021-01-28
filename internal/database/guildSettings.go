@@ -5,13 +5,14 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/VTGare/boe-tea-go/internal/cache"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 var (
 	//GuildCache stores guild settings locally
-	GuildCache = make(map[string]*GuildSettings)
+	GuildCache = cache.NewCache()
 )
 
 //GuildSettings is a database model for per guild bot settings
@@ -66,7 +67,7 @@ func (d *Database) LoadGuilds() ([]*GuildSettings, error) {
 	}
 
 	for _, guild := range guilds {
-		GuildCache[guild.ID] = guild
+		GuildCache.Set(guild.ID, guild)
 	}
 
 	return guilds, nil
@@ -116,7 +117,7 @@ func (d *Database) ChangeSetting(guildID, setting string, newSetting interface{}
 		return err
 	}
 
-	GuildCache[guildID] = guild
+	GuildCache.Set(guildID, guild)
 	return nil
 }
 
@@ -138,7 +139,7 @@ func (d *Database) AddArtChannels(guildID string, channelID ...string) error {
 		return err
 	}
 
-	GuildCache[guildID] = guild
+	GuildCache.Set(guildID, guild)
 	return nil
 }
 
@@ -160,6 +161,6 @@ func (d *Database) RemoveArtChannels(guildID string, channelID ...string) error 
 		return err
 	}
 
-	GuildCache[guildID] = guild
+	GuildCache.Set(guildID, guild)
 	return nil
 }

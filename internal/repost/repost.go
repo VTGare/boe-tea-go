@@ -215,8 +215,8 @@ func sendMessage(s *discordgo.Session, m *discordgo.MessageCreate, send *discord
 		logrus.Warnln(err)
 	} else {
 		MsgCache.Set(msg.ChannelID+msg.ID, &CachedMessage{s, send, m, msg})
-		if g, ok := database.GuildCache[m.GuildID]; ok {
-			if g.Reactions {
+		if g, ok := database.GuildCache.Get(m.GuildID); ok {
+			if g.(*database.GuildSettings).Reactions {
 				s.MessageReactionAdd(msg.ChannelID, msg.ID, "💖")
 				s.MessageReactionAdd(msg.ChannelID, msg.ID, "🤤")
 			}
@@ -232,14 +232,14 @@ func (a *ArtPost) Post(s *discordgo.Session, pixivOpts ...SendPixivOptions) erro
 		twitter = make(map[string]bool)
 	)
 
-	guild, ok := database.GuildCache[m.GuildID]
+	guild, ok := database.GuildCache.Get(m.GuildID)
 	if !ok {
 		return nil
 	}
 
-	if len(guild.ArtChannels) > 0 {
+	if len(guild.(*database.GuildSettings).ArtChannels) > 0 {
 		flag = false
-		for _, channel := range guild.ArtChannels {
+		for _, channel := range guild.(*database.GuildSettings).ArtChannels {
 			if channel == m.ChannelID {
 				flag = true
 			}
@@ -257,7 +257,7 @@ func (a *ArtPost) Post(s *discordgo.Session, pixivOpts ...SendPixivOptions) erro
 		twitter[k] = v
 	}
 
-	if guild.Repost != "disabled" {
+	if guild.(*database.GuildSettings).Repost != "disabled" {
 		reposts := a.FindReposts(m.GuildID, m.ChannelID)
 		if len(reposts) > 0 {
 			sendRepost := func() {
@@ -269,7 +269,7 @@ func (a *ArtPost) Post(s *discordgo.Session, pixivOpts ...SendPixivOptions) erro
 					}()
 				}
 			}
-			if guild.Repost == "strict" {
+			if guild.(*database.GuildSettings).Repost == "strict" {
 				pixiv, twitter = a.RemoveReposts(reposts)
 
 				sendRepost()
@@ -283,8 +283,8 @@ func (a *ArtPost) Post(s *discordgo.Session, pixivOpts ...SendPixivOptions) erro
 				} else if len(pixiv)+len(twitter) == 0 {
 					s.ChannelMessageDelete(m.ChannelID, m.ID)
 				}
-			} else if guild.Repost == "enabled" {
-				if a.PixivReposts(reposts) > 0 && guild.Pixiv {
+			} else if guild.(*database.GuildSettings).Repost == "enabled" {
+				if a.PixivReposts(reposts) > 0 && guild.(*database.GuildSettings).Pixiv {
 					prompt := utils.CreatePromptWithMessage(s, m, &discordgo.MessageSend{
 						Content: "Following posts are reposts, react ✅ to post them.",
 						Embed:   a.RepostEmbed(reposts),
@@ -300,7 +300,7 @@ func (a *ArtPost) Post(s *discordgo.Session, pixivOpts ...SendPixivOptions) erro
 	}
 
 	var posts []*ugoira.PixivPost
-	if guild.Pixiv && len(pixiv) > 0 {
+	if guild.(*database.GuildSettings).Pixiv && len(pixiv) > 0 {
 		var (
 			messages []*discordgo.MessageSend
 			err      error
@@ -316,7 +316,7 @@ func (a *ArtPost) Post(s *discordgo.Session, pixivOpts ...SendPixivOptions) erro
 		}
 	}
 
-	if guild.Twitter && len(twitter) > 0 {
+	if guild.(*database.GuildSettings).Twitter && len(twitter) > 0 {
 		tweets, err := a.SendTwitter(s, twitter, true)
 		if err != nil {
 			return err
@@ -326,7 +326,7 @@ func (a *ArtPost) Post(s *discordgo.Session, pixivOpts ...SendPixivOptions) erro
 			msg := ""
 
 			prompt := true
-			if guild.TwitterPrompt {
+			if guild.(*database.GuildSettings).TwitterPrompt {
 				if len(tweets) == 1 {
 					msg = "Detected a tweet with more than one image, would you like to send embeds of other images for mobile users?"
 				} else {
@@ -393,10 +393,10 @@ func (a *ArtPost) Crosspost(s *discordgo.Session, channels []string, pixivOpts .
 			twitter[k] = v
 		}
 
-		guild := database.GuildCache[m.GuildID]
-		if len(guild.ArtChannels) > 0 {
+		guild, _ := database.GuildCache.Get(m.GuildID)
+		if len(guild.(*database.GuildSettings).ArtChannels) > 0 {
 			flag = false
-			for _, channel := range guild.ArtChannels {
+			for _, channel := range guild.(*database.GuildSettings).ArtChannels {
 				if channel == m.ChannelID {
 					flag = true
 				}
@@ -407,7 +407,7 @@ func (a *ArtPost) Crosspost(s *discordgo.Session, channels []string, pixivOpts .
 			continue
 		}
 
-		if guild.Repost != "disabled" {
+		if guild.(*database.GuildSettings).Repost != "disabled" {
 			reposts := a.FindReposts(m.GuildID, m.ChannelID)
 			pixiv, twitter = a.RemoveReposts(reposts)
 		}

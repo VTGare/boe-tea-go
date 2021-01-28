@@ -5,12 +5,13 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/VTGare/boe-tea-go/internal/cache"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 var (
-	userCache = make(map[string]*UserSettings, 0)
+	userCache = cache.NewCache()
 )
 
 type UserSettings struct {
@@ -71,14 +72,14 @@ func (d *Database) LoadUsers() ([]*UserSettings, error) {
 	}
 
 	for _, u := range s {
-		userCache[u.ID] = u
+		userCache.Set(u.ID, u)
 	}
 	return s, nil
 }
 
 func (d *Database) FindUser(id string) *UserSettings {
-	if user, ok := userCache[id]; ok {
-		return user
+	if user, ok := userCache.Get(id); ok {
+		return user.(*UserSettings)
 	}
 
 	return nil
@@ -90,7 +91,7 @@ func (d *Database) InsertOneUser(user *UserSettings) error {
 		return err
 	}
 
-	userCache[user.ID] = user
+	userCache.Set(user.ID, user)
 	return nil
 }
 
@@ -100,7 +101,7 @@ func (d *Database) RemoveUser(id string) error {
 		return err
 	}
 
-	delete(userCache, id)
+	userCache.Delete(id)
 	return nil
 }
 
@@ -242,7 +243,7 @@ func (d *Database) RemoveFromGroup(userID string, groupName string, channelID ..
 			if res.Err() != nil {
 				return nil, res.Err()
 			}
-			userCache[userID] = user
+			userCache.Set(userID, user)
 		}
 	}
 
@@ -300,7 +301,7 @@ func (d *Database) UserAddFavourite(userID string, fav *NewFavourite) (bool, err
 		return false, err
 	}
 
-	userCache[userID] = updated
+	userCache.Set(userID, updated)
 	return true, nil
 }
 
@@ -333,7 +334,7 @@ func (d *Database) UserDeleteFavourite(userID string, artworkID int) (*NewFavour
 			var user = &UserSettings{}
 			res.Decode(user)
 
-			userCache[userID] = user
+			userCache.Set(userID, user)
 			return fav, nil
 		}
 	}
@@ -357,6 +358,6 @@ func (d *Database) ChangeUserSetting(userID, setting string, newSetting interfac
 		return err
 	}
 
-	userCache[userID] = user
+	userCache.Set(userID, user)
 	return nil
 }

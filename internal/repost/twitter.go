@@ -19,8 +19,8 @@ var (
 
 func (a *ArtPost) SendTwitter(s *discordgo.Session, tweetMap map[string]bool, skipFirst bool) ([][]*discordgo.MessageSend, error) {
 	var (
-		tweets = make([][]*discordgo.MessageSend, 0)
-		guild  = database.GuildCache[a.event.GuildID]
+		tweets   = make([][]*discordgo.MessageSend, 0)
+		guild, _ = database.GuildCache.Get(a.event.GuildID)
 	)
 
 	t, err := a.fetchTwitterPosts(tweetMap)
@@ -36,7 +36,7 @@ func (a *ArtPost) SendTwitter(s *discordgo.Session, tweetMap map[string]bool, sk
 		}
 	}
 
-	if flag && a.event != nil && guild.Reactions {
+	if flag && a.event != nil && guild.(*database.GuildSettings).Reactions {
 		s.MessageReactionAdd(a.event.ChannelID, a.event.ID, "💖")
 		s.MessageReactionAdd(a.event.ChannelID, a.event.ID, "🤤")
 	}

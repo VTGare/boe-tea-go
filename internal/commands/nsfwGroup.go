@@ -37,8 +37,8 @@ func nhentai(ctx *gumi.Ctx) error {
 		eb   = embeds.NewBuilder()
 	)
 
-	if g, ok := database.GuildCache[m.GuildID]; ok {
-		if !g.NSFW {
+	if g, ok := database.GuildCache.Get(m.GuildID); ok {
+		if !g.(*database.GuildSettings).NSFW {
 			eb.FailureTemplate("You're trying to execute an NSFW command. The server prohibits NSFW content.")
 			s.ChannelMessageSendEmbed(m.ChannelID, eb.Finalize())
 			return nil

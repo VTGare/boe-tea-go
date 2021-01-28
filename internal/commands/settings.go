@@ -41,7 +41,7 @@ func addArtChannel(ctx *gumi.Ctx) error {
 		s        = ctx.Session
 		m        = ctx.Event
 		eb       = embeds.NewBuilder()
-		guild    = database.GuildCache[m.GuildID]
+		guild, _ = database.GuildCache.Get(m.GuildID)
 		channels = make([]string, 0)
 	)
 
@@ -51,7 +51,7 @@ func addArtChannel(ctx *gumi.Ctx) error {
 			return err
 		}
 
-		if ch.GuildID != guild.ID {
+		if ch.GuildID != guild.(*database.GuildSettings).ID {
 			eb.FailureTemplate(fmt.Sprintf("Can't read a channel (%v) from another guild.", ch.ID))
 			s.ChannelMessageSendEmbed(m.ChannelID, eb.Finalize())
 			return nil
@@ -60,7 +60,7 @@ func addArtChannel(ctx *gumi.Ctx) error {
 		switch ch.Type {
 		case discordgo.ChannelTypeGuildText:
 			exists := false
-			for _, channelID := range guild.ArtChannels {
+			for _, channelID := range guild.(*database.GuildSettings).ArtChannels {
 				if channelID == ch.ID {
 					exists = true
 				}
@@ -74,7 +74,7 @@ func addArtChannel(ctx *gumi.Ctx) error {
 
 			channels = append(channels, ch.ID)
 		case discordgo.ChannelTypeGuildCategory:
-			gcs, err := s.GuildChannels(guild.ID)
+			gcs, err := s.GuildChannels(guild.(*database.GuildSettings).ID)
 			if err != nil {
 				return err
 			}
@@ -86,7 +86,7 @@ func addArtChannel(ctx *gumi.Ctx) error {
 
 				if gc.ParentID == ch.ID {
 					exists := false
-					for _, channelID := range guild.ArtChannels {
+					for _, channelID := range guild.(*database.GuildSettings).ArtChannels {
 						if channelID == gc.ID {
 							exists = true
 						}
@@ -108,7 +108,7 @@ func addArtChannel(ctx *gumi.Ctx) error {
 		}
 	}
 
-	err := database.DB.AddArtChannels(guild.ID, channels...)
+	err := database.DB.AddArtChannels(guild.(*database.GuildSettings).ID, channels...)
 	if err != nil {
 		return err
 	}
@@ -129,7 +129,7 @@ func removeArtChannel(ctx *gumi.Ctx) error {
 		s        = ctx.Session
 		m        = ctx.Event
 		eb       = embeds.NewBuilder()
-		guild    = database.GuildCache[m.GuildID]
+		guild, _ = database.GuildCache.Get(m.GuildID)
 		channels = make([]string, 0)
 	)
 
@@ -139,7 +139,7 @@ func removeArtChannel(ctx *gumi.Ctx) error {
 			return err
 		}
 
-		if ch.GuildID != guild.ID {
+		if ch.GuildID != guild.(*database.GuildSettings).ID {
 			eb.FailureTemplate(fmt.Sprintf("Can't read a channel (%v) from another guild.", ch.ID))
 			s.ChannelMessageSendEmbed(m.ChannelID, eb.Finalize())
 			return nil
@@ -148,7 +148,7 @@ func removeArtChannel(ctx *gumi.Ctx) error {
 		switch ch.Type {
 		case discordgo.ChannelTypeGuildText:
 			exists := false
-			for _, channelID := range guild.ArtChannels {
+			for _, channelID := range guild.(*database.GuildSettings).ArtChannels {
 				if channelID == ch.ID {
 					exists = true
 				}
@@ -162,7 +162,7 @@ func removeArtChannel(ctx *gumi.Ctx) error {
 
 			channels = append(channels, ch.ID)
 		case discordgo.ChannelTypeGuildCategory:
-			gcs, err := s.GuildChannels(guild.ID)
+			gcs, err := s.GuildChannels(guild.(*database.GuildSettings).ID)
 			if err != nil {
 				return err
 			}
@@ -174,7 +174,7 @@ func removeArtChannel(ctx *gumi.Ctx) error {
 
 				if gc.ParentID == ch.ID {
 					exists := false
-					for _, channelID := range guild.ArtChannels {
+					for _, channelID := range guild.(*database.GuildSettings).ArtChannels {
 						if channelID == gc.ID {
 							exists = true
 						}
@@ -196,7 +196,7 @@ func removeArtChannel(ctx *gumi.Ctx) error {
 		}
 	}
 
-	err := database.DB.RemoveArtChannels(guild.ID, channels...)
+	err := database.DB.RemoveArtChannels(guild.(*database.GuildSettings).ID, channels...)
 	if err != nil {
 		return err
 	}
@@ -213,12 +213,12 @@ func set(ctx *gumi.Ctx) error {
 		s = ctx.Session
 		m = ctx.Event
 	)
-	settings := database.GuildCache[m.GuildID]
+	settings, _ := database.GuildCache.Get(m.GuildID)
 	eb := embeds.NewBuilder()
 
 	switch {
 	case ctx.Args.Len() == 0:
-		showGuildSettings(s, m, settings)
+		showGuildSettings(s, m, settings.(*database.GuildSettings))
 	case ctx.Args.Len() >= 2:
 		setting := ctx.Args.Get(0).Raw
 		newSetting := ctx.Args.Get(1).Raw

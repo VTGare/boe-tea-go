@@ -282,7 +282,7 @@ func twitter(ctx *gumi.Ctx) error {
 		m          = ctx.Event
 		s          = ctx.Session
 		args       = strings.Fields(ctx.Args.Raw)
-		guild      = database.GuildCache[m.GuildID]
+		guild, _   = database.GuildCache.Get(m.GuildID)
 		twitterURL = args[0]
 		indices    = args[1:]
 	)
@@ -314,10 +314,10 @@ func twitter(ctx *gumi.Ctx) error {
 	}
 
 	a := repost.NewPost(m, twitterURL)
-	if guild.Repost != "disabled" {
+	if guild.(*database.GuildSettings).Repost != "disabled" {
 		reposts := a.FindReposts(m.GuildID, m.ChannelID)
 		if len(reposts) > 0 {
-			switch guild.Repost {
+			switch guild.(*database.GuildSettings).Repost {
 			case "strict":
 				s.ChannelMessageSendEmbed(m.ChannelID, a.RepostEmbed(reposts))
 				return nil
@@ -349,7 +349,7 @@ func twitter(ctx *gumi.Ctx) error {
 				log.Warnln(err)
 			}
 
-			if msg != nil && guild.Reactions {
+			if msg != nil && guild.(*database.GuildSettings).Reactions {
 				s.MessageReactionAdd(msg.ChannelID, msg.ID, "💖")
 				s.MessageReactionAdd(msg.ChannelID, msg.ID, "🤤")
 			}

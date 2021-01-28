@@ -76,7 +76,7 @@ func (a *ArtPost) SendPixiv(s *discordgo.Session, IDs map[string]bool, opts ...S
 	}
 
 	var (
-		guild      = database.GuildCache[a.event.GuildID]
+		guild, _   = database.GuildCache.Get(a.event.GuildID)
 		indexMap   = make(map[int]bool)
 		include    bool
 		skipUgoira bool
@@ -103,7 +103,7 @@ func (a *ArtPost) SendPixiv(s *discordgo.Session, IDs map[string]bool, opts ...S
 	}
 
 	if isNSFW(posts) {
-		if !guild.NSFW {
+		if !guild.(*database.GuildSettings).NSFW {
 			eb := embeds.NewBuilder().FailureTemplate("An NSFW post has been detected. The server prohibits NSFW content.")
 			s.ChannelMessageSendEmbed(a.event.ChannelID, eb.Finalize())
 
@@ -125,7 +125,7 @@ func (a *ArtPost) SendPixiv(s *discordgo.Session, IDs map[string]bool, opts ...S
 		}
 	}
 
-	return createPixivEmbeds(a, posts, indexMap, include, skipUgoira, guild), posts, nil
+	return createPixivEmbeds(a, posts, indexMap, include, skipUgoira, guild.(*database.GuildSettings)), posts, nil
 }
 
 func joinTags(elems []string, sep string) string {
@@ -157,8 +157,8 @@ func createPixivEmbeds(a *ArtPost, posts []*ugoira.PixivPost, indexMap map[int]b
 		messages     = make([]*discordgo.MessageSend, 0)
 	)
 
-	g := database.GuildCache[a.event.GuildID]
-	if !g.NSFW {
+	g, _ := database.GuildCache.Get(a.event.GuildID)
+	if !g.(*database.GuildSettings).NSFW {
 		easterEgg = sfwEmbedMessages[rand.Intn(len(sfwEmbedMessages))]
 	} else {
 		easterEgg = embedMessages[rand.Intn(len(embedMessages))]
@@ -197,7 +197,7 @@ func createPixivEmbeds(a *ArtPost, posts []*ugoira.PixivPost, indexMap map[int]b
 			}
 			messages = append(messages, ms)
 
-			if count > g.Limit {
+			if count > g.(*database.GuildSettings).Limit {
 				break
 			}
 		}
