@@ -25,18 +25,7 @@ func init() {
 
 	Commands = append(Commands, &gumi.Command{
 		Name:        "sauce",
-		Aliases:     []string{},
-		Description: "Finds sauce using both SauceNAO and iqdb.",
-		Group:       groupName,
-		Usage:       "bt!sauce <image attachment, link, reply or in last 5 messages>",
-		Example:     "bt!sauce https://rem.moe/cuteanimegirl.png",
-		GuildOnly:   true,
-		Exec:        sauce,
-	})
-
-	Commands = append(Commands, &gumi.Command{
-		Name:        "saucenao",
-		Aliases:     []string{"snao"},
+		Aliases:     []string{"saucenao", "snao"},
 		Description: "Finds sauce using SauceNAO reverse search engine.",
 		Group:       groupName,
 		Usage:       "bt!sauce <image attachment, link, reply or in last 5 messages>",
@@ -46,104 +35,13 @@ func init() {
 
 	Commands = append(Commands, &gumi.Command{
 		Name:        "iqdb",
-		Description: "Finds sauce using iqdb reverse search engine.",
+		Description: "***WARNING. NSFW results!*** Finds sauce using iqdb reverse search engine.",
 		Group:       groupName,
 		Usage:       "bt!iqdb <image attachment, link, reply or in last 5 messages>",
 		Example:     "bt!iqdb https://emilia.moe/cuteanimegirl.png",
 		Exec:        iqdb,
+		NSFW:        true,
 	})
-}
-
-func sauce(ctx *gumi.Ctx) error {
-	var (
-		s    = ctx.Session
-		m    = ctx.Event
-		args = strings.Fields(ctx.Args.Raw)
-	)
-
-	url, err := findImage(s, m, args)
-	if err != nil {
-		return err
-	}
-
-	if url == "" {
-		return utils.ErrNotEnoughArguments
-	}
-
-	send := func(embeds ...*discordgo.MessageEmbed) error {
-		if len(embeds) > 1 {
-			w := widget.NewWidget(s, m.Author.ID, embeds)
-			err := w.Start(m.ChannelID)
-			if err != nil {
-				return err
-			}
-		} else {
-			_, err = s.ChannelMessageSendEmbed(m.ChannelID, embeds[0])
-			if err != nil {
-				return err
-			}
-		}
-
-		return nil
-	}
-
-	log.Infof("Searching source on SauceNAO. Image URL: %v", url)
-	sauceEmbeds, err := saucenaoEmbeds(url, false)
-	if err != nil {
-		log.Warnf("saucenaoEmbeds: %v", err)
-		if err == sengoku.ErrRateLimitReached {
-			eb := embeds.NewBuilder().InfoTemplate("Boe Tea's getting rate limited by SauceNAO. If you want to support me, so I can afford monthly SauceNAO subscription consider becoming a patron!")
-			eb.AddField("Patreon", "[Click here desu~](https://www.patreon.com/vtgare)")
-
-			s.ChannelMessageSendEmbed(m.ChannelID, eb.Finalize())
-		}
-	}
-
-	if len(sauceEmbeds) != 0 {
-		err := send(sauceEmbeds...)
-		if err != nil {
-			return err
-		}
-		return nil
-	}
-
-	eb := embeds.NewBuilder()
-	eb.InfoTemplate("<:peepoRainy:530050503955054593> Source couldn't be found on SauceNAO. Would you like to try your luck with iqdb?")
-	prompt := utils.CreatePromptWithMessage(s, m, &discordgo.MessageSend{
-		Embed: eb.Finalize(),
-	})
-
-	if prompt {
-		log.Infof("Searching source on iqdb. Image URL: %v", url)
-		res, err := iqdbgo.Search(url)
-		if err != nil {
-			return err
-		}
-
-		var embeds = make([]*discordgo.MessageEmbed, 0)
-		length := len(res.PossibleMatches)
-
-		if res.BestMatch != nil {
-			length++
-			embeds = append(embeds, iqdbEmbed(res.BestMatch, true, 0, length))
-		}
-		if length == 0 {
-			s.ChannelMessageSendEmbed(m.ChannelID, noSauceEmbed)
-		}
-
-		for i, s := range res.PossibleMatches {
-			embeds = append(embeds, iqdbEmbed(s, false, i+1, length))
-		}
-
-		if len(embeds) > 0 {
-			w := widget.NewWidget(s, m.Author.ID, embeds)
-			err = w.Start(m.ChannelID)
-			if err != nil {
-				return err
-			}
-		}
-	}
-	return nil
 }
 
 func saucenao(ctx *gumi.Ctx) error {
