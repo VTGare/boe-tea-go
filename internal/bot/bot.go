@@ -57,13 +57,15 @@ func NewBot(token string) (*Bot, error) {
 	router := gumi.Create(&gumi.Router{
 		PrefixResolver: func(s *discordgo.Session, m *discordgo.MessageCreate) []string {
 			var (
-				guild    = database.GuildCache.MustGet(m.GuildID).(*database.GuildSettings)
-				mention1 = fmt.Sprintf("<@%v> ", s.State.User.ID)
-				mention2 = fmt.Sprintf("<@!%v> ", s.State.User.ID)
+				guild, ok = database.GuildCache.Get(m.GuildID)
+				mention1  = fmt.Sprintf("<@%v> ", s.State.User.ID)
+				mention2  = fmt.Sprintf("<@!%v> ", s.State.User.ID)
 			)
 
-			if guild != nil && guild.Prefix != "bt!" {
-				return []string{guild.Prefix, mention1, mention2}
+			if ok {
+				if prefix := guild.(*database.GuildSettings).Prefix; prefix != "bt!" {
+					return []string{prefix, mention1, mention2}
+				}
 			}
 
 			return []string{"bt!", "bt ", "bt.", mention1, mention2}
