@@ -57,13 +57,13 @@ func NewBot(token string) (*Bot, error) {
 	router := gumi.Create(&gumi.Router{
 		PrefixResolver: func(s *discordgo.Session, m *discordgo.MessageCreate) []string {
 			var (
-				guild, ok = database.GuildCache.Get(m.GuildID)
-				mention1  = fmt.Sprintf("<@%v>", s.State.User.ID)
-				mention2  = fmt.Sprintf("<@!%v>", s.State.User.ID)
+				guild    = database.GuildCache.MustGet(m.GuildID).(*database.GuildSettings)
+				mention1 = fmt.Sprintf("<@%v> ", s.State.User.ID)
+				mention2 = fmt.Sprintf("<@!%v> ", s.State.User.ID)
 			)
 
-			if ok {
-				return []string{guild.(*database.GuildSettings).Prefix, mention1, mention2}
+			if guild != nil && guild.Prefix != "bt!" {
+				return []string{guild.Prefix, mention1, mention2}
 			}
 
 			return []string{"bt!", "bt ", "bt.", mention1, mention2}
@@ -110,19 +110,20 @@ func NewBot(token string) (*Bot, error) {
 	}
 	router.Initialize(dg)
 
-	dg.AddHandler(bot.onReady)
-	dg.AddHandler(bot.reactCreated)
-	dg.AddHandler(bot.guildCreated)
-	dg.AddHandler(bot.guildDeleted)
-	dg.AddHandler(bot.reactRemoved)
-	dg.AddHandler(bot.guildBanAdd)
+	dg.AddHandler(onReady)
+	dg.AddHandler(reactCreated)
+	dg.AddHandler(guildCreated)
+	dg.AddHandler(guildDeleted)
+	dg.AddHandler(reactRemoved)
+	dg.AddHandler(guildBanAdd)
+	dg.AddHandler(messageDeleted)
 	dg.Identify.Intents = discordgo.MakeIntent(discordgo.IntentsAllWithoutPrivileged)
 
 	BoeTea = bot
 	return bot, nil
 }
 
-func (b *Bot) onReady(_ *discordgo.Session, e *discordgo.Ready) {
+func onReady(_ *discordgo.Session, e *discordgo.Ready) {
 	log.Infoln(e.User.String(), "is ready.")
 	log.Infof("Connected to %v guilds!", len(e.Guilds))
 }
@@ -148,7 +149,7 @@ func prefixless(s *discordgo.Session, m *discordgo.MessageCreate) error {
 	return nil
 }
 
-func (b *Bot) reactCreated(s *discordgo.Session, r *discordgo.MessageReactionAdd) {
+func reactCreated(s *discordgo.Session, r *discordgo.MessageReactionAdd) {
 	if r.UserID == s.State.User.ID {
 		return
 	}
@@ -260,12 +261,20 @@ func (b *Bot) reactCreated(s *discordgo.Session, r *discordgo.MessageReactionAdd
 			if ok {
 				cache := cache.(*repost.CachedMessage)
 				if cache != nil {
-					if cache.OriginalMessage.Author.ID != r.UserID {
+					if cache.AuthorID != r.UserID {
 						return
 					}
-					err := s.ChannelMessageDelete(cache.SentMessage.ChannelID, cache.SentMessage.ID)
-					if err != nil {
-						log.Warnf("ChannelMessageDelete(): %v", err)
+
+					if cache.Original {
+						err := s.ChannelMessagesBulkDelete(cache.ChannelID, append(cache.ChildIDs, cache.ID))
+						if err != nil {
+							log.Warnf("ChannelMessageBulkDelete(): %v", err)
+						}
+					} else {
+						err := s.ChannelMessageDelete(cache.ChannelID, cache.ID)
+						if err != nil {
+							log.Warnf("ChannelMessageDelete(): %v", err)
+						}
 					}
 				}
 			}
@@ -277,7 +286,7 @@ func (b *Bot) reactCreated(s *discordgo.Session, r *discordgo.MessageReactionAdd
 	}
 }
 
-func (b *Bot) reactRemoved(s *discordgo.Session, r *discordgo.MessageReactionRemove) {
+func reactRemoved(s *discordgo.Session, r *discordgo.MessageReactionRemove) {
 	if r.UserID == s.State.User.ID {
 		return
 	}
@@ -363,7 +372,7 @@ func (b *Bot) reactRemoved(s *discordgo.Session, r *discordgo.MessageReactionRem
 	}
 }
 
-func (b *Bot) guildCreated(_ *discordgo.Session, g *discordgo.GuildCreate) {
+func guildCreated(_ *discordgo.Session, g *discordgo.GuildCreate) {
 	if _, ok := database.GuildCache.Get(g.ID); !ok {
 		newGuild := database.DefaultGuildSettings(g.ID)
 		err := database.DB.InsertOneGuild(newGuild)
@@ -376,7 +385,7 @@ func (b *Bot) guildCreated(_ *discordgo.Session, g *discordgo.GuildCreate) {
 	}
 }
 
-func (b *Bot) guildDeleted(_ *discordgo.Session, g *discordgo.GuildDelete) {
+func guildDeleted(_ *discordgo.Session, g *discordgo.GuildDelete) {
 	if g.Unavailable {
 		log.Infoln("Guild outage. ID: ", g.ID)
 	} else {
@@ -384,6 +393,24 @@ func (b *Bot) guildDeleted(_ *discordgo.Session, g *discordgo.GuildDelete) {
 	}
 }
 
-func (b *Bot) guildBanAdd(_ *discordgo.Session, m *discordgo.GuildBanAdd) {
+func guildBanAdd(_ *discordgo.Session, m *discordgo.GuildBanAdd) {
 	bannedUsers.Set(m.User.ID, m.GuildID)
+}
+
+func messageDeleted(s *discordgo.Session, m *discordgo.MessageDelete) {
+	if repost.MsgCache.Count() > 0 {
+		key := m.ChannelID + m.ID
+		cache, ok := repost.MsgCache.Get(key)
+		if ok {
+			cache := cache.(*repost.CachedMessage)
+			if cache != nil {
+				if cache.Original {
+					err := s.ChannelMessagesBulkDelete(cache.ChannelID, cache.ChildIDs)
+					if err != nil {
+						log.Warnf("ChannelMessageBulkDelete(): %v", err)
+					}
+				}
+			}
+		}
+	}
 }

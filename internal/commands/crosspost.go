@@ -238,10 +238,9 @@ func addToGroup(ctx *gumi.Ctx) error {
 	}
 
 	groupName := ctx.Args.Get(0).Raw
-	ctx.Args.Remove(0)
 
 	channelsMap := make(map[string]bool)
-	for _, arg := range ctx.Args.Arguments {
+	for _, arg := range ctx.Args.Arguments[1:] {
 		channelsMap[arg.Raw] = true
 	}
 

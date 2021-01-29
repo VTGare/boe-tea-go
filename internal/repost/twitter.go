@@ -17,11 +17,18 @@ var (
 	twitterLogo = "https://abs.twimg.com/icons/apple-touch-icon-192x192.png"
 )
 
-func (a *ArtPost) SendTwitter(s *discordgo.Session, tweetMap map[string]bool, skipFirst bool) ([][]*discordgo.MessageSend, error) {
+func (a *ArtPost) SendTwitter(s *discordgo.Session, tweetMap map[string]bool, opts ...RepostOptions) ([][]*discordgo.MessageSend, error) {
 	var (
 		tweets   = make([][]*discordgo.MessageSend, 0)
 		guild, _ = database.GuildCache.Get(a.event.GuildID)
 	)
+
+	if len(opts) == 0 {
+		opts = []RepostOptions{{
+			TwitterIndices:   make(map[int]bool),
+			KeepTwitterFirst: false,
+		}}
+	}
 
 	t, err := a.fetchTwitterPosts(tweetMap)
 	if err != nil {
@@ -41,7 +48,7 @@ func (a *ArtPost) SendTwitter(s *discordgo.Session, tweetMap map[string]bool, sk
 		s.MessageReactionAdd(a.event.ChannelID, a.event.ID, "🤤")
 	}
 
-	if skipFirst {
+	if !opts[0].KeepTwitterFirst {
 		new := make([]*tsuita.Tweet, 0)
 		for _, m := range t {
 			if len(m.Gallery) > 1 {
@@ -53,7 +60,7 @@ func (a *ArtPost) SendTwitter(s *discordgo.Session, tweetMap map[string]bool, sk
 
 	if len(t) > 0 {
 		for _, m := range t {
-			embeds, err := a.tweetToEmbeds(m, skipFirst)
+			embeds, err := a.tweetToEmbeds(m, opts[0])
 			if len(embeds) > 0 {
 				if a.IsCrosspost {
 					embeds[0].Content = fmt.Sprintf("<%v>", m.URL)
@@ -108,13 +115,13 @@ func (a *ArtPost) fetchTwitterPosts(tweets map[string]bool) ([]*tsuita.Tweet, er
 	return posts, nil
 }
 
-func (a *ArtPost) tweetToEmbeds(tweet *tsuita.Tweet, skipFirst bool) ([]*discordgo.MessageSend, error) {
+func (a *ArtPost) tweetToEmbeds(tweet *tsuita.Tweet, opts RepostOptions) ([]*discordgo.MessageSend, error) {
 	var (
 		messages = make([]*discordgo.MessageSend, 0)
 		ind      = 0
 	)
 
-	if skipFirst {
+	if !opts.KeepTwitterFirst {
 		switch len(tweet.Gallery) {
 		case 0:
 			return messages, nil
@@ -126,8 +133,12 @@ func (a *ArtPost) tweetToEmbeds(tweet *tsuita.Tweet, skipFirst bool) ([]*discord
 	}
 
 	for ind, media := range tweet.Gallery[ind:] {
-		if skipFirst {
+		if !opts.KeepTwitterFirst {
 			ind++
+		}
+
+		if _, ok := opts.TwitterIndices[ind+1]; ok {
+			continue
 		}
 
 		title := ""

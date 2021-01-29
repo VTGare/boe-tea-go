@@ -70,7 +70,7 @@ func isNSFW(posts []*ugoira.PixivPost) bool {
 	return false
 }
 
-func (a *ArtPost) SendPixiv(s *discordgo.Session, IDs map[string]bool, opts ...SendPixivOptions) ([]*discordgo.MessageSend, []*ugoira.PixivPost, error) {
+func (a *ArtPost) SendPixiv(s *discordgo.Session, IDs map[string]bool, opts ...RepostOptions) ([]*discordgo.MessageSend, []*ugoira.PixivPost, error) {
 	if utils.PixivDown {
 		return nil, nil, errors.New("pixiv api is down")
 	}
@@ -84,8 +84,8 @@ func (a *ArtPost) SendPixiv(s *discordgo.Session, IDs map[string]bool, opts ...S
 	)
 
 	if len(opts) != 0 {
-		if opts[0].IndexMap != nil {
-			indexMap = opts[0].IndexMap
+		if opts[0].PixivIndices != nil {
+			indexMap = opts[0].PixivIndices
 			include = opts[0].Include
 		}
 		skipUgoira = opts[0].SkipUgoira

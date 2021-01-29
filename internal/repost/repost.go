@@ -79,10 +79,13 @@ type ArtPost struct {
 	event          *discordgo.MessageCreate
 }
 
-type SendPixivOptions struct {
-	IndexMap   map[int]bool
-	Include    bool
-	SkipUgoira bool
+type RepostOptions struct {
+	PixivIndices      map[int]bool
+	TwitterIndices    map[int]bool
+	Include           bool
+	SkipUgoira        bool
+	SkipTwitterPrompt bool
+	KeepTwitterFirst  bool
 }
 
 type embedMessage struct {
@@ -91,10 +94,11 @@ type embedMessage struct {
 }
 
 type CachedMessage struct {
-	session         *discordgo.Session
-	OriginalEmbed   *discordgo.MessageSend
-	OriginalMessage *discordgo.MessageCreate
-	SentMessage     *discordgo.Message
+	ID        string
+	ChannelID string
+	AuthorID  string
+	Original  bool
+	ChildIDs  []string
 }
 
 func (a *ArtPost) PixivReposts(reposts []*database.ImagePost) int {
@@ -209,27 +213,29 @@ func (a *ArtPost) Cleanup(posts []*ugoira.PixivPost) {
 	}
 }
 
-func sendMessage(s *discordgo.Session, m *discordgo.MessageCreate, send *discordgo.MessageSend) {
+func sendMessage(s *discordgo.Session, m *discordgo.MessageCreate, send *discordgo.MessageSend) (*discordgo.Message, error) {
 	msg, err := s.ChannelMessageSendComplex(m.ChannelID, send)
 	if err != nil {
-		logrus.Warnln(err)
-	} else {
-		MsgCache.Set(msg.ChannelID+msg.ID, &CachedMessage{s, send, m, msg})
-		if g, ok := database.GuildCache.Get(m.GuildID); ok {
-			if g.(*database.GuildSettings).Reactions {
-				s.MessageReactionAdd(msg.ChannelID, msg.ID, "💖")
-				s.MessageReactionAdd(msg.ChannelID, msg.ID, "🤤")
-			}
+		return nil, err
+	}
+
+	if g, ok := database.GuildCache.Get(m.GuildID); ok {
+		if g.(*database.GuildSettings).Reactions {
+			s.MessageReactionAdd(msg.ChannelID, msg.ID, "💖")
+			s.MessageReactionAdd(msg.ChannelID, msg.ID, "🤤")
 		}
 	}
+
+	return msg, nil
 }
 
-func (a *ArtPost) Post(s *discordgo.Session, pixivOpts ...SendPixivOptions) error {
+func (a *ArtPost) Post(s *discordgo.Session, opts ...RepostOptions) error {
 	var (
-		m       = a.event
-		flag    = true
-		pixiv   = make(map[string]bool)
-		twitter = make(map[string]bool)
+		m            = a.event
+		flag         = true
+		pixiv        = make(map[string]bool)
+		twitter      = make(map[string]bool)
+		sentMessages = make([]*discordgo.Message, 0)
 	)
 
 	guild, ok := database.GuildCache.Get(m.GuildID)
@@ -306,18 +312,23 @@ func (a *ArtPost) Post(s *discordgo.Session, pixivOpts ...SendPixivOptions) erro
 			err      error
 		)
 
-		messages, posts, err = a.SendPixiv(s, pixiv, pixivOpts...)
+		messages, posts, err = a.SendPixiv(s, pixiv, opts...)
 		if err != nil {
 			return err
 		}
 
 		for _, message := range messages {
-			sendMessage(s, m, message)
+			msg, err := sendMessage(s, m, message)
+			if err != nil {
+				logrus.Warnf("sendMessage: %v", err)
+			}
+
+			sentMessages = append(sentMessages, msg)
 		}
 	}
 
 	if guild.(*database.GuildSettings).Twitter && len(twitter) > 0 {
-		tweets, err := a.SendTwitter(s, twitter, true)
+		tweets, err := a.SendTwitter(s, twitter, opts...)
 		if err != nil {
 			return err
 		}
@@ -326,7 +337,13 @@ func (a *ArtPost) Post(s *discordgo.Session, pixivOpts ...SendPixivOptions) erro
 			msg := ""
 
 			prompt := true
-			if guild.(*database.GuildSettings).TwitterPrompt {
+
+			skipPrompt := false
+			if len(opts) != 0 {
+				skipPrompt = opts[0].SkipTwitterPrompt
+			}
+
+			if guild.(*database.GuildSettings).TwitterPrompt && !skipPrompt {
 				if len(tweets) == 1 {
 					msg = "Detected a tweet with more than one image, would you like to send embeds of other images for mobile users?"
 				} else {
@@ -351,13 +368,45 @@ func (a *ArtPost) Post(s *discordgo.Session, pixivOpts ...SendPixivOptions) erro
 			if prompt {
 				for _, t := range tweets {
 					for _, send := range t {
-						sendMessage(s, m, send)
+						msg, err := sendMessage(s, m, send)
+						if err != nil {
+							logrus.Warnf("sendMessage: %v", err)
+						}
+
+						sentMessages = append(sentMessages, msg)
 					}
 				}
 			}
 		}
 	}
 
+	//Cache sent messages to activate removing by reacting :x:
+	if len(sentMessages) > 0 {
+		//First cache child messages
+		childIDs := make([]string, 0, len(sentMessages))
+		for _, msg := range sentMessages {
+			if msg != nil {
+				childIDs = append(childIDs, msg.ID)
+				MsgCache.Set(msg.ChannelID+msg.ID, &CachedMessage{
+					ID:        msg.ID,
+					ChannelID: msg.ChannelID,
+					AuthorID:  m.Author.ID,
+					Original:  false,
+				})
+			}
+		}
+
+		//Cache original messages with child IDs
+		MsgCache.Set(m.ChannelID+m.ID, &CachedMessage{
+			ID:        m.ID,
+			ChannelID: m.ChannelID,
+			AuthorID:  m.Author.ID,
+			ChildIDs:  childIDs,
+			Original:  true,
+		})
+	}
+
+	//Cleanup Ugoira left-overs if any posts had an Ugoira.
 	if a.HasUgoira {
 		a.Cleanup(posts)
 	}
@@ -365,7 +414,7 @@ func (a *ArtPost) Post(s *discordgo.Session, pixivOpts ...SendPixivOptions) erro
 	return nil
 }
 
-func (a *ArtPost) Crosspost(s *discordgo.Session, channels []string, pixivOpts ...SendPixivOptions) error {
+func (a *ArtPost) Crosspost(s *discordgo.Session, channels []string, opts ...RepostOptions) error {
 	var (
 		m       = a.event
 		pixiv   = make(map[string]bool)
@@ -418,11 +467,11 @@ func (a *ArtPost) Crosspost(s *discordgo.Session, channels []string, pixivOpts .
 				err      error
 			)
 
-			if len(pixivOpts) > 0 {
-				pixivOpts[0].SkipUgoira = true
-				messages, _, err = a.SendPixiv(s, pixiv, pixivOpts[0])
+			if len(opts) > 0 {
+				opts[0].SkipUgoira = true
+				messages, _, err = a.SendPixiv(s, pixiv, opts...)
 			} else {
-				messages, _, err = a.SendPixiv(s, pixiv, SendPixivOptions{
+				messages, _, err = a.SendPixiv(s, pixiv, RepostOptions{
 					SkipUgoira: true,
 				})
 			}
@@ -437,7 +486,7 @@ func (a *ArtPost) Crosspost(s *discordgo.Session, channels []string, pixivOpts .
 		}
 
 		if len(twitter) > 0 {
-			tweets, err := a.SendTwitter(s, twitter, false)
+			tweets, err := a.SendTwitter(s, twitter, opts...)
 			if err != nil {
 				return err
 			}

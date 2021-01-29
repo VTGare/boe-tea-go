@@ -13,8 +13,6 @@ import (
 	"github.com/VTGare/boe-tea-go/utils"
 	"github.com/VTGare/gumi"
 	"github.com/VTGare/sengoku"
-	"github.com/bwmarrin/discordgo"
-	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -148,8 +146,8 @@ func exclude(ctx *gumi.Ctx) error {
 		}
 	}
 
-	opts := repost.SendPixivOptions{
-		IndexMap: indexMap,
+	opts := repost.RepostOptions{
+		PixivIndices: indexMap,
 	}
 	err := art.Post(s, opts)
 	if err != nil {
@@ -208,9 +206,9 @@ func include(ctx *gumi.Ctx) error {
 		}
 	}
 
-	opts := repost.SendPixivOptions{
-		IndexMap: indexMap,
-		Include:  true,
+	opts := repost.RepostOptions{
+		PixivIndices: indexMap,
+		Include:      true,
 	}
 	err := art.Post(s, opts)
 	if err != nil {
@@ -282,7 +280,6 @@ func twitter(ctx *gumi.Ctx) error {
 		m          = ctx.Event
 		s          = ctx.Session
 		args       = strings.Fields(ctx.Args.Raw)
-		guild, _   = database.GuildCache.Get(m.GuildID)
 		twitterURL = args[0]
 		indices    = args[1:]
 	)
@@ -314,47 +311,11 @@ func twitter(ctx *gumi.Ctx) error {
 	}
 
 	a := repost.NewPost(m, twitterURL)
-	if guild.(*database.GuildSettings).Repost != "disabled" {
-		reposts := a.FindReposts(m.GuildID, m.ChannelID)
-		if len(reposts) > 0 {
-			switch guild.(*database.GuildSettings).Repost {
-			case "strict":
-				s.ChannelMessageSendEmbed(m.ChannelID, a.RepostEmbed(reposts))
-				return nil
-			case "enabled":
-				f := utils.CreatePromptWithMessage(s, m, &discordgo.MessageSend{
-					Content: "Tweet you're trying to post is a repost. Are you sure about that?",
-					Embed:   a.RepostEmbed(reposts),
-				})
-				if !f {
-					return nil
-				}
-			}
-		}
-	}
+	err := a.Post(s, repost.RepostOptions{
+		KeepTwitterFirst:  true,
+		TwitterIndices:    indexMap,
+		SkipTwitterPrompt: true,
+	})
 
-	tweets, err := a.SendTwitter(s, a.TwitterMatches, false)
-	if err != nil {
-		return err
-	}
-
-	for _, t := range tweets {
-		for ind, send := range t {
-			if _, ok := indexMap[ind+1]; ok {
-				continue
-			}
-
-			msg, err := s.ChannelMessageSendComplex(m.ChannelID, send)
-			if err != nil {
-				log.Warnln(err)
-			}
-
-			if msg != nil && guild.(*database.GuildSettings).Reactions {
-				s.MessageReactionAdd(msg.ChannelID, msg.ID, "💖")
-				s.MessageReactionAdd(msg.ChannelID, msg.ID, "🤤")
-			}
-		}
-	}
-
-	return nil
+	return err
 }
