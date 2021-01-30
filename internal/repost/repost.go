@@ -86,6 +86,7 @@ type RepostOptions struct {
 	SkipUgoira        bool
 	SkipTwitterPrompt bool
 	KeepTwitterFirst  bool
+	IgnorePermissions bool
 }
 
 type embedMessage struct {
@@ -236,7 +237,12 @@ func (a *ArtPost) Post(s *discordgo.Session, opts ...RepostOptions) error {
 		pixiv        = make(map[string]bool)
 		twitter      = make(map[string]bool)
 		sentMessages = make([]*discordgo.Message, 0)
+		opt          = RepostOptions{}
 	)
+
+	if len(opts) > 0 {
+		opt = opts[0]
+	}
 
 	guild, ok := database.GuildCache.Get(m.GuildID)
 	if !ok {
@@ -306,7 +312,7 @@ func (a *ArtPost) Post(s *discordgo.Session, opts ...RepostOptions) error {
 	}
 
 	var posts []*ugoira.PixivPost
-	if guild.(*database.GuildSettings).Pixiv && len(pixiv) > 0 {
+	if opt.IgnorePermissions || guild.(*database.GuildSettings).Pixiv && len(pixiv) > 0 {
 		var (
 			messages []*discordgo.MessageSend
 			err      error
@@ -327,7 +333,7 @@ func (a *ArtPost) Post(s *discordgo.Session, opts ...RepostOptions) error {
 		}
 	}
 
-	if guild.(*database.GuildSettings).Twitter && len(twitter) > 0 {
+	if opt.IgnorePermissions || guild.(*database.GuildSettings).Twitter && len(twitter) > 0 {
 		tweets, err := a.SendTwitter(s, twitter, opts...)
 		if err != nil {
 			return err
@@ -337,13 +343,7 @@ func (a *ArtPost) Post(s *discordgo.Session, opts ...RepostOptions) error {
 			msg := ""
 
 			prompt := true
-
-			skipPrompt := false
-			if len(opts) != 0 {
-				skipPrompt = opts[0].SkipTwitterPrompt
-			}
-
-			if guild.(*database.GuildSettings).TwitterPrompt && !skipPrompt {
+			if guild.(*database.GuildSettings).TwitterPrompt && !opt.SkipTwitterPrompt {
 				if len(tweets) == 1 {
 					msg = "Detected a tweet with more than one image, would you like to send embeds of other images for mobile users?"
 				} else {

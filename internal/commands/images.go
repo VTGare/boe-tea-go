@@ -147,7 +147,8 @@ func exclude(ctx *gumi.Ctx) error {
 	}
 
 	opts := repost.RepostOptions{
-		PixivIndices: indexMap,
+		PixivIndices:      indexMap,
+		IgnorePermissions: true,
 	}
 	err := art.Post(s, opts)
 	if err != nil {
@@ -207,8 +208,9 @@ func include(ctx *gumi.Ctx) error {
 	}
 
 	opts := repost.RepostOptions{
-		PixivIndices: indexMap,
-		Include:      true,
+		PixivIndices:      indexMap,
+		Include:           true,
+		IgnorePermissions: true,
 	}
 	err := art.Post(s, opts)
 	if err != nil {
@@ -315,6 +317,7 @@ func twitter(ctx *gumi.Ctx) error {
 		KeepTwitterFirst:  true,
 		TwitterIndices:    indexMap,
 		SkipTwitterPrompt: true,
+		IgnorePermissions: true,
 	})
 
 	return err
