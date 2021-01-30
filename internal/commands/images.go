@@ -264,7 +264,9 @@ func crosspost(ctx *gumi.Ctx) error {
 			}
 			return true
 		})
-		err := art.Crosspost(s, channels)
+		err := art.Crosspost(s, channels, repost.RepostOptions{
+			KeepTwitterFirst: true,
+		})
 		if err != nil {
 			return err
 		}

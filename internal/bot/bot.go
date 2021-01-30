@@ -142,7 +142,9 @@ func prefixless(s *discordgo.Session, m *discordgo.MessageCreate) error {
 
 	if user := database.DB.FindUser(m.Author.ID); user != nil {
 		channels := user.Channels(m.ChannelID)
-		err := art.Crosspost(s, channels)
+		err := art.Crosspost(s, channels, repost.RepostOptions{
+			KeepTwitterFirst: true,
+		})
 		if err != nil {
 			log.Warnln("art.Crosspost():", err)
 		}
