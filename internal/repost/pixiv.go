@@ -75,6 +75,10 @@ func (a *ArtPost) SendPixiv(s *discordgo.Session, IDs map[string]bool, opts ...R
 		return nil, nil, errors.New("pixiv api is down")
 	}
 
+	if len(IDs) == 0 {
+		return nil, nil, nil
+	}
+
 	var (
 		guild, _   = database.GuildCache.Get(a.event.GuildID)
 		indexMap   = make(map[int]bool)
@@ -220,18 +224,18 @@ func createPixivEmbeds(a *ArtPost, posts []*ugoira.PixivPost, indexMap map[int]b
 }
 
 func createPixivEmbed(post *ugoira.PixivPost, ind int, easter *embedMessage) *discordgo.MessageSend {
-	title := ""
+	var (
+		title    string
+		original string
+		preview  string
+		eb       = embeds.NewBuilder()
+	)
 
 	if post.Len() == 1 {
 		title = fmt.Sprintf("%v by %v", post.Title, post.Author)
 	} else {
 		title = fmt.Sprintf("%v by %v. Page %v/%v", post.Title, post.Author, ind+1, post.Len())
 	}
-
-	var (
-		original = ""
-		preview  = ""
-	)
 
 	switch database.DevSet.PixivReverseProxy {
 	case database.KotoriLove:
@@ -245,20 +249,13 @@ func createPixivEmbed(post *ugoira.PixivPost, ind int, easter *embedMessage) *di
 		preview = post.Images.Preview[ind].PixivCatProxy
 	}
 
-	eb := embeds.NewBuilder()
 	eb.Title(title).URL(post.URL).Image(preview)
-
-	if strings.Contains(easter.Content, "Shit waifu") && post.GoodWaifu {
-		eb.Footer("Good taste, m8", "")
-	} else {
-		eb.Footer(easter.Content, "")
-	}
-
 	eb.AddField("Likes", strconv.Itoa(post.Likes), true).AddField("Original quality", fmt.Sprintf("[Click here desu~](%v)", original), true)
-	eb.AddField("Liked an artwork?", "Add it to favourites!\nReact: 💖 - as sfw | 🤤 - as nsfw")
+	eb.Footer(easter.Content, "")
 
 	if ind == 0 {
 		eb.Description(fmt.Sprintf("**Tags**\n%v", joinTags(post.Tags, " • ")))
+		eb.AddField("Liked an artwork?", "Add it to favourites!\nReact: 💖 - as sfw | 🤤 - as nsfw")
 	}
 
 	send := &discordgo.MessageSend{Embed: eb.Finalize()}

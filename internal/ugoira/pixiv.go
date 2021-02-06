@@ -20,7 +20,6 @@ type App struct {
 	app        *pixiv.AppPixivAPI
 	kotoriBase string
 	cache      *ttlcache.Cache
-	goodWaifus map[string]bool
 }
 
 func NewApp(username, password string) (*App, error) {
@@ -37,23 +36,21 @@ func NewApp(username, password string) (*App, error) {
 		app:        app,
 		kotoriBase: "https://api.kotori.love/pixiv/image/",
 		cache:      cache,
-		goodWaifus: map[string]bool{"星街すいせい": true, "ヨルハ二号B型": true, "2B": true, "牧瀬紅莉栖": true, "宝鐘マリン": true},
 	}, nil
 }
 
 type PixivPost struct {
-	ID        string
-	Type      string
-	Author    string
-	Title     string
-	URL       string
-	Likes     int
-	Pages     int
-	Ugoira    *Ugoira
-	Tags      []string
-	Images    *PixivImages
-	NSFW      bool
-	GoodWaifu bool
+	ID     string
+	Type   string
+	Author string
+	Title  string
+	URL    string
+	Likes  int
+	Pages  int
+	Ugoira *Ugoira
+	Tags   []string
+	Images *PixivImages
+	NSFW   bool
 }
 
 type PixivImages struct {
@@ -144,7 +141,7 @@ func (a *App) GetPixivPost(id string) (*PixivPost, error) {
 		if illust.MetaSinglePage.OriginalImageURL != "" {
 			original := a.newPixivImage(illust.MetaSinglePage.OriginalImageURL, illust.ID, false, 0)
 			images.Original = append(images.Original, original)
-			preview := a.newPixivImage(illust.Images.Large, illust.ID, false, 0)
+			preview := a.newPixivImage(illust.Images.Medium, illust.ID, false, 0)
 			images.Preview = append(images.Preview, preview)
 		}
 	}
@@ -152,20 +149,15 @@ func (a *App) GetPixivPost(id string) (*PixivPost, error) {
 	for ind, page := range illust.MetaPages {
 		original := a.newPixivImage(page.Images.Original, illust.ID, true, ind)
 		images.Original = append(images.Original, original)
-		preview := a.newPixivImage(page.Images.Large, illust.ID, true, ind)
+		preview := a.newPixivImage(page.Images.Medium, illust.ID, true, ind)
 		images.Preview = append(images.Preview, preview)
 	}
 
 	nsfw := false
-	goodwaifu := false
 	tags := make([]string, 0)
 	for _, t := range illust.Tags {
 		if t.Name == "R-18" {
 			nsfw = true
-		}
-
-		if _, ok := a.goodWaifus[t.Name]; ok {
-			goodwaifu = true
 		}
 
 		tags = append(tags, t.Name)
@@ -178,17 +170,16 @@ func (a *App) GetPixivPost(id string) (*PixivPost, error) {
 		author = "Unknown"
 	}
 	post := &PixivPost{
-		ID:        id,
-		URL:       "https://pixiv.net/en/artworks/" + id,
-		Author:    author,
-		Type:      illust.Type,
-		Title:     illust.Title,
-		Tags:      tags,
-		Pages:     illust.PageCount,
-		Images:    images,
-		Likes:     illust.TotalBookmarks,
-		NSFW:      nsfw,
-		GoodWaifu: goodwaifu,
+		ID:     id,
+		URL:    "https://pixiv.net/en/artworks/" + id,
+		Author: author,
+		Type:   illust.Type,
+		Title:  illust.Title,
+		Tags:   tags,
+		Pages:  illust.PageCount,
+		Images: images,
+		Likes:  illust.TotalBookmarks,
+		NSFW:   nsfw,
 	}
 
 	a.cache.Set(id, post)
