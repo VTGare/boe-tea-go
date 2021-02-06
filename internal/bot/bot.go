@@ -215,7 +215,7 @@ func reactCreated(s *discordgo.Session, r *discordgo.MessageReactionAdd) {
 				}
 
 				log.Infof("Detected Twitter art to favourite. User ID: %v. Tweet: %v", r.UserID, twitterURL)
-				tweet, err := tsuita.GetTweet(twitterURL)
+				tweet, err := tsuita.App.GetTweet(twitterURL)
 				if err != nil {
 					log.Warnf("addFavorite -> GetTwitterPost: %v", err)
 					return
@@ -234,13 +234,9 @@ func reactCreated(s *discordgo.Session, r *discordgo.MessageReactionAdd) {
 
 			if artwork != nil {
 				artwork, err := database.DB.AddFavourite(r.UserID, artwork, nsfw)
-				if err != nil {
-					log.Warnf("database.DB.AddFavourite() -> Error while adding a favourite: %v", err)
-				} else if user.DM {
+				if err == nil && user.DM {
 					ch, err := s.UserChannelCreate(user.ID)
-					if err != nil {
-						log.Warnf("s.UserChannelCreate -> %v", err)
-					} else {
+					if err == nil {
 						var (
 							eb          = embeds.NewBuilder()
 							description = fmt.Sprintf("Don't like DMs? Execute `bt!userset dm disabled`\n```\nID: %v\nURL: %v\nNSFW: %v```", artwork.ID, artwork.URL, nsfw)
@@ -348,7 +344,7 @@ func reactRemoved(s *discordgo.Session, r *discordgo.MessageReactionRemove) {
 						break
 					}
 
-					tweet, err := tsuita.GetTweet(twitterURL)
+					tweet, err := tsuita.App.GetTweet(twitterURL)
 					if err != nil {
 						log.Warnf("reactRemoved -> GetTweet: %v", err)
 						return

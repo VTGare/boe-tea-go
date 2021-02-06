@@ -1,28 +1,43 @@
 package tsuita
 
 import (
-	"errors"
 	"fmt"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/ReneKroon/ttlcache"
-	"github.com/VTGare/boe-tea-go/internal/database"
 	"github.com/gocolly/colly/v2"
 	"github.com/sirupsen/logrus"
 )
 
 var (
+	App          = NewTsuita()
 	TwitterRegex = regexp.MustCompile(`https?://(?:mobile.)?twitter.com/(?:\S+)/status/(\d+)(?:\?s=\d\d)?`)
-
-	twitterCache *ttlcache.Cache
 )
 
-func init() {
-	twitterCache = ttlcache.NewCache()
-	twitterCache.SetTTL(1 * time.Hour)
+type Tsuita struct {
+	cache           *ttlcache.Cache
+	nitterInstances []string
+}
+
+func NewTsuita() *Tsuita {
+	cache := ttlcache.NewCache()
+	cache.SetTTL(1 * time.Hour)
+
+	return &Tsuita{
+		cache: cache,
+		nitterInstances: []string{
+			"https://nitter.net",
+			"https://nitter.snopyta.org",
+			"https://nitter.42l.fr",
+			"https://nitter.nixnet.services",
+			"https://nitter.himiko.cloud",
+			"https://nitter.cc",
+		},
+	}
 }
 
 type Tweet struct {
@@ -54,35 +69,47 @@ func (t *Tweet) Images() []string {
 	return images
 }
 
-func GetTweet(uri string) (*Tweet, error) {
+func (ts *Tsuita) GetTweet(uri string) (*Tweet, error) {
 	var (
-		res       = &Tweet{Gallery: make([]TwitterMedia, 0)}
-		match     = TwitterRegex.FindStringSubmatch(uri)
-		nitterURL = database.DevSet.NitterInstance
+		match = TwitterRegex.FindStringSubmatch(uri)
 	)
 
-	if len(match) == 0 {
-		return nil, errors.New("invalid twitter url")
+	if match == nil {
+		return nil, ErrBadURL
 	}
 
-	res.Snowflake = match[1]
-	if cache, ok := twitterCache.Get(res.Snowflake); ok {
-		logrus.Infof("Found a cached tweet. Snowflake: %v", res.Snowflake)
+	snowflake := match[1]
+	if cache, ok := ts.cache.Get(snowflake); ok {
 		return cache.(*Tweet), nil
 	}
 
-	logrus.Infof("Fetching a tweet. Snowflake: %v", res.Snowflake)
-	nitter := fmt.Sprintf(nitterURL+"/i/status/%v", res.Snowflake)
+	for _, inst := range ts.nitterInstances {
+		logrus.Infof("Trying to scrape a Tweet. Instance: %v. Snowflake: %v.", inst, snowflake)
+		tweet, err := ts.scrape(inst, snowflake)
+		if err != nil {
+			logrus.Warnf("Instance failed to scrape a tweet. Instance: %v. Snowflake: %v. Error: %v", inst, snowflake, err)
+			continue
+		}
+
+		ts.cache.Set(tweet.Snowflake, tweet)
+		return tweet, nil
+	}
+
+	return nil, ErrRateLimitReached
+}
+
+func (ts *Tsuita) scrape(inst, snowflake string) (*Tweet, error) {
+	var (
+		res = &Tweet{Gallery: make([]TwitterMedia, 0), Snowflake: snowflake}
+	)
+
+	nitter := fmt.Sprintf(inst+"/i/status/%v", res.Snowflake)
 	c := colly.NewCollector()
-	c.Limit(&colly.LimitRule{
-		RandomDelay: 2 * time.Second,
-		Parallelism: 4,
-	})
 
 	c.OnHTML(".main-tweet .still-image", func(e *colly.HTMLElement) {
-		imageURL := nitterURL + e.Attr("href")
+		imageURL := inst + e.Attr("href")
 
-		imageURL = strings.Replace(imageURL, nitterURL+"/pic/media%2F", "https://pbs.twimg.com/media/", 1)
+		imageURL = strings.Replace(imageURL, inst+"/pic/media%2F", "https://pbs.twimg.com/media/", 1)
 		imageURL = strings.TrimSuffix(imageURL, "%3Fname%3Dorig")
 		res.Gallery = append(res.Gallery, TwitterMedia{
 			URL:      imageURL,
@@ -91,20 +118,14 @@ func GetTweet(uri string) (*Tweet, error) {
 	})
 
 	c.OnHTML(".main-tweet .gif", func(e *colly.HTMLElement) {
-		imageURL := nitterURL + e.ChildAttr("source", "src")
+		gif := strings.Replace(e.ChildAttr("source", "src"), "/pic/", "https://", 1)
+		gif, _ = url.QueryUnescape(gif)
 		res.Gallery = append(res.Gallery, TwitterMedia{
-			URL:      imageURL,
+			URL:      gif,
 			Animated: true,
 		})
 	})
 
-	parse := func(s string) int {
-		if strings.Contains(s, ",") {
-			s = strings.ReplaceAll(s, ",", "")
-		}
-		num, _ := strconv.Atoi(s)
-		return num
-	}
 	c.OnHTML(".main-tweet .icon-container", func(e *colly.HTMLElement) {
 		children := e.DOM.Children()
 
@@ -147,8 +168,15 @@ func GetTweet(uri string) (*Tweet, error) {
 	c.Wait()
 
 	res.URL = fmt.Sprintf("https://twitter.com/%v/status/%v", strings.TrimLeft(res.Username, "@"), res.Snowflake)
-	twitterCache.Set(match[1], res)
 
-	logrus.Infof("Fetched a tweet successfully. URL: %v. Images: %v", res.URL, len(res.Gallery))
 	return res, nil
+}
+
+func parse(s string) int {
+	if strings.Contains(s, ",") {
+		s = strings.ReplaceAll(s, ",", "")
+	}
+
+	num, _ := strconv.Atoi(s)
+	return num
 }

@@ -2,9 +2,7 @@ package repost
 
 import (
 	"fmt"
-	"net/http"
 	"strconv"
-	"strings"
 	"sync"
 
 	"github.com/VTGare/boe-tea-go/internal/database"
@@ -87,7 +85,7 @@ func (a *ArtPost) fetchTwitterPosts(tweets map[string]bool) ([]*tsuita.Tweet, er
 	for t := range tweets {
 		go func(t string) {
 			defer wg.Done()
-			tweet, err := tsuita.GetTweet(fmt.Sprintf("https://twitter.com/i/web/status/%v", t))
+			tweet, err := tsuita.App.GetTweet(fmt.Sprintf("https://twitter.com/i/web/status/%v", t))
 			if err != nil {
 				errChan <- err
 			} else {
@@ -161,17 +159,7 @@ func (a *ArtPost) tweetToEmbeds(tweet *tsuita.Tweet, opts RepostOptions) ([]*dis
 		}
 
 		if media.Animated {
-			resp, err := http.Get(media.URL)
-			if err != nil {
-				return nil, err
-			}
-			defer resp.Body.Close()
-
-			filename := media.URL[strings.LastIndex(media.URL, "/")+1:]
-			msg.File = &discordgo.File{
-				Name:   filename,
-				Reader: resp.Body,
-			}
+			eb.AddField("Video", fmt.Sprintf("[Click here desu~](%v)", media.URL))
 		} else {
 			eb.Image(media.URL)
 		}
