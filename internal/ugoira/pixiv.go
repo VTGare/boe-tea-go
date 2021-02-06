@@ -141,7 +141,7 @@ func (a *App) GetPixivPost(id string) (*PixivPost, error) {
 		if illust.MetaSinglePage.OriginalImageURL != "" {
 			original := a.newPixivImage(illust.MetaSinglePage.OriginalImageURL, illust.ID, false, 0)
 			images.Original = append(images.Original, original)
-			preview := a.newPixivImage(illust.Images.Medium, illust.ID, false, 0)
+			preview := a.newPixivImage(illust.Images.Large, illust.ID, false, 0)
 			images.Preview = append(images.Preview, preview)
 		}
 	}
@@ -149,7 +149,7 @@ func (a *App) GetPixivPost(id string) (*PixivPost, error) {
 	for ind, page := range illust.MetaPages {
 		original := a.newPixivImage(page.Images.Original, illust.ID, true, ind)
 		images.Original = append(images.Original, original)
-		preview := a.newPixivImage(page.Images.Medium, illust.ID, true, ind)
+		preview := a.newPixivImage(page.Images.Large, illust.ID, true, ind)
 		images.Preview = append(images.Preview, preview)
 	}
 
