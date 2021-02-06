@@ -11,7 +11,7 @@ import (
 type PixivReverseProxy int
 
 const (
-	KotoriLove PixivReverseProxy = iota
+	PixivMoe PixivReverseProxy = iota
 	PixivCatProxy
 	PixivCat
 )
@@ -54,8 +54,8 @@ func (d *Database) ChangeDevSetting(setting string, newSetting interface{}) erro
 
 func (r PixivReverseProxy) String() string {
 	switch r {
-	case KotoriLove:
-		return "Kotori"
+	case PixivMoe:
+		return "PixivMoe"
 	case PixivCat:
 		return "PixivCat"
 	case PixivCatProxy:
