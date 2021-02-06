@@ -238,9 +238,9 @@ func createPixivEmbed(post *ugoira.PixivPost, ind int, easter *embedMessage) *di
 	}
 
 	switch database.DevSet.PixivReverseProxy {
-	case database.KotoriLove:
-		original = post.Images.Original[ind].Kotori
-		preview = post.Images.Preview[ind].Kotori
+	case database.PixivMoe:
+		original = post.Images.Original[ind].PixivMoe
+		preview = post.Images.Preview[ind].PixivMoe
 	case database.PixivCat:
 		original = post.Images.Original[ind].PixivCat
 		preview = post.Images.Preview[ind].PixivCat

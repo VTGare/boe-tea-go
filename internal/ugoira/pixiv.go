@@ -17,9 +17,8 @@ var (
 )
 
 type App struct {
-	app        *pixiv.AppPixivAPI
-	kotoriBase string
-	cache      *ttlcache.Cache
+	app   *pixiv.AppPixivAPI
+	cache *ttlcache.Cache
 }
 
 func NewApp(username, password string) (*App, error) {
@@ -33,9 +32,8 @@ func NewApp(username, password string) (*App, error) {
 	cache := ttlcache.NewCache()
 	cache.SetTTL(60 * time.Minute)
 	return &App{
-		app:        app,
-		kotoriBase: "https://api.kotori.love/pixiv/image/",
-		cache:      cache,
+		app:   app,
+		cache: cache,
 	}, nil
 }
 
@@ -61,9 +59,9 @@ type PixivImages struct {
 func (p *PixivImages) ToArray() []string {
 	images := make([]string, 0, len(p.Preview))
 	switch database.DevSet.PixivReverseProxy {
-	case database.KotoriLove:
+	case database.PixivMoe:
 		for _, img := range p.Preview {
-			images = append(images, img.Kotori)
+			images = append(images, img.PixivMoe)
 		}
 	case database.PixivCat:
 		for _, img := range p.Preview {
@@ -79,7 +77,7 @@ func (p *PixivImages) ToArray() []string {
 }
 
 type PixivImage struct {
-	Kotori        string
+	PixivMoe      string
 	PixivCat      string
 	PixivCatProxy string
 }
@@ -93,7 +91,7 @@ func (a *App) newPixivImage(url string, id uint64, manga bool, page int) *PixivI
 	}
 
 	return &PixivImage{
-		Kotori:        a.kotoriBase + strings.TrimPrefix(url, "https://"),
+		PixivMoe:      "https://api.pixiv.moe/image/" + strings.TrimPrefix(url, "https://"),
 		PixivCat:      pixivCat,
 		PixivCatProxy: strings.Replace(url, "i.pximg.net", "i.pixiv.cat", 1),
 	}
