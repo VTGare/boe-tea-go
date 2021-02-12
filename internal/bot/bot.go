@@ -14,6 +14,7 @@ import (
 	"github.com/VTGare/boe-tea-go/internal/repost"
 	"github.com/VTGare/boe-tea-go/internal/ugoira"
 	"github.com/VTGare/boe-tea-go/pkg/tsuita"
+	"github.com/VTGare/boe-tea-go/utils"
 	"github.com/VTGare/gumi"
 	"github.com/bwmarrin/discordgo"
 	log "github.com/sirupsen/logrus"
@@ -186,6 +187,10 @@ func reactCreated(s *discordgo.Session, r *discordgo.MessageReactionAdd) {
 			var artwork *database.Artwork
 			switch {
 			case len(art.PixivMatches) > 0:
+				if utils.PixivDown {
+					return
+				}
+
 				pixivID := ""
 				for k := range art.PixivMatches {
 					pixivID = k

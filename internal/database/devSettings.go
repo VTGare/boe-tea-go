@@ -22,7 +22,6 @@ var (
 
 type DevSettings struct {
 	PixivReverseProxy PixivReverseProxy `json:"pixiv" bson:"pixiv"`
-	NitterInstance    string            `json:"nitter" bson:"nitter"`
 }
 
 func (d *Database) LoadSettings() error {
