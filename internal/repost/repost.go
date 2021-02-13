@@ -330,68 +330,72 @@ func (a *ArtPost) Post(s *discordgo.Session, opts ...RepostOptions) error {
 	}
 
 	var posts []*ugoira.PixivPost
-	if opt.IgnorePermissions || guild.(*database.GuildSettings).Pixiv && len(pixiv) > 0 {
-		var (
-			messages []*discordgo.MessageSend
-			err      error
-		)
+	if opt.IgnorePermissions || guild.(*database.GuildSettings).Pixiv {
+		if len(pixiv) != 0 {
+			var (
+				messages []*discordgo.MessageSend
+				err      error
+			)
 
-		messages, posts, err = a.SendPixiv(s, pixiv, opts...)
-		if err != nil {
-			return err
-		}
-
-		for _, message := range messages {
-			msg, err := sendMessage(s, m, message)
+			messages, posts, err = a.SendPixiv(s, pixiv, opts...)
 			if err != nil {
-				logrus.Warnf("sendMessage: %v", err)
+				return err
 			}
 
-			sentMessages = append(sentMessages, msg)
+			for _, message := range messages {
+				msg, err := sendMessage(s, m, message)
+				if err != nil {
+					logrus.Warnf("sendMessage: %v", err)
+				}
+
+				sentMessages = append(sentMessages, msg)
+			}
 		}
 	}
 
-	if opt.IgnorePermissions || guild.(*database.GuildSettings).Twitter && len(twitter) > 0 {
-		tweets, err := a.SendTwitter(s, twitter, opts...)
-		if err != nil {
-			return err
-		}
-
-		if len(tweets) > 0 {
-			msg := ""
-
-			prompt := true
-			if guild.(*database.GuildSettings).TwitterPrompt && !opt.SkipTwitterPrompt {
-				if len(tweets) == 1 {
-					msg = "Detected a tweet with more than one image, would you like to send embeds of other images for mobile users?"
-				} else {
-					msg = "Detected tweets with more than one image, would you like to send embeds of other images for mobile users?"
-				}
-
-				prompt = utils.CreatePrompt(s, m, &utils.PromptOptions{
-					Actions: map[string]bool{
-						"✅": true,
-						"❎": false,
-					},
-					Message: msg,
-					Timeout: 10 * time.Second,
-					TimeoutCallback: func(s *discordgo.Session, m *discordgo.Message) {
-						s.MessageReactionRemove(m.ChannelID, m.ID, "✅", s.State.User.ID)
-						s.MessageReactionRemove(m.ChannelID, m.ID, "❎", s.State.User.ID)
-						s.ChannelMessageEdit(m.ChannelID, m.ID, "<:AmeliaPhone:778148172203687947> Attention all mobile users! Tweet above has multiple images.")
-					},
-				})
+	if opt.IgnorePermissions || guild.(*database.GuildSettings).Twitter {
+		if len(twitter) != 0 {
+			tweets, err := a.SendTwitter(s, twitter, opts...)
+			if err != nil {
+				return err
 			}
 
-			if prompt {
-				for _, t := range tweets {
-					for _, send := range t {
-						msg, err := sendMessage(s, m, send)
-						if err != nil {
-							logrus.Warnf("sendMessage: %v", err)
-						}
+			if len(tweets) > 0 {
+				msg := ""
 
-						sentMessages = append(sentMessages, msg)
+				prompt := true
+				if guild.(*database.GuildSettings).TwitterPrompt && !opt.SkipTwitterPrompt {
+					if len(tweets) == 1 {
+						msg = "Detected a tweet with more than one image, would you like to send embeds of other images for mobile users?"
+					} else {
+						msg = "Detected tweets with more than one image, would you like to send embeds of other images for mobile users?"
+					}
+
+					prompt = utils.CreatePrompt(s, m, &utils.PromptOptions{
+						Actions: map[string]bool{
+							"✅": true,
+							"❎": false,
+						},
+						Message: msg,
+						Timeout: 10 * time.Second,
+						TimeoutCallback: func(s *discordgo.Session, m *discordgo.Message) {
+							s.MessageReactionRemove(m.ChannelID, m.ID, "✅", s.State.User.ID)
+							s.MessageReactionRemove(m.ChannelID, m.ID, "❎", s.State.User.ID)
+							s.ChannelMessageEdit(m.ChannelID, m.ID, "<:AmeliaPhone:778148172203687947> Attention all mobile users! Tweet above has multiple images.")
+						},
+					})
+				}
+
+				if prompt {
+					for _, t := range tweets {
+						for _, send := range t {
+							msg, err := sendMessage(s, m, send)
+							if err != nil {
+								logrus.Warnf("sendMessage: %v", err)
+							}
+
+							sentMessages = append(sentMessages, msg)
+						}
 					}
 				}
 			}
