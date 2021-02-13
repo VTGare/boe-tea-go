@@ -9,8 +9,8 @@ github.com/ReneKroon/ttlcache v1.7.0 h1:8BkjFfrzVFXyrqnMtezAaJ6AHPSsVV10m6w28N/F
 github.com/ReneKroon/ttlcache v1.7.0/go.mod h1:8BGGzdumrIjWxdRx8zpK6L3oGMWvIXdvB2GD1cfvd+I=
 github.com/VTGare/go-cloudflare-scraper v0.0.1 h1:KzA9OZZv5TY1q5kAUSMToB90/zHubxKptaRJ/PGceAA=
 github.com/VTGare/go-cloudflare-scraper v0.0.1/go.mod h1:vLpSbNh4vRcWG3zlOwBcXkxM6OpEny/qqmofCLl0CZ4=
-github.com/VTGare/gumi v0.3.2 h1:pW7FUOeyaoBwBz2K6Q8RFECAjZhe/sj8KahJoG+0C64=
-github.com/VTGare/gumi v0.3.2/go.mod h1:51ik9+9yzkWVzFyBtIbpkKXwkboXs8uz98x41ZmJHYQ=
+github.com/VTGare/gumi v0.4.0 h1:xJUw1RLovAfVNfqeVjN5oSqhg+XwJEaMtPdW830HlCI=
+github.com/VTGare/gumi v0.4.0/go.mod h1:51ik9+9yzkWVzFyBtIbpkKXwkboXs8uz98x41ZmJHYQ=
 github.com/VTGare/iqdbgo v0.1.1 h1:zBTski6p/TFrT/D3mvEzPfufr/+XaQpexn5m/GSSJTU=
 github.com/VTGare/iqdbgo v0.1.1/go.mod h1:s0K3YyaD9FuHcVN2TnTj4okzGpnL1LuFUm5e9TJuK3w=
 github.com/VTGare/pixiv v0.0.6 h1:3XkkYqeTyA7SB7pWokukADh/YLLaKmu6IKdPprzCj6U=

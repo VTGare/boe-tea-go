@@ -13,12 +13,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-var (
-	App          = NewTsuita()
-	TwitterRegex = regexp.MustCompile(`https?://(?:mobile.)?twitter.com/(?:\S+)/status/(\d+)(?:\?s=\d\d)?`)
-)
-
 type Tsuita struct {
+	TwitterRegex    *regexp.Regexp
 	cache           *ttlcache.Cache
 	nitterInstances []string
 }
@@ -28,14 +24,15 @@ func NewTsuita() *Tsuita {
 	cache.SetTTL(1 * time.Hour)
 
 	return &Tsuita{
-		cache: cache,
+		cache:        cache,
+		TwitterRegex: regexp.MustCompile(`https?://(?:mobile.)?twitter.com/(?:\S+)/status/(\d+)(?:\?s=\d\d)?`),
 		nitterInstances: []string{
-			"https://nitter.net",
 			"https://nitter.snopyta.org",
 			"https://nitter.42l.fr",
 			"https://nitter.nixnet.services",
 			"https://nitter.himiko.cloud",
 			"https://nitter.cc",
+			"https://nitter.net",
 		},
 	}
 }
@@ -71,7 +68,7 @@ func (t *Tweet) Images() []string {
 
 func (ts *Tsuita) GetTweet(uri string) (*Tweet, error) {
 	var (
-		match = TwitterRegex.FindStringSubmatch(uri)
+		match = ts.TwitterRegex.FindStringSubmatch(uri)
 	)
 
 	if match == nil {

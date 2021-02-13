@@ -125,7 +125,7 @@ func feedback(ctx *gumi.Ctx) error {
 		eb.Image(ctx.Event.Attachments[0].URL)
 	}
 
-	ch, err := ctx.Session.UserChannelCreate(utils.AuthorID)
+	ch, err := ctx.Session.UserChannelCreate(ctx.Router.AuthorID)
 	if err != nil {
 		return err
 	}

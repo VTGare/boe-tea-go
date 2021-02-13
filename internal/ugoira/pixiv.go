@@ -12,10 +12,6 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-var (
-	PixivApp *App
-)
-
 type App struct {
 	app   *pixiv.AppPixivAPI
 	cache *ttlcache.Cache

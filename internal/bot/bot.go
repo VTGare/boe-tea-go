@@ -14,7 +14,6 @@ import (
 	"github.com/VTGare/boe-tea-go/internal/repost"
 	"github.com/VTGare/boe-tea-go/internal/ugoira"
 	"github.com/VTGare/boe-tea-go/pkg/tsuita"
-	"github.com/VTGare/boe-tea-go/utils"
 	"github.com/VTGare/gumi"
 	"github.com/bwmarrin/discordgo"
 	log "github.com/sirupsen/logrus"
@@ -22,11 +21,11 @@ import (
 
 var (
 	bannedUsers = ttlcache.NewCache()
-	BoeTea      *Bot
 )
 
 type Bot struct {
 	Session *discordgo.Session
+	Router  *gumi.Router
 }
 
 func init() {
@@ -53,8 +52,6 @@ func NewBot(token string) (*Bot, error) {
 		return nil, err
 	}
 
-	bot := &Bot{dg}
-
 	router := gumi.Create(&gumi.Router{
 		PrefixResolver: func(s *discordgo.Session, m *discordgo.MessageCreate) []string {
 			var (
@@ -71,13 +68,18 @@ func NewBot(token string) (*Bot, error) {
 
 			return []string{"bt!", "bt ", "bt.", mention1, mention2}
 		},
-		NotCommandCallback: prefixless,
-		OnErrorCallback: func(s *discordgo.Session, m *discordgo.MessageCreate, err error) {
+		NotCommandCallback: notCommand,
+		OnErrorCallback: func(ctx *gumi.Ctx, err error) {
 			eb := embeds.NewBuilder()
 			eb.ErrorTemplate(err.Error())
 
-			log.Errorln(err)
-			s.ChannelMessageSendEmbed(m.ChannelID, eb.Finalize())
+			if ctx.Command != nil {
+				log.Errorf("An error occurred while executing command [%v]: %v", ctx.Command.Name, err)
+			} else {
+				log.Errorf("An error occurred: %v", err)
+			}
+
+			ctx.ReplyEmbed(eb.Finalize())
 		},
 		OnRateLimitCallback: func(ctx *gumi.Ctx) error {
 			duration, err := ctx.Command.RateLimiter.Expires(ctx.Event.Author.ID)
@@ -108,21 +110,22 @@ func NewBot(token string) (*Bot, error) {
 			return nil
 		},
 	})
+
 	for _, cmd := range commands.Commands {
 		router.RegisterCmd(cmd)
 	}
 	router.Initialize(dg)
 
+	bot := &Bot{dg, router}
 	dg.AddHandler(onReady)
-	dg.AddHandler(reactCreated)
+	dg.AddHandler(bot.reactCreated)
 	dg.AddHandler(guildCreated)
 	dg.AddHandler(guildDeleted)
-	dg.AddHandler(reactRemoved)
+	dg.AddHandler(bot.reactRemoved)
 	dg.AddHandler(guildBanAdd)
 	dg.AddHandler(messageDeleted)
 	dg.Identify.Intents = discordgo.MakeIntent(discordgo.IntentsAllWithoutPrivileged)
 
-	BoeTea = bot
 	return bot, nil
 }
 
@@ -131,19 +134,19 @@ func onReady(_ *discordgo.Session, e *discordgo.Ready) {
 	log.Infof("Connected to %v guilds!", len(e.Guilds))
 }
 
-func prefixless(s *discordgo.Session, m *discordgo.MessageCreate) error {
+func notCommand(ctx *gumi.Ctx) error {
 	var (
-		art = repost.NewPost(m)
+		art = repost.NewPost(ctx)
 	)
 
-	err := art.Post(s)
+	err := art.Post(ctx.Session)
 	if err != nil {
 		log.Warnln("art.Post():", err)
 	}
 
-	if user := database.DB.FindUser(m.Author.ID); user != nil {
-		channels := user.Channels(m.ChannelID)
-		err := art.Crosspost(s, channels, repost.RepostOptions{
+	if user := database.DB.FindUser(ctx.Event.Author.ID); user != nil {
+		channels := user.Channels(ctx.Event.ChannelID)
+		err := art.Crosspost(ctx.Session, channels, repost.RepostOptions{
 			KeepTwitterFirst: true,
 		})
 		if err != nil {
@@ -154,7 +157,7 @@ func prefixless(s *discordgo.Session, m *discordgo.MessageCreate) error {
 	return nil
 }
 
-func reactCreated(s *discordgo.Session, r *discordgo.MessageReactionAdd) {
+func (b *Bot) reactCreated(s *discordgo.Session, r *discordgo.MessageReactionAdd) {
 	if r.UserID == s.State.User.ID {
 		return
 	}
@@ -179,7 +182,13 @@ func reactCreated(s *discordgo.Session, r *discordgo.MessageReactionAdd) {
 					msg.Content = msg.Embeds[0].URL
 				}
 			}
-			art := repost.NewPost(&discordgo.MessageCreate{Message: msg})
+
+			art := repost.NewPost(&gumi.Ctx{
+				Session: s,
+				Event:   &discordgo.MessageCreate{Message: msg},
+				Router:  b.Router,
+			})
+
 			if art.Len() == 0 {
 				return
 			}
@@ -187,52 +196,58 @@ func reactCreated(s *discordgo.Session, r *discordgo.MessageReactionAdd) {
 			var artwork *database.Artwork
 			switch {
 			case len(art.PixivMatches) > 0:
-				if utils.PixivDown {
-					return
-				}
+				if px, ok := b.Router.Storage.Get("pixiv"); ok {
+					px := px.(*ugoira.App)
 
-				pixivID := ""
-				for k := range art.PixivMatches {
-					pixivID = k
-					break
-				}
+					pixivID := ""
+					for k := range art.PixivMatches {
+						pixivID = k
+						break
+					}
 
-				log.Infof("Detected Pixiv art to favourite. User ID: %v. Pixiv ID: %v", r.UserID, pixivID)
-				pixiv, err := ugoira.PixivApp.GetPixivPost(pixivID)
-				if err != nil {
-					log.Warnf("addFavorite -> GetPixivPost: %v", err)
-					return
-				}
+					log.Infof("Detected Pixiv art to favourite. User ID: %v. Pixiv ID: %v", r.UserID, pixivID)
+					pixiv, err := px.GetPixivPost(pixivID)
+					if err != nil {
+						log.Warnf("addFavorite -> GetPixivPost: %v", err)
+						return
+					}
 
-				artwork = &database.Artwork{
-					Title:     pixiv.Title,
-					URL:       pixiv.URL,
-					Author:    pixiv.Author,
-					Images:    pixiv.Images.ToArray(),
-					CreatedAt: time.Now(),
-					UpdatedAt: time.Now(),
-				}
-			case len(art.TwitterMatches) > 0:
-				twitterURL := ""
-				for k := range art.TwitterMatches {
-					twitterURL = "https://twitter.com/i/status/" + k
-					break
-				}
-
-				log.Infof("Detected Twitter art to favourite. User ID: %v. Tweet: %v", r.UserID, twitterURL)
-				tweet, err := tsuita.App.GetTweet(twitterURL)
-				if err != nil {
-					log.Warnf("addFavorite -> GetTwitterPost: %v", err)
-					return
-				}
-
-				if len(tweet.Gallery) > 0 {
 					artwork = &database.Artwork{
-						Author:    tweet.Username,
-						Images:    tweet.Images(),
-						URL:       tweet.URL,
+						Title:     pixiv.Title,
+						URL:       pixiv.URL,
+						Author:    pixiv.Author,
+						Images:    pixiv.Images.ToArray(),
 						CreatedAt: time.Now(),
 						UpdatedAt: time.Now(),
+					}
+				}
+			case len(art.TwitterMatches) > 0:
+				if ts, ok := b.Router.Storage.Get("twitter"); ok {
+					var (
+						twitterURL string
+						ts         = ts.(*tsuita.Tsuita)
+					)
+
+					for k := range art.TwitterMatches {
+						twitterURL = "https://twitter.com/i/status/" + k
+						break
+					}
+
+					log.Infof("Detected Twitter art to favourite. User ID: %v. Tweet: %v", r.UserID, twitterURL)
+					tweet, err := ts.GetTweet(twitterURL)
+					if err != nil {
+						log.Warnf("addFavorite -> GetTwitterPost: %v", err)
+						return
+					}
+
+					if len(tweet.Gallery) > 0 {
+						artwork = &database.Artwork{
+							Author:    tweet.Username,
+							Images:    tweet.Images(),
+							URL:       tweet.URL,
+							CreatedAt: time.Now(),
+							UpdatedAt: time.Now(),
+						}
 					}
 				}
 			}
@@ -291,7 +306,7 @@ func reactCreated(s *discordgo.Session, r *discordgo.MessageReactionAdd) {
 	}
 }
 
-func reactRemoved(s *discordgo.Session, r *discordgo.MessageReactionRemove) {
+func (b *Bot) reactRemoved(s *discordgo.Session, r *discordgo.MessageReactionRemove) {
 	if r.UserID == s.State.User.ID {
 		return
 	}
@@ -311,7 +326,12 @@ func reactRemoved(s *discordgo.Session, r *discordgo.MessageReactionRemove) {
 						msg.Content = msg.Embeds[0].URL
 					}
 				}
-				art := repost.NewPost(&discordgo.MessageCreate{Message: msg})
+
+				art := repost.NewPost(&gumi.Ctx{
+					Session: s,
+					Event:   &discordgo.MessageCreate{Message: msg},
+					Router:  b.Router,
+				})
 				if art.Len() == 0 {
 					return
 				}
@@ -342,33 +362,39 @@ func reactRemoved(s *discordgo.Session, r *discordgo.MessageReactionRemove) {
 						}
 					}
 				case len(art.TwitterMatches) > 0:
-					log.Infof("Removing a favourite. User ID: %v", r.UserID)
-					twitterURL := ""
-					for k := range art.TwitterMatches {
-						twitterURL = "https://twitter.com/i/status/" + k
-						break
-					}
+					if ts, ok := b.Router.Storage.Get("twitter"); ok {
+						var (
+							twitterURL string
+							ts         = ts.(*tsuita.Tsuita)
+						)
 
-					tweet, err := tsuita.App.GetTweet(twitterURL)
-					if err != nil {
-						log.Warnf("reactRemoved -> GetTweet: %v", err)
-						return
-					}
+						for k := range art.TwitterMatches {
+							twitterURL = "https://twitter.com/i/status/" + k
+							break
+						}
 
-					artwork, err := database.DB.RemoveFavouriteURL(user.ID, tweet.URL)
-					if err != nil {
-						log.Warnln("DeleteFavouriteURL -> %v", err)
-					} else if user.DM {
-						ch, err := s.UserChannelCreate(user.ID)
+						log.Infof("Removing a favourite. User ID: %v", r.UserID)
+						tweet, err := ts.GetTweet(twitterURL)
 						if err != nil {
-							log.Warnf("s.UserChannelCreate -> %v", err)
-						} else {
-							eb := embeds.NewBuilder()
-							eb.Title("✅ Sucessfully removed an artwork from favourites")
-							eb.Thumbnail(artwork.Images[0])
-							eb.Description(fmt.Sprintf("Don't like DMs? Execute `bt!userset dm disabled`\n```\nURL: %v```", twitterURL))
+							log.Warnf("reactRemoved -> GetTweet: %v", err)
+							return
+						}
 
-							s.ChannelMessageSendEmbed(ch.ID, eb.Finalize())
+						artwork, err := database.DB.RemoveFavouriteURL(user.ID, tweet.URL)
+						if err != nil {
+							log.Warnln("DeleteFavouriteURL -> %v", err)
+						} else if user.DM {
+							ch, err := s.UserChannelCreate(user.ID)
+							if err != nil {
+								log.Warnf("s.UserChannelCreate -> %v", err)
+							} else {
+								eb := embeds.NewBuilder()
+								eb.Title("✅ Sucessfully removed an artwork from favourites")
+								eb.Thumbnail(artwork.Images[0])
+								eb.Description(fmt.Sprintf("Don't like DMs? Execute `bt!userset dm disabled`\n```\nURL: %v```", twitterURL))
+
+								s.ChannelMessageSendEmbed(ch.ID, eb.Finalize())
+							}
 						}
 					}
 				}

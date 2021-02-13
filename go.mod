@@ -5,7 +5,7 @@ go 1.15
 require (
 	github.com/PuerkitoBio/goquery v1.6.0 // indirect
 	github.com/ReneKroon/ttlcache v1.7.0
-	github.com/VTGare/gumi v0.3.2
+	github.com/VTGare/gumi v0.4.0
 	github.com/VTGare/iqdbgo v0.1.1
 	github.com/VTGare/pixiv v0.0.6
 	github.com/VTGare/sengoku v0.1.6

@@ -12,6 +12,7 @@ import (
 	"github.com/VTGare/boe-tea-go/internal/ugoira"
 	"github.com/VTGare/boe-tea-go/pkg/tsuita"
 	"github.com/VTGare/boe-tea-go/utils"
+	"github.com/VTGare/gumi"
 	"github.com/bwmarrin/discordgo"
 	"github.com/sirupsen/logrus"
 )
@@ -95,6 +96,8 @@ type ArtPost struct {
 	HasUgoira      bool
 	IsCrosspost    bool
 	event          *discordgo.MessageCreate
+	ts             *tsuita.Tsuita
+	px             *ugoira.App
 }
 
 type RepostOptions struct {
@@ -527,30 +530,40 @@ func (a *ArtPost) Crosspost(s *discordgo.Session, channels []string, opts ...Rep
 }
 
 //NewPost creates an ArtPost from discordgo message create event.
-func NewPost(m *discordgo.MessageCreate, content ...string) *ArtPost {
+func NewPost(ctx *gumi.Ctx, content ...string) *ArtPost {
 	var (
 		twitter = make(map[string]bool)
 		IDs     = make(map[string]bool)
 	)
 
 	if len(content) != 0 {
-		m.Content = content[0]
+		ctx.Event.Content = content[0]
 	}
 
-	for _, match := range tsuita.TwitterRegex.FindAllStringSubmatch(m.Content, len(m.Content)+1) {
-		twitter[match[1]] = true
+	ts, ok := ctx.Router.Storage.Get("twitter")
+	if ok {
+		for _, match := range ts.(*tsuita.Tsuita).TwitterRegex.FindAllStringSubmatch(ctx.Event.Content, len(ctx.Event.Content)+1) {
+			twitter[match[1]] = true
+		}
 	}
 
-	pixiv := utils.PixivRegex.FindAllStringSubmatch(m.Content, len(m.Content)+1)
+	pixiv := utils.PixivRegex.FindAllStringSubmatch(ctx.Event.Content, len(ctx.Event.Content)+1)
 	if pixiv != nil {
 		for _, match := range pixiv {
 			IDs[match[1]] = true
 		}
 	}
 
-	return &ArtPost{
-		event:          m,
+	post := &ArtPost{
+		event:          ctx.Event,
 		TwitterMatches: twitter,
 		PixivMatches:   IDs,
+		ts:             ts.(*tsuita.Tsuita),
 	}
+
+	if px, ok := ctx.Router.Storage.Get("pixiv"); ok {
+		post.px = px.(*ugoira.App)
+	}
+
+	return post
 }

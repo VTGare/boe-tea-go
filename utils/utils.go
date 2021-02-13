@@ -28,15 +28,12 @@ type PromptOptions struct {
 }
 
 var (
-	PixivDown bool
 	//DefaultEmbedImage is an image for embeds
 	DefaultEmbedImage = "https://i.imgur.com/OZ1Al5h.png"
 	//PixivRegex is a regular experession that detects various Pixiv links
 	PixivRegex = regexp.MustCompile(`(?i)http(?:s)?:\/\/(?:www\.)?pixiv\.net\/(?:en\/)?(?:artworks\/|member_illust\.php\?)(?:mode=medium\&)?(?:illust_id=)?([0-9]+)`)
 	//NumRegex is a terrible number regex. Gonna replace it with better code.
 	NumRegex = regexp.MustCompile(`([0-9]+)`)
-	//AuthorID is author's Discord ID, gonna replace it with an env variable.
-	AuthorID = "244208152776540160"
 	//ErrNotEnoughArguments is a default error when not enough arguments were given
 	ErrNotEnoughArguments = errors.New("not enough arguments")
 	//ErrParsingArgument is a default error when provided arguments couldn't be parsed

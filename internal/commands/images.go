@@ -118,7 +118,7 @@ func exclude(ctx *gumi.Ctx) error {
 		indices = args[1:]
 	)
 
-	art := repost.NewPost(m, url)
+	art := repost.NewPost(ctx, url)
 	if len(art.PixivMatches) == 0 {
 		eb := embeds.NewBuilder()
 		msg := "First argument should be a Pixiv link.\nValue received: [" + args[0] + "]"
@@ -179,7 +179,7 @@ func include(ctx *gumi.Ctx) error {
 		indices = args[1:]
 	)
 
-	art := repost.NewPost(m, url)
+	art := repost.NewPost(ctx, url)
 	if len(art.PixivMatches) == 0 {
 		eb := embeds.NewBuilder()
 		msg := "First argument should be a Pixiv link.\nValue received: [" + args[0] + "]"
@@ -237,7 +237,7 @@ func crosspost(ctx *gumi.Ctx) error {
 		s    = ctx.Session
 		m    = ctx.Event
 		user = database.DB.FindUser(m.Author.ID)
-		art  = repost.NewPost(m)
+		art  = repost.NewPost(ctx)
 	)
 	if user == nil {
 		eb := embeds.NewBuilder()
@@ -281,7 +281,6 @@ func twitter(ctx *gumi.Ctx) error {
 	}
 
 	var (
-		m          = ctx.Event
 		s          = ctx.Session
 		args       = strings.Fields(ctx.Args.Raw)
 		twitterURL = args[0]
@@ -314,7 +313,7 @@ func twitter(ctx *gumi.Ctx) error {
 		}
 	}
 
-	a := repost.NewPost(m, twitterURL)
+	a := repost.NewPost(ctx, twitterURL)
 	err := a.Post(s, repost.RepostOptions{
 		KeepTwitterFirst:  true,
 		TwitterIndices:    indexMap,

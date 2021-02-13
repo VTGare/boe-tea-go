@@ -6,7 +6,7 @@ import (
 	"github.com/VTGare/boe-tea-go/internal/bot"
 	"github.com/VTGare/boe-tea-go/internal/database"
 	"github.com/VTGare/boe-tea-go/internal/ugoira"
-	"github.com/VTGare/boe-tea-go/utils"
+	"github.com/VTGare/boe-tea-go/pkg/tsuita"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -14,6 +14,7 @@ var (
 	token         = os.Getenv("BOT_TOKEN")
 	pixivEmail    = os.Getenv("PIXIV_EMAIL")
 	pixivPassword = os.Getenv("PIXIV_PASSWORD")
+	authorID      = os.Getenv("AUTHOR_ID")
 )
 
 func main() {
@@ -24,17 +25,20 @@ func main() {
 		log.Fatalln("PIXIV_EMAIL env variable doesn't exist")
 	case pixivPassword == "":
 		log.Fatalln("PIXIV_PASSWORD env variable doesn't exist")
+	case authorID == "":
+		log.Fatalln("AUTHOR_ID env variable doesn't exist'")
 	}
 
-	b, err := bot.NewBot(token)
+	bot, err := bot.NewBot(token)
 	px, err := ugoira.NewApp(pixivEmail, pixivPassword)
-	if err != nil {
-		log.Warnln("ugoira.NewApp(): ", err)
-		utils.PixivDown = true
+	if px != nil {
+		bot.Router.Storage.Set("pixiv", px)
 	}
 
-	ugoira.PixivApp = px
-	err = b.Run()
+	bot.Router.Storage.Set("twitter", tsuita.NewTsuita())
+	bot.Router.AuthorID = authorID
+
+	err = bot.Run()
 	if err != nil {
 		log.Fatalln(err)
 	}
