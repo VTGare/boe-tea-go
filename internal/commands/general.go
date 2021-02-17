@@ -116,10 +116,20 @@ func feedback(ctx *gumi.Ctx) error {
 
 	eb := embeds.NewBuilder()
 	eb.Title(
-		fmt.Sprintf("Feedback from %v (%v)", ctx.Event.Author.String(), ctx.Event.Author.ID),
+		fmt.Sprintf("Feedback from %v", ctx.Event.Author.String()),
 	).Thumbnail(
 		ctx.Event.Author.AvatarURL(""),
-	).Description(ctx.Args.Raw)
+	).Description(
+		ctx.Args.Raw,
+	).AddField(
+		"Author", ctx.Event.Author.Mention(),
+	)
+
+	if ctx.Event.GuildID != "" {
+		eb.AddField(
+			"Guild", ctx.Event.GuildID,
+		)
+	}
 
 	if len(ctx.Event.Attachments) >= 1 {
 		eb.Image(ctx.Event.Attachments[0].URL)

@@ -42,12 +42,48 @@ func init() {
 	})
 
 	Commands = append(Commands, &gumi.Command{
-		Name:        "download",
+		Name:        "reply",
 		Group:       groupName,
 		AuthorOnly:  true,
-		Description: "Download images",
-		Usage:       "bt!download <channel ID>",
+		Description: "Reply to feedback",
+		Usage:       "bt!reply <user ID>",
+		Exec:        reply,
 	})
+
+}
+
+func reply(ctx *gumi.Ctx) error {
+	if ctx.Args.Len() < 2 {
+		return utils.ErrNotEnoughArguments
+	}
+
+	userID := ctx.Args.Get(0).Raw
+	ch, err := ctx.Session.UserChannelCreate(userID)
+	if err != nil {
+		return err
+	}
+
+	eb := embeds.NewBuilder()
+	eb.Title(
+		fmt.Sprintf("Feedback reply"),
+	).Thumbnail(
+		ctx.Session.State.User.AvatarURL(""),
+	).Description(strings.TrimPrefix(strings.TrimSpace(ctx.Args.Raw), userID))
+
+	if attachments := ctx.Event.Attachments; len(attachments) >= 1 {
+		if strings.HasSuffix(attachments[0].Filename, "png") || strings.HasSuffix(attachments[0].Filename, "jpg") || strings.HasSuffix(attachments[0].Filename, "gif") {
+			eb.Image(attachments[0].URL)
+		}
+	}
+
+	_, err = ctx.Session.ChannelMessageSendEmbed(ch.ID, eb.Finalize())
+	if err != nil {
+		return err
+	}
+
+	eb.Clear()
+	ctx.ReplyEmbed(eb.SuccessTemplate("Reply has been sent.").Finalize())
+	return nil
 }
 
 func devstats(ctx *gumi.Ctx) error {
