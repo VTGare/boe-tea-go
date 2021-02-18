@@ -1,7 +1,6 @@
 package repost
 
 import (
-	"errors"
 	"fmt"
 	"math/rand"
 	"strconv"
@@ -72,7 +71,12 @@ func isNSFW(posts []*ugoira.PixivPost) bool {
 
 func (a *ArtPost) SendPixiv(s *discordgo.Session, IDs map[string]bool, opts ...RepostOptions) ([]*discordgo.MessageSend, []*ugoira.PixivPost, error) {
 	if a.px == nil {
-		return nil, nil, errors.New("pixiv api is down")
+		messages := make([]*discordgo.MessageSend, 0, len(IDs))
+		for id := range IDs {
+			messages = append(messages, minimalPixivEmbed(id))
+		}
+
+		return messages, nil, nil
 	}
 
 	if len(IDs) == 0 {
@@ -278,4 +282,23 @@ func createUgoiraEmbed(post *ugoira.PixivPost, easter *embedMessage) *discordgo.
 		Reader: post.Ugoira.File,
 	})
 	return send
+}
+
+func minimalPixivEmbed(pixivID string) *discordgo.MessageSend {
+	var (
+		eb  = embeds.NewBuilder().Title("Artwork " + pixivID).URL("https://pixiv.net/en/artworks/" + pixivID)
+		uri = fmt.Sprintf("https://api.pixiv.moe/image/%v.jpg", pixivID)
+	)
+
+	eb.Image(uri)
+	eb.AddField("Original quality", fmt.Sprintf("[Click here desu~](%v)", uri), true)
+	eb.AddField(
+		"Heads-up",
+		"This is a LIDL replacement for Pixiv embeds while Boe Tea can't connent to Pixiv API. If embed image doesn't load use URL in [Original quality] field",
+		true,
+	)
+
+	return &discordgo.MessageSend{
+		Embed: eb.Finalize(),
+	}
 }

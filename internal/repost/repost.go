@@ -235,7 +235,7 @@ func (a *ArtPost) Cleanup(posts []*ugoira.PixivPost) {
 	}
 }
 
-func sendMessage(s *discordgo.Session, m *discordgo.MessageCreate, send *discordgo.MessageSend) (*discordgo.Message, error) {
+func (a *ArtPost) sendMessage(s *discordgo.Session, m *discordgo.MessageCreate, send *discordgo.MessageSend) (*discordgo.Message, error) {
 	msg, err := s.ChannelMessageSendComplex(m.ChannelID, send)
 	if err != nil {
 		return nil, err
@@ -243,8 +243,10 @@ func sendMessage(s *discordgo.Session, m *discordgo.MessageCreate, send *discord
 
 	if g, ok := database.GuildCache.Get(m.GuildID); ok {
 		if g.(*database.GuildSettings).Reactions {
-			s.MessageReactionAdd(msg.ChannelID, msg.ID, "💖")
-			s.MessageReactionAdd(msg.ChannelID, msg.ID, "🤤")
+			if len(a.PixivMatches) == 0 {
+				s.MessageReactionAdd(msg.ChannelID, msg.ID, "💖")
+				s.MessageReactionAdd(msg.ChannelID, msg.ID, "🤤")
+			}
 		}
 	}
 
@@ -346,7 +348,7 @@ func (a *ArtPost) Post(s *discordgo.Session, opts ...RepostOptions) error {
 			}
 
 			for _, message := range messages {
-				msg, err := sendMessage(s, m, message)
+				msg, err := a.sendMessage(s, m, message)
 				if err != nil {
 					logrus.Warnf("sendMessage: %v", err)
 				}
@@ -392,7 +394,7 @@ func (a *ArtPost) Post(s *discordgo.Session, opts ...RepostOptions) error {
 				if prompt {
 					for _, t := range tweets {
 						for _, send := range t {
-							msg, err := sendMessage(s, m, send)
+							msg, err := a.sendMessage(s, m, send)
 							if err != nil {
 								logrus.Warnf("sendMessage: %v", err)
 							}
@@ -506,7 +508,7 @@ func (a *ArtPost) Crosspost(s *discordgo.Session, channels []string, opts ...Rep
 			}
 
 			for _, message := range messages {
-				sendMessage(s, m, message)
+				a.sendMessage(s, m, message)
 			}
 		}
 
@@ -519,7 +521,7 @@ func (a *ArtPost) Crosspost(s *discordgo.Session, channels []string, opts ...Rep
 			if len(tweets) > 0 {
 				for _, t := range tweets {
 					for _, send := range t {
-						sendMessage(s, m, send)
+						a.sendMessage(s, m, send)
 					}
 				}
 			}
