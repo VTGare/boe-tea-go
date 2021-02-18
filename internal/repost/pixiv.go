@@ -297,6 +297,9 @@ func minimalPixivEmbed(pixivID string) *discordgo.MessageSend {
 		"This is a LIDL replacement for Pixiv embeds while Boe Tea can't connect to Pixiv API.\nEmbed image might fail to load!",
 	)
 
+	easter := embedMessages[rand.Intn(len(embedMessages))]
+	eb.Footer(easter.Content, "")
+
 	return &discordgo.MessageSend{
 		Embed: eb.Finalize(),
 	}
