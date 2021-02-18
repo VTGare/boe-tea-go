@@ -291,11 +291,10 @@ func minimalPixivEmbed(pixivID string) *discordgo.MessageSend {
 	)
 
 	eb.Image(uri)
-	eb.AddField("Original quality", fmt.Sprintf("[Click here desu~](%v)", uri), true)
+	eb.AddField("Original quality", fmt.Sprintf("[Click here desu~](%v)", uri))
 	eb.AddField(
 		"Heads-up",
-		"This is a LIDL replacement for Pixiv embeds while Boe Tea can't connent to Pixiv API. If embed image doesn't load use URL in [Original quality] field",
-		true,
+		"This is a LIDL replacement for Pixiv embeds while Boe Tea can't connect to Pixiv API.\nEmbed image might fail to load!",
 	)
 
 	return &discordgo.MessageSend{
