@@ -243,10 +243,8 @@ func (a *ArtPost) sendMessage(s *discordgo.Session, m *discordgo.MessageCreate, 
 
 	if g, ok := database.GuildCache.Get(m.GuildID); ok {
 		if g.(*database.GuildSettings).Reactions {
-			if len(a.PixivMatches) == 0 {
-				s.MessageReactionAdd(msg.ChannelID, msg.ID, "💖")
-				s.MessageReactionAdd(msg.ChannelID, msg.ID, "🤤")
-			}
+			s.MessageReactionAdd(msg.ChannelID, msg.ID, "💖")
+			s.MessageReactionAdd(msg.ChannelID, msg.ID, "🤤")
 		}
 	}
 
