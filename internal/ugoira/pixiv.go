@@ -17,8 +17,8 @@ type App struct {
 	cache *ttlcache.Cache
 }
 
-func NewApp(username, password string) (*App, error) {
-	_, err := pixiv.Login(username, password)
+func NewApp(token, refreshToken string) (*App, error) {
+	_, err := pixiv.LoadAuth(token, refreshToken, time.Now().Add(3600))
 	if err != nil {
 		log.Warnln("pixiv.Login():", err)
 		return nil, err
