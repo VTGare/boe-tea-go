@@ -100,6 +100,7 @@ If you want to copy an invite link, simply right click it and press Copy Link.
 
 ***Special thanks to our patron(s):***
 - Nom (Indy#4649) | 4 months
+- Danyo | 1 month
 `)
 	eb.AddField("Support server", "[Click here desu~](https://discord.gg/hcxuHE7)", true)
 	eb.AddField("Invite link", "[Click here desu~](https://discord.com/api/oauth2/authorize?client_id=636468907049353216&permissions=537259072&scope=bot)", true)

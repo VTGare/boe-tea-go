@@ -115,6 +115,7 @@ type NHBook struct {
 	Artists    []string
 	Tags       []string
 	Cover      string
-	Pages      int
+	Pages      []string
+	PageCount  int
 	Favourites int
 }

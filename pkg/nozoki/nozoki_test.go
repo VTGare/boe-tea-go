@@ -8,13 +8,13 @@ var (
 	n        *Nozoki
 	expected = map[string]NHBook{
 		"177013": {
-			ID:      177013,
-			URL:     "https://nhentai.net/g/177013",
-			Titles:  NHTitle{Japanese: "", English: "[ShindoLA] METAMORPHOSIS (Complete) [English]", Pretty: "METAMORPHOSIS"},
-			Artists: []string{""},
-			Tags:    []string{""},
-			Cover:   "",
-			Pages:   225,
+			ID:        177013,
+			URL:       "https://nhentai.net/g/177013",
+			Titles:    NHTitle{Japanese: "", English: "[ShindoLA] METAMORPHOSIS (Complete) [English]", Pretty: "METAMORPHOSIS"},
+			Artists:   []string{""},
+			Tags:      []string{""},
+			Cover:     "",
+			PageCount: 225,
 		},
 	}
 )
@@ -34,8 +34,8 @@ func TestNozoki(t *testing.T) {
 		switch {
 		case res.ID != book.ID:
 			t.Errorf("ID mismatch. Expected %v, got %v", book.ID, res.ID)
-		case res.Pages != book.Pages:
-			t.Errorf("Pages mismatch. Expected %v, got %v", book.Pages, res.Pages)
+		case res.PageCount != book.PageCount:
+			t.Errorf("Pages mismatch. Expected %v, got %v", book.PageCount, res.PageCount)
 		}
 	}
 }

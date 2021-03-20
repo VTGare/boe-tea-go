@@ -10,8 +10,8 @@ var (
 	controls = map[string]bool{"⏮": true, "⏪": true, "◀": true, "⏹": true, "▶": true, "⏩": true, "⏭": true}
 )
 
-//Widget is an interactive DiscordGo widget interface
-type Widget struct {
+//EmbedWidget is an interactive DiscordGo widget interface
+type EmbedWidget struct {
 	s           *discordgo.Session
 	m           *discordgo.Message
 	author      string
@@ -19,11 +19,11 @@ type Widget struct {
 	Pages       []*discordgo.MessageEmbed
 }
 
-func NewWidget(s *discordgo.Session, author string, embeds []*discordgo.MessageEmbed) *Widget {
-	return &Widget{s, nil, author, 0, embeds}
+func NewWidget(s *discordgo.Session, author string, embeds []*discordgo.MessageEmbed) *EmbedWidget {
+	return &EmbedWidget{s, nil, author, 0, embeds}
 }
 
-func (w *Widget) Start(channelID string) error {
+func (w *EmbedWidget) Start(channelID string) error {
 	if len(w.Pages) == 0 {
 		return nil
 	}
@@ -115,7 +115,7 @@ func (w *Widget) Start(channelID string) error {
 	return nil
 }
 
-func (w *Widget) pageUp() error {
+func (w *EmbedWidget) pageUp() error {
 	if w.currentPage == w.len()-1 || w.len() <= 1 {
 		return nil
 	}
@@ -129,7 +129,7 @@ func (w *Widget) pageUp() error {
 	return nil
 }
 
-func (w *Widget) fivePagesUp() error {
+func (w *EmbedWidget) fivePagesUp() error {
 	if w.currentPage == w.len()-1 || w.len() <= 1 {
 		return nil
 	}
@@ -147,7 +147,7 @@ func (w *Widget) fivePagesUp() error {
 	return nil
 }
 
-func (w *Widget) pageDown() error {
+func (w *EmbedWidget) pageDown() error {
 	if w.currentPage == 0 || w.len() <= 1 {
 		return nil
 	}
@@ -161,7 +161,7 @@ func (w *Widget) pageDown() error {
 	return nil
 }
 
-func (w *Widget) fivePagesDown() error {
+func (w *EmbedWidget) fivePagesDown() error {
 	if w.currentPage == 0 || w.len() <= 1 {
 		return nil
 	}
@@ -179,7 +179,7 @@ func (w *Widget) fivePagesDown() error {
 	return nil
 }
 
-func (w *Widget) lastPage() error {
+func (w *EmbedWidget) lastPage() error {
 	if w.currentPage == w.len()-1 || w.len() <= 1 {
 		return nil
 	}
@@ -193,7 +193,7 @@ func (w *Widget) lastPage() error {
 	return nil
 }
 
-func (w *Widget) firstPage() error {
+func (w *EmbedWidget) firstPage() error {
 	if w.currentPage == 0 || w.len() <= 1 {
 		return nil
 	}
@@ -207,7 +207,7 @@ func (w *Widget) firstPage() error {
 	return nil
 }
 
-func (w *Widget) len() int {
+func (w *EmbedWidget) len() int {
 	return len(w.Pages)
 }
 

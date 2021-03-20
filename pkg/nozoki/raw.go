@@ -12,7 +12,7 @@ type rawNHBook struct {
 	MediaID    string      `json:"media_id"`
 	Titles     NHTitle     `json:"title"`
 	Tags       []rawNHTag  `json:"tags"`
-	Pages      interface{} `json:"num_pages"`
+	PageCount  interface{} `json:"num_pages"`
 	Favourites interface{} `json:"num_favorites"`
 }
 
@@ -42,9 +42,14 @@ func (raw *rawNHBook) toBook() (*NHBook, error) {
 	if err != nil {
 		logrus.Warnf("nozoki.toBook(): %v", err)
 	}
-	pages, err := interfaceToInt(raw.Pages)
+	pageCount, err := interfaceToInt(raw.PageCount)
 	if err != nil {
 		logrus.Warnf("nozoki.toBook(): %v", err)
+	}
+
+	pages := make([]string, 0, pageCount)
+	for i := 1; i <= pageCount; i++ {
+		pages = append(pages, fmt.Sprintf("https://i.nhentai.net/galleries/%v/%v.jpg", raw.MediaID, i))
 	}
 
 	return &NHBook{
@@ -55,6 +60,7 @@ func (raw *rawNHBook) toBook() (*NHBook, error) {
 		URL:        fmt.Sprintf("https://nhentai.net/g/%v/", id),
 		Cover:      fmt.Sprintf("https://t.nhentai.net/galleries/%v/cover.jpg", raw.MediaID),
 		Pages:      pages,
+		PageCount:  pageCount,
 		Favourites: favourites,
 	}, nil
 }

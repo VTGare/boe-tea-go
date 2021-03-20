@@ -7,8 +7,11 @@ import (
 
 	"github.com/VTGare/boe-tea-go/internal/database"
 	"github.com/VTGare/boe-tea-go/internal/embeds"
+	"github.com/VTGare/boe-tea-go/internal/widget"
 	"github.com/VTGare/boe-tea-go/pkg/nozoki"
 	"github.com/VTGare/gumi"
+	"github.com/bwmarrin/discordgo"
+	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -77,12 +80,29 @@ func nhentai(ctx *gumi.Ctx) error {
 	}
 
 	eb.Title(book.Titles.Pretty).URL(book.URL).Thumbnail(book.Cover)
-	eb.AddField("Artists", artists).AddField("Tags", tags).AddField("Favourites", strconv.Itoa(book.Favourites)).AddField("Pages", strconv.Itoa(book.Pages))
+	eb.AddField("Artists", artists).AddField("Tags", tags).AddField("Favourites", strconv.Itoa(book.Favourites)).AddField("Pages", strconv.Itoa(book.PageCount))
 
-	_, err = s.ChannelMessageSendEmbed(m.ChannelID, eb.Finalize())
-	if err != nil {
-		return err
+	doujin := make([]*discordgo.MessageEmbed, 0)
+
+	//Title embed
+	doujin = append(doujin, eb.Finalize())
+	for ind, page := range book.Pages {
+		eb := embeds.NewBuilder()
+
+		eb.Footer(fmt.Sprintf("Page %v/%v", ind+1, book.PageCount), "")
+		eb.Author(book.Titles.Pretty, page, "")
+		eb.Image(page)
+
+		doujin = append(doujin, eb.Finalize())
 	}
+
+	wg := widget.NewWidget(ctx.Session, m.Author.ID, doujin)
+	func() {
+		err := wg.Start(ctx.Event.ChannelID)
+		if err != nil {
+			logrus.Warnln("Widget error:", err)
+		}
+	}()
 
 	return nil
 }
