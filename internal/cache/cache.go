@@ -1,6 +1,9 @@
 package cache
 
-import "sync"
+import (
+	"sync"
+	"time"
+)
 
 //Cache represents a thread-safe map
 type Cache struct {
@@ -8,7 +11,7 @@ type Cache struct {
 	cache map[string]interface{}
 }
 
-func NewCache() *Cache {
+func NewCache(timeout time.Duration) *Cache {
 	return &Cache{
 		cache: make(map[string]interface{}),
 	}
