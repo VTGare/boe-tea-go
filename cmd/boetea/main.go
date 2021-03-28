@@ -8,9 +8,12 @@ import (
 
 	"github.com/VTGare/boe-tea-go/internal/config"
 	"github.com/VTGare/boe-tea-go/internal/database/mongodb"
+	"github.com/VTGare/boe-tea-go/pkg/artworks/pixiv"
 	"github.com/VTGare/boe-tea-go/pkg/artworks/twitter"
 	"github.com/VTGare/boe-tea-go/pkg/bot"
+	"github.com/VTGare/boe-tea-go/pkg/handlers"
 	"github.com/VTGare/boe-tea-go/pkg/models"
+	"github.com/VTGare/gumi"
 	"go.uber.org/zap"
 )
 
@@ -35,7 +38,15 @@ func main() {
 	m := models.New(db, log)
 	b, err := bot.New(cfg, m, log)
 	b.AddProvider(twitter.New())
-	b.AddRouter()
+	if pixiv, err := pixiv.New(cfg.Pixiv.AuthToken, cfg.Pixiv.RefreshToken); err == nil {
+		b.AddProvider(pixiv)
+	}
+
+	b.AddRouter(&gumi.Router{
+		AuthorID:           cfg.Discord.AuthorID,
+		PrefixResolver:     handlers.PrefixResolver(b),
+		NotCommandCallback: handlers.NotCommand(b),
+	})
 
 	if err := b.Open(); err != nil {
 		log.Fatal(err)

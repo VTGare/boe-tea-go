@@ -15,7 +15,7 @@ import (
 	"github.com/gocolly/colly/v2"
 )
 
-type tsuita struct {
+type Twitter struct {
 	cache  *ttlcache.Cache
 	nitter []string
 }
@@ -49,7 +49,7 @@ func New() artworks.Provider {
 	c := ttlcache.NewCache()
 	c.SetTTL(30 * time.Minute)
 
-	return &tsuita{cache: c, nitter: []string{
+	return &Twitter{cache: c, nitter: []string{
 		"https://nitter.snopyta.org",
 		"https://nitter.42l.fr",
 		"https://nitter.nixnet.services",
@@ -59,7 +59,7 @@ func New() artworks.Provider {
 	}}
 }
 
-func (t tsuita) Match(s string) (string, bool) {
+func (t Twitter) Match(s string) (string, bool) {
 	u, err := url.ParseRequestURI(s)
 	if err != nil {
 		return "", false
@@ -86,7 +86,7 @@ func (t tsuita) Match(s string) (string, bool) {
 	return snowflake, true
 }
 
-func (t tsuita) Find(snowflake string) (artworks.Artwork, error) {
+func (t Twitter) Find(snowflake string) (artworks.Artwork, error) {
 	if a, ok := t.Get(snowflake); ok {
 		return a, nil
 	}
@@ -104,7 +104,7 @@ func (t tsuita) Find(snowflake string) (artworks.Artwork, error) {
 	return nil, nil
 }
 
-func (t tsuita) scrapeTwitter(snowflake, nitter string) (*Artwork, error) {
+func (t Twitter) scrapeTwitter(snowflake, nitter string) (*Artwork, error) {
 	var (
 		res      = &Artwork{Snowflake: snowflake}
 		visitURL = fmt.Sprintf(nitter+"/i/status/%v", res.Snowflake)
@@ -186,7 +186,7 @@ func parse(s string) int {
 	return num
 }
 
-func (t tsuita) Get(snowflake string) (*Artwork, bool) {
+func (t Twitter) Get(snowflake string) (*Artwork, bool) {
 	a, ok := t.cache.Get(snowflake)
 	if !ok {
 		return nil, ok
@@ -195,7 +195,7 @@ func (t tsuita) Get(snowflake string) (*Artwork, bool) {
 	return a.(*Artwork), ok
 }
 
-func (t tsuita) Set(snowflake string, artwork *Artwork) {
+func (t Twitter) Set(snowflake string, artwork *Artwork) {
 	t.cache.Set(snowflake, artwork)
 }
 
