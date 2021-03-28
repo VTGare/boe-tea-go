@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/VTGare/boe-tea-go/internal/cache"
 	"github.com/VTGare/boe-tea-go/internal/database/mongodb"
 	"github.com/VTGare/boe-tea-go/internal/validate"
 	"go.mongodb.org/mongo-driver/bson"
@@ -38,10 +39,13 @@ type Service interface {
 type guildService struct {
 	db     *mongodb.Mongo
 	logger *zap.SugaredLogger
+	cache  *cache.Cache
 }
 
 func NewService(db *mongodb.Mongo, logger *zap.SugaredLogger) Service {
-	return &guildService{db, logger}
+	cache := cache.New()
+
+	return &guildService{db, logger, cache}
 }
 
 func (g guildService) col() *mongo.Collection {
@@ -67,38 +71,31 @@ func (g guildService) All(ctx context.Context) ([]*Guild, error) {
 }
 
 func (g guildService) FindOne(ctx context.Context, id string) (*Guild, error) {
+	if guild, ok := g.get(id); ok {
+		return guild, nil
+	}
+
 	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
 
-	res := g.col().FindOne(ctx, bson.D{{Key: "guild_id", Value: id}})
+	res := g.col().FindOne(ctx, bson.M{"guild_id": id})
 
 	var guild Guild
 	err := res.Decode(&guild)
 
+	g.set(id, &guild)
 	return &guild, err
 }
 
 func (g guildService) InsertOne(ctx context.Context, id string) (*Guild, error) {
-	guild := &Guild{
-		ID:          id,
-		Prefix:      "bt!",
-		Limit:       10,
-		NSFW:        true,
-		Pixiv:       true,
-		Twitter:     true,
-		Repost:      "enabled",
-		Crosspost:   true,
-		Reactions:   true,
-		ArtChannels: make([]string, 0),
-		CreatedAt:   time.Now(),
-		UpdatedAt:   time.Now(),
-	}
+	guild := DefaultGuild(id)
 
 	_, err := g.col().InsertOne(ctx, guild)
 	if err != nil {
 		return nil, err
 	}
 
+	g.set(id, guild)
 	return guild, nil
 }
 
@@ -126,5 +123,36 @@ func (g guildService) ReplaceOne(ctx context.Context, guild *Guild) (*Guild, err
 		return nil, err
 	}
 
+	g.set(guild.ID, guild)
 	return guild, nil
+}
+
+func (g guildService) set(id string, guild *Guild) {
+	g.cache.Set(guild.ID, guild)
+}
+
+func (g guildService) get(id string) (*Guild, bool) {
+	guild, ok := g.cache.Get(id)
+	if !ok {
+		return nil, false
+	}
+
+	return guild.(*Guild), true
+}
+
+func DefaultGuild(id string) *Guild {
+	return &Guild{
+		ID:          id,
+		Prefix:      "bt!",
+		Limit:       10,
+		NSFW:        true,
+		Pixiv:       true,
+		Twitter:     true,
+		Repost:      "enabled",
+		Crosspost:   true,
+		Reactions:   true,
+		ArtChannels: make([]string, 0),
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+	}
 }
