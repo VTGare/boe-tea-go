@@ -13,6 +13,7 @@ require (
 	github.com/bwmarrin/discordgo v0.23.2
 	github.com/everpcpc/pixiv v0.0.0-20210128034500-a54eb720d8f3 // indirect
 	github.com/go-playground/validator/v10 v10.4.1
+	github.com/go-redis/redis/v8 v8.8.0 // indirect
 	github.com/gocolly/colly/v2 v2.1.0
 	github.com/stretchr/testify v1.7.0 // indirect
 	github.com/valyala/fasthttp v1.22.0 // indirect

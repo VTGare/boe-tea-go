@@ -13,6 +13,7 @@ import (
 	"github.com/VTGare/boe-tea-go/pkg/bot"
 	"github.com/VTGare/boe-tea-go/pkg/handlers"
 	"github.com/VTGare/boe-tea-go/pkg/models"
+	"github.com/VTGare/boe-tea-go/pkg/repost"
 	"github.com/VTGare/gumi"
 	"go.uber.org/zap"
 )
@@ -36,7 +37,17 @@ func main() {
 	}
 
 	m := models.New(db, log)
-	b, err := bot.New(cfg, m, log)
+
+	var dec repost.Detector
+	switch cfg.Repost.Type {
+	case "redis":
+		//TODO: add redis
+		dec = repost.NewRedis(nil)
+	default:
+		dec = repost.NewMemory()
+	}
+
+	b, err := bot.New(cfg, m, log, dec)
 	b.AddProvider(twitter.New())
 	if pixiv, err := pixiv.New(cfg.Pixiv.AuthToken, cfg.Pixiv.RefreshToken); err == nil {
 		log.Info("Successfully logged into Pixiv.")
@@ -50,7 +61,7 @@ func main() {
 	})
 
 	b.AddHandler(handlers.OnReady(b))
-	b.AddHandler(handlers.GuildCreated(b))
+	b.AddHandler(handlers.OnGuildCreated(b))
 
 	if err := b.Open(); err != nil {
 		log.Fatal(err)

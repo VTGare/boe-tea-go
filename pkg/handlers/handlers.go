@@ -12,6 +12,7 @@ import (
 	"github.com/VTGare/boe-tea-go/pkg/artworks/twitter"
 	"github.com/VTGare/boe-tea-go/pkg/bot"
 	"github.com/VTGare/boe-tea-go/pkg/models/guilds"
+	"github.com/VTGare/boe-tea-go/pkg/repost"
 	"github.com/VTGare/gumi"
 	"github.com/bwmarrin/discordgo"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -56,6 +57,7 @@ func NotCommand(b *bot.Bot) func(*gumi.Ctx) error {
 
 			wg, _ := errgroup.WithContext(context.Background())
 			artworks := make(chan artworks.Artwork, len(urls))
+			reposts := make(chan *repost.Repost, len(urls))
 
 			for _, url := range urls {
 				url := url //shadowing loop variables to pass them to wg.Go. It's required otherwise variables will stay the same every loop.
@@ -74,12 +76,28 @@ func NotCommand(b *bot.Bot) func(*gumi.Ctx) error {
 						}
 
 						if id, ok := provider.Match(url); ok {
+							if rep, _ := b.RepostDetector.Find(ctx.Event.ChannelID, id); rep != nil {
+								reposts <- rep
+								break
+							}
+
 							artwork, err := provider.Find(id)
 							if err != nil {
 								return err
 							}
 
 							artworks <- artwork
+							err = b.RepostDetector.Create(&repost.Repost{
+								ID:        id,
+								URL:       url,
+								GuildID:   ctx.Event.GuildID,
+								ChannelID: ctx.Event.ChannelID,
+								MessageID: ctx.Event.ID,
+							}, 24*time.Hour)
+							if err != nil {
+								b.Logger.Errorf("Error adding a repost detector: %v", err)
+							}
+
 							break
 						}
 					}
@@ -92,7 +110,14 @@ func NotCommand(b *bot.Bot) func(*gumi.Ctx) error {
 				return err
 			}
 
-			//close(artworks)
+			close(artworks)
+			close(reposts)
+
+			for rep := range reposts {
+				//TODO: handle reposts
+				b.Logger.Info("Repost detected: %v", rep)
+			}
+
 			for artwork := range artworks {
 				if artwork != nil {
 					s := rand.NewSource(time.Now().Unix())
@@ -121,7 +146,7 @@ func OnReady(b *bot.Bot) func(*discordgo.Session, *discordgo.Ready) {
 	}
 }
 
-func GuildCreated(b *bot.Bot) func(*discordgo.Session, *discordgo.GuildCreate) {
+func OnGuildCreated(b *bot.Bot) func(*discordgo.Session, *discordgo.GuildCreate) {
 	return func(s *discordgo.Session, g *discordgo.GuildCreate) {
 		_, err := b.Models.Guilds.FindOne(context.Background(), g.ID)
 		if errors.Is(err, mongo.ErrNoDocuments) {

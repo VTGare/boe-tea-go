@@ -4,6 +4,7 @@ import (
 	"github.com/VTGare/boe-tea-go/internal/config"
 	"github.com/VTGare/boe-tea-go/pkg/artworks"
 	"github.com/VTGare/boe-tea-go/pkg/models"
+	"github.com/VTGare/boe-tea-go/pkg/repost"
 	"github.com/VTGare/gumi"
 	"github.com/bwmarrin/discordgo"
 	"go.uber.org/zap"
@@ -15,10 +16,11 @@ type Bot struct {
 	Config           *config.Config
 	Router           *gumi.Router
 	ArtworkProviders []artworks.Provider
+	RepostDetector   repost.Detector
 	s                *discordgo.Session
 }
 
-func New(config *config.Config, models *models.Models, logger *zap.SugaredLogger) (*Bot, error) {
+func New(config *config.Config, models *models.Models, logger *zap.SugaredLogger, rd repost.Detector) (*Bot, error) {
 	dg, err := discordgo.New("Bot " + config.Discord.Token)
 	if err != nil {
 		return nil, err
@@ -26,10 +28,11 @@ func New(config *config.Config, models *models.Models, logger *zap.SugaredLogger
 	dg.Identify.Intents = discordgo.IntentsAllWithoutPrivileged
 
 	return &Bot{
-		Models: models,
-		Logger: logger,
-		Config: config,
-		s:      dg,
+		Models:         models,
+		Logger:         logger,
+		Config:         config,
+		RepostDetector: rd,
+		s:              dg,
 	}, nil
 }
 
