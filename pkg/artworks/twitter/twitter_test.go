@@ -10,77 +10,77 @@ import (
 func TestTwitterMatch(t *testing.T) {
 	tests := []struct {
 		name              string
-		tr                tsuita
+		tr                Twitter
 		url               string
 		expectedBool      bool
 		expectedSnowflake string
 	}{
 		{
 			name:              "Standard Twitter URL",
-			tr:                tsuita{},
+			tr:                Twitter{},
 			url:               "https://twitter.com/watsonameliaEN/status/1371674594675937282",
 			expectedSnowflake: "1371674594675937282",
 			expectedBool:      true,
 		},
 		{
 			name:              "Mobile Twitter URL",
-			tr:                tsuita{},
+			tr:                Twitter{},
 			url:               "https://mobile.twitter.com/watsonameliaEN/status/1371674594675937282",
 			expectedBool:      true,
 			expectedSnowflake: "1371674594675937282",
 		},
 		{
 			name:              "Twitter URL without username",
-			tr:                tsuita{},
+			tr:                Twitter{},
 			url:               "https://twitter.com/i/status/1371674594675937282",
 			expectedBool:      true,
 			expectedSnowflake: "1371674594675937282",
 		},
 		{
 			name:              "Twitter URL i/web",
-			tr:                tsuita{},
+			tr:                Twitter{},
 			url:               "https://twitter.com/i/web/status/1371674594675937282",
 			expectedBool:      true,
 			expectedSnowflake: "1371674594675937282",
 		},
 		{
 			name:              "Invalid snowflake",
-			tr:                tsuita{},
+			tr:                Twitter{},
 			url:               "https://twitter.com/i/web/status/13716745235f",
 			expectedBool:      false,
 			expectedSnowflake: "",
 		},
 		{
 			name:              "With query parameters",
-			tr:                tsuita{},
+			tr:                Twitter{},
 			url:               "https://twitter.com/i/web/status/12345678?width=120",
 			expectedBool:      true,
 			expectedSnowflake: "12345678",
 		},
 		{
 			name:              "Profile URL",
-			tr:                tsuita{},
+			tr:                Twitter{},
 			url:               "https://twitter.com/vtgare",
 			expectedBool:      false,
 			expectedSnowflake: "",
 		},
 		{
 			name:              "Not Twitter URL",
-			tr:                tsuita{},
+			tr:                Twitter{},
 			url:               "https://google.com",
 			expectedBool:      false,
 			expectedSnowflake: "",
 		},
 		{
 			name:              "Not URL",
-			tr:                tsuita{},
+			tr:                Twitter{},
 			url:               "google",
 			expectedBool:      false,
 			expectedSnowflake: "",
 		},
 		{
 			name:              "Invalid Twitter URL",
-			tr:                tsuita{},
+			tr:                Twitter{},
 			url:               "https://twitter.com/i/web/",
 			expectedBool:      false,
 			expectedSnowflake: "",
