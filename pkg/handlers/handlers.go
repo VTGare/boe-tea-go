@@ -2,16 +2,19 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"math/rand"
 	"time"
 
 	"github.com/VTGare/boe-tea-go/internal/arrays"
 	"github.com/VTGare/boe-tea-go/pkg/artworks"
+	"github.com/VTGare/boe-tea-go/pkg/artworks/pixiv"
 	"github.com/VTGare/boe-tea-go/pkg/artworks/twitter"
 	"github.com/VTGare/boe-tea-go/pkg/bot"
 	"github.com/VTGare/boe-tea-go/pkg/models/guilds"
 	"github.com/VTGare/gumi"
 	"github.com/bwmarrin/discordgo"
+	"go.mongodb.org/mongo-driver/mongo"
 	"golang.org/x/sync/errgroup"
 	"mvdan.cc/xurls/v2"
 )
@@ -64,6 +67,10 @@ func NotCommand(b *bot.Bot) func(*gumi.Ctx) error {
 							if !guild.Twitter {
 								continue
 							}
+						case pixiv.Pixiv:
+							if !guild.Pixiv {
+								continue
+							}
 						}
 
 						if id, ok := provider.Match(url); ok {
@@ -105,5 +112,24 @@ func NotCommand(b *bot.Bot) func(*gumi.Ctx) error {
 		}
 
 		return nil
+	}
+}
+
+func OnReady(b *bot.Bot) func(*discordgo.Session, *discordgo.Ready) {
+	return func(s *discordgo.Session, r *discordgo.Ready) {
+		b.Logger.Infof("%v is online. Session ID: %v. Guilds: %v", r.User.String(), r.SessionID, len(r.Guilds))
+	}
+}
+
+func GuildCreated(b *bot.Bot) func(*discordgo.Session, *discordgo.GuildCreate) {
+	return func(s *discordgo.Session, g *discordgo.GuildCreate) {
+		_, err := b.Models.Guilds.FindOne(context.Background(), g.ID)
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			b.Logger.Infof("Joined a guild. Name: %v. ID: %v", g.Name, g.ID)
+			_, err := b.Models.Guilds.InsertOne(context.Background(), g.ID)
+			if err != nil {
+				b.Logger.Errorf("Error while inserting guild %v: %v", g.ID, err)
+			}
+		}
 	}
 }

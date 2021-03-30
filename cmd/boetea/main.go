@@ -39,6 +39,7 @@ func main() {
 	b, err := bot.New(cfg, m, log)
 	b.AddProvider(twitter.New())
 	if pixiv, err := pixiv.New(cfg.Pixiv.AuthToken, cfg.Pixiv.RefreshToken); err == nil {
+		log.Info("Successfully logged into Pixiv.")
 		b.AddProvider(pixiv)
 	}
 
@@ -47,6 +48,9 @@ func main() {
 		PrefixResolver:     handlers.PrefixResolver(b),
 		NotCommandCallback: handlers.NotCommand(b),
 	})
+
+	b.AddHandler(handlers.OnReady(b))
+	b.AddHandler(handlers.GuildCreated(b))
 
 	if err := b.Open(); err != nil {
 		log.Fatal(err)

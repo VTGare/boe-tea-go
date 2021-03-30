@@ -43,6 +43,10 @@ func (b *Bot) AddProvider(provider artworks.Provider) {
 	b.ArtworkProviders = append(b.ArtworkProviders, provider)
 }
 
+func (b *Bot) AddHandler(handler interface{}) {
+	b.s.AddHandler(handler)
+}
+
 func (b *Bot) Open() error {
 	err := b.s.Open()
 	if err != nil {
