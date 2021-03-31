@@ -1,6 +1,13 @@
 package repost
 
-import "time"
+import (
+	"errors"
+	"time"
+)
+
+var (
+	ErrNotFound = errors.New("repost not found")
+)
 
 type Detector interface {
 	Find(channelID string, artworkID string) (*Repost, error)
