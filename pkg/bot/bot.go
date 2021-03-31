@@ -37,9 +37,7 @@ func New(config *config.Config, models *models.Models, logger *zap.SugaredLogger
 }
 
 func (b *Bot) AddRouter(router *gumi.Router) {
-	r := gumi.Create(router)
-
-	r.Initialize(b.s)
+	b.Router = gumi.Create(router)
 }
 
 func (b *Bot) AddProvider(provider artworks.Provider) {
@@ -51,6 +49,8 @@ func (b *Bot) AddHandler(handler interface{}) {
 }
 
 func (b *Bot) Open() error {
+	b.Router.Initialize(b.s)
+
 	err := b.s.Open()
 	if err != nil {
 		return err

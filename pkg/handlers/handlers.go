@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math/rand"
 	"time"
 
@@ -11,8 +12,10 @@ import (
 	"github.com/VTGare/boe-tea-go/pkg/artworks/pixiv"
 	"github.com/VTGare/boe-tea-go/pkg/artworks/twitter"
 	"github.com/VTGare/boe-tea-go/pkg/bot"
+	"github.com/VTGare/boe-tea-go/pkg/messages"
 	"github.com/VTGare/boe-tea-go/pkg/models/guilds"
 	"github.com/VTGare/boe-tea-go/pkg/repost"
+	"github.com/VTGare/embeds"
 	"github.com/VTGare/gumi"
 	"github.com/bwmarrin/discordgo"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -25,12 +28,15 @@ func PrefixResolver(b *bot.Bot) func(s *discordgo.Session, m *discordgo.MessageC
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 
+		mention := fmt.Sprintf("<@%v> ", s.State.User.ID)
+		mentionExcl := fmt.Sprintf("<@!%v> ", s.State.User.ID)
+
 		g, err := b.Models.Guilds.FindOne(ctx, m.GuildID)
 		if err != nil || arrays.AnyString(b.Config.Discord.Prefixes, g.Prefix) {
-			return b.Config.Discord.Prefixes
+			return append(b.Config.Discord.Prefixes, mention, mentionExcl)
 		}
 
-		return []string{g.Prefix}
+		return []string{mention, mentionExcl, g.Prefix}
 	}
 }
 
@@ -156,5 +162,26 @@ func OnGuildCreated(b *bot.Bot) func(*discordgo.Session, *discordgo.GuildCreate)
 				b.Logger.Errorf("Error while inserting guild %v: %v", g.ID, err)
 			}
 		}
+	}
+}
+
+func OnError(b *bot.Bot) func(*gumi.Ctx, error) {
+	return func(ctx *gumi.Ctx, err error) {
+		eb := embeds.NewBuilder()
+
+		var (
+			cmd *messages.IncorrectCmd
+		)
+
+		switch {
+		case errors.As(err, &cmd):
+			eb.ErrorTemplate(cmd.Error())
+			eb.AddField("Usage", fmt.Sprintf("`%v`", cmd.Usage), true)
+			eb.AddField("Example", fmt.Sprintf("`%v`", cmd.Example), true)
+		default:
+			eb.ErrorTemplate(err.Error())
+		}
+
+		ctx.ReplyEmbed(eb.Finalize())
 	}
 }

@@ -11,6 +11,7 @@ import (
 	"github.com/VTGare/boe-tea-go/pkg/artworks/pixiv"
 	"github.com/VTGare/boe-tea-go/pkg/artworks/twitter"
 	"github.com/VTGare/boe-tea-go/pkg/bot"
+	"github.com/VTGare/boe-tea-go/pkg/commands"
 	"github.com/VTGare/boe-tea-go/pkg/handlers"
 	"github.com/VTGare/boe-tea-go/pkg/models"
 	"github.com/VTGare/boe-tea-go/pkg/repost"
@@ -55,13 +56,16 @@ func main() {
 	}
 
 	b.AddRouter(&gumi.Router{
+		Commands:           make(map[string]*gumi.Command),
 		AuthorID:           cfg.Discord.AuthorID,
 		PrefixResolver:     handlers.PrefixResolver(b),
 		NotCommandCallback: handlers.NotCommand(b),
+		OnErrorCallback:    handlers.OnError(b),
 	})
 
 	b.AddHandler(handlers.OnReady(b))
 	b.AddHandler(handlers.OnGuildCreated(b))
+	commands.GeneralGroup(b)
 
 	if err := b.Open(); err != nil {
 		log.Fatal(err)
