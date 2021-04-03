@@ -1,6 +1,9 @@
 package bot
 
 import (
+	"time"
+
+	"github.com/ReneKroon/ttlcache"
 	"github.com/VTGare/boe-tea-go/internal/config"
 	"github.com/VTGare/boe-tea-go/pkg/artworks"
 	"github.com/VTGare/boe-tea-go/pkg/models"
@@ -17,6 +20,7 @@ type Bot struct {
 	Router           *gumi.Router
 	ArtworkProviders []artworks.Provider
 	RepostDetector   repost.Detector
+	BannedUsers      *ttlcache.Cache
 	s                *discordgo.Session
 }
 
@@ -27,11 +31,15 @@ func New(config *config.Config, models *models.Models, logger *zap.SugaredLogger
 	}
 	dg.Identify.Intents = discordgo.IntentsAllWithoutPrivileged
 
+	banned := ttlcache.NewCache()
+	banned.SetTTL(15 * time.Second)
+
 	return &Bot{
 		Models:         models,
 		Logger:         logger,
 		Config:         config,
 		RepostDetector: rd,
+		BannedUsers:    banned,
 		s:              dg,
 	}, nil
 }
