@@ -49,6 +49,10 @@ func main() {
 	}
 
 	b, err := bot.New(cfg, m, log, dec)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	b.AddProvider(twitter.New())
 	if pixiv, err := pixiv.New(cfg.Pixiv.AuthToken, cfg.Pixiv.RefreshToken); err == nil {
 		log.Info("Successfully logged into Pixiv.")
@@ -68,7 +72,9 @@ func main() {
 	})
 
 	b.AddHandler(handlers.OnReady(b))
-	b.AddHandler(handlers.OnGuildCreated(b))
+	b.AddHandler(handlers.OnGuildCreate(b))
+	b.AddHandler(handlers.OnGuildDelete(b))
+	b.AddHandler(handlers.OnGuildBanAdd(b))
 	commands.GeneralGroup(b)
 
 	if err := b.Open(); err != nil {
@@ -76,7 +82,7 @@ func main() {
 	}
 
 	sc := make(chan os.Signal, 1)
-	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt, os.Kill)
+	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
 	<-sc
 
 	db.Close()

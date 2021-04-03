@@ -23,6 +23,7 @@ import (
 	"mvdan.cc/xurls/v2"
 )
 
+//PrefixResolver returns an array of guild's prefixes and bot mentions.
 func PrefixResolver(b *bot.Bot) func(s *discordgo.Session, m *discordgo.MessageCreate) []string {
 	return func(s *discordgo.Session, m *discordgo.MessageCreate) []string {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -40,6 +41,7 @@ func PrefixResolver(b *bot.Bot) func(s *discordgo.Session, m *discordgo.MessageC
 	}
 }
 
+//NotCommand is executed on every message that isn't a command.
 func NotCommand(b *bot.Bot) func(*gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
 		var (
@@ -152,13 +154,15 @@ func NotCommand(b *bot.Bot) func(*gumi.Ctx) error {
 	}
 }
 
+//OnReady logs that bot's up.
 func OnReady(b *bot.Bot) func(*discordgo.Session, *discordgo.Ready) {
 	return func(s *discordgo.Session, r *discordgo.Ready) {
 		b.Logger.Infof("%v is online. Session ID: %v. Guilds: %v", r.User.String(), r.SessionID, len(r.Guilds))
 	}
 }
 
-func OnGuildCreated(b *bot.Bot) func(*discordgo.Session, *discordgo.GuildCreate) {
+//OnGuildCreate loads server configuration on launch and creates new database entries when joining a new server.
+func OnGuildCreate(b *bot.Bot) func(*discordgo.Session, *discordgo.GuildCreate) {
 	return func(s *discordgo.Session, g *discordgo.GuildCreate) {
 		_, err := b.Models.Guilds.FindOne(context.Background(), g.ID)
 		if errors.Is(err, mongo.ErrNoDocuments) {
@@ -171,6 +175,26 @@ func OnGuildCreated(b *bot.Bot) func(*discordgo.Session, *discordgo.GuildCreate)
 	}
 }
 
+//OnGuilldDelete logs guild outages and guilds that kicked the bot out.
+func OnGuildDelete(b *bot.Bot) func(*discordgo.Session, *discordgo.GuildDelete) {
+	return func(s *discordgo.Session, g *discordgo.GuildDelete) {
+		if g.Unavailable {
+			b.Logger.Infof("Guild outage. ID: %v", g.ID)
+		} else {
+			b.Logger.Infof("Kicked/banned from guild: %v", g.ID)
+		}
+	}
+}
+
+//OnGuildBanAdd adds a banned server member to temporary banned users cache to prevent them from losing all their favourites
+//on that server due to Discord removing all reactions of banned users.
+func OnGuildBanAdd(b *bot.Bot) func(*discordgo.Session, *discordgo.GuildBanAdd) {
+	return func(s *discordgo.Session, gb *discordgo.GuildBanAdd) {
+		b.BannedUsers.Set(gb.User.ID, struct{}{})
+	}
+}
+
+//OnError creates an error response, logs them and sends the response on Discord.
 func OnError(b *bot.Bot) func(*gumi.Ctx, error) {
 	return func(ctx *gumi.Ctx, err error) {
 		eb := embeds.NewBuilder()
@@ -192,6 +216,7 @@ func OnError(b *bot.Bot) func(*gumi.Ctx, error) {
 	}
 }
 
+//OnRateLimit creates a response for users who use bot's command too frequently
 func OnRateLimit(b *bot.Bot) func(*gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
 		duration, err := ctx.Command.RateLimiter.Expires(ctx.Event.Author.ID)
@@ -206,6 +231,7 @@ func OnRateLimit(b *bot.Bot) func(*gumi.Ctx) error {
 	}
 }
 
+//OnNoPerms creates a response for users who used a command without required permissions.
 func OnNoPerms(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
 		eb := embeds.NewBuilder()
@@ -215,6 +241,7 @@ func OnNoPerms(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	}
 }
 
+//OnNSFW creates a response for users who used a NSFW command in a SFW channel
 func OnNSFW(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
 		eb := embeds.NewBuilder()
@@ -225,6 +252,7 @@ func OnNSFW(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	}
 }
 
+//OnExecute logs every executed command.
 func OnExecute(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
 		b.Logger.Infof("Executing command [%v]. Arguments: [%v]. Guild ID: %v, channel ID: %v", ctx.Command.Name, ctx.Args.Raw, ctx.Event.GuildID, ctx.Event.ChannelID)
