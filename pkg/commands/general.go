@@ -10,10 +10,12 @@ import (
 	"unicode"
 
 	"github.com/VTGare/boe-tea-go/internal/arrays"
+	"github.com/VTGare/boe-tea-go/internal/dgoutils"
 	"github.com/VTGare/boe-tea-go/pkg/bot"
 	"github.com/VTGare/boe-tea-go/pkg/messages"
 	"github.com/VTGare/embeds"
 	"github.com/VTGare/gumi"
+	"github.com/bwmarrin/discordgo"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
@@ -112,6 +114,20 @@ func set(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			ctx.ReplyEmbed(eb.Finalize())
 			return nil
 		case ctx.Args.Len() >= 2:
+			perms, err := dgoutils.MemberHasPermission(
+				ctx.Session,
+				ctx.Event.GuildID,
+				ctx.Event.Author.ID,
+				discordgo.PermissionAdministrator|discordgo.PermissionManageServer,
+			)
+			if err != nil {
+				return err
+			}
+
+			if !perms {
+				return ctx.Router.OnNoPermissionsCallback(ctx)
+			}
+
 			guild, err := b.Models.Guilds.FindOne(context.Background(), ctx.Event.GuildID)
 			if err != nil {
 				return err

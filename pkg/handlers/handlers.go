@@ -67,24 +67,27 @@ func NotCommand(b *bot.Bot) func(*gumi.Ctx) error {
 
 			for _, url := range urls {
 				url := url //shadowing loop variables to pass them to wg.Go. It's required otherwise variables will stay the same every loop.
-
 				wg.Go(func() error {
 					for _, provider := range b.ArtworkProviders {
-						switch provider.(type) {
-						case twitter.Twitter:
-							if !guild.Twitter {
-								continue
-							}
-						case pixiv.Pixiv:
-							if !guild.Pixiv {
-								continue
+						if !dm {
+							switch provider.(type) {
+							case twitter.Twitter:
+								if !guild.Twitter {
+									continue
+								}
+							case pixiv.Pixiv:
+								if !guild.Pixiv {
+									continue
+								}
 							}
 						}
 
 						if id, ok := provider.Match(url); ok {
-							if rep, _ := b.RepostDetector.Find(ctx.Event.ChannelID, id); rep != nil {
-								reposts <- rep
-								break
+							if !dm {
+								if rep, _ := b.RepostDetector.Find(ctx.Event.ChannelID, id); rep != nil {
+									reposts <- rep
+									break
+								}
 							}
 
 							artwork, err := provider.Find(id)
@@ -93,13 +96,16 @@ func NotCommand(b *bot.Bot) func(*gumi.Ctx) error {
 							}
 
 							artworks <- artwork
-							err = b.RepostDetector.Create(&repost.Repost{
-								ID:        id,
-								URL:       url,
-								GuildID:   ctx.Event.GuildID,
-								ChannelID: ctx.Event.ChannelID,
-								MessageID: ctx.Event.ID,
-							}, 24*time.Hour)
+							if !dm {
+								err = b.RepostDetector.Create(&repost.Repost{
+									ID:        id,
+									URL:       url,
+									GuildID:   ctx.Event.GuildID,
+									ChannelID: ctx.Event.ChannelID,
+									MessageID: ctx.Event.ID,
+								}, 24*time.Hour)
+							}
+
 							if err != nil {
 								b.Logger.Errorf("Error adding a repost detector: %v", err)
 							}
@@ -183,5 +189,45 @@ func OnError(b *bot.Bot) func(*gumi.Ctx, error) {
 		}
 
 		ctx.ReplyEmbed(eb.Finalize())
+	}
+}
+
+func OnRateLimit(b *bot.Bot) func(*gumi.Ctx) error {
+	return func(ctx *gumi.Ctx) error {
+		duration, err := ctx.Command.RateLimiter.Expires(ctx.Event.Author.ID)
+		if err != nil {
+			return err
+		}
+
+		eb := embeds.NewBuilder()
+		eb.FailureTemplate(fmt.Sprintf("Hold your horses! You're getting rate limited. Try again in **%v**", duration.Round(1*time.Second).String()))
+
+		return ctx.ReplyEmbed(eb.Finalize())
+	}
+}
+
+func OnNoPerms(b *bot.Bot) func(ctx *gumi.Ctx) error {
+	return func(ctx *gumi.Ctx) error {
+		eb := embeds.NewBuilder()
+		eb.FailureTemplate("You don't have enough permissions to run this command.")
+
+		return ctx.ReplyEmbed(eb.Finalize())
+	}
+}
+
+func OnNSFW(b *bot.Bot) func(ctx *gumi.Ctx) error {
+	return func(ctx *gumi.Ctx) error {
+		eb := embeds.NewBuilder()
+
+		eb.FailureTemplate(fmt.Sprintf("Bonk! You're trying to execute a NSFW command `%v` in a SFW channel.", ctx.Command.Name))
+
+		return ctx.ReplyEmbed(eb.Finalize())
+	}
+}
+
+func OnExecute(b *bot.Bot) func(ctx *gumi.Ctx) error {
+	return func(ctx *gumi.Ctx) error {
+		b.Logger.Infof("Executing command [%v]. Arguments: [%v]. Guild ID: %v, channel ID: %v", ctx.Command.Name, ctx.Args.Raw, ctx.Event.GuildID, ctx.Event.ChannelID)
+		return nil
 	}
 }

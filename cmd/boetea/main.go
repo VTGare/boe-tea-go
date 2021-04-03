@@ -56,11 +56,15 @@ func main() {
 	}
 
 	b.AddRouter(&gumi.Router{
-		Commands:           make(map[string]*gumi.Command),
-		AuthorID:           cfg.Discord.AuthorID,
-		PrefixResolver:     handlers.PrefixResolver(b),
-		NotCommandCallback: handlers.NotCommand(b),
-		OnErrorCallback:    handlers.OnError(b),
+		Commands:                make(map[string]*gumi.Command),
+		AuthorID:                cfg.Discord.AuthorID,
+		PrefixResolver:          handlers.PrefixResolver(b),
+		NotCommandCallback:      handlers.NotCommand(b),
+		OnErrorCallback:         handlers.OnError(b),
+		OnRateLimitCallback:     handlers.OnRateLimit(b),
+		OnNSFWCallback:          handlers.OnNSFW(b),
+		OnExecuteCallback:       handlers.OnExecute(b),
+		OnNoPermissionsCallback: handlers.OnNoPerms(b),
 	})
 
 	b.AddHandler(handlers.OnReady(b))
