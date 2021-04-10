@@ -243,7 +243,7 @@ func (a Artwork) Embeds(footer string) []*discordgo.MessageEmbed {
 		for ind, art := range a.Gallery[1:] {
 			eb := embeds.NewBuilder()
 
-			eb.Title(fmt.Sprintf("%v (%v) | Page %v / %v", a.FullName, a.Username, ind+2, length))
+			eb.Title(fmt.Sprintf("%v (%v) | Page %v / %v", a.FullName, a.Username, ind+2, length)).URL(a.URL)
 			eb.Image(art.URL).Footer(footer, "").TimestampString(a.Timestamp)
 
 			tweets = append(tweets, eb.Finalize())
