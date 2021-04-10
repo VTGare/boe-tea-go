@@ -202,3 +202,13 @@ func (u userService) DeleteFromGroup(ctx context.Context, userID, group, child s
 
 	return &user, nil
 }
+
+func (u *User) FindGroup(parentID string) (*Group, bool) {
+	for _, group := range u.Groups {
+		if group.Parent == parentID {
+			return group, true
+		}
+	}
+
+	return nil, false
+}
