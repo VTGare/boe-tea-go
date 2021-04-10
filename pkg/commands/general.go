@@ -98,9 +98,8 @@ func set(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			eb.AddField(
 				msg.TwitterSettings.Title,
 				fmt.Sprintf(
-					"**%v**: %v | **%v**: %v",
+					"**%v**: %v",
 					msg.TwitterSettings.Enabled, messages.FormatBool(guild.Twitter),
-					msg.TwitterSettings.Prompt, messages.FormatBool(guild.Prompt),
 				),
 			)
 
@@ -215,15 +214,6 @@ func set(b *bot.Bot) func(ctx *gumi.Ctx) error {
 				oldSettingEmbed = guild.Twitter
 				newSettingEmbed = new
 				guild.Twitter = new
-			case "prompt":
-				new, err := parseBool(newSetting.Raw)
-				if err != nil {
-					return err
-				}
-
-				oldSettingEmbed = guild.Prompt
-				newSettingEmbed = new
-				guild.Prompt = new
 			default:
 				return messages.ErrUnknownSetting(settingName.Raw)
 			}

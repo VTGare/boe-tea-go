@@ -23,7 +23,6 @@ type Guild struct {
 	Repost      string    `json:"repost" bson:"repost" validate:"required"`
 	Crosspost   bool      `json:"crosspost" bson:"crosspost" validate:"required"`
 	Reactions   bool      `json:"reactions" bson:"reactions" validate:"required"`
-	Prompt      bool      `json:"twitterprompt" bson:"twitterprompt" validate:"required"`
 	ArtChannels []string  `json:"art_channels" bson:"art_channels" validate:"required"`
 	CreatedAt   time.Time `json:"created_at" bson:"created_at" validate:"required"`
 	UpdatedAt   time.Time `json:"updated_at" bson:"updated_at"`
@@ -149,8 +148,24 @@ func DefaultGuild(id string) *Guild {
 		NSFW:        true,
 		Pixiv:       true,
 		Twitter:     true,
-		Prompt:      false,
 		Repost:      "enabled",
+		Crosspost:   true,
+		Reactions:   true,
+		ArtChannels: make([]string, 0),
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+	}
+}
+
+func UserGuild() *Guild {
+	return &Guild{
+		ID:          "",
+		Prefix:      "bt!",
+		Limit:       100,
+		NSFW:        true,
+		Pixiv:       true,
+		Twitter:     true,
+		Repost:      "disabled",
 		Crosspost:   true,
 		Reactions:   true,
 		ArtChannels: make([]string, 0),
