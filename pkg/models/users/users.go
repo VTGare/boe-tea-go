@@ -34,15 +34,15 @@ type Group struct {
 }
 
 type Service interface {
-	InsertOne(context.Context, string) (*User, error)
-	FindOne(context.Context, string) (*User, error)
-	DeleteOne(context.Context, string) (*User, error)
-	InsertFavourite(context.Context, string, *Favourite) (*User, error)
-	DeleteFavourite(context.Context, string, *Favourite) (*User, error)
-	InsertGroup(context.Context, string, *Group) (*User, error)
-	DeleteGroup(context.Context, string, string) (*User, error)
-	InsertToGroup(context.Context, string, string, string) (*User, error)
-	DeleteFromGroup(context.Context, string, string, string) (*User, error)
+	InsertOne(ctx context.Context, userID string) (*User, error)
+	FindOne(ctx context.Context, userID string) (*User, error)
+	DeleteOne(ctx context.Context, userID string) (*User, error)
+	InsertFavourite(ctx context.Context, userID string, fav *Favourite) (*User, error)
+	DeleteFavourite(ctx context.Context, userID string, fav *Favourite) (*User, error)
+	InsertGroup(ctx context.Context, userID string, group *Group) (*User, error)
+	DeleteGroup(ctx context.Context, userID string, group string) (*User, error)
+	InsertToGroup(ctx context.Context, userID string, group string, child string) (*User, error)
+	DeleteFromGroup(ctx context.Context, userID string, group string, child string) (*User, error)
 }
 
 type userService struct {
@@ -173,7 +173,7 @@ func (u userService) InsertToGroup(ctx context.Context, userID, group, child str
 	res := u.col().FindOneAndUpdate(
 		ctx,
 		bson.M{"user_id": userID, "channel_groups.name": group, "channel_groups.children": bson.M{"$nin": []string{child}}},
-		bson.M{"$push": bson.M{"channel_groups.children": child}},
+		bson.M{"$addToSet": bson.M{"channel_groups.$.children": child}},
 		options.FindOneAndUpdate().SetReturnDocument(options.After),
 	)
 
@@ -190,7 +190,7 @@ func (u userService) DeleteFromGroup(ctx context.Context, userID, group, child s
 	res := u.col().FindOneAndUpdate(
 		ctx,
 		bson.M{"user_id": userID, "channel_groups.name": group, "channel_groups.children": bson.M{"$in": []string{child}}},
-		bson.M{"$pull": bson.M{"channel_groups.children": child}},
+		bson.M{"$pull": bson.M{"channel_groups.$.children": child}},
 		options.FindOneAndUpdate().SetReturnDocument(options.After),
 	)
 

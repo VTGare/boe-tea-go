@@ -9,6 +9,7 @@ import (
 
 	"github.com/ReneKroon/ttlcache"
 	"github.com/VTGare/boe-tea-go/pkg/artworks"
+	"github.com/VTGare/boe-tea-go/pkg/messages"
 	models "github.com/VTGare/boe-tea-go/pkg/models/artworks"
 	"github.com/VTGare/embeds"
 	"github.com/bwmarrin/discordgo"
@@ -231,7 +232,7 @@ func (a Artwork) Embeds(footer string) []*discordgo.MessageEmbed {
 		art := a.Gallery[0]
 
 		if art.Animated {
-			eb.AddField("Video", fmt.Sprintf("[Click here desu~](%v)", art.URL))
+			eb.AddField("Video", messages.ClickHere(art.URL))
 		} else {
 			eb.Image(art.URL)
 		}

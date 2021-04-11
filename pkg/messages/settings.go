@@ -65,21 +65,21 @@ func Set() *SetCommand {
 }
 
 func ErrPrefixTooLong(prefix string) error {
-	return fmt.Errorf("Prefix `%v` is too long. Maximum length is 5 characters", prefix)
+	return newUserError(fmt.Sprintf("Prefix `%v` is too long. Maximum length is 5 characters", prefix))
 }
 
 func ErrUnknownSetting(setting string) error {
-	return fmt.Errorf("Setting `%v` doesn't exist. Please use `bt!set` to view existing settings", setting)
+	return newUserError(fmt.Sprintf("Setting `%v` doesn't exist. Please use `bt!set` to view existing settings", setting))
 }
 
 func ErrParseBool(value string) error {
-	return fmt.Errorf("Failed to parse %v to boolean", value)
+	return newUserError(fmt.Sprintf("Failed to parse %v to boolean", value))
 }
 
 func ErrParseInt(value string) error {
-	return fmt.Errorf("Failed to parse %v to integer", value)
+	return newUserError(fmt.Sprintf("Failed to parse %v to integer", value))
 }
 
 func ErrUnknownRepostOption(option string) error {
-	return fmt.Errorf("Repost option `%v` doesn't exist. Available options are `[enabled, disabled, strict]`", option)
+	return newUserError(fmt.Sprintf("Repost option `%v` doesn't exist. Available options are `[enabled, disabled, strict]`", option))
 }

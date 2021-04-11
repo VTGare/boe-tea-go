@@ -27,7 +27,7 @@ func PrefixResolver(b *bot.Bot) func(s *discordgo.Session, m *discordgo.MessageC
 		mention := fmt.Sprintf("<@%v> ", s.State.User.ID)
 		mentionExcl := fmt.Sprintf("<@!%v> ", s.State.User.ID)
 
-		g, err := b.Models.Guilds.FindOne(ctx, m.GuildID)
+		g, err := b.Guilds.FindOne(ctx, m.GuildID)
 		if err != nil || arrays.AnyString(b.Config.Discord.Prefixes, g.Prefix) {
 			return append(b.Config.Discord.Prefixes, mention, mentionExcl)
 		}
@@ -48,7 +48,7 @@ func NotCommand(b *bot.Bot) func(*gumi.Ctx) error {
 			guild = guilds.DefaultGuild("")
 		} else {
 			var err error
-			guild, err = b.Models.Guilds.FindOne(context.Background(), ctx.Event.GuildID)
+			guild, err = b.Guilds.FindOne(context.Background(), ctx.Event.GuildID)
 			if err != nil {
 				return err
 			}
@@ -64,7 +64,7 @@ func NotCommand(b *bot.Bot) func(*gumi.Ctx) error {
 				return err
 			}
 
-			user, err := b.Models.Users.FindOne(context.Background(), ctx.Event.Author.ID)
+			user, err := b.Users.FindOne(context.Background(), ctx.Event.Author.ID)
 			if err != nil {
 				if !errors.Is(err, mongo.ErrNoDocuments) {
 					return err
@@ -73,7 +73,7 @@ func NotCommand(b *bot.Bot) func(*gumi.Ctx) error {
 				if user.Crosspost {
 					group, ok := user.FindGroup(ctx.Event.ChannelID)
 					if ok {
-						p.Crosspost(group.Children)
+						p.Crosspost(ctx.Event.Author.ID, group.Name, group.Children)
 					}
 				}
 			}
@@ -86,19 +86,19 @@ func NotCommand(b *bot.Bot) func(*gumi.Ctx) error {
 //OnReady logs that bot's up.
 func OnReady(b *bot.Bot) func(*discordgo.Session, *discordgo.Ready) {
 	return func(s *discordgo.Session, r *discordgo.Ready) {
-		b.Logger.Infof("%v is online. Session ID: %v. Guilds: %v", r.User.String(), r.SessionID, len(r.Guilds))
+		b.Log.Infof("%v is online. Session ID: %v. Guilds: %v", r.User.String(), r.SessionID, len(r.Guilds))
 	}
 }
 
 //OnGuildCreate loads server configuration on launch and creates new database entries when joining a new server.
 func OnGuildCreate(b *bot.Bot) func(*discordgo.Session, *discordgo.GuildCreate) {
 	return func(s *discordgo.Session, g *discordgo.GuildCreate) {
-		_, err := b.Models.Guilds.FindOne(context.Background(), g.ID)
+		_, err := b.Guilds.FindOne(context.Background(), g.ID)
 		if errors.Is(err, mongo.ErrNoDocuments) {
-			b.Logger.Infof("Joined a guild. Name: %v. ID: %v", g.Name, g.ID)
-			_, err := b.Models.Guilds.InsertOne(context.Background(), g.ID)
+			b.Log.Infof("Joined a guild. Name: %v. ID: %v", g.Name, g.ID)
+			_, err := b.Guilds.InsertOne(context.Background(), g.ID)
 			if err != nil {
-				b.Logger.Errorf("Error while inserting guild %v: %v", g.ID, err)
+				b.Log.Errorf("Error while inserting guild %v: %v", g.ID, err)
 			}
 		}
 	}
@@ -108,9 +108,9 @@ func OnGuildCreate(b *bot.Bot) func(*discordgo.Session, *discordgo.GuildCreate) 
 func OnGuildDelete(b *bot.Bot) func(*discordgo.Session, *discordgo.GuildDelete) {
 	return func(s *discordgo.Session, g *discordgo.GuildDelete) {
 		if g.Unavailable {
-			b.Logger.Infof("Guild outage. ID: %v", g.ID)
+			b.Log.Infof("Guild outage. ID: %v", g.ID)
 		} else {
-			b.Logger.Infof("Kicked/banned from guild: %v", g.ID)
+			b.Log.Infof("Kicked/banned from guild: %v", g.ID)
 		}
 	}
 }
@@ -129,15 +129,32 @@ func OnError(b *bot.Bot) func(*gumi.Ctx, error) {
 		eb := embeds.NewBuilder()
 
 		var (
-			cmd *messages.IncorrectCmd
+			cmdErr *messages.IncorrectCmd
+			usrErr *messages.UserErr
 		)
 
 		switch {
-		case errors.As(err, &cmd):
-			eb.ErrorTemplate(cmd.Error())
-			eb.AddField("Usage", fmt.Sprintf("`%v`", cmd.Usage), true)
-			eb.AddField("Example", fmt.Sprintf("`%v`", cmd.Example), true)
+		case errors.As(err, &cmdErr):
+			eb.FailureTemplate(cmdErr.Error())
+			eb.AddField(cmdErr.Embed.Usage, fmt.Sprintf("`%v`", cmdErr.Usage), true)
+			eb.AddField(cmdErr.Embed.Example, fmt.Sprintf("`%v`", cmdErr.Example), true)
+		case errors.As(err, &usrErr):
+			if err := usrErr.Unwrap(); err != nil {
+				if ctx.Command != nil {
+					b.Log.Errorf("An error occured. Command: %v. Arguments: [%v]. Error: %v", ctx.Command.Name, ctx.Args.Raw, err)
+				} else {
+					b.Log.Errorf("An error occured. Error: %v", err)
+				}
+			}
+
+			eb.FailureTemplate(usrErr.Error())
 		default:
+			if ctx.Command != nil {
+				b.Log.Errorf("An error occured. Command: %v. Arguments: [%v]. Error: %v", ctx.Command.Name, ctx.Args.Raw, err)
+			} else {
+				b.Log.Errorf("An error occured. Error: %v", err)
+			}
+
 			eb.ErrorTemplate(err.Error())
 		}
 
@@ -154,7 +171,7 @@ func OnRateLimit(b *bot.Bot) func(*gumi.Ctx) error {
 		}
 
 		eb := embeds.NewBuilder()
-		eb.FailureTemplate(fmt.Sprintf("Hold your horses! You're getting rate limited. Try again in **%v**", duration.Round(1*time.Second).String()))
+		eb.FailureTemplate(messages.RateLimit(duration))
 
 		return ctx.ReplyEmbed(eb.Finalize())
 	}
@@ -164,7 +181,7 @@ func OnRateLimit(b *bot.Bot) func(*gumi.Ctx) error {
 func OnNoPerms(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
 		eb := embeds.NewBuilder()
-		eb.FailureTemplate("You don't have enough permissions to run this command.")
+		eb.FailureTemplate(messages.NoPerms())
 
 		return ctx.ReplyEmbed(eb.Finalize())
 	}
@@ -175,7 +192,7 @@ func OnNSFW(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
 		eb := embeds.NewBuilder()
 
-		eb.FailureTemplate(fmt.Sprintf("Bonk! You're trying to execute a NSFW command `%v` in a SFW channel.", ctx.Command.Name))
+		eb.FailureTemplate(messages.NSFWCommand(ctx.Command.Name))
 
 		return ctx.ReplyEmbed(eb.Finalize())
 	}
@@ -184,7 +201,7 @@ func OnNSFW(b *bot.Bot) func(ctx *gumi.Ctx) error {
 //OnExecute logs every executed command.
 func OnExecute(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
-		b.Logger.Infof("Executing command [%v]. Arguments: [%v]. Guild ID: %v, channel ID: %v", ctx.Command.Name, ctx.Args.Raw, ctx.Event.GuildID, ctx.Event.ChannelID)
+		b.Log.Infof("Executing command [%v]. Arguments: [%v]. Guild ID: %v, channel ID: %v", ctx.Command.Name, ctx.Args.Raw, ctx.Event.GuildID, ctx.Event.ChannelID)
 		return nil
 	}
 }

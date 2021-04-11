@@ -76,6 +76,7 @@ func main() {
 	b.AddHandler(handlers.OnGuildDelete(b))
 	b.AddHandler(handlers.OnGuildBanAdd(b))
 	commands.GeneralGroup(b)
+	commands.UserGroup(b)
 
 	if err := b.Open(); err != nil {
 		log.Fatal(err)

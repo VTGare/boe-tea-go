@@ -7,6 +7,9 @@ import (
 	"github.com/VTGare/boe-tea-go/internal/config"
 	"github.com/VTGare/boe-tea-go/pkg/artworks"
 	"github.com/VTGare/boe-tea-go/pkg/models"
+	artworksModel "github.com/VTGare/boe-tea-go/pkg/models/artworks"
+	"github.com/VTGare/boe-tea-go/pkg/models/guilds"
+	"github.com/VTGare/boe-tea-go/pkg/models/users"
 	"github.com/VTGare/boe-tea-go/pkg/repost"
 	"github.com/VTGare/gumi"
 	"github.com/bwmarrin/discordgo"
@@ -14,8 +17,10 @@ import (
 )
 
 type Bot struct {
-	Models           *models.Models
-	Logger           *zap.SugaredLogger
+	Guilds           guilds.Service
+	Users            users.Service
+	Artworks         artworksModel.Service
+	Log              *zap.SugaredLogger
 	Config           *config.Config
 	Router           *gumi.Router
 	ArtworkProviders []artworks.Provider
@@ -35,8 +40,10 @@ func New(config *config.Config, models *models.Models, logger *zap.SugaredLogger
 	banned.SetTTL(15 * time.Second)
 
 	return &Bot{
-		Models:         models,
-		Logger:         logger,
+		Guilds:         models.Guilds,
+		Users:          models.Users,
+		Artworks:       models.Artworks,
+		Log:            logger,
 		Config:         config,
 		RepostDetector: rd,
 		BannedUsers:    banned,
@@ -64,7 +71,7 @@ func (b *Bot) Open() error {
 		return err
 	}
 
-	b.Logger.Info("Started a bot.")
+	b.Log.Info("Started a bot.")
 	return nil
 }
 

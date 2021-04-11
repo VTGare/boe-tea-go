@@ -10,6 +10,7 @@ import (
 	"github.com/ReneKroon/ttlcache"
 	"github.com/VTGare/boe-tea-go/internal/arrays"
 	"github.com/VTGare/boe-tea-go/pkg/artworks"
+	"github.com/VTGare/boe-tea-go/pkg/messages"
 	models "github.com/VTGare/boe-tea-go/pkg/models/artworks"
 	"github.com/VTGare/embeds"
 	"github.com/bwmarrin/discordgo"
@@ -193,7 +194,7 @@ func (a Artwork) Embeds(quote string) []*discordgo.MessageEmbed {
 	eb.Description(fmt.Sprintf("**Tags**\n%v", strings.Join(tags, " • ")))
 
 	eb.AddField("Likes", strconv.Itoa(a.Likes), true)
-	eb.AddField("Original quality", fmt.Sprintf("[Click here](%v)", a.Images[0].originalPixivMoe()), true)
+	eb.AddField("Original quality", messages.ClickHere(a.Images[0].originalPixivMoe()), true)
 	eb.Timestamp(time.Now()).Footer(quote, "")
 	pages = append(pages, eb.Finalize())
 
@@ -205,7 +206,7 @@ func (a Artwork) Embeds(quote string) []*discordgo.MessageEmbed {
 			eb.Image(image.previewPixivMoe())
 			eb.URL(a.URL).Timestamp(time.Now()).Footer(quote, "")
 			eb.AddField("Likes", strconv.Itoa(a.Likes), true)
-			eb.AddField("Original quality", fmt.Sprintf("[Click here](%v)", image.originalPixivMoe()), true)
+			eb.AddField("Original quality", messages.ClickHere(image.originalPixivMoe()), true)
 
 			pages = append(pages, eb.Finalize())
 		}

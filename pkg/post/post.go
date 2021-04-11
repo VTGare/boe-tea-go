@@ -4,14 +4,17 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"reflect"
 	"sync/atomic"
 	"time"
 
+	"github.com/VTGare/boe-tea-go/internal/arrays"
 	"github.com/VTGare/boe-tea-go/internal/dgoutils"
 	"github.com/VTGare/boe-tea-go/pkg/artworks"
 	"github.com/VTGare/boe-tea-go/pkg/artworks/pixiv"
 	"github.com/VTGare/boe-tea-go/pkg/artworks/twitter"
 	"github.com/VTGare/boe-tea-go/pkg/bot"
+	"github.com/VTGare/boe-tea-go/pkg/messages"
 	"github.com/VTGare/boe-tea-go/pkg/models/guilds"
 	"github.com/VTGare/boe-tea-go/pkg/repost"
 	"github.com/VTGare/embeds"
@@ -24,6 +27,12 @@ type Post struct {
 	bot  *bot.Bot
 	ctx  *gumi.Ctx
 	urls []string
+}
+
+type fetchResult struct {
+	Artworks []artworks.Artwork
+	Reposts  []*repost.Repost
+	Matched  int
 }
 
 func New(bot *bot.Bot, ctx *gumi.Ctx, urls ...string) *Post {
@@ -42,18 +51,18 @@ func (p *Post) Send() error {
 		guild = guilds.UserGuild()
 	} else {
 		var err error
-		guild, err = p.bot.Models.Guilds.FindOne(context.Background(), p.ctx.Event.GuildID)
+		guild, err = p.bot.Guilds.FindOne(context.Background(), p.ctx.Event.GuildID)
 		if err != nil {
 			return err
 		}
 	}
 
-	artworks, reposts, matched, err := p.fetch(guild, p.ctx.Event.ChannelID)
+	res, err := p.fetch(guild, p.ctx.Event.ChannelID)
 	if err != nil {
 		return err
 	}
 
-	if len(reposts) > 0 {
+	if len(res.Reposts) > 0 {
 		if guild.Repost == "strict" {
 			perm, _ := dgoutils.MemberHasPermission(
 				p.ctx.Session,
@@ -62,18 +71,18 @@ func (p *Post) Send() error {
 				discordgo.PermissionAdministrator|discordgo.PermissionManageMessages,
 			)
 
-			if perm && int(matched) == len(reposts) {
+			if perm && res.Matched == len(res.Reposts) {
 				p.ctx.Session.ChannelMessageDelete(p.ctx.Event.ChannelID, p.ctx.Event.ID)
 			}
 		}
 
-		p.sendReposts(guild, reposts, p.ctx.Event.ChannelID, p.ctx.Event.ID)
+		p.sendReposts(guild, res.Reposts, p.ctx.Event.ChannelID, p.ctx.Event.ID)
 	}
 
-	return p.send(guild, p.ctx.Event.ChannelID, artworks, false)
+	return p.send(guild, p.ctx.Event.ChannelID, res.Artworks, false)
 }
 
-func (p *Post) Crosspost(channels []string) error {
+func (p *Post) Crosspost(userID, group string, channels []string) error {
 	wg, _ := errgroup.WithContext(context.Background())
 	for _, channelID := range channels {
 		channelID := channelID
@@ -81,22 +90,40 @@ func (p *Post) Crosspost(channels []string) error {
 		wg.Go(func() error {
 			ch, err := p.ctx.Session.Channel(channelID)
 			if err != nil {
-				return err
+				return nil
 			}
 
-			guild, err := p.bot.Models.Guilds.FindOne(context.Background(), ch.GuildID)
-			if err != nil {
-				return err
+			if _, err := p.ctx.Session.GuildMember(ch.GuildID, userID); err != nil {
+				p.bot.Log.Infof(
+					"Couldn't crosspost. User: %v. Group: %v. Channel: %v. Error: %v. Removing the channel from user's group.",
+					userID, group, channelID, err,
+				)
+
+				if _, err := p.bot.Users.DeleteFromGroup(context.Background(), userID, group, channelID); err != nil {
+					p.bot.Log.Errorf(
+						"Failed to remove a channel from user's group. User: %v. Group: %v. Channel: %v. Error: %v",
+						userID, group, channelID, err,
+					)
+				}
+
+				return nil
 			}
 
-			artworks, _, _, err := p.fetch(guild, channelID)
+			guild, err := p.bot.Guilds.FindOne(context.Background(), ch.GuildID)
 			if err != nil {
-				return err
+				return nil
 			}
 
-			err = p.send(guild, channelID, artworks, true)
-			if err != nil {
-				return err
+			if guild.Crosspost && len(guild.ArtChannels) == 0 || arrays.AnyString(guild.ArtChannels, ch.ID) {
+				res, err := p.fetch(guild, channelID)
+				if err != nil {
+					return err
+				}
+
+				err = p.send(guild, channelID, res.Artworks, true)
+				if err != nil {
+					return err
+				}
 			}
 
 			return nil
@@ -131,7 +158,7 @@ func (p *Post) providers(guild *guilds.Guild) []artworks.Provider {
 	return providers
 }
 
-func (p *Post) fetch(guild *guilds.Guild, channelID string) ([]artworks.Artwork, []*repost.Repost, int64, error) {
+func (p *Post) fetch(guild *guilds.Guild, channelID string) (*fetchResult, error) {
 	var (
 		wg, _        = errgroup.WithContext(context.Background())
 		providers    = p.providers(guild)
@@ -145,6 +172,7 @@ func (p *Post) fetch(guild *guilds.Guild, channelID string) ([]artworks.Artwork,
 		wg.Go(func() error {
 			for _, provider := range providers {
 				if id, ok := provider.Match(url); ok {
+					p.bot.Log.Infof("Matched a URL: %v. Provider: %v", url, reflect.TypeOf(provider))
 					atomic.AddInt64(&matched, 1)
 
 					if guild.Repost != "disabled" {
@@ -168,10 +196,10 @@ func (p *Post) fetch(guild *guilds.Guild, channelID string) ([]artworks.Artwork,
 							ChannelID: channelID,
 							MessageID: p.ctx.Event.ID,
 						}, 24*time.Hour)
-					}
 
-					if err != nil {
-						p.bot.Logger.Errorf("Error adding a repost detector: %v", err)
+						if err != nil {
+							p.bot.Log.Errorf("Error creating a repost: %v", err)
+						}
 					}
 
 					break
@@ -183,39 +211,42 @@ func (p *Post) fetch(guild *guilds.Guild, channelID string) ([]artworks.Artwork,
 	}
 
 	if err := wg.Wait(); err != nil {
-		return nil, nil, 0, err
+		return nil, err
 	}
 
 	close(artworksChan)
 
-	var (
-		arts    = make([]artworks.Artwork, 0)
-		reposts = make([]*repost.Repost, 0)
-	)
+	res := &fetchResult{
+		Artworks: make([]artworks.Artwork, 0),
+		Reposts:  make([]*repost.Repost, 0),
+		Matched:  int(matched),
+	}
 
 	for art := range artworksChan {
 		switch art := art.(type) {
 		case *repost.Repost:
-			reposts = append(reposts, art)
+			res.Reposts = append(res.Reposts, art)
 		case artworks.Artwork:
-			arts = append(arts, art)
+			res.Artworks = append(res.Artworks, art)
 		}
 	}
 
-	return arts, reposts, matched, nil
+	return res, nil
 }
 
 func (p *Post) sendReposts(guild *guilds.Guild, reposts []*repost.Repost, channelID, messageID string) {
+	local := messages.RepostEmbed()
+
 	eb := embeds.NewBuilder()
-	eb.Title("Repost detected!")
+	eb.Title(local.Title)
 	for _, rep := range reposts {
 		eb.AddField(
 			rep.ID,
 			fmt.Sprintf(
-				"**Original message:** [Click here](https://discord.com/channels/%v/%v/%v)\n**Expires in:** %v\n**URL:** [Click here](%v)",
-				rep.GuildID, rep.ChannelID, rep.MessageID,
-				time.Until(rep.Expire).Round(time.Second),
-				rep.URL,
+				"**%v:** %v\n**%v:** %v\n**URL:** %v",
+				local.OriginalMessage, messages.ClickHere(fmt.Sprintf("https://discord.com/channels/%v/%v/%v", rep.GuildID, rep.ChannelID, rep.MessageID)),
+				local.ExpiresIn, time.Until(rep.Expire).Round(time.Second),
+				messages.ClickHere(rep.URL),
 			),
 		)
 	}
@@ -249,11 +280,13 @@ func (p *Post) send(guild *guilds.Guild, channelID string, artworks []artworks.A
 					return err
 				}
 
+				//Silently skip NSFW artworks in safe channels
 				if !ch.NSFW && artwork.NSFW {
 					continue
 				}
 			}
 
+			//Random number generator for a quote.
 			s := rand.NewSource(time.Now().Unix())
 			r := rand.New(s)
 
@@ -270,7 +303,7 @@ func (p *Post) send(guild *guilds.Guild, channelID string, artworks []artworks.A
 			if crosspost {
 				for _, embed := range embeds {
 					embed.Author = &discordgo.MessageEmbedAuthor{
-						Name:    fmt.Sprintf("Crosspost requested by %v", p.ctx.Event.Author.String()),
+						Name:    messages.CrosspostBy(p.ctx.Event.Author.String()),
 						IconURL: p.ctx.Event.Author.AvatarURL(""),
 					}
 				}
@@ -290,12 +323,8 @@ func (p *Post) send(guild *guilds.Guild, channelID string, artworks []artworks.A
 	if count > guild.Limit {
 		first := allEmbeds[0][0]
 		p.ctx.Session.ChannelMessageSendComplex(channelID, &discordgo.MessageSend{
-			Content: fmt.Sprintf(
-				"Album size `(%v)` is higher than the server's limit `(%v)`, only the first image of every artwork has been sent.",
-				count,
-				guild.Limit,
-			),
-			Embed: first,
+			Content: messages.LimitExceeded(guild.Limit, count),
+			Embed:   first,
 		})
 
 		if len(allEmbeds) > 1 {

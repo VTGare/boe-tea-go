@@ -45,14 +45,14 @@ func set(b *bot.Bot) func(ctx *gumi.Ctx) error {
 		case ctx.Args.Len() == 0:
 			gd, err := ctx.Session.Guild(ctx.Event.GuildID)
 			if err != nil {
-				return messages.ErrGuildNotFound(ctx.Event.GuildID)
+				return messages.ErrGuildNotFound(err, ctx.Event.GuildID)
 			}
 
-			guild, err := b.Models.Guilds.FindOne(context.Background(), gd.ID)
+			guild, err := b.Guilds.FindOne(context.Background(), gd.ID)
 			if err != nil {
 				switch {
 				case errors.Is(err, mongo.ErrNoDocuments):
-					return messages.ErrGuildNotFound(ctx.Event.GuildID)
+					return messages.ErrGuildNotFound(err, ctx.Event.GuildID)
 				default:
 					return err
 				}
@@ -103,12 +103,14 @@ func set(b *bot.Bot) func(ctx *gumi.Ctx) error {
 				),
 			)
 
-			eb.AddField(
-				msg.ArtChannels,
-				strings.Join(arrays.MapString(guild.ArtChannels, func(s string) string {
-					return fmt.Sprintf("<#%v> | `%v`", s, s)
-				}), "\n"),
-			)
+			if len(guild.ArtChannels) > 0 {
+				eb.AddField(
+					msg.ArtChannels,
+					strings.Join(arrays.MapString(guild.ArtChannels, func(s string) string {
+						return fmt.Sprintf("<#%v> | `%v`", s, s)
+					}), "\n"),
+				)
+			}
 
 			ctx.ReplyEmbed(eb.Finalize())
 			return nil
@@ -127,7 +129,7 @@ func set(b *bot.Bot) func(ctx *gumi.Ctx) error {
 				return ctx.Router.OnNoPermissionsCallback(ctx)
 			}
 
-			guild, err := b.Models.Guilds.FindOne(context.Background(), ctx.Event.GuildID)
+			guild, err := b.Guilds.FindOne(context.Background(), ctx.Event.GuildID)
 			if err != nil {
 				return err
 			}
@@ -218,7 +220,7 @@ func set(b *bot.Bot) func(ctx *gumi.Ctx) error {
 				return messages.ErrUnknownSetting(settingName.Raw)
 			}
 
-			_, err = b.Models.Guilds.ReplaceOne(context.Background(), guild)
+			_, err = b.Guilds.ReplaceOne(context.Background(), guild)
 			if err != nil {
 				return err
 			}
