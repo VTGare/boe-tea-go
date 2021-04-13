@@ -1,0 +1,21 @@
+version: "2.0"
+services:
+    bot:
+        build: .
+        network_mode: host
+        depends_on:
+            - redis
+            - mongodb
+    redis:
+        image: redis:latest
+        logging:
+            driver: none
+    mongodb:
+        image: mongo:latest
+        volumes:
+            - "mongodata:/data/db"
+        network_mode: host
+        logging:
+            driver: none
+volumes:
+    mongodata:
