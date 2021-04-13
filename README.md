@@ -45,10 +45,6 @@ Bot's documentation is currently getting rewritten and won't be publicly availab
     {
     "discord": {
         "token": "Your Discord bot token. Acquire it on Discord Developer Portal.",
-        "prefixes": [
-            "bt!",
-            "An array of prefixes."
-        ],
         "author_id": "Your Discord user ID. Gives access to developer commands."
     },
     "mongo": {

@@ -27,9 +27,9 @@ func PrefixResolver(b *bot.Bot) func(s *discordgo.Session, m *discordgo.MessageC
 		mention := fmt.Sprintf("<@%v> ", s.State.User.ID)
 		mentionExcl := fmt.Sprintf("<@!%v> ", s.State.User.ID)
 
-		g, err := b.Guilds.FindOne(ctx, m.GuildID)
-		if err != nil || arrays.AnyString(b.Config.Discord.Prefixes, g.Prefix) {
-			return append(b.Config.Discord.Prefixes, mention, mentionExcl)
+		g, _ := b.Guilds.FindOne(ctx, m.GuildID)
+		if g == nil || g.Prefix == "bt!" {
+			return []string{mention, mentionExcl, "bt!", "bt ", "bt.", "bt?"}
 		}
 
 		return []string{mention, mentionExcl, g.Prefix}
@@ -104,7 +104,7 @@ func OnGuildCreate(b *bot.Bot) func(*discordgo.Session, *discordgo.GuildCreate) 
 	}
 }
 
-//OnGuilldDelete logs guild outages and guilds that kicked the bot out.
+//OnGuildDelete logs guild outages and guilds that kicked the bot out.
 func OnGuildDelete(b *bot.Bot) func(*discordgo.Session, *discordgo.GuildDelete) {
 	return func(s *discordgo.Session, g *discordgo.GuildDelete) {
 		if g.Unavailable {

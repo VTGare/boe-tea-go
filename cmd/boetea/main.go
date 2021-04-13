@@ -29,7 +29,7 @@ func main() {
 
 	cfg, err := config.FromFile("config.json")
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("Config not found: ", err)
 	}
 
 	db, err := mongodb.New(cfg.Mongo.URI, cfg.Mongo.Database)
