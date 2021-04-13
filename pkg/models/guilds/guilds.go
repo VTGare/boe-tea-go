@@ -17,12 +17,12 @@ type Guild struct {
 	ID          string    `json:"id" bson:"guild_id" validate:"required"`
 	Prefix      string    `json:"prefix" bson:"prefix" validate:"required,max=5"`
 	Limit       int       `json:"limit" bson:"limit" validate:"required"`
-	NSFW        bool      `json:"nsfw" bson:"nsfw" validate:"required"`
-	Pixiv       bool      `json:"pixiv" bson:"pixiv" validate:"required"`
-	Twitter     bool      `json:"twitter" bson:"twitter" validate:"required"`
+	NSFW        bool      `json:"nsfw" bson:"nsfw"`
+	Pixiv       bool      `json:"pixiv" bson:"pixiv"`
+	Twitter     bool      `json:"twitter" bson:"twitter"`
+	Crosspost   bool      `json:"crosspost" bson:"crosspost"`
+	Reactions   bool      `json:"reactions" bson:"reactions"`
 	Repost      string    `json:"repost" bson:"repost" validate:"required"`
-	Crosspost   bool      `json:"crosspost" bson:"crosspost" validate:"required"`
-	Reactions   bool      `json:"reactions" bson:"reactions" validate:"required"`
 	ArtChannels []string  `json:"art_channels" bson:"art_channels" validate:"required"`
 	CreatedAt   time.Time `json:"created_at" bson:"created_at" validate:"required"`
 	UpdatedAt   time.Time `json:"updated_at" bson:"updated_at"`
