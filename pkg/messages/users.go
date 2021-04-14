@@ -79,7 +79,7 @@ func UserRemoveSuccess(name string, channels []string) string {
 			arrays.MapString(
 				channels,
 				func(s string) string {
-					return fmt.Sprintf("<#%v> | `$%v`", s, s)
+					return fmt.Sprintf("<#%v> | `%v`", s, s)
 				},
 			),
 			" • ",
@@ -90,5 +90,36 @@ func UserRemoveFail(name string) error {
 	return newUserError(fmt.Sprintf(
 		"No channels were removed from group `%v`. None of the channel were part of the group.",
 		name,
+	))
+}
+
+func UserChannelAlreadyParent(id string) error {
+	return newUserError(fmt.Sprintf(
+		"Channel <#%v> | `%v` is already a parent",
+		id, id,
+	))
+}
+
+func UserCopyGroupSuccess(src, dest string, channels []string) string {
+	return fmt.Sprintf(
+		"Copied group `%v` to `%v`. Children channels:\n%v",
+		src, dest, strings.Join(
+			arrays.MapString(
+				channels,
+				func(s string) string {
+					return fmt.Sprintf("<#%v> | `$%v`", s, s)
+				},
+			),
+			" • ",
+		),
+	)
+}
+
+func UserCopyGroupFail(src, dest string) error {
+	return newUserError(fmt.Sprintf(
+		"Couldn't copy group `%v` to `%v`. One of the following is true:\n%v\n%v",
+		src, dest,
+		"• Group "+src+" doesn't exist;",
+		"• Group "+dest+" already exists.",
 	))
 }

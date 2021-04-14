@@ -26,7 +26,7 @@ func UserGroup(b *bot.Bot) {
 		Description: "Shows user's profile and settings.",
 		Usage:       "bt!profile",
 		Example:     "bt!profile",
-		RateLimiter: gumi.NewRateLimiter(15 * time.Second),
+		RateLimiter: gumi.NewRateLimiter(10 * time.Second),
 		Exec:        profile(b),
 	})
 
@@ -37,7 +37,7 @@ func UserGroup(b *bot.Bot) {
 		Description: "Shows all crosspost groups.",
 		Usage:       "bt!groups",
 		Example:     "bt!groups",
-		RateLimiter: gumi.NewRateLimiter(15 * time.Second),
+		RateLimiter: gumi.NewRateLimiter(10 * time.Second),
 		Exec:        groups(b),
 	})
 
@@ -48,7 +48,7 @@ func UserGroup(b *bot.Bot) {
 		Description: "Creates a new crosspost group.",
 		Usage:       "bt!newgroup <group name> <parent channel>",
 		Example:     "bt!newgroup lewds #nsfw",
-		RateLimiter: gumi.NewRateLimiter(15 * time.Second),
+		RateLimiter: gumi.NewRateLimiter(10 * time.Second),
 		Exec:        newgroup(b),
 	})
 
@@ -58,7 +58,7 @@ func UserGroup(b *bot.Bot) {
 		Description: "Deletes a crosspost group.",
 		Usage:       "bt!delgroup <group name>",
 		Example:     "bt!delgroup schooldays",
-		RateLimiter: gumi.NewRateLimiter(15 * time.Second),
+		RateLimiter: gumi.NewRateLimiter(10 * time.Second),
 		Exec:        delgroup(b),
 	})
 
@@ -69,7 +69,7 @@ func UserGroup(b *bot.Bot) {
 		Description: "Adds channels to a crosspost group.",
 		Usage:       "bt!push <group name> [channel ids]",
 		Example:     "bt!push myCoolGroup #coolchannel #coolerchannel",
-		RateLimiter: gumi.NewRateLimiter(15 * time.Second),
+		RateLimiter: gumi.NewRateLimiter(10 * time.Second),
 		Exec:        push(b),
 	})
 
@@ -80,8 +80,19 @@ func UserGroup(b *bot.Bot) {
 		Description: "Removes channels from a crosspost group",
 		Usage:       "bt!remove <group name> [channel ids]",
 		Example:     "bt!remove cuteAnimeGirls #nsfw-channel #cat-pics",
-		RateLimiter: gumi.NewRateLimiter(15 * time.Second),
+		RateLimiter: gumi.NewRateLimiter(10 * time.Second),
 		Exec:        remove(b),
+	})
+
+	b.Router.RegisterCmd(&gumi.Command{
+		Name:        "copygroup",
+		Group:       group,
+		Aliases:     []string{},
+		Description: "Copies a crosspost group with a different parent channel",
+		Usage:       "bt!copygroup <from> <to> <parent channel id>",
+		Example:     "bt!copygroup sfw1 sfw2 #za-warudo",
+		RateLimiter: gumi.NewRateLimiter(10 * time.Second),
+		Exec:        copygroup(b),
 	})
 }
 
@@ -365,5 +376,51 @@ func remove(b *bot.Bot) func(ctx *gumi.Ctx) error {
 		}
 
 		return nil
+	}
+}
+
+func copygroup(b *bot.Bot) func(ctx *gumi.Ctx) error {
+	return func(ctx *gumi.Ctx) error {
+		if ctx.Args.Len() < 3 {
+			return messages.ErrIncorrectCmd(ctx.Command)
+		}
+
+		user, err := findOrCreateUser(b, ctx.Event.Author.ID)
+		if err != nil {
+			return err
+		}
+
+		src := ctx.Args.Get(0).Raw
+		dest := ctx.Args.Get(1).Raw
+		parent := strings.Trim(ctx.Args.Get(2).Raw, "<#>")
+		if _, ok := user.FindGroup(parent); ok {
+			return messages.UserChannelAlreadyParent(parent)
+		}
+
+		for _, group := range user.Groups {
+			if group.Name == src {
+				newGroup := &users.Group{
+					Name:   dest,
+					Parent: parent,
+					Children: arrays.FilterString(group.Children, func(s string) bool {
+						return s != parent
+					}),
+				}
+
+				_, err := b.Users.InsertGroup(context.Background(), user.ID, newGroup)
+				if err != nil {
+					return messages.UserCopyGroupFail(src, dest)
+				}
+
+				eb := embeds.NewBuilder()
+				eb.SuccessTemplate(
+					messages.UserCopyGroupSuccess(src, dest, newGroup.Children),
+				)
+
+				return ctx.ReplyEmbed(eb.Finalize())
+			}
+		}
+
+		return messages.UserCopyGroupFail(src, dest)
 	}
 }
