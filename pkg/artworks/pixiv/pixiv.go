@@ -27,7 +27,7 @@ type Artwork struct {
 	Type   string
 	Author string
 	Title  string
-	URL    string
+	url    string
 	Likes  int
 	Pages  int
 	Tags   []string
@@ -151,7 +151,7 @@ func (p Pixiv) Find(id string) (artworks.Artwork, error) {
 
 	return &Artwork{
 		ID:     id,
-		URL:    "https://pixiv.net/en/artworks/" + id,
+		url:    "https://pixiv.net/en/artworks/" + id,
 		Title:  illust.Title,
 		Author: author,
 		Tags:   tags,
@@ -167,7 +167,7 @@ func (a Artwork) ToModel() *models.ArtworkInsert {
 	return &models.ArtworkInsert{
 		Title:  a.Title,
 		Author: a.Author,
-		URL:    a.URL,
+		URL:    a.url,
 		Images: a.imageURLs(),
 	}
 }
@@ -185,7 +185,7 @@ func (a Artwork) Embeds(quote string) []*discordgo.MessageEmbed {
 		eb.Title(fmt.Sprintf("%v by %v", a.Title, a.Author))
 	}
 
-	eb.URL(a.URL)
+	eb.URL(a.url)
 	eb.Image(a.Images[0].previewPixivMoe())
 
 	tags := arrays.MapString(a.Tags, func(s string) string {
@@ -204,7 +204,7 @@ func (a Artwork) Embeds(quote string) []*discordgo.MessageEmbed {
 
 			eb.Title(fmt.Sprintf("%v by %v | Page %v / %v", a.Title, a.Author, ind+2, length))
 			eb.Image(image.previewPixivMoe())
-			eb.URL(a.URL).Timestamp(time.Now()).Footer(quote, "")
+			eb.URL(a.url).Timestamp(time.Now()).Footer(quote, "")
 			eb.AddField("Likes", strconv.Itoa(a.Likes), true)
 			eb.AddField("Original quality", messages.ClickHere(image.originalPixivMoe()), true)
 
@@ -213,6 +213,10 @@ func (a Artwork) Embeds(quote string) []*discordgo.MessageEmbed {
 	}
 
 	return pages
+}
+
+func (a Artwork) URL() string {
+	return a.url
 }
 
 func (a Artwork) imageURLs() []string {

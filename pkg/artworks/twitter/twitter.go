@@ -26,7 +26,7 @@ type Artwork struct {
 	FullName  string
 	Username  string
 	Snowflake string
-	URL       string
+	url       string
 	Content   string
 	Timestamp string
 	Likes     int
@@ -173,7 +173,7 @@ func (t Twitter) scrapeTwitter(snowflake, nitter string) (*Artwork, error) {
 
 	c.Wait()
 
-	res.URL = fmt.Sprintf("https://twitter.com/%v/status/%v", strings.TrimLeft(res.Username, "@"), res.Snowflake)
+	res.url = fmt.Sprintf("https://twitter.com/%v/status/%v", strings.TrimLeft(res.Username, "@"), res.Snowflake)
 
 	return res, nil
 }
@@ -205,7 +205,7 @@ func (a Artwork) ToModel() *models.ArtworkInsert {
 	return &models.ArtworkInsert{
 		Title:  "",
 		Author: a.Username,
-		URL:    a.URL,
+		URL:    a.url,
 		Images: a.Gallery.Strings(),
 	}
 }
@@ -225,7 +225,7 @@ func (a Artwork) Embeds(footer string) []*discordgo.MessageEmbed {
 		eb.Title(fmt.Sprintf("%v (%v)", a.FullName, a.Username))
 	}
 
-	eb.URL(a.URL).Description(a.Content).TimestampString(a.Timestamp).Footer(footer, "")
+	eb.URL(a.url).Description(a.Content).TimestampString(a.Timestamp).Footer(footer, "")
 	eb.AddField("Retweets", strconv.Itoa(a.Retweets), true)
 	eb.AddField("Likes", strconv.Itoa(a.Likes), true)
 	if length > 0 {
@@ -244,7 +244,7 @@ func (a Artwork) Embeds(footer string) []*discordgo.MessageEmbed {
 		for ind, art := range a.Gallery[1:] {
 			eb := embeds.NewBuilder()
 
-			eb.Title(fmt.Sprintf("%v (%v) | Page %v / %v", a.FullName, a.Username, ind+2, length)).URL(a.URL)
+			eb.Title(fmt.Sprintf("%v (%v) | Page %v / %v", a.FullName, a.Username, ind+2, length)).URL(a.url)
 			eb.Image(art.URL).Footer(footer, "").TimestampString(a.Timestamp)
 
 			tweets = append(tweets, eb.Finalize())
@@ -252,6 +252,10 @@ func (a Artwork) Embeds(footer string) []*discordgo.MessageEmbed {
 	}
 
 	return tweets
+}
+
+func (a Artwork) URL() string {
+	return a.url
 }
 
 //Len returns the length of Tweets gallery.

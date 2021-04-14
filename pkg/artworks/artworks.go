@@ -13,4 +13,5 @@ type Provider interface {
 type Artwork interface {
 	ToModel() *artworks.ArtworkInsert
 	Embeds(string) []*discordgo.MessageEmbed
+	URL() string
 }
