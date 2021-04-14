@@ -322,20 +322,41 @@ func (p *Post) send(guild *guilds.Guild, channelID string, artworks []artworks.A
 
 	if count > guild.Limit {
 		first := allEmbeds[0][0]
+
+		content := messages.LimitExceeded(guild.Limit, count)
+		if crosspost {
+			content = first.URL + "\n" + content
+		}
+
 		p.ctx.Session.ChannelMessageSendComplex(channelID, &discordgo.MessageSend{
-			Content: messages.LimitExceeded(guild.Limit, count),
+			Content: content,
 			Embed:   first,
 		})
 
 		if len(allEmbeds) > 1 {
 			for _, embeds := range allEmbeds[1:] {
-				p.ctx.Session.ChannelMessageSendEmbed(channelID, embeds[0])
+				var content string
+				if crosspost {
+					content = embeds[0].URL
+				}
+
+				p.ctx.Session.ChannelMessageSendComplex(channelID, &discordgo.MessageSend{
+					Content: content,
+					Embed:   embeds[0],
+				})
 			}
 		}
 	} else {
 		for _, embeds := range allEmbeds {
 			for _, embed := range embeds {
-				p.ctx.Session.ChannelMessageSendEmbed(channelID, embed)
+				if crosspost {
+					p.ctx.Session.ChannelMessageSendComplex(channelID, &discordgo.MessageSend{
+						Content: embed.URL,
+						Embed:   embed,
+					})
+				} else {
+					p.ctx.Session.ChannelMessageSendEmbed(channelID, embed)
+				}
 			}
 		}
 	}
