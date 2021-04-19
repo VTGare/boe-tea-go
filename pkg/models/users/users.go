@@ -2,6 +2,7 @@ package users
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/VTGare/boe-tea-go/internal/database/mongodb"
@@ -36,6 +37,7 @@ type Group struct {
 type Service interface {
 	InsertOne(ctx context.Context, userID string) (*User, error)
 	FindOne(ctx context.Context, userID string) (*User, error)
+	FindOneOrCreate(ctx context.Context, userID string) (*User, error)
 	DeleteOne(ctx context.Context, userID string) (*User, error)
 	InsertFavourite(ctx context.Context, userID string, fav *Favourite) (*User, error)
 	DeleteFavourite(ctx context.Context, userID string, fav *Favourite) (*User, error)
@@ -203,10 +205,41 @@ func (u userService) DeleteFromGroup(ctx context.Context, userID, group, child s
 	return &user, nil
 }
 
+func (u userService) FindOneOrCreate(ctx context.Context, userID string) (*User, error) {
+	user, err := u.FindOne(context.Background(), userID)
+	if err != nil {
+		switch {
+		case errors.Is(err, mongo.ErrNoDocuments):
+			user, err = u.InsertOne(
+				context.Background(),
+				userID,
+			)
+
+			if err != nil {
+				return nil, err
+			}
+		default:
+			return nil, err
+		}
+	}
+
+	return user, nil
+}
+
 func (u *User) FindGroup(parentID string) (*Group, bool) {
 	for _, group := range u.Groups {
 		if group.Parent == parentID {
 			return group, true
+		}
+	}
+
+	return nil, false
+}
+
+func (u *User) FindFavourite(artworkID int) (*Favourite, bool) {
+	for _, fav := range u.Favourites {
+		if fav.ArtworkID == artworkID {
+			return fav, true
 		}
 	}
 

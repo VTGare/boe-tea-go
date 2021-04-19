@@ -45,7 +45,7 @@ type FilterOne struct {
 }
 
 type Filter struct {
-	ID     int    `query:"id"`
+	IDs    []int  `query:"id"`
 	Title  string `query:"title"`
 	Author string `query:"author"`
 	URL    string `query:"url"`
@@ -78,8 +78,8 @@ func (o *Filter) BSON() bson.D {
 	}
 
 	switch {
-	case o.ID != 0:
-		filter = append(filter, bson.E{"artwork_id", o.ID})
+	case len(o.IDs) != 0:
+		filter = append(filter, bson.E{"artwork_id", bson.M{"$in": o.IDs}})
 	case o.URL != "":
 		filter = append(filter, bson.E{"url", o.URL})
 	default:

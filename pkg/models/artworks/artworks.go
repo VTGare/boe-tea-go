@@ -2,6 +2,7 @@ package artworks
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/VTGare/boe-tea-go/internal/database/mongodb"
@@ -48,6 +49,8 @@ type Service interface {
 	FindMany(context.Context, ...mo.Find) ([]*Artwork, error)
 	FindOne(context.Context, *mo.FilterOne) (*Artwork, error)
 	InsertOne(context.Context, *ArtworkInsert) (*Artwork, error)
+	FindOneOrCreate(context.Context, *mo.FilterOne, *ArtworkInsert) (*Artwork, error)
+	IncrementFavourite(ctx context.Context, id int, inc int, nsfw bool) (*Artwork, error)
 	DeleteOne(context.Context, *mo.FilterOne) (*Artwork, error)
 }
 
@@ -129,6 +132,48 @@ func (a artwork) DeleteOne(ctx context.Context, filter *mo.FilterOne) (*Artwork,
 	err = res.Decode(&artwork)
 
 	return &artwork, err
+}
+
+func (a artwork) FindOneOrCreate(ctx context.Context, filter *mo.FilterOne, insert *ArtworkInsert) (*Artwork, error) {
+	art, err := a.FindOne(context.Background(), filter)
+	if err != nil {
+		switch {
+		case errors.Is(err, mongo.ErrNoDocuments):
+			art, err = a.InsertOne(
+				context.Background(),
+				insert,
+			)
+
+			if err != nil {
+				return nil, err
+			}
+		default:
+			return nil, err
+		}
+	}
+
+	return art, nil
+}
+
+func (a artwork) IncrementFavourite(ctx context.Context, id int, inc int, nsfw bool) (*Artwork, error) {
+	nsfwInc := 0
+	if nsfw {
+		nsfwInc += inc
+	}
+
+	res := a.col().FindOneAndUpdate(
+		ctx,
+		bson.M{"artwork_id": id},
+		bson.M{"$inc": bson.M{"favourites": inc, "nsfw": nsfwInc}},
+	)
+
+	var artwork Artwork
+	err := res.Decode(&artwork)
+	if err != nil {
+		return nil, err
+	}
+
+	return &artwork, nil
 }
 
 func (a artwork) nextID(ctx context.Context) (int, error) {
