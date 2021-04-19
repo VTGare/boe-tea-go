@@ -4,12 +4,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/VTGare/boe-tea-go/internal/arrays"
+	"github.com/VTGare/boe-tea-go/pkg/artworks"
 	"github.com/VTGare/boe-tea-go/pkg/bot"
 	"github.com/VTGare/boe-tea-go/pkg/messages"
+	"github.com/VTGare/boe-tea-go/pkg/models/artworks/options"
 	"github.com/VTGare/boe-tea-go/pkg/models/guilds"
+	"github.com/VTGare/boe-tea-go/pkg/models/users"
 	"github.com/VTGare/boe-tea-go/pkg/post"
 	"github.com/VTGare/embeds"
 	"github.com/VTGare/gumi"
@@ -120,6 +124,257 @@ func OnGuildDelete(b *bot.Bot) func(*discordgo.Session, *discordgo.GuildDelete) 
 func OnGuildBanAdd(b *bot.Bot) func(*discordgo.Session, *discordgo.GuildBanAdd) {
 	return func(s *discordgo.Session, gb *discordgo.GuildBanAdd) {
 		b.BannedUsers.Set(gb.User.ID, struct{}{})
+	}
+}
+
+func OnReactionAdd(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageReactionAdd) {
+	return func(s *discordgo.Session, r *discordgo.MessageReactionAdd) {
+		//Do nothing if Boe Tea adds reactions
+		if r.UserID == s.State.User.ID {
+			return
+		}
+
+		name := r.Emoji.APIName()
+		switch {
+		case name == "❌":
+		case name == "💖" || name == "🤤":
+			nsfw := name == "🤤"
+
+			msg, err := s.ChannelMessage(r.ChannelID, r.MessageID)
+			if err != nil {
+				b.Log.Warn("OnReactionAdd -> ChannelMessage: ", err)
+				return
+			}
+
+			urls := make([]string, 0, 2)
+			if len(msg.Embeds) > 0 {
+				embed := msg.Embeds[0]
+				urls = append(urls, embed.URL)
+			}
+
+			regex := xurls.Strict()
+			if url := regex.FindString(msg.Content); url != "" {
+				urls = append(urls, url)
+			}
+
+			var artwork artworks.Artwork
+			for _, url := range urls {
+				for _, provider := range b.ArtworkProviders {
+					if id, ok := provider.Match(url); ok {
+						artwork, err = provider.Find(id)
+						if err != nil {
+							b.Log.Warn("OnReactionAdd -> provider.Find: ", err)
+							return
+						}
+
+						break
+					}
+				}
+
+				if artwork != nil {
+					break
+				}
+			}
+
+			if artwork == nil {
+				return
+			}
+
+			insert := artwork.ToModel()
+			artworkDB, err := b.Artworks.FindOneOrCreate(context.Background(), &options.FilterOne{
+				URL: artwork.URL(),
+			}, insert)
+
+			if err != nil {
+				b.Log.Warn("OnReactionAdd -> Artworks.FindOneOrCreate: ", err)
+				return
+			}
+
+			user, err := b.Users.FindOneOrCreate(context.Background(), r.UserID)
+			if err != nil {
+				b.Log.Warn("OnReactionAdd -> Users.FindOneOrCreate: ", err)
+				return
+			}
+
+			b.Log.Infof("Inserting a favourite for %v. Artwork ID: %v", r.UserID, artworkDB.ID)
+			_, err = b.Users.InsertFavourite(context.Background(), r.UserID, &users.Favourite{
+				ArtworkID: artworkDB.ID,
+				NSFW:      nsfw,
+				CreatedAt: time.Now(),
+			})
+
+			if err != nil {
+				switch {
+				case errors.Is(err, mongo.ErrNoDocuments):
+				default:
+					b.Log.Warn("OnReactionAdd -> InsertFavourite: ", err)
+					return
+				}
+			}
+
+			_, err = b.Artworks.IncrementFavourite(context.Background(), artworkDB.ID, 1, nsfw)
+			if err != nil {
+				b.Log.Warn("OnReactionAdd -> IncrementFavourite: ", err)
+				return
+			}
+
+			if user.DM {
+				ch, err := s.UserChannelCreate(user.ID)
+				if err == nil {
+					var (
+						eb     = embeds.NewBuilder()
+						locale = messages.UserFavouriteAdded()
+					)
+
+					eb.Title(locale.Title).Description(locale.Description)
+					eb.AddField(
+						"ID",
+						strconv.Itoa(artworkDB.ID),
+						true,
+					).AddField(
+						"URL",
+						messages.ClickHere(artworkDB.URL),
+						true,
+					).AddField(
+						"NSFW",
+						strconv.FormatBool(nsfw),
+						true,
+					)
+					if len(artworkDB.Images) > 0 {
+						eb.Thumbnail(artworkDB.Images[0])
+					}
+
+					s.ChannelMessageSendEmbed(ch.ID, eb.Finalize())
+				}
+			}
+		}
+	}
+}
+
+func OnReactionRemove(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageReactionRemove) {
+	return func(s *discordgo.Session, r *discordgo.MessageReactionRemove) {
+		//Do nothing if Boe Tea adds reactions
+		if r.UserID == s.State.User.ID {
+			return
+		}
+
+		//Do nothing if user was banned recently. Discord removes all reactions
+		//of banned users on the server which in turn removes all favourites.
+		if _, ok := b.BannedUsers.Get(r.UserID); ok {
+			return
+		}
+
+		if r.Emoji.APIName() == "💖" || r.Emoji.APIName() == "🤤" {
+			msg, err := s.ChannelMessage(r.ChannelID, r.MessageID)
+			if err != nil {
+				b.Log.Warn("OnReactionRemove -> ChannelMessage: ", err)
+				return
+			}
+
+			urls := make([]string, 0, 2)
+			if len(msg.Embeds) > 0 {
+				embed := msg.Embeds[0]
+				urls = append(urls, embed.URL)
+			}
+
+			regex := xurls.Strict()
+			if url := regex.FindString(msg.Content); url != "" {
+				urls = append(urls, url)
+			}
+
+			var artwork artworks.Artwork
+			for _, url := range urls {
+				for _, provider := range b.ArtworkProviders {
+					if id, ok := provider.Match(url); ok {
+						artwork, err = provider.Find(id)
+						if err != nil {
+							b.Log.Warn("OnReactionRemove -> provider.Find: ", err)
+							return
+						}
+
+						break
+					}
+				}
+
+				if artwork != nil {
+					break
+				}
+			}
+
+			if artwork == nil {
+				return
+			}
+
+			artworkDB, err := b.Artworks.FindOne(context.Background(), &options.FilterOne{
+				URL: artwork.URL(),
+			})
+
+			if err != nil {
+				if !errors.Is(err, mongo.ErrNoDocuments) {
+					b.Log.Warn("OnReactionRemove -> Artworks.FindOneOrCreate: ", err)
+				}
+				return
+			}
+
+			user, err := b.Users.FindOne(context.Background(), r.UserID)
+			if err != nil {
+				if !errors.Is(err, mongo.ErrNoDocuments) {
+					b.Log.Warn("OnReactionRemove -> Users.FindOneOrCreate: ", err)
+				}
+
+				return
+			}
+
+			if fav, ok := user.FindFavourite(artworkDB.ID); ok {
+				b.Log.Infof("Removing a favourite for %v. Artwork ID: %v", r.UserID, artworkDB.ID)
+				_, err := b.Users.DeleteFavourite(
+					context.Background(),
+					user.ID,
+					fav,
+				)
+
+				if err != nil {
+					b.Log.Warn("OnReactionRemove -> Users.DeleteFavourite: ", err)
+					return
+				}
+
+				_, err = b.Artworks.IncrementFavourite(context.Background(), fav.ArtworkID, -1, fav.NSFW)
+				if err != nil {
+					b.Log.Warn("OnReactionAdd -> IncrementFavourite: ", err)
+					return
+				}
+
+				if user.DM {
+					ch, err := s.UserChannelCreate(user.ID)
+					if err == nil {
+						var (
+							eb     = embeds.NewBuilder()
+							locale = messages.UserFavouriteRemoved()
+						)
+
+						eb.Title(locale.Title).Description(locale.Description)
+						eb.AddField(
+							"ID",
+							strconv.Itoa(artworkDB.ID),
+							true,
+						).AddField(
+							"URL",
+							messages.ClickHere(artworkDB.URL),
+							true,
+						).AddField(
+							"NSFW",
+							strconv.FormatBool(fav.NSFW),
+							true,
+						)
+						if len(artworkDB.Images) > 0 {
+							eb.Thumbnail(artworkDB.Images[0])
+						}
+
+						s.ChannelMessageSendEmbed(ch.ID, eb.Finalize())
+					}
+				}
+			}
+		}
 	}
 }
 
