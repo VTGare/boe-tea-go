@@ -97,3 +97,13 @@ func ErrChannelNotFound(err error, id string) error {
 		err,
 	)
 }
+
+func ErrSkipIndexSyntax(str string) error {
+	return newUserError(
+		fmt.Sprintf(
+			"Argument `%v` couldn't be parsed correctly. It's neither a numberic range nor an integer. %v",
+			str,
+			"Please follow one of the following syntaxes:\n• A numeric range (e.g. 1-5)\n• An integer number (e.g. 177013)",
+		),
+	)
+}

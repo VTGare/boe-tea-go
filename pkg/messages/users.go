@@ -62,7 +62,7 @@ func UserPushSuccess(name string, channels []string) string {
 		))
 }
 
-func UserPushFail(name string) error {
+func ErrUserPushFail(name string) error {
 	return newUserError(fmt.Sprintf(
 		"No channels were added to group `%v`. One of the following is true:\n%v\n%v",
 		name,
@@ -86,14 +86,14 @@ func UserRemoveSuccess(name string, channels []string) string {
 		))
 }
 
-func UserRemoveFail(name string) error {
+func ErrUserRemoveFail(name string) error {
 	return newUserError(fmt.Sprintf(
 		"No channels were removed from group `%v`. None of the channel were part of the group.",
 		name,
 	))
 }
 
-func UserChannelAlreadyParent(id string) error {
+func ErrUserChannelAlreadyParent(id string) error {
 	return newUserError(fmt.Sprintf(
 		"Channel <#%v> | `%v` is already a parent",
 		id, id,
@@ -115,11 +115,36 @@ func UserCopyGroupSuccess(src, dest string, channels []string) string {
 	)
 }
 
-func UserCopyGroupFail(src, dest string) error {
+func ErrUserCopyGroupFail(src, dest string) error {
 	return newUserError(fmt.Sprintf(
 		"Couldn't copy group `%v` to `%v`. One of the following is true:\n%v\n%v",
 		src, dest,
 		"• Group "+src+" doesn't exist;",
 		"• Group "+dest+" already exists.",
 	))
+}
+
+func ErrUserNoFavourites(id string) error {
+	return newUserError(fmt.Sprintf(
+		"User <@%v> doesn't have any favourites", id,
+	))
+}
+
+type UserFavouriteDM struct {
+	Title       string
+	Description string
+}
+
+func UserFavouriteAdded() *UserFavouriteDM {
+	return &UserFavouriteDM{
+		Title:       "💖 Successfully added an artwork to favourites",
+		Description: "If you dislike direct messages disable them by running `bt!userset dm off` command",
+	}
+}
+
+func UserFavouriteRemoved() *UserFavouriteDM {
+	return &UserFavouriteDM{
+		Title:       "💔 Successfully removed an artwork from favourites",
+		Description: "If you dislike direct messages disable them by running `bt!userset dm off` command",
+	}
 }
