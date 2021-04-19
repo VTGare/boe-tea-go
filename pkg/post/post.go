@@ -23,10 +23,22 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+//SkipMode is an enum that configures what indices are skipped from the send function
+type SkipMode int
+
+//SkipMode enum
+const (
+	SkipModeNone SkipMode = iota
+	SkipModeInclude
+	SkipModeExclude
+)
+
 type Post struct {
-	bot  *bot.Bot
-	ctx  *gumi.Ctx
-	urls []string
+	bot      *bot.Bot
+	ctx      *gumi.Ctx
+	urls     []string
+	indices  map[int]struct{}
+	skipMode SkipMode
 }
 
 type fetchResult struct {
@@ -37,9 +49,11 @@ type fetchResult struct {
 
 func New(bot *bot.Bot, ctx *gumi.Ctx, urls ...string) *Post {
 	return &Post{
-		bot:  bot,
-		ctx:  ctx,
-		urls: urls,
+		bot:      bot,
+		ctx:      ctx,
+		urls:     urls,
+		indices:  make(map[int]struct{}),
+		skipMode: SkipModeNone,
 	}
 }
 
@@ -135,6 +149,11 @@ func (p *Post) Crosspost(userID, group string, channels []string) error {
 	}
 
 	return nil
+}
+
+func (p *Post) SetSkip(indices map[int]struct{}, mode SkipMode) {
+	p.indices = indices
+	p.skipMode = mode
 }
 
 func (p *Post) providers(guild *guilds.Guild) []artworks.Provider {
@@ -262,6 +281,10 @@ func (p *Post) sendReposts(guild *guilds.Guild, reposts []*repost.Repost, channe
 }
 
 func (p *Post) send(guild *guilds.Guild, channelID string, artworks []artworks.Artwork, crosspost bool) error {
+	if len(artworks) == 0 {
+		return nil
+	}
+
 	allEmbeds := make([][]*discordgo.MessageEmbed, 0, len(artworks))
 
 	for _, artwork := range artworks {
@@ -315,6 +338,12 @@ func (p *Post) send(guild *guilds.Guild, channelID string, artworks []artworks.A
 		}
 	}
 
+	//If skipMode not equals none, remove certain indices from the embeds array.
+	//It only happens from the command so only one artwork should be affected.
+	if p.skipMode != SkipModeNone {
+		allEmbeds[0] = p.skipArtworks(allEmbeds[0])
+	}
+
 	count := 0
 	for _, embeds := range allEmbeds {
 		count += len(embeds)
@@ -362,4 +391,26 @@ func (p *Post) send(guild *guilds.Guild, channelID string, artworks []artworks.A
 	}
 
 	return nil
+}
+
+func (p *Post) skipArtworks(embeds []*discordgo.MessageEmbed) []*discordgo.MessageEmbed {
+	filtered := make([]*discordgo.MessageEmbed, 0)
+	switch p.skipMode {
+	case SkipModeExclude:
+		for ind, val := range embeds {
+			if _, ok := p.indices[ind+1]; !ok {
+				filtered = append(filtered, val)
+			}
+		}
+	case SkipModeInclude:
+		for ind, val := range embeds {
+			if _, ok := p.indices[ind+1]; ok {
+				filtered = append(filtered, val)
+			}
+		}
+	case SkipModeNone:
+		return embeds
+	}
+
+	return filtered
 }
