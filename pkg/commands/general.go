@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -19,7 +20,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-func GeneralGroup(b *bot.Bot) {
+func generalGroup(b *bot.Bot) {
 	group := "general"
 
 	b.Router.RegisterCmd(&gumi.Command{
@@ -37,6 +38,189 @@ func GeneralGroup(b *bot.Bot) {
 		RateLimiter: gumi.NewRateLimiter(15 * time.Second),
 		Exec:        set(b),
 	})
+
+	b.Router.RegisterCmd(&gumi.Command{
+		Name:        "about",
+		Group:       group,
+		Aliases:     []string{"invite", "patreon", "support"},
+		Description: "Bot's about page with the invite link and other useful stuff.",
+		Usage:       "bt!about",
+		Example:     "bt!about",
+		RateLimiter: gumi.NewRateLimiter(5 * time.Second),
+		Exec:        about(b),
+	})
+
+	b.Router.RegisterCmd(&gumi.Command{
+		Name:        "ping",
+		Group:       group,
+		Description: "Checks bot's availabity and response time.",
+		Usage:       "bt!ping",
+		Example:     "bt!ping",
+		RateLimiter: gumi.NewRateLimiter(5 * time.Second),
+		Exec:        ping(b),
+	})
+
+	b.Router.RegisterCmd(&gumi.Command{
+		Name:        "feedback",
+		Group:       group,
+		Description: "Sends feedback to bot's author.",
+		Usage:       "bt!feedback <your wall of text here>",
+		Example:     "bt!feedback Damn your bot sucks!",
+		RateLimiter: gumi.NewRateLimiter(15 * time.Second),
+		Exec:        feedback(b),
+	})
+
+	b.Router.RegisterCmd(&gumi.Command{
+		Name:        "stats",
+		Group:       group,
+		Description: "Shows bot's runtime stats.",
+		Usage:       "bt!stats",
+		Example:     "bt!stats",
+		RateLimiter: gumi.NewRateLimiter(5 * time.Second),
+		Exec:        stats(b),
+	})
+}
+
+func ping(b *bot.Bot) func(ctx *gumi.Ctx) error {
+	return func(ctx *gumi.Ctx) error {
+		eb := embeds.NewBuilder()
+
+		return ctx.ReplyEmbed(
+			eb.Title("🏓 Pong!").AddField(
+				"Heartbeat latency",
+				ctx.Session.HeartbeatLatency().Round(time.Millisecond).String(),
+			).Finalize(),
+		)
+	}
+}
+
+func about(b *bot.Bot) func(ctx *gumi.Ctx) error {
+	return func(ctx *gumi.Ctx) error {
+		locale := messages.AboutEmbed()
+
+		eb := embeds.NewBuilder()
+		eb.Title(locale.Title).Thumbnail(ctx.Session.State.User.AvatarURL(""))
+		eb.Description(locale.Description)
+
+		eb.AddField(
+			locale.SupportServer,
+			messages.ClickHere("https://discord.gg/hcxuHE7"),
+			true,
+		)
+
+		eb.AddField(
+			locale.InviteLink,
+			messages.ClickHere(
+				"https://discord.com/api/oauth2/authorize?client_id=636468907049353216&permissions=537259072&scope=bot",
+			),
+			true,
+		)
+
+		eb.AddField(
+			locale.Patreon,
+			messages.ClickHere("https://patreon.com/vtgare"),
+			true,
+		)
+
+		ctx.ReplyEmbed(eb.Finalize())
+		return nil
+	}
+}
+
+func feedback(b *bot.Bot) func(ctx *gumi.Ctx) error {
+	return func(ctx *gumi.Ctx) error {
+		if ctx.Args.Len() == 0 {
+			return messages.ErrIncorrectCmd(ctx.Command)
+		}
+
+		eb := embeds.NewBuilder()
+		eb.Author(
+			fmt.Sprintf("Feedback from %v", ctx.Event.Author.String()),
+			"",
+			ctx.Event.Author.AvatarURL(""),
+		).Description(
+			ctx.Args.Raw,
+		).AddField(
+			"Author Mention",
+			ctx.Event.Author.Mention(),
+			true,
+		).AddField(
+			"Author ID",
+			ctx.Event.Author.ID,
+			true,
+		)
+
+		if ctx.Event.GuildID != "" {
+			eb.AddField(
+				"Guild", ctx.Event.GuildID, true,
+			)
+		}
+
+		if len(ctx.Event.Attachments) > 0 {
+			att := ctx.Event.Attachments[0]
+			if strings.HasSuffix(att.Filename, "png") ||
+				strings.HasSuffix(att.Filename, "jpg") ||
+				strings.HasSuffix(att.Filename, "gif") {
+				eb.Image(att.URL)
+			}
+		}
+
+		ch, err := ctx.Session.UserChannelCreate(ctx.Router.AuthorID)
+		if err != nil {
+			return err
+		}
+
+		_, err = ctx.Session.ChannelMessageSendEmbed(ch.ID, eb.Finalize())
+		if err != nil {
+			return err
+		}
+
+		eb.Clear()
+		ctx.ReplyEmbed(eb.SuccessTemplate("Feedback message has been sent.").Finalize())
+		return nil
+	}
+}
+
+func stats(b *bot.Bot) func(ctx *gumi.Ctx) error {
+	return func(ctx *gumi.Ctx) error {
+		var (
+			s   = ctx.Session
+			mem runtime.MemStats
+		)
+		runtime.ReadMemStats(&mem)
+
+		guilds := len(s.State.Guilds)
+		channels := 0
+		for _, g := range s.State.Guilds {
+			channels += len(g.Channels)
+		}
+
+		latency := s.HeartbeatLatency().Round(1 * time.Millisecond)
+
+		eb := embeds.NewBuilder()
+		eb.Title("Bot stats")
+		eb.AddField(
+			"Guilds",
+			strconv.Itoa(guilds),
+			true,
+		).AddField(
+			"Channels",
+			strconv.Itoa(channels),
+			true,
+		).AddField(
+			"Latency",
+			latency.String(),
+			true,
+		).AddField(
+			"Shards",
+			strconv.Itoa(s.ShardCount),
+		).AddField(
+			"RAM used",
+			fmt.Sprintf("%v MB", mem.Alloc/1024/1024),
+		)
+
+		return ctx.ReplyEmbed(eb.Finalize())
+	}
 }
 
 func set(b *bot.Bot) func(ctx *gumi.Ctx) error {

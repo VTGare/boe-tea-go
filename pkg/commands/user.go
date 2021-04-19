@@ -4,12 +4,17 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/VTGare/boe-tea-go/internal/arrays"
+	"github.com/VTGare/boe-tea-go/internal/dgoutils"
 	"github.com/VTGare/boe-tea-go/pkg/bot"
+	"github.com/VTGare/boe-tea-go/pkg/commands/flags"
 	"github.com/VTGare/boe-tea-go/pkg/messages"
+	"github.com/VTGare/boe-tea-go/pkg/models/artworks"
+	"github.com/VTGare/boe-tea-go/pkg/models/artworks/options"
 	"github.com/VTGare/boe-tea-go/pkg/models/users"
 	"github.com/VTGare/embeds"
 	"github.com/VTGare/gumi"
@@ -17,7 +22,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-func UserGroup(b *bot.Bot) {
+func userGroup(b *bot.Bot) {
 	group := "user"
 
 	b.Router.RegisterCmd(&gumi.Command{
@@ -93,6 +98,22 @@ func UserGroup(b *bot.Bot) {
 		Example:     "bt!copygroup sfw1 sfw2 #za-warudo",
 		RateLimiter: gumi.NewRateLimiter(10 * time.Second),
 		Exec:        copygroup(b),
+	})
+	b.Router.RegisterCmd(&gumi.Command{
+		Name:        "favourites",
+		Group:       group,
+		Aliases:     []string{"favorites", "favs"},
+		Description: "Shows your favourites. Use help command to learn more about filtering and sorting.",
+		Usage:       "bt!favourites [flags]",
+		Example:     "bt!favourites during:month sort:time order:asc",
+		Flags: map[string]string{
+			"sort":   "**Options:** `[time, favourites]`. **Default:** time. Changes sort type.",
+			"order":  "**Options:** `[asc, desc]`. **Default:** desc. Changes order of sorted artworks.",
+			"mode":   "**Options:** `[all, sfw, nsfw]`. **Default:** all in nsfw channels and DMs, sfw otherwise.",
+			"during": "**Options:** `[day, week, month]`. **Default:** none. Filters artworks by time.",
+		},
+		RateLimiter: gumi.NewRateLimiter(10 * time.Second),
+		Exec:        favourites(b),
 	})
 }
 
@@ -323,7 +344,7 @@ func push(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			eb.SuccessTemplate(messages.UserPushSuccess(name, inserted))
 			ctx.ReplyEmbed(eb.Finalize())
 		} else {
-			return messages.UserPushFail(name)
+			return messages.ErrUserPushFail(name)
 		}
 
 		return nil
@@ -372,7 +393,7 @@ func remove(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			eb.SuccessTemplate(messages.UserRemoveSuccess(name, removed))
 			ctx.ReplyEmbed(eb.Finalize())
 		} else {
-			return messages.UserRemoveFail(name)
+			return messages.ErrUserRemoveFail(name)
 		}
 
 		return nil
@@ -394,7 +415,7 @@ func copygroup(b *bot.Bot) func(ctx *gumi.Ctx) error {
 		dest := ctx.Args.Get(1).Raw
 		parent := strings.Trim(ctx.Args.Get(2).Raw, "<#>")
 		if _, ok := user.FindGroup(parent); ok {
-			return messages.UserChannelAlreadyParent(parent)
+			return messages.ErrUserChannelAlreadyParent(parent)
 		}
 
 		for _, group := range user.Groups {
@@ -409,7 +430,7 @@ func copygroup(b *bot.Bot) func(ctx *gumi.Ctx) error {
 
 				_, err := b.Users.InsertGroup(context.Background(), user.ID, newGroup)
 				if err != nil {
-					return messages.UserCopyGroupFail(src, dest)
+					return messages.ErrUserCopyGroupFail(src, dest)
 				}
 
 				eb := embeds.NewBuilder()
@@ -421,6 +442,153 @@ func copygroup(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			}
 		}
 
-		return messages.UserCopyGroupFail(src, dest)
+		return messages.ErrUserCopyGroupFail(src, dest)
 	}
+}
+
+func favourites(b *bot.Bot) func(ctx *gumi.Ctx) error {
+	return func(ctx *gumi.Ctx) error {
+		user, err := findOrCreateUser(b, ctx.Event.Author.ID)
+		if err != nil {
+			return err
+		}
+
+		if len(user.Favourites) == 0 {
+			return messages.ErrUserNoFavourites(ctx.Event.Author.ID)
+		}
+
+		var (
+			limit  = int64(len(user.Favourites))
+			order  = options.Descending
+			sort   = options.ByTime
+			args   = strings.Fields(ctx.Args.Raw)
+			mode   = flags.SFWFavourites
+			filter = &options.Filter{}
+		)
+
+		ch, err := ctx.Session.Channel(ctx.Event.ChannelID)
+		if err != nil {
+			return err
+		}
+
+		if ch.NSFW || ch.Type == discordgo.ChannelTypeDM {
+			mode = flags.AllFavourites
+		}
+
+		flagsMap, err := flags.FromArgs(
+			args,
+			flags.FlagTypeOrder,
+			flags.FlagTypeSort,
+			flags.FlagTypeDuring,
+			flags.FlagTypeMode,
+		)
+
+		if err != nil {
+			return err
+		}
+
+		for key, val := range flagsMap {
+			switch key {
+			case flags.FlagTypeOrder:
+				order = val.(options.Order)
+			case flags.FlagTypeSort:
+				sort = val.(options.Sort)
+			case flags.FlagTypeDuring:
+				filter.Time = val.(time.Duration)
+			case flags.FlagTypeMode:
+				mode = val.(flags.FavouritesMode)
+			}
+		}
+
+		ids := make([]int, 0, len(user.Favourites))
+		switch mode {
+		case flags.AllFavourites:
+			for _, fav := range user.Favourites {
+				ids = append(ids, fav.ArtworkID)
+			}
+		case flags.NSFWFavourites:
+			for _, fav := range user.Favourites {
+				if fav.NSFW {
+					ids = append(ids, fav.ArtworkID)
+				}
+			}
+		case flags.SFWFavourites:
+			for _, fav := range user.Favourites {
+				if !fav.NSFW {
+					ids = append(ids, fav.ArtworkID)
+				}
+			}
+		}
+
+		filter.IDs = ids
+
+		artworks, err := b.Artworks.FindMany(
+			context.Background(),
+			options.Find{
+				Limit:  limit,
+				Order:  order,
+				Sort:   sort,
+				Filter: filter,
+			},
+		)
+
+		artworkEmbeds := make([]*discordgo.MessageEmbed, 0, len(artworks))
+		for ind, artwork := range artworks {
+			//TODO: Clean up the database off artworks without images
+			//and remove this fix.
+			if len(artwork.Images) > 0 {
+				artworkEmbeds = append(artworkEmbeds, artworkToEmbed(artwork, artwork.Images[0], ind, len(artworks)))
+			}
+		}
+
+		wg := dgoutils.NewWidget(ctx.Session, ctx.Event.Author.ID, artworkEmbeds)
+		return wg.Start(ctx.Event.ChannelID)
+	}
+}
+
+func artworkToEmbed(artwork *artworks.Artwork, image string, ind, length int) *discordgo.MessageEmbed {
+	var (
+		title   = ""
+		percent = (float64(artwork.NSFW) / float64(artwork.Favourites)) * 100.0
+	)
+
+	if length > 1 {
+		if artwork.Title == "" {
+			title = fmt.Sprintf("[%v/%v] %v", ind+1, length, artwork.Author)
+		} else {
+			title = fmt.Sprintf("[%v/%v] %v", ind+1, length, artwork.Title)
+		}
+	} else {
+		if artwork.Title == "" {
+			title = fmt.Sprintf("%v", artwork.Author)
+		} else {
+			title = fmt.Sprintf("%v", artwork.Title)
+		}
+	}
+
+	eb := embeds.NewBuilder()
+	eb.Title(title).URL(artwork.URL)
+	if len(artwork.Images) > 0 {
+		eb.Image(image)
+	}
+	eb.AddField("ID",
+		strconv.Itoa(artwork.ID),
+		true,
+	).AddField(
+		"Author",
+		artwork.Author,
+		true,
+	).AddField(
+		"Favourites",
+		strconv.Itoa(artwork.Favourites),
+		true,
+	).AddField(
+		"URL",
+		messages.ClickHere(artwork.URL),
+	).AddField(
+		"Lewdmeter",
+		fmt.Sprintf("%.2f%s", percent, "%"),
+	).Timestamp(artwork.CreatedAt)
+
+	return eb.Finalize()
 }
