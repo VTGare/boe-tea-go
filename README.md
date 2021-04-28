@@ -57,7 +57,7 @@ Bot's documentation is currently getting rewritten and won't be publicly availab
     },
     "quotes": [
         {
-            "content": "Test",
+            "content": "Embed footer message",
             "nsfw": false
         }
     ]

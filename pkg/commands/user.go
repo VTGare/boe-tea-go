@@ -115,32 +115,21 @@ func userGroup(b *bot.Bot) {
 		RateLimiter: gumi.NewRateLimiter(10 * time.Second),
 		Exec:        favourites(b),
 	})
-}
 
-func findOrCreateUser(b *bot.Bot, userID string) (*users.User, error) {
-	user, err := b.Users.FindOne(context.Background(), userID)
-	if err != nil {
-		switch {
-		case errors.Is(err, mongo.ErrNoDocuments):
-			user, err = b.Users.InsertOne(
-				context.Background(),
-				userID,
-			)
-
-			if err != nil {
-				return nil, err
-			}
-		default:
-			return nil, messages.ErrUserNotFound(err, userID)
-		}
-	}
-
-	return user, nil
+	b.Router.RegisterCmd(&gumi.Command{
+		Name:        "userset",
+		Group:       group,
+		Description: "Changes user's settings.",
+		Usage:       "bt!userset <setting name> <new setting>",
+		Example:     "bt!userset dm false",
+		RateLimiter: gumi.NewRateLimiter(10 * time.Second),
+		Exec:        userset(b),
+	})
 }
 
 func profile(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
-		user, err := findOrCreateUser(b, ctx.Event.Author.ID)
+		user, err := b.Users.FindOneOrCreate(context.Background(), ctx.Event.Author.ID)
 		if err != nil {
 			return err
 		}
@@ -175,7 +164,7 @@ func profile(b *bot.Bot) func(ctx *gumi.Ctx) error {
 
 func groups(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
-		user, err := findOrCreateUser(b, ctx.Event.Author.ID)
+		user, err := b.Users.FindOneOrCreate(context.Background(), ctx.Event.Author.ID)
 		if err != nil {
 			return err
 		}
@@ -216,7 +205,7 @@ func newgroup(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			return messages.ErrIncorrectCmd(ctx.Command)
 		}
 
-		user, err := findOrCreateUser(b, ctx.Event.Author.ID)
+		user, err := b.Users.FindOneOrCreate(context.Background(), ctx.Event.Author.ID)
 		if err != nil {
 			return err
 		}
@@ -259,7 +248,7 @@ func delgroup(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			return messages.ErrIncorrectCmd(ctx.Command)
 		}
 
-		user, err := findOrCreateUser(b, ctx.Event.Author.ID)
+		user, err := b.Users.FindOneOrCreate(context.Background(), ctx.Event.Author.ID)
 		if err != nil {
 			return err
 		}
@@ -293,7 +282,7 @@ func push(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			return messages.ErrIncorrectCmd(ctx.Command)
 		}
 
-		user, err := findOrCreateUser(b, ctx.Event.Author.ID)
+		user, err := b.Users.FindOneOrCreate(context.Background(), ctx.Event.Author.ID)
 		if err != nil {
 			return err
 		}
@@ -357,7 +346,7 @@ func remove(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			return messages.ErrIncorrectCmd(ctx.Command)
 		}
 
-		user, err := findOrCreateUser(b, ctx.Event.Author.ID)
+		user, err := b.Users.FindOneOrCreate(context.Background(), ctx.Event.Author.ID)
 		if err != nil {
 			return err
 		}
@@ -406,7 +395,7 @@ func copygroup(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			return messages.ErrIncorrectCmd(ctx.Command)
 		}
 
-		user, err := findOrCreateUser(b, ctx.Event.Author.ID)
+		user, err := b.Users.FindOneOrCreate(context.Background(), ctx.Event.Author.ID)
 		if err != nil {
 			return err
 		}
@@ -448,7 +437,7 @@ func copygroup(b *bot.Bot) func(ctx *gumi.Ctx) error {
 
 func favourites(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
-		user, err := findOrCreateUser(b, ctx.Event.Author.ID)
+		user, err := b.Users.FindOneOrCreate(context.Background(), ctx.Event.Author.ID)
 		if err != nil {
 			return err
 		}
@@ -532,6 +521,10 @@ func favourites(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			},
 		)
 
+		if err != nil {
+			return err
+		}
+
 		artworkEmbeds := make([]*discordgo.MessageEmbed, 0, len(artworks))
 		for ind, artwork := range artworks {
 			//TODO: Clean up the database off artworks without images
@@ -543,6 +536,63 @@ func favourites(b *bot.Bot) func(ctx *gumi.Ctx) error {
 
 		wg := dgoutils.NewWidget(ctx.Session, ctx.Event.Author.ID, artworkEmbeds)
 		return wg.Start(ctx.Event.ChannelID)
+	}
+}
+
+func userset(b *bot.Bot) func(ctx *gumi.Ctx) error {
+	return func(ctx *gumi.Ctx) error {
+		if ctx.Args.Len() < 2 {
+			return messages.ErrIncorrectCmd(ctx.Command)
+		}
+
+		user, err := b.Users.FindOneOrCreate(context.Background(), ctx.Event.GuildID)
+		if err != nil {
+			return err
+		}
+
+		var (
+			settingName     = ctx.Args.Get(0)
+			newSetting      = ctx.Args.Get(1)
+			newSettingEmbed interface{}
+			oldSettingEmbed interface{}
+		)
+
+		switch settingName.Raw {
+		case "dm":
+			new, err := parseBool(newSetting.Raw)
+			if err != nil {
+				return err
+			}
+
+			oldSettingEmbed = user.DM
+			newSettingEmbed = new
+			user.DM = new
+		case "crosspost":
+			new, err := parseBool(newSetting.Raw)
+			if err != nil {
+				return err
+			}
+
+			oldSettingEmbed = user.Crosspost
+			newSettingEmbed = new
+			user.Crosspost = new
+		default:
+			return messages.ErrUnknownUserSetting(settingName.Raw)
+		}
+
+		_, err = b.Users.ReplaceOne(context.Background(), user)
+		if err != nil {
+			return err
+		}
+
+		eb := embeds.NewBuilder()
+		eb.InfoTemplate("Successfully changed user setting.")
+		eb.AddField("Setting name", settingName.Raw, true)
+		eb.AddField("Old setting", fmt.Sprintf("%v", oldSettingEmbed), true)
+		eb.AddField("New setting", fmt.Sprintf("%v", newSettingEmbed), true)
+
+		ctx.ReplyEmbed(eb.Finalize())
+		return nil
 	}
 }
 

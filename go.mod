@@ -7,6 +7,7 @@ require (
 	github.com/ReneKroon/ttlcache v1.7.0
 	github.com/VTGare/embeds v0.1.1
 	github.com/VTGare/gumi v0.4.1
+	github.com/VTGare/sengoku v0.1.6
 	github.com/antchfx/xmlquery v1.3.5 // indirect
 	github.com/bwmarrin/discordgo v0.23.2
 	github.com/everpcpc/pixiv v0.0.0-20210128034500-a54eb720d8f3

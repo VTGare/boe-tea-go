@@ -29,11 +29,13 @@ type Guild struct {
 }
 
 type Service interface {
-	All(context.Context) ([]*Guild, error)
-	FindOne(context.Context, string) (*Guild, error)
-	InsertOne(context.Context, string) (*Guild, error)
-	DeleteOne(context.Context, string) (*Guild, error)
-	ReplaceOne(context.Context, *Guild) (*Guild, error)
+	All(ctx context.Context) ([]*Guild, error)
+	FindOne(ctx context.Context, guildID string) (*Guild, error)
+	InsertOne(ctx context.Context, guildID string) (*Guild, error)
+	DeleteOne(ctx context.Context, guildID string) (*Guild, error)
+	ReplaceOne(ctx context.Context, guild *Guild) (*Guild, error)
+	InsertArtChannels(ctx context.Context, guildID string, channels []string) (*Guild, error)
+	DeleteArtChannels(ctx context.Context, guildID string, channels []string) (*Guild, error)
 }
 
 type guildService struct {
@@ -125,6 +127,40 @@ func (g guildService) ReplaceOne(ctx context.Context, guild *Guild) (*Guild, err
 
 	g.set(guild.ID, guild)
 	return guild, nil
+}
+
+func (g guildService) InsertArtChannels(ctx context.Context, guildID string, channels []string) (*Guild, error) {
+	res := g.col().FindOneAndUpdate(
+		ctx,
+		bson.M{"guild_id": guildID, "art_channels": bson.M{"$nin": channels}},
+		bson.M{"$addToSet": bson.M{"art_channels": bson.M{"$each": channels}}},
+	)
+
+	var guild Guild
+	err := res.Decode(&guild)
+	if err != nil {
+		return nil, err
+	}
+
+	g.set(guildID, &guild)
+	return &guild, nil
+}
+
+func (g guildService) DeleteArtChannels(ctx context.Context, guildID string, channels []string) (*Guild, error) {
+	res := g.col().FindOneAndUpdate(
+		ctx,
+		bson.M{"guild_id": guildID, "art_channels": bson.M{"$all": channels}},
+		bson.M{"$pullAll": bson.M{"art_channels": channels}},
+	)
+
+	var guild Guild
+	err := res.Decode(&guild)
+	if err != nil {
+		return nil, err
+	}
+
+	g.set(guildID, &guild)
+	return &guild, nil
 }
 
 func (g guildService) set(id string, guild *Guild) {

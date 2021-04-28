@@ -10,6 +10,7 @@ services:
         image: redis:latest
         logging:
             driver: none
+# Uncomment everything below if you run mongodb locally.
     mongodb:
         image: mongo:latest
         volumes:

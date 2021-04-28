@@ -2,7 +2,10 @@ package messages
 
 import (
 	"fmt"
+	"strings"
 	"time"
+
+	"github.com/VTGare/boe-tea-go/internal/arrays"
 )
 
 type Repost struct {
@@ -39,6 +42,10 @@ func ClickHere(url string) string {
 	return fmt.Sprintf("[Click here](%v)", url)
 }
 
+func NamedLink(name, url string) string {
+	return fmt.Sprintf("[%v](%v)", name, url)
+}
+
 func LimitExceeded(limit, count int) string {
 	return fmt.Sprintf("Album size `(%v)` is higher than the server's limit `(%v)`, only the first image of every artwork has been sent.", count, limit)
 }
@@ -73,4 +80,16 @@ func AboutEmbed() About {
 		InviteLink:    "Invite link",
 		Patreon:       "Patreon",
 	}
+}
+
+func ListChannels(channels []string) string {
+	return strings.Join(
+		arrays.MapString(
+			channels,
+			func(s string) string {
+				return fmt.Sprintf("<#%v> | `%v`", s, s)
+			},
+		),
+		" • ",
+	)
 }

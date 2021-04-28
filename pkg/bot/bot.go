@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/ReneKroon/ttlcache"
+	"github.com/VTGare/boe-tea-go/internal/cache"
 	"github.com/VTGare/boe-tea-go/internal/config"
 	"github.com/VTGare/boe-tea-go/pkg/artworks"
 	"github.com/VTGare/boe-tea-go/pkg/models"
@@ -12,6 +13,7 @@ import (
 	"github.com/VTGare/boe-tea-go/pkg/models/users"
 	"github.com/VTGare/boe-tea-go/pkg/repost"
 	"github.com/VTGare/gumi"
+	"github.com/VTGare/sengoku"
 	"github.com/bwmarrin/discordgo"
 	"go.uber.org/zap"
 )
@@ -26,6 +28,8 @@ type Bot struct {
 	ArtworkProviders []artworks.Provider
 	RepostDetector   repost.Detector
 	BannedUsers      *ttlcache.Cache
+	EmbedCache       *cache.EmbedCache
+	Sengoku          *sengoku.Sengoku
 	s                *discordgo.Session
 }
 
@@ -39,6 +43,11 @@ func New(config *config.Config, models *models.Models, logger *zap.SugaredLogger
 	banned := ttlcache.NewCache()
 	banned.SetTTL(15 * time.Second)
 
+	sg := sengoku.NewSengoku(config.SauceNAO, sengoku.Config{
+		DB:      999,
+		Results: 10,
+	})
+
 	return &Bot{
 		Guilds:         models.Guilds,
 		Users:          models.Users,
@@ -47,6 +56,8 @@ func New(config *config.Config, models *models.Models, logger *zap.SugaredLogger
 		Config:         config,
 		RepostDetector: rd,
 		BannedUsers:    banned,
+		EmbedCache:     cache.NewEmbedCache(),
+		Sengoku:        sg,
 		s:              dg,
 	}, nil
 }

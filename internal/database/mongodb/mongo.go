@@ -2,6 +2,7 @@ package mongodb
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"go.mongodb.org/mongo-driver/mongo"
@@ -29,6 +30,46 @@ func New(uri, db string) (*Mongo, error) {
 	}
 
 	return &Mongo{client, client.Database(db)}, nil
+}
+
+func (m *Mongo) CreateCollections() error {
+	err := m.Database.CreateCollection(
+		context.Background(),
+		"artworks",
+	)
+
+	if err != nil && !errors.As(err, &mongo.CommandError{}) {
+		return err
+	}
+
+	err = m.Database.CreateCollection(
+		context.Background(),
+		"counters",
+	)
+
+	if err != nil && !errors.As(err, &mongo.CommandError{}) {
+		return err
+	}
+
+	err = m.Database.CreateCollection(
+		context.Background(),
+		"guildsettings",
+	)
+
+	if err != nil && !errors.As(err, &mongo.CommandError{}) {
+		return err
+	}
+
+	err = m.Database.CreateCollection(
+		context.Background(),
+		"user_settings",
+	)
+
+	if err != nil && !errors.As(err, &mongo.CommandError{}) {
+		return err
+	}
+
+	return nil
 }
 
 func (m *Mongo) Close() error {

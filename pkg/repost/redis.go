@@ -12,8 +12,18 @@ type redisDetector struct {
 	client *redis.Client
 }
 
-func NewRedis(client *redis.Client) Detector {
-	return &redisDetector{client}
+func NewRedis(addr string) (Detector, error) {
+	client := redis.NewClient(&redis.Options{
+		Addr:       addr,
+		MaxConnAge: 5 * time.Minute,
+	})
+
+	status := client.Ping(context.Background())
+	if status.Err() != nil {
+		return nil, status.Err()
+	}
+
+	return &redisDetector{client}, nil
 }
 
 func (rd redisDetector) Find(channelID, artworkID string) (*Repost, error) {
@@ -85,4 +95,8 @@ func (rd redisDetector) Create(repost *Repost, duration time.Duration) error {
 	}
 
 	return nil
+}
+
+func (rd redisDetector) Close() error {
+	return rd.client.Close()
 }

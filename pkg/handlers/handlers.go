@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/VTGare/boe-tea-go/internal/arrays"
+	"github.com/VTGare/boe-tea-go/internal/cache"
 	"github.com/VTGare/boe-tea-go/pkg/artworks"
 	"github.com/VTGare/boe-tea-go/pkg/bot"
 	"github.com/VTGare/boe-tea-go/pkg/messages"
@@ -58,15 +59,19 @@ func NotCommand(b *bot.Bot) func(*gumi.Ctx) error {
 			}
 		}
 
+		allSent := make([]*cache.MessageInfo, 0)
 		if len(guild.ArtChannels) == 0 || arrays.AnyString(guild.ArtChannels, ctx.Event.ChannelID) {
 			rx := xurls.Strict()
 			urls := rx.FindAllString(ctx.Event.Content, -1)
 
 			p := post.New(b, ctx, urls...)
-			err := p.Send()
+
+			sent, err := p.Send()
 			if err != nil {
 				return err
 			}
+
+			allSent = append(allSent, sent...)
 
 			user, err := b.Users.FindOne(context.Background(), ctx.Event.Author.ID)
 			if err != nil {
@@ -77,14 +82,44 @@ func NotCommand(b *bot.Bot) func(*gumi.Ctx) error {
 				if user.Crosspost {
 					group, ok := user.FindGroup(ctx.Event.ChannelID)
 					if ok {
-						p.Crosspost(ctx.Event.Author.ID, group.Name, group.Children)
+						sent, _ := p.Crosspost(ctx.Event.Author.ID, group.Name, group.Children)
+						allSent = append(allSent, sent...)
 					}
 				}
 			}
 		}
 
+		if len(allSent) > 0 {
+			b.EmbedCache.Set(
+				ctx.Event.Author.ID,
+				ctx.Event.ChannelID,
+				ctx.Event.ID,
+				true,
+				allSent...,
+			)
+
+			for _, msg := range allSent {
+				b.EmbedCache.Set(
+					ctx.Event.Author.ID,
+					msg.ChannelID,
+					msg.MessageID,
+					false,
+				)
+			}
+		}
+
 		return nil
 	}
+}
+
+func RegisterHandlers(b *bot.Bot) {
+	b.AddHandler(OnReady(b))
+	b.AddHandler(OnGuildCreate(b))
+	b.AddHandler(OnGuildDelete(b))
+	b.AddHandler(OnGuildBanAdd(b))
+	b.AddHandler(OnReactionAdd(b))
+	b.AddHandler(OnReactionRemove(b))
+	b.AddHandler(OnMessageRemove(b))
 }
 
 //OnReady logs that bot's up.
@@ -127,6 +162,51 @@ func OnGuildBanAdd(b *bot.Bot) func(*discordgo.Session, *discordgo.GuildBanAdd) 
 	}
 }
 
+func OnMessageRemove(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageDelete) {
+	return func(s *discordgo.Session, m *discordgo.MessageDelete) {
+		msg, ok := b.EmbedCache.Get(
+			m.ChannelID,
+			m.ID,
+		)
+
+		if !ok {
+			return
+		}
+
+		b.EmbedCache.Remove(
+			m.ChannelID, m.ID,
+		)
+
+		if msg.Parent {
+			b.Log.Infof(
+				"Removing children messages. Channel ID: %v. Parent ID: %v. User ID: %v.",
+				m.ChannelID,
+				m.ID,
+				msg.AuthorID,
+			)
+
+			for _, child := range msg.Children {
+				b.Log.Infof(
+					"Removing a child message. Parent ID: %v. Channel ID: %v. Message ID: %v. User ID: %v.",
+					m.ID,
+					child.ChannelID,
+					child.MessageID,
+					msg.AuthorID,
+				)
+
+				b.EmbedCache.Remove(
+					child.ChannelID, child.MessageID,
+				)
+
+				err := s.ChannelMessageDelete(child.ChannelID, child.MessageID)
+				if err != nil {
+					b.Log.Warn("OnMessageRemove -> s.ChannelMessageDelete: ", err)
+				}
+			}
+		}
+	}
+}
+
 func OnReactionAdd(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageReactionAdd) {
 	return func(s *discordgo.Session, r *discordgo.MessageReactionAdd) {
 		//Do nothing if Boe Tea adds reactions
@@ -137,6 +217,61 @@ func OnReactionAdd(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageReacti
 		name := r.Emoji.APIName()
 		switch {
 		case name == "❌":
+			msg, ok := b.EmbedCache.Get(
+				r.ChannelID, r.MessageID,
+			)
+
+			if !ok {
+				return
+			}
+
+			if msg.AuthorID != r.UserID {
+				return
+			}
+
+			b.Log.Infof(
+				"Removing a message by reacting. Channel ID: %v. Message ID: %v. User ID: %v.",
+				r.ChannelID,
+				r.MessageID,
+				r.UserID,
+			)
+
+			b.EmbedCache.Remove(
+				r.ChannelID, r.MessageID,
+			)
+
+			err := s.ChannelMessageDelete(r.ChannelID, r.MessageID)
+			if err != nil {
+				b.Log.Warn("OnReactionAdd -> s.ChannelMessageDelete: ", err)
+			}
+
+			if msg.Parent {
+				b.Log.Infof(
+					"Removing children messages. Channel ID: %v. Parent ID: %v. User ID: %v.",
+					r.ChannelID,
+					r.MessageID,
+					r.UserID,
+				)
+
+				for _, child := range msg.Children {
+					b.Log.Infof(
+						"Removing a child message. Parent ID: %v. Channel ID: %v. Message ID: %v. User ID: %v.",
+						r.MessageID,
+						child.ChannelID,
+						child.MessageID,
+						r.UserID,
+					)
+
+					b.EmbedCache.Remove(
+						child.ChannelID, child.MessageID,
+					)
+
+					err := s.ChannelMessageDelete(child.ChannelID, child.MessageID)
+					if err != nil {
+						b.Log.Warn("OnReactionAdd -> s.ChannelMessageDelete: ", err)
+					}
+				}
+			}
 		case name == "💖" || name == "🤤":
 			nsfw := name == "🤤"
 
@@ -181,9 +316,22 @@ func OnReactionAdd(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageReacti
 			}
 
 			insert := artwork.ToModel()
-			artworkDB, err := b.Artworks.FindOneOrCreate(context.Background(), &options.FilterOne{
+			if len(insert.Images) == 0 {
+				return
+			}
+
+			artworkDB, created, err := b.Artworks.FindOneOrCreate(context.Background(), &options.FilterOne{
 				URL: artwork.URL(),
 			}, insert)
+
+			if created {
+				b.Log.Infof(
+					"Created a new artwork. ID: %v. URL: %v. Images: %v",
+					artworkDB.ID,
+					artworkDB.URL,
+					len(artworkDB.Images),
+				)
+			}
 
 			if err != nil {
 				b.Log.Warn("OnReactionAdd -> Artworks.FindOneOrCreate: ", err)
@@ -196,7 +344,7 @@ func OnReactionAdd(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageReacti
 				return
 			}
 
-			b.Log.Infof("Inserting a favourite for %v. Artwork ID: %v", r.UserID, artworkDB.ID)
+			b.Log.Infof("Inserting a favourite. User ID: %v. Artwork ID: %v", r.UserID, artworkDB.ID)
 			_, err = b.Users.InsertFavourite(context.Background(), r.UserID, &users.Favourite{
 				ArtworkID: artworkDB.ID,
 				NSFW:      nsfw,
@@ -210,12 +358,6 @@ func OnReactionAdd(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageReacti
 					b.Log.Warn("OnReactionAdd -> InsertFavourite: ", err)
 					return
 				}
-			}
-
-			_, err = b.Artworks.IncrementFavourite(context.Background(), artworkDB.ID, 1, nsfw)
-			if err != nil {
-				b.Log.Warn("OnReactionAdd -> IncrementFavourite: ", err)
-				return
 			}
 
 			if user.DM {
@@ -326,7 +468,7 @@ func OnReactionRemove(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageRea
 			}
 
 			if fav, ok := user.FindFavourite(artworkDB.ID); ok {
-				b.Log.Infof("Removing a favourite for %v. Artwork ID: %v", r.UserID, artworkDB.ID)
+				b.Log.Infof("Removing a favourite. User ID: %v. Artwork ID: %v", r.UserID, artworkDB.ID)
 				_, err := b.Users.DeleteFavourite(
 					context.Background(),
 					user.ID,
@@ -335,12 +477,6 @@ func OnReactionRemove(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageRea
 
 				if err != nil {
 					b.Log.Warn("OnReactionRemove -> Users.DeleteFavourite: ", err)
-					return
-				}
-
-				_, err = b.Artworks.IncrementFavourite(context.Background(), fav.ArtworkID, -1, fav.NSFW)
-				if err != nil {
-					b.Log.Warn("OnReactionAdd -> IncrementFavourite: ", err)
 					return
 				}
 

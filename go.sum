@@ -10,6 +10,8 @@ github.com/VTGare/embeds v0.1.1 h1:OL0RtM5ydzFLMCZyDCX7pq8RjFvBfJR6n/Z4FmX00ag=
 github.com/VTGare/embeds v0.1.1/go.mod h1:v55e0g2BYWW9vl3cstoP9ot9CC3macRa6Rb4EaJywcc=
 github.com/VTGare/gumi v0.4.1 h1:qE4Ok+O5E8usBIyblNB4KR9gd63b1cIfkDvM4rB0bXw=
 github.com/VTGare/gumi v0.4.1/go.mod h1:gFbWxeqFguHD+UJRAM6EjXCW+8/loWchOkbCdFiWBQs=
+github.com/VTGare/sengoku v0.1.6 h1:xgCZl+ocdOnN7481jbkZ1uf8nvK4Ay6jUb+5vRoGaM8=
+github.com/VTGare/sengoku v0.1.6/go.mod h1:zJ6kmJNQrvLP73knCFl9hPSs/A6k812d9duax+fMLaI=
 github.com/andybalholm/cascadia v1.1.0/go.mod h1:GsXiBklL0woXo1j/WYWtSYYC4ouU9PqHO0sqidkEA4Y=
 github.com/andybalholm/cascadia v1.2.0 h1:vuRCkM5Ozh/BfmsaTm26kbjm0mIOM3yS5Ek/F5h18aE=
 github.com/andybalholm/cascadia v1.2.0/go.mod h1:YCyR8vOZT9aZ1CHEd8ap0gMVm2aFgxBp0T0eFw1RUQY=
@@ -176,6 +178,8 @@ github.com/saintfish/chardet v0.0.0-20120816061221-3af4cd4741ca/go.mod h1:uugorj
 github.com/sirupsen/logrus v1.4.0/go.mod h1:LxeOpSwHxABJmUn/MG1IvRgCAasNZTLOkJPxbbu5VWo=
 github.com/sirupsen/logrus v1.4.1/go.mod h1:ni0Sbl8bgC9z8RoU9G6nDWqqs/fq4eDPysMBDgk/93Q=
 github.com/sirupsen/logrus v1.4.2/go.mod h1:tLMulIdttU9McNUspp0xgXVQah82FyeX6MwdIuYE2rE=
+github.com/sirupsen/logrus v1.7.0/go.mod h1:yWOB1SBYBC5VeMP7gHvWumXLIWorT60ONWic61uBYv0=
+github.com/sirupsen/logrus v1.8.1 h1:dJKuHgqk1NNQlqoA6BTlM1Wf9DOH3NBjQyu0h9+AZZE=
 github.com/sirupsen/logrus v1.8.1/go.mod h1:yWOB1SBYBC5VeMP7gHvWumXLIWorT60ONWic61uBYv0=
 github.com/spf13/cobra v0.0.3/go.mod h1:1l0Ry5zgKvJasoi3XT1TypsSe7PqH0Sj9dhYf7v3XqQ=
 github.com/spf13/pflag v1.0.3/go.mod h1:DYY7MBk1bdzusC3SYhjObp+wFpr4gzcvqqNjLnInEg4=

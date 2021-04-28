@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/VTGare/boe-tea-go/internal/arrays"
+	"github.com/VTGare/boe-tea-go/internal/cache"
 	"github.com/VTGare/boe-tea-go/internal/dgoutils"
 	"github.com/VTGare/boe-tea-go/pkg/bot"
 	"github.com/VTGare/boe-tea-go/pkg/commands/flags"
@@ -194,19 +195,43 @@ func share(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			p.SetSkip(indices, post.SkipModeExclude)
 		}
 
-		err := p.Send()
+		allSent := make([]*cache.MessageInfo, 0)
+		sent, err := p.Send()
 		if err != nil {
 			return err
 		}
+
+		allSent = append(allSent, sent...)
 
 		user, _ := b.Users.FindOne(context.Background(), ctx.Event.Author.ID)
 
 		if user != nil {
 			if group, ok := user.FindGroup(ctx.Event.ChannelID); ok {
-				err := p.Crosspost(user.ID, group.Name, group.Children)
+				sent, err := p.Crosspost(user.ID, group.Name, group.Children)
 				if err != nil {
 					return err
 				}
+
+				allSent = append(allSent, sent...)
+			}
+		}
+
+		if len(allSent) > 0 {
+			b.EmbedCache.Set(
+				ctx.Event.Author.ID,
+				ctx.Event.ChannelID,
+				ctx.Event.ID,
+				true,
+				allSent...,
+			)
+
+			for _, msg := range allSent {
+				b.EmbedCache.Set(
+					ctx.Event.Author.ID,
+					msg.ChannelID,
+					msg.MessageID,
+					false,
+				)
 			}
 		}
 
@@ -245,19 +270,42 @@ func shareInclude(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			p.SetSkip(indices, post.SkipModeInclude)
 		}
 
-		err := p.Send()
+		allSent := make([]*cache.MessageInfo, 0)
+		sent, err := p.Send()
 		if err != nil {
 			return err
 		}
 
-		user, _ := b.Users.FindOne(context.Background(), ctx.Event.Author.ID)
+		allSent = append(allSent, sent...)
 
+		user, _ := b.Users.FindOne(context.Background(), ctx.Event.Author.ID)
 		if user != nil {
 			if group, ok := user.FindGroup(ctx.Event.ChannelID); ok {
-				err := p.Crosspost(user.ID, group.Name, group.Children)
+				sent, err := p.Crosspost(user.ID, group.Name, group.Children)
 				if err != nil {
 					return err
 				}
+
+				allSent = append(allSent, sent...)
+			}
+		}
+
+		if len(allSent) > 0 {
+			b.EmbedCache.Set(
+				ctx.Event.Author.ID,
+				ctx.Event.ChannelID,
+				ctx.Event.ID,
+				true,
+				allSent...,
+			)
+
+			for _, msg := range allSent {
+				b.EmbedCache.Set(
+					ctx.Event.Author.ID,
+					msg.ChannelID,
+					msg.MessageID,
+					false,
+				)
 			}
 		}
 
@@ -275,10 +323,14 @@ func crosspost(b *bot.Bot) func(ctx *gumi.Ctx) error {
 		ctx.Args.Remove(0)
 
 		p := post.New(b, ctx, url)
-		err := p.Send()
+
+		allSent := make([]*cache.MessageInfo, 0)
+		sent, err := p.Send()
 		if err != nil {
 			return err
 		}
+
+		allSent = append(allSent, sent...)
 
 		user, _ := b.Users.FindOne(context.Background(), ctx.Event.Author.ID)
 		if user != nil {
@@ -297,11 +349,32 @@ func crosspost(b *bot.Bot) func(ctx *gumi.Ctx) error {
 				//If channels were successfully excluded, crosspost to a trimmed down
 				//collection of channels. Otherwise skip crossposting altogether.
 				if len(group.Children) > len(filtered) {
-					err := p.Crosspost(user.ID, group.Name, filtered)
+					sent, err := p.Crosspost(user.ID, group.Name, filtered)
 					if err != nil {
 						return err
 					}
+
+					allSent = append(allSent, sent...)
 				}
+			}
+		}
+
+		if len(allSent) > 0 {
+			b.EmbedCache.Set(
+				ctx.Event.Author.ID,
+				ctx.Event.ChannelID,
+				ctx.Event.ID,
+				true,
+				allSent...,
+			)
+
+			for _, msg := range allSent {
+				b.EmbedCache.Set(
+					ctx.Event.Author.ID,
+					msg.ChannelID,
+					msg.MessageID,
+					false,
+				)
 			}
 		}
 

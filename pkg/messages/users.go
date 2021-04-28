@@ -2,9 +2,6 @@ package messages
 
 import (
 	"fmt"
-	"strings"
-
-	"github.com/VTGare/boe-tea-go/internal/arrays"
 )
 
 type UserProfile struct {
@@ -51,15 +48,8 @@ func UserPushSuccess(name string, channels []string) string {
 	return fmt.Sprintf(
 		"Added following channels to group `%v`:\n%v",
 		name,
-		strings.Join(
-			arrays.MapString(
-				channels,
-				func(s string) string {
-					return fmt.Sprintf("<#%v> | `$%v`", s, s)
-				},
-			),
-			" • ",
-		))
+		ListChannels(channels),
+	)
 }
 
 func ErrUserPushFail(name string) error {
@@ -73,17 +63,10 @@ func ErrUserPushFail(name string) error {
 
 func UserRemoveSuccess(name string, channels []string) string {
 	return fmt.Sprintf(
-		"Remove following channels from group `%v`:\n%v",
+		"Removed following channels from group `%v`:\n%v",
 		name,
-		strings.Join(
-			arrays.MapString(
-				channels,
-				func(s string) string {
-					return fmt.Sprintf("<#%v> | `%v`", s, s)
-				},
-			),
-			" • ",
-		))
+		ListChannels(channels),
+	)
 }
 
 func ErrUserRemoveFail(name string) error {
@@ -103,15 +86,7 @@ func ErrUserChannelAlreadyParent(id string) error {
 func UserCopyGroupSuccess(src, dest string, channels []string) string {
 	return fmt.Sprintf(
 		"Copied group `%v` to `%v`. Children channels:\n%v",
-		src, dest, strings.Join(
-			arrays.MapString(
-				channels,
-				func(s string) string {
-					return fmt.Sprintf("<#%v> | `$%v`", s, s)
-				},
-			),
-			" • ",
-		),
+		src, dest, ListChannels(channels),
 	)
 }
 
@@ -147,4 +122,10 @@ func UserFavouriteRemoved() *UserFavouriteDM {
 		Title:       "💔 Successfully removed an artwork from favourites",
 		Description: "If you dislike direct messages disable them by running `bt!userset dm off` command",
 	}
+}
+
+func ErrUnknownUserSetting(setting string) error {
+	return newUserError(
+		fmt.Sprintf("Setting `%v` doesn't exist. Please use `bt!profile` to see existing settings.", setting),
+	)
 }

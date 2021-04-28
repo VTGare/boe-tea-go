@@ -37,18 +37,25 @@ func main() {
 		log.Fatal(err)
 	}
 
-	m := models.New(db, log)
-
-	var dec repost.Detector
-	switch cfg.Repost.Type {
-	case "redis":
-		//TODO: add redis
-		dec = repost.NewRedis(nil)
-	default:
-		dec = repost.NewMemory()
+	err = db.CreateCollections()
+	if err != nil {
+		log.Fatal(err)
 	}
 
-	b, err := bot.New(cfg, m, log, dec)
+	m := models.New(db, log)
+
+	var repostDetector repost.Detector
+	switch cfg.Repost.Type {
+	case "redis":
+		repostDetector, err = repost.NewRedis(cfg.Repost.RedisURI)
+		if err != nil {
+			log.Fatal(err)
+		}
+	default:
+		repostDetector = repost.NewMemory()
+	}
+
+	b, err := bot.New(cfg, m, log, repostDetector)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -71,12 +78,7 @@ func main() {
 		OnNoPermissionsCallback: handlers.OnNoPerms(b),
 	})
 
-	b.AddHandler(handlers.OnReady(b))
-	b.AddHandler(handlers.OnGuildCreate(b))
-	b.AddHandler(handlers.OnGuildDelete(b))
-	b.AddHandler(handlers.OnGuildBanAdd(b))
-	b.AddHandler(handlers.OnReactionAdd(b))
-	b.AddHandler(handlers.OnReactionRemove(b))
+	handlers.RegisterHandlers(b)
 	commands.RegisterCommands(b)
 
 	if err := b.Open(); err != nil {
@@ -88,5 +90,6 @@ func main() {
 	<-sc
 
 	db.Close()
+	repostDetector.Close()
 	b.Close()
 }

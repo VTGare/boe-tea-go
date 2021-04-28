@@ -34,3 +34,9 @@ func (rd inMemory) Find(channelID, artworkID string) (*Repost, error) {
 func (rd inMemory) key(rep *Repost) string {
 	return fmt.Sprintf("%v:%v", rep.ChannelID, rep.ID)
 }
+
+func (rd inMemory) Close() error {
+	rd.cache.Close()
+
+	return nil
+}

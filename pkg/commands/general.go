@@ -35,7 +35,7 @@ func generalGroup(b *bot.Bot) {
 		NSFW:        false,
 		AuthorOnly:  false,
 		Permissions: 0,
-		RateLimiter: gumi.NewRateLimiter(15 * time.Second),
+		RateLimiter: gumi.NewRateLimiter(5 * time.Second),
 		Exec:        set(b),
 	})
 
@@ -66,7 +66,6 @@ func generalGroup(b *bot.Bot) {
 		Description: "Sends feedback to bot's author.",
 		Usage:       "bt!feedback <your wall of text here>",
 		Example:     "bt!feedback Damn your bot sucks!",
-		RateLimiter: gumi.NewRateLimiter(15 * time.Second),
 		Exec:        feedback(b),
 	})
 
@@ -78,6 +77,31 @@ func generalGroup(b *bot.Bot) {
 		Example:     "bt!stats",
 		RateLimiter: gumi.NewRateLimiter(5 * time.Second),
 		Exec:        stats(b),
+	})
+
+	b.Router.RegisterCmd(&gumi.Command{
+		Name:        "addchannel",
+		Group:       group,
+		Aliases:     []string{"artchannel"},
+		Description: "Adds a new art channel to server settings.",
+		Usage:       "bt!addchannel [channel ids/category id...]",
+		Example:     "bt!addchannel #sfw #nsfw #basement",
+		GuildOnly:   true,
+		Permissions: discordgo.PermissionAdministrator | discordgo.PermissionManageServer,
+		RateLimiter: gumi.NewRateLimiter(5 * time.Second),
+		Exec:        addchannel(b),
+	})
+
+	b.Router.RegisterCmd(&gumi.Command{
+		Name:        "removechannel",
+		Group:       group,
+		Description: "Removes an art channel from server settings.",
+		Usage:       "bt!removechannel [channel ids/category id...]",
+		Example:     "bt!removechannel #sfw #nsfw #basement",
+		GuildOnly:   true,
+		Permissions: discordgo.PermissionAdministrator | discordgo.PermissionManageServer,
+		RateLimiter: gumi.NewRateLimiter(5 * time.Second),
+		Exec:        removechannel(b),
 	})
 }
 
@@ -370,7 +394,7 @@ func set(b *bot.Bot) func(ctx *gumi.Ctx) error {
 					return err
 				}
 
-				oldSettingEmbed = guild.NSFW
+				oldSettingEmbed = guild.Crosspost
 				newSettingEmbed = crosspost
 				guild.Crosspost = crosspost
 			case "reactions":
@@ -379,7 +403,7 @@ func set(b *bot.Bot) func(ctx *gumi.Ctx) error {
 					return err
 				}
 
-				oldSettingEmbed = guild.NSFW
+				oldSettingEmbed = guild.Reactions
 				newSettingEmbed = new
 				guild.Reactions = new
 			case "pixiv":
@@ -420,6 +444,154 @@ func set(b *bot.Bot) func(ctx *gumi.Ctx) error {
 		default:
 			return messages.ErrIncorrectCmd(ctx.Command)
 		}
+	}
+}
+
+func addchannel(b *bot.Bot) func(ctx *gumi.Ctx) error {
+	return func(ctx *gumi.Ctx) error {
+		if ctx.Args.Len() == 0 {
+			return messages.ErrIncorrectCmd(ctx.Command)
+		}
+
+		guild, err := b.Guilds.FindOne(context.Background(), ctx.Event.GuildID)
+		if err != nil {
+			return messages.ErrGuildNotFound(err, ctx.Event.GuildID)
+		}
+
+		channels := make([]string, 0)
+		for _, arg := range ctx.Args.Arguments {
+			ch, err := ctx.Session.Channel(strings.Trim(arg.Raw, "<#>"))
+			if err != nil {
+				return err
+			}
+
+			if ch.GuildID != guild.ID {
+				return messages.ErrForeignChannel(ch.ID)
+			}
+
+			switch ch.Type {
+			case discordgo.ChannelTypeGuildText:
+				exists := false
+				for _, channelID := range guild.ArtChannels {
+					if channelID == ch.ID {
+						exists = true
+					}
+				}
+
+				if exists {
+					return messages.ErrAlreadyArtChannel(ch.ID)
+				}
+
+				channels = append(channels, ch.ID)
+			case discordgo.ChannelTypeGuildCategory:
+				gcs, err := ctx.Session.GuildChannels(guild.ID)
+				if err != nil {
+					return err
+				}
+
+				for _, gc := range gcs {
+					if gc.Type != discordgo.ChannelTypeGuildText {
+						continue
+					}
+
+					if gc.ParentID == ch.ID {
+						exists := false
+						for _, channelID := range guild.ArtChannels {
+							if channelID == gc.ID {
+								exists = true
+							}
+						}
+
+						if exists {
+							return messages.ErrAlreadyArtChannel(ch.ID)
+						}
+
+						channels = append(channels, gc.ID)
+					}
+				}
+			default:
+				return nil
+			}
+		}
+
+		_, err = b.Guilds.InsertArtChannels(
+			context.Background(),
+			guild.ID,
+			channels,
+		)
+
+		if err != nil {
+			return err
+		}
+
+		eb := embeds.NewBuilder()
+		eb.SuccessTemplate(messages.AddArtChannelSuccess(channels))
+		return ctx.ReplyEmbed(eb.Finalize())
+	}
+}
+
+func removechannel(b *bot.Bot) func(ctx *gumi.Ctx) error {
+	return func(ctx *gumi.Ctx) error {
+		if ctx.Args.Len() == 0 {
+			return messages.ErrIncorrectCmd(ctx.Command)
+		}
+
+		guild, err := b.Guilds.FindOne(context.Background(), ctx.Event.GuildID)
+		if err != nil {
+			return messages.ErrGuildNotFound(err, ctx.Event.GuildID)
+		}
+
+		channels := make([]string, 0)
+		for _, arg := range ctx.Args.Arguments {
+			ch, err := ctx.Session.Channel(strings.Trim(arg.Raw, "<#>"))
+			if err != nil {
+				return messages.ErrChannelNotFound(err, arg.Raw)
+			}
+
+			if ch.GuildID != ctx.Event.GuildID {
+				return messages.ErrForeignChannel(ch.ID)
+			}
+
+			switch ch.Type {
+			case discordgo.ChannelTypeGuildText:
+				channels = append(channels, ch.ID)
+			case discordgo.ChannelTypeGuildCategory:
+				gcs, err := ctx.Session.GuildChannels(guild.ID)
+				if err != nil {
+					return err
+				}
+
+				for _, gc := range gcs {
+					if gc.Type != discordgo.ChannelTypeGuildText {
+						continue
+					}
+
+					if gc.ParentID == ch.ID {
+						channels = append(channels, gc.ID)
+					}
+				}
+			default:
+				return nil
+			}
+		}
+
+		_, err = b.Guilds.DeleteArtChannels(
+			context.Background(),
+			guild.ID,
+			channels,
+		)
+
+		if err != nil {
+			if errors.Is(err, mongo.ErrNoDocuments) {
+				return messages.RemoveArtChannelFail(channels)
+			}
+
+			return err
+		}
+
+		eb := embeds.NewBuilder()
+		eb.SuccessTemplate(messages.RemoveArtChannelSuccess(channels))
+		return ctx.ReplyEmbed(eb.Finalize())
 	}
 }
 

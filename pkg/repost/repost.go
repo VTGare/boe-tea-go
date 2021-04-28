@@ -12,6 +12,7 @@ var (
 type Detector interface {
 	Find(channelID string, artworkID string) (*Repost, error)
 	Create(*Repost, time.Duration) error
+	Close() error
 }
 
 type Repost struct {

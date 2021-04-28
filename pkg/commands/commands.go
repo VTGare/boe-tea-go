@@ -8,4 +8,5 @@ func RegisterCommands(b *bot.Bot) {
 	memesGroup(b)
 	artworksGroup(b)
 	ownerGroup(b)
+	sourceGroup(b)
 }

@@ -11,6 +11,8 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/mongo/readconcern"
+	"go.mongodb.org/mongo-driver/mongo/writeconcern"
 	"go.uber.org/zap"
 )
 
@@ -49,8 +51,7 @@ type Service interface {
 	FindMany(context.Context, ...mo.Find) ([]*Artwork, error)
 	FindOne(context.Context, *mo.FilterOne) (*Artwork, error)
 	InsertOne(context.Context, *ArtworkInsert) (*Artwork, error)
-	FindOneOrCreate(context.Context, *mo.FilterOne, *ArtworkInsert) (*Artwork, error)
-	IncrementFavourite(ctx context.Context, id int, inc int, nsfw bool) (*Artwork, error)
+	FindOneOrCreate(context.Context, *mo.FilterOne, *ArtworkInsert) (*Artwork, bool, error)
 	DeleteOne(context.Context, *mo.FilterOne) (*Artwork, error)
 }
 
@@ -102,22 +103,52 @@ func (a artwork) FindOne(ctx context.Context, filter *mo.FilterOne) (*Artwork, e
 }
 
 func (a artwork) InsertOne(ctx context.Context, req *ArtworkInsert) (*Artwork, error) {
-	id, err := a.nextID(ctx)
-	if err != nil {
-		return nil, err
-	}
-
 	if errs := validate.Struct(req); len(errs) != 0 {
 		return nil, errs[0]
 	}
 
-	artwork := req.toArtwork(id)
-	_, err = a.col().InsertOne(ctx, artwork)
+	wc := writeconcern.New(writeconcern.WMajority())
+	rc := readconcern.Snapshot()
+	opts := options.Transaction().SetWriteConcern(wc).SetReadConcern(rc)
+
+	session, err := a.db.Client.StartSession()
+	if err != nil {
+		return nil, err
+	}
+	defer session.EndSession(ctx)
+
+	callback := func(sessionContext mongo.SessionContext) (interface{}, error) {
+		sres := a.db.Database.Collection("counters").FindOneAndUpdate(
+			sessionContext,
+			bson.M{"_id": "artworks"},
+			bson.M{"$inc": bson.M{"counter": 1}},
+			options.FindOneAndUpdate().SetReturnDocument(options.After).SetUpsert(true),
+		)
+
+		counter := &struct {
+			ID int `bson:"counter"`
+		}{}
+
+		err := sres.Decode(counter)
+		if err != nil {
+			return nil, err
+		}
+
+		artwork := req.toArtwork(counter.ID)
+		_, err = a.col().InsertOne(sessionContext, artwork)
+		if err != nil {
+			return nil, err
+		}
+
+		return artwork, nil
+	}
+
+	artwork, err := session.WithTransaction(ctx, callback, opts)
 	if err != nil {
 		return nil, err
 	}
 
-	return artwork, nil
+	return artwork.(*Artwork), nil
 }
 
 func (a artwork) DeleteOne(ctx context.Context, filter *mo.FilterOne) (*Artwork, error) {
@@ -134,7 +165,9 @@ func (a artwork) DeleteOne(ctx context.Context, filter *mo.FilterOne) (*Artwork,
 	return &artwork, err
 }
 
-func (a artwork) FindOneOrCreate(ctx context.Context, filter *mo.FilterOne, insert *ArtworkInsert) (*Artwork, error) {
+func (a artwork) FindOneOrCreate(ctx context.Context, filter *mo.FilterOne, insert *ArtworkInsert) (*Artwork, bool, error) {
+	created := false
+
 	art, err := a.FindOne(context.Background(), filter)
 	if err != nil {
 		switch {
@@ -145,53 +178,14 @@ func (a artwork) FindOneOrCreate(ctx context.Context, filter *mo.FilterOne, inse
 			)
 
 			if err != nil {
-				return nil, err
+				return nil, false, err
 			}
+
+			created = true
 		default:
-			return nil, err
+			return nil, false, err
 		}
 	}
 
-	return art, nil
-}
-
-func (a artwork) IncrementFavourite(ctx context.Context, id int, inc int, nsfw bool) (*Artwork, error) {
-	nsfwInc := 0
-	if nsfw {
-		nsfwInc += inc
-	}
-
-	res := a.col().FindOneAndUpdate(
-		ctx,
-		bson.M{"artwork_id": id},
-		bson.M{"$inc": bson.M{"favourites": inc, "nsfw": nsfwInc}},
-	)
-
-	var artwork Artwork
-	err := res.Decode(&artwork)
-	if err != nil {
-		return nil, err
-	}
-
-	return &artwork, nil
-}
-
-func (a artwork) nextID(ctx context.Context) (int, error) {
-	sres := a.db.Database.Collection("counters").FindOneAndUpdate(
-		ctx,
-		bson.M{"_id": "artworks"},
-		bson.M{"$inc": bson.M{"counter": 1}},
-		options.FindOneAndUpdate().SetReturnDocument(options.After).SetUpsert(true),
-	)
-
-	counter := &struct {
-		Counter int `bson:"counter"`
-	}{}
-
-	err := sres.Decode(counter)
-	if err != nil {
-		return 0, err
-	}
-
-	return counter.Counter, nil
+	return art, created, nil
 }
