@@ -1,2 +1,2 @@
-web: bin/boetea
+web: echo "xd"
 worker: bin/boetea

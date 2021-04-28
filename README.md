@@ -5,7 +5,7 @@
 
 <img align="center" src="https://cdn.discordapp.com/avatars/636468907049353216/9bba642061fe0d500e92987098fdcf85.png?size=256">
 
-**Boe Tea** is a source image bot that reposts Pixiv, Twitter images, detects reposts and searches sauce for you!
+**Boe Tea** is an ultimate artwork sharing bot for all your artwork-related needs.
 
 ## Getting started
 
@@ -26,41 +26,48 @@ If you ran into a problem or have a suggestion create an issue here, use bt!feed
 
 ## Documentation
 
-Current documentation is out of date. All these commands still work as documented, but there are more undocumented commands or missed features on documented ones. Also their behaviour is subject to change soon. I'll make sure Boe Tea is fully documented when I finally release its own fansy website.
+Bot's documentation is currently getting rewritten and won't be publicly available until website release. Please use `bt!help` command instead.
 
--   `bt!sauce` - tries to find original image source on SauceNAO search engine.
-    -   _Usage_: `bt!sauce <optional link>`. If link is not present looks up for an attachment.
--   `bt!pixiv` - advanced pixiv command, let's you exclude certain pictures.
-    -   _Usage_: `bt!pixiv <pixiv link> [excluded pictures]`
-    -   _pixiv link_: Required link to a pixiv post.
-    -   _excluded pictures_: Array of excluded pictures separated by space, supports range syntax (e.g. `1-7` excludes 1 through 7 inclusively)
-    -   _Example_: `bt!pixiv https://www.pixiv.net/en/artworks/81893997 2-3` will repost only the first image of the set.
--   `bt!twitter` - reposts all images from a tweet, useful for mobile that doesn't support all images natively.
-    -   _Usage_: `bt!twitter <required tweet link>`
--   `bt!deepfry` - deepfries an image for le epic memes.
-    -   _Usage_: `bt!deepfry <image link> <times deepfried>`
-    -   _image link_: optional if image is attached, link is prioritized if both are present.
-    -   _times deepfried_: optional, fries even deeper, up to 5 times.
-    -   _Example_: `bt!deepfry https://imgur.com/image.png 5`
--   `bt!help` - displays Boe Tea's command documentation
-    -   _Advanced usage_: `bt!help <group name>` for the list of group's commands. `bt!help <group> <command>` for documentation of a specific command.
--   `bt!set` - displays current guild settings or changes them (e.g `bt!set prefix uwu`)
-    -   _prefix_: bot's prefix. String up to 5 characters, if last character is a letter whitespace is assumed.
-    -   _pixiv_ | _twitter_ | _crosspost_: switches corresponding feature server-wide. Accepted parameters: [_enabled, on, t,true_]  [_disabled, off, f, false_]
-    -   _repost_: Configures repost checker behaviour. Accepts **enabled**, **disabled**, or **strict** parameters.
-    -   _limit_: Album size limit. If album exceeds the limit only first image of every separate post will be send.
--   `bt!ping` - checks if Boe Tea online and sends its ping back
--   `bt!nhentai` - sends detailed information about an nhentai book.
-    - _Usage_: `bt!nhentai <magic number>`
-    - _magic number_: Typically, but not always, a 6-digit numbers only weebs can understand meaning of.
-
-## Building
+## Deployment
 
 ### Requirements
-- Golang (1.13+)
+- Golang (1.16+). Download Golang from https://golang.org or using any package manager for your platform (e.g. Chocolatey on Windows or pacman on ArchLinux).
 - ffmpeg
 
-Soon there will be a guide how build and deploy your own Boe Tea but until then you can go through the source code to figure it out yourself Kappa
+### Locally
+1. Clone this repository. `git clone https://github.com/VTGare/boe-tea-go.git`
+2. Change working directory to boe-tea-go. `cd boe-tea-go`
+3. Download all required dependencies. `go mod download`
+4. Build an executable file. `go build ./cmd/boetea`
+5. Create a configuration file and fill it up. `touch config.json`
+```
+{
+    {
+    "discord": {
+        "token": "Your Discord bot token. Acquire it on Discord Developer Portal.",
+        "author_id": "Your Discord user ID. Gives access to developer commands."
+    },
+    "mongo": {
+        "uri": "mongodb://localhost:27017",
+        "default_db": "boe-tea"
+    },
+    "pixiv": {
+        "auth_token": "Pixiv auth token. Refer to https://gist.github.com/upbit/6edda27cb1644e94183291109b8a5fde to acquire.",
+        "refresh_token": "Pixiv refresh token. Refer to https://gist.github.com/upbit/6edda27cb1644e94183291109b8a5fde to acquire."
+    },
+    "quotes": [
+        {
+            "content": "Embed footer message",
+            "nsfw": false
+        }
+    ]
+}
+}
+```
+6. Run the executable file.
+
+### Heroku
+TODO
 
 ## License
 [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2FVTGare%2Fboe-tea-go.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2FVTGare%2Fboe-tea-go?ref=badge_large)

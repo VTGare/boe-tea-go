@@ -3,3 +3,4 @@ tmp
 .env
 vendor
 __debug_bin
+config.json

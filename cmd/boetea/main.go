@@ -1,47 +1,95 @@
 package main
 
 import (
+	"fmt"
 	"os"
+	"os/signal"
+	"syscall"
 
-	"github.com/VTGare/boe-tea-go/internal/bot"
-	"github.com/VTGare/boe-tea-go/internal/database"
-	"github.com/VTGare/boe-tea-go/internal/ugoira"
-	"github.com/VTGare/boe-tea-go/pkg/tsuita"
-	log "github.com/sirupsen/logrus"
-)
-
-var (
-	token        = os.Getenv("BOT_TOKEN")
-	authToken    = os.Getenv("AUTH_TOKEN")
-	refreshToken = os.Getenv("REFRESH_TOKEN")
-	authorID     = os.Getenv("AUTHOR_ID")
+	"github.com/VTGare/boe-tea-go/internal/config"
+	"github.com/VTGare/boe-tea-go/internal/database/mongodb"
+	"github.com/VTGare/boe-tea-go/pkg/artworks/pixiv"
+	"github.com/VTGare/boe-tea-go/pkg/artworks/twitter"
+	"github.com/VTGare/boe-tea-go/pkg/bot"
+	"github.com/VTGare/boe-tea-go/pkg/commands"
+	"github.com/VTGare/boe-tea-go/pkg/handlers"
+	"github.com/VTGare/boe-tea-go/pkg/models"
+	"github.com/VTGare/boe-tea-go/pkg/repost"
+	"github.com/VTGare/gumi"
+	"go.uber.org/zap"
 )
 
 func main() {
-	switch {
-	case token == "":
-		log.Fatalln("BOT_TOKEN env variable doesn't exist")
-	case authToken == "":
-		log.Fatalln("AUTH_TOKEN env variable doesn't exist")
-	case refreshToken == "":
-		log.Fatalln("REFRESH_TOKEN env variable doesn't exist")
-	case authorID == "":
-		log.Fatalln("AUTHOR_ID env variable doesn't exist'")
-	}
-
-	bot, err := bot.NewBot(token)
-	px, err := ugoira.NewApp(authToken, refreshToken)
-	if px != nil {
-		bot.Router.Storage.Set("pixiv", px)
-	}
-
-	bot.Router.Storage.Set("twitter", tsuita.NewTsuita())
-	bot.Router.AuthorID = authorID
-
-	err = bot.Run()
+	prod, err := zap.NewProduction()
 	if err != nil {
-		log.Fatalln(err)
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	log := prod.Sugar()
+
+	cfg, err := config.FromFile("config.json")
+	if err != nil {
+		log.Fatal("Config not found: ", err)
 	}
 
-	database.DB.Close()
+	db, err := mongodb.New(cfg.Mongo.URI, cfg.Mongo.Database)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = db.CreateCollections()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	m := models.New(db, log)
+
+	var repostDetector repost.Detector
+	switch cfg.Repost.Type {
+	case "redis":
+		repostDetector, err = repost.NewRedis(cfg.Repost.RedisURI)
+		if err != nil {
+			log.Fatal(err)
+		}
+	default:
+		repostDetector = repost.NewMemory()
+	}
+
+	b, err := bot.New(cfg, m, log, repostDetector)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	b.AddProvider(twitter.New())
+	if pixiv, err := pixiv.New(cfg.Pixiv.AuthToken, cfg.Pixiv.RefreshToken); err == nil {
+		log.Info("Successfully logged into Pixiv.")
+		b.AddProvider(pixiv)
+	}
+
+	b.AddRouter(&gumi.Router{
+		Commands:                make(map[string]*gumi.Command),
+		AuthorID:                cfg.Discord.AuthorID,
+		PrefixResolver:          handlers.PrefixResolver(b),
+		NotCommandCallback:      handlers.NotCommand(b),
+		OnErrorCallback:         handlers.OnError(b),
+		OnRateLimitCallback:     handlers.OnRateLimit(b),
+		OnNSFWCallback:          handlers.OnNSFW(b),
+		OnExecuteCallback:       handlers.OnExecute(b),
+		OnNoPermissionsCallback: handlers.OnNoPerms(b),
+	})
+
+	handlers.RegisterHandlers(b)
+	commands.RegisterCommands(b)
+
+	if err := b.Open(); err != nil {
+		log.Fatal(err)
+	}
+
+	sc := make(chan os.Signal, 1)
+	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
+	<-sc
+
+	db.Close()
+	repostDetector.Close()
+	b.Close()
 }
