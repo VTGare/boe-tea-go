@@ -29,11 +29,13 @@ func sourceGroup(b *bot.Bot) {
 		Name:        "sauce",
 		Group:       group,
 		Aliases:     []string{"saucenao"},
+		Description: "Search sauce on SauceNAO",
+		Example:     "bt!sauce https://imagehosting.com/animegirl.png",
+		Usage:       "bt!sauce <image url, attachment, message url>",
 		GuildOnly:   true,
 		RateLimiter: gumi.NewRateLimiter(15 * time.Second),
 		Exec:        sauce(b),
 	})
-
 }
 
 func sauce(b *bot.Bot) func(ctx *gumi.Ctx) error {

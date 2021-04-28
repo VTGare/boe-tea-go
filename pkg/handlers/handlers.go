@@ -281,6 +281,16 @@ func OnReactionAdd(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageReacti
 				return
 			}
 
+			dgUser, err := s.User(r.UserID)
+			if err != nil {
+				b.Log.Warn("OnReactionRemove -> User: ", err)
+				return
+			}
+
+			if dgUser.Bot {
+				return
+			}
+
 			urls := make([]string, 0, 2)
 			if len(msg.Embeds) > 0 {
 				embed := msg.Embeds[0]
@@ -410,6 +420,16 @@ func OnReactionRemove(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageRea
 			msg, err := s.ChannelMessage(r.ChannelID, r.MessageID)
 			if err != nil {
 				b.Log.Warn("OnReactionRemove -> ChannelMessage: ", err)
+				return
+			}
+
+			dgUser, err := s.User(r.UserID)
+			if err != nil {
+				b.Log.Warn("OnReactionRemove -> User: ", err)
+				return
+			}
+
+			if dgUser.Bot {
 				return
 			}
 
@@ -593,6 +613,8 @@ func OnNSFW(b *bot.Bot) func(ctx *gumi.Ctx) error {
 func OnExecute(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
 		b.Log.Infof("Executing command [%v]. Arguments: [%v]. Guild ID: %v, channel ID: %v", ctx.Command.Name, ctx.Args.Raw, ctx.Event.GuildID, ctx.Event.ChannelID)
+
+		b.Metrics.IncrementCommand()
 		return nil
 	}
 }

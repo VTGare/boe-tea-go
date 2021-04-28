@@ -7,6 +7,7 @@ import (
 	"github.com/VTGare/boe-tea-go/internal/cache"
 	"github.com/VTGare/boe-tea-go/internal/config"
 	"github.com/VTGare/boe-tea-go/pkg/artworks"
+	"github.com/VTGare/boe-tea-go/pkg/metrics"
 	"github.com/VTGare/boe-tea-go/pkg/models"
 	artworksModel "github.com/VTGare/boe-tea-go/pkg/models/artworks"
 	"github.com/VTGare/boe-tea-go/pkg/models/guilds"
@@ -30,6 +31,7 @@ type Bot struct {
 	BannedUsers      *ttlcache.Cache
 	EmbedCache       *cache.EmbedCache
 	Sengoku          *sengoku.Sengoku
+	Metrics          *metrics.Metrics
 	s                *discordgo.Session
 }
 
@@ -57,6 +59,7 @@ func New(config *config.Config, models *models.Models, logger *zap.SugaredLogger
 		RepostDetector: rd,
 		BannedUsers:    banned,
 		EmbedCache:     cache.NewEmbedCache(),
+		Metrics:        metrics.New(),
 		Sengoku:        sg,
 		s:              dg,
 	}, nil

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -51,6 +52,16 @@ func generalGroup(b *bot.Bot) {
 	})
 
 	b.Router.RegisterCmd(&gumi.Command{
+		Name:        "help",
+		Group:       group,
+		Aliases:     []string{"documentation", "docs"},
+		Description: "Shows this page.",
+		Usage:       "bt!help <group/command name>",
+		Example:     "bt!help",
+		Exec:        help(b),
+	})
+
+	b.Router.RegisterCmd(&gumi.Command{
 		Name:        "ping",
 		Group:       group,
 		Description: "Checks bot's availabity and response time.",
@@ -93,16 +104,103 @@ func generalGroup(b *bot.Bot) {
 	})
 
 	b.Router.RegisterCmd(&gumi.Command{
-		Name:        "removechannel",
+		Name:        "rmchannel",
 		Group:       group,
+		Aliases:     []string{"removechannel"},
 		Description: "Removes an art channel from server settings.",
-		Usage:       "bt!removechannel [channel ids/category id...]",
-		Example:     "bt!removechannel #sfw #nsfw #basement",
+		Usage:       "bt!rmchannel [channel ids/category id...]",
+		Example:     "bt!rmchannel #sfw #nsfw #basement",
 		GuildOnly:   true,
 		Permissions: discordgo.PermissionAdministrator | discordgo.PermissionManageServer,
 		RateLimiter: gumi.NewRateLimiter(5 * time.Second),
 		Exec:        removechannel(b),
 	})
+}
+
+func help(b *bot.Bot) func(ctx *gumi.Ctx) error {
+	return func(ctx *gumi.Ctx) error {
+		eb := embeds.NewBuilder()
+
+		eb.Title("Boe Tea's Documentation").Thumbnail(ctx.Session.State.User.AvatarURL(""))
+		switch {
+		case ctx.Args.Len() == 0:
+			groups := make(map[string][]string)
+			added := make(map[string]struct{})
+
+			for _, cmd := range b.Router.Commands {
+				if _, ok := added[cmd.Name]; ok {
+					continue
+				}
+
+				_, ok := groups[cmd.Group]
+				if !ok {
+					groups[cmd.Group] = []string{cmd.Name}
+					added[cmd.Name] = struct{}{}
+					continue
+				}
+
+				groups[cmd.Group] = append(groups[cmd.Group], cmd.Name)
+				added[cmd.Name] = struct{}{}
+			}
+
+			keys := make([]string, 0, len(groups))
+			for key := range groups {
+				keys = append(keys, key)
+			}
+			sort.Strings(keys)
+
+			for _, group := range groups {
+				sort.Strings(group)
+			}
+
+			eb.Description(
+				"This page shows bot's command groups. Under the group name you'll see a list of available commands. Use `bt!help <command name> for command's documentation.`",
+			)
+
+			for _, key := range keys {
+				group := groups[key]
+
+				eb.AddField(key, fmt.Sprintf(
+					"```\n%v\n```", strings.Join(arrays.MapString(group, func(s string) string {
+						return "• " + s
+					}), "\n"),
+				), true)
+			}
+		case ctx.Args.Len() >= 1:
+			name := ctx.Args.Get(0).Raw
+
+			cmd, ok := b.Router.Commands[name]
+			if !ok {
+				return messages.HelpCommandNotFound(name)
+			}
+
+			var sb strings.Builder
+			if cmd.GuildOnly {
+				sb.WriteString("Guild only. ")
+			}
+
+			if cmd.NSFW {
+				sb.WriteString("Only usable in NSFW channels. ")
+			}
+
+			eb.Description(sb.String())
+
+			eb.AddField(
+				"Description", "```"+cmd.Description+"```", true,
+			).AddField(
+				"Usage", "```"+cmd.Usage+"```", true,
+			).AddField(
+				"Example", "```"+cmd.Example+"```", true,
+			)
+
+			if cmd.RateLimiter != nil {
+				eb.AddField("Cooldown", cmd.RateLimiter.Cooldown.String(), true)
+			}
+
+		}
+
+		return ctx.ReplyEmbed(eb.Finalize())
+	}
 }
 
 func ping(b *bot.Bot) func(ctx *gumi.Ctx) error {
@@ -236,11 +334,21 @@ func stats(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			latency.String(),
 			true,
 		).AddField(
-			"Shards",
-			strconv.Itoa(s.ShardCount),
+			"Uptime",
+			b.Metrics.Uptime.String(),
+			true,
+		).AddField(
+			"Commands executed",
+			strconv.FormatInt(b.Metrics.CommandsExecuted, 10),
+			true,
+		).AddField(
+			"Artworks sent",
+			strconv.FormatInt(b.Metrics.ArtworksSent, 10),
+			true,
 		).AddField(
 			"RAM used",
 			fmt.Sprintf("%v MB", mem.Alloc/1024/1024),
+			true,
 		)
 
 		return ctx.ReplyEmbed(eb.Finalize())

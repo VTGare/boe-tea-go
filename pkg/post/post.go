@@ -306,6 +306,10 @@ func (p *Post) send(guild *guilds.Guild, channelID string, artworks []artworks.A
 		return nil, nil
 	}
 
+	for range artworks {
+		p.bot.Metrics.IncrementArtwork()
+	}
+
 	allEmbeds, err := p.generateEmbeds(artworks, channelID, crosspost)
 	if err != nil {
 		return nil, err
