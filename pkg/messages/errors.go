@@ -7,10 +7,11 @@ import (
 )
 
 type IncorrectCmd struct {
-	Name    string
-	Usage   string
-	Example string
-	Embed   *IncorrectCmdEmbed
+	Name        string
+	Usage       string
+	Example     string
+	Description string
+	Embed       *IncorrectCmdEmbed
 }
 
 type IncorrectCmdEmbed struct {
@@ -24,9 +25,10 @@ func (cmd *IncorrectCmd) Error() string {
 
 func ErrIncorrectCmd(cmd *gumi.Command) error {
 	return &IncorrectCmd{
-		Name:    cmd.Name,
-		Usage:   cmd.Usage,
-		Example: cmd.Example,
+		Name:        cmd.Name,
+		Usage:       cmd.Usage,
+		Example:     cmd.Example,
+		Description: cmd.Description,
 		Embed: &IncorrectCmdEmbed{
 			Usage:   "Usage",
 			Example: "Example",

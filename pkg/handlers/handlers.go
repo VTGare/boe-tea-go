@@ -547,8 +547,9 @@ func OnError(b *bot.Bot) func(*gumi.Ctx, error) {
 		switch {
 		case errors.As(err, &cmdErr):
 			eb.FailureTemplate(cmdErr.Error())
-			eb.AddField(cmdErr.Embed.Usage, fmt.Sprintf("`%v`", cmdErr.Usage), true)
-			eb.AddField(cmdErr.Embed.Example, fmt.Sprintf("`%v`", cmdErr.Example), true)
+			eb.Description(cmdErr.Description)
+			eb.AddField(cmdErr.Embed.Usage, fmt.Sprintf("`%v`", cmdErr.Usage))
+			eb.AddField(cmdErr.Embed.Example, fmt.Sprintf("`%v`", cmdErr.Example))
 		case errors.As(err, &usrErr):
 			if err := usrErr.Unwrap(); err != nil {
 				if ctx.Command != nil {
