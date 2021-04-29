@@ -128,6 +128,7 @@ func (u userService) InsertFavourite(ctx context.Context, id string, fav *Favour
 			sessionCtx,
 			bson.M{"artwork_id": fav.ArtworkID},
 			bson.M{"$inc": bson.M{"favourites": 1, "nsfw": nsfw}},
+			options.FindOneAndUpdate().SetReturnDocument(options.After),
 		)
 
 		var artwork artworks.Artwork
@@ -184,6 +185,7 @@ func (u userService) DeleteFavourite(ctx context.Context, id string, fav *Favour
 			sessionCtx,
 			bson.M{"artwork_id": fav.ArtworkID},
 			bson.M{"$inc": bson.M{"favourites": -1, "nsfw": nsfw}},
+			options.FindOneAndUpdate().SetReturnDocument(options.After),
 		)
 
 		var artwork artworks.Artwork
@@ -256,7 +258,7 @@ func (u userService) DeleteGroup(ctx context.Context, userID, group string) (*Us
 func (u userService) InsertToGroup(ctx context.Context, userID, group, child string) (*User, error) {
 	res := u.col().FindOneAndUpdate(
 		ctx,
-		bson.M{"user_id": userID, "channel_groups.name": group, "channel_groups.children": bson.M{"$nin": []string{child}}},
+		bson.M{"user_id": userID, "channel_groups.name": group},
 		bson.M{"$addToSet": bson.M{"channel_groups.$.children": child}},
 		options.FindOneAndUpdate().SetReturnDocument(options.After),
 	)
@@ -273,7 +275,7 @@ func (u userService) InsertToGroup(ctx context.Context, userID, group, child str
 func (u userService) DeleteFromGroup(ctx context.Context, userID, group, child string) (*User, error) {
 	res := u.col().FindOneAndUpdate(
 		ctx,
-		bson.M{"user_id": userID, "channel_groups.name": group, "channel_groups.children": bson.M{"$in": []string{child}}},
+		bson.M{"user_id": userID, "channel_groups.name": group},
 		bson.M{"$pull": bson.M{"channel_groups.$.children": child}},
 		options.FindOneAndUpdate().SetReturnDocument(options.After),
 	)
@@ -326,6 +328,16 @@ func (u userService) ReplaceOne(ctx context.Context, user *User) (*User, error) 
 func (u *User) FindGroup(parentID string) (*Group, bool) {
 	for _, group := range u.Groups {
 		if group.Parent == parentID {
+			return group, true
+		}
+	}
+
+	return nil, false
+}
+
+func (u *User) FindGroupByName(name string) (*Group, bool) {
+	for _, group := range u.Groups {
+		if group.Name == name {
 			return group, true
 		}
 	}

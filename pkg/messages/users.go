@@ -54,8 +54,9 @@ func UserPushSuccess(name string, channels []string) string {
 
 func ErrUserPushFail(name string) error {
 	return newUserError(fmt.Sprintf(
-		"No channels were added to group `%v`. One of the following is true:\n%v\n%v",
+		"No channels were added to group `%v`. One of the following is true:\n%v\n%v\n%v",
 		name,
+		"• Group "+name+" doesn't exist;",
 		"• All channels are already part of the group;",
 		"• A channel is also a parent of this group.",
 	))
@@ -71,7 +72,7 @@ func UserRemoveSuccess(name string, channels []string) string {
 
 func ErrUserRemoveFail(name string) error {
 	return newUserError(fmt.Sprintf(
-		"No channels were removed from group `%v`. None of the channel were part of the group.",
+		"No channels were removed from group `%v`. None of the channel were part of the group or group doesn't exist.",
 		name,
 	))
 }

@@ -38,7 +38,7 @@ func userGroup(b *bot.Bot) {
 	b.Router.RegisterCmd(&gumi.Command{
 		Name:        "groups",
 		Group:       group,
-		Aliases:     []string{"ls"},
+		Aliases:     []string{"ls", "list"},
 		Description: "Shows all crosspost groups.",
 		Usage:       "bt!groups",
 		Example:     "bt!groups",
@@ -290,6 +290,11 @@ func push(b *bot.Bot) func(ctx *gumi.Ctx) error {
 		name := ctx.Args.Get(0).Raw
 		ctx.Args.Remove(0)
 
+		group, ok := user.FindGroupByName(name)
+		if !ok {
+			return messages.ErrUserPushFail(name)
+		}
+
 		inserted := make([]string, 0, ctx.Args.Len())
 		for _, arg := range ctx.Args.Arguments {
 			channelID := strings.Trim(arg.Raw, "<#>")
@@ -303,10 +308,12 @@ func push(b *bot.Bot) func(ctx *gumi.Ctx) error {
 				continue
 			}
 
-			if group, ok := user.FindGroup(channelID); ok {
-				if group.Name == name {
-					continue
-				}
+			if group.Parent == channelID {
+				continue
+			}
+
+			if arrays.AnyString(group.Children, channelID) {
+				continue
 			}
 
 			_, err = b.Users.InsertToGroup(
@@ -354,9 +361,18 @@ func remove(b *bot.Bot) func(ctx *gumi.Ctx) error {
 		name := ctx.Args.Get(0).Raw
 		ctx.Args.Remove(0)
 
+		group, ok := user.FindGroupByName(name)
+		if !ok {
+			return messages.ErrUserRemoveFail(name)
+		}
+
 		removed := make([]string, 0, ctx.Args.Len())
 		for _, arg := range ctx.Args.Arguments {
 			channelID := strings.Trim(arg.Raw, "<#>")
+
+			if !arrays.AnyString(group.Children, channelID) {
+				continue
+			}
 
 			_, err = b.Users.DeleteFromGroup(
 				context.Background(),

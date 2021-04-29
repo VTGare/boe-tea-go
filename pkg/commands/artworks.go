@@ -170,7 +170,8 @@ func share(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			return messages.ErrIncorrectCmd(ctx.Command)
 		}
 
-		url := ctx.Args.Get(0).Raw
+		//Trim <> in case someone wraps the link in it.
+		url := strings.Trim(ctx.Args.Get(0).Raw, "<>")
 		ctx.Args.Remove(0)
 
 		indices := make(map[int]struct{})
@@ -245,7 +246,8 @@ func shareInclude(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			return messages.ErrIncorrectCmd(ctx.Command)
 		}
 
-		url := ctx.Args.Get(0).Raw
+		//Trim <> in case someone wraps the link in it.
+		url := strings.Trim(ctx.Args.Get(0).Raw, "<>")
 		ctx.Args.Remove(0)
 
 		indices := make(map[int]struct{})
@@ -319,7 +321,8 @@ func crosspost(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			return messages.ErrIncorrectCmd(ctx.Command)
 		}
 
-		url := ctx.Args.Get(0).Raw
+		//Trim <> in case someone wraps the link in it.
+		url := strings.Trim(ctx.Args.Get(0).Raw, "<>")
 		ctx.Args.Remove(0)
 
 		p := post.New(b, ctx, url)
