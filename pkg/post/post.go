@@ -59,17 +59,9 @@ func New(bot *bot.Bot, ctx *gumi.Ctx, urls ...string) *Post {
 }
 
 func (p *Post) Send() ([]*cache.MessageInfo, error) {
-	dm := p.ctx.Event.GuildID == ""
-
-	var guild *guilds.Guild
-	if dm {
-		guild = guilds.UserGuild()
-	} else {
-		var err error
-		guild, err = p.bot.Guilds.FindOne(context.Background(), p.ctx.Event.GuildID)
-		if err != nil {
-			return nil, err
-		}
+	guild, err := p.bot.Guilds.FindOne(context.Background(), p.ctx.Event.GuildID)
+	if err != nil {
+		return nil, err
 	}
 
 	res, err := p.fetch(guild, p.ctx.Event.ChannelID)

@@ -47,6 +47,9 @@ type guildService struct {
 func NewService(db *mongodb.Mongo, logger *zap.SugaredLogger) Service {
 	cache := cache.New()
 
+	//If guild ID is empty, return DM guild settings.
+	cache.Set("", UserGuild())
+
 	return &guildService{db, logger, cache}
 }
 
