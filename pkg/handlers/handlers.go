@@ -13,7 +13,6 @@ import (
 	"github.com/VTGare/boe-tea-go/pkg/bot"
 	"github.com/VTGare/boe-tea-go/pkg/messages"
 	"github.com/VTGare/boe-tea-go/pkg/models/artworks/options"
-	"github.com/VTGare/boe-tea-go/pkg/models/guilds"
 	"github.com/VTGare/boe-tea-go/pkg/models/users"
 	"github.com/VTGare/boe-tea-go/pkg/post"
 	"github.com/VTGare/embeds"
@@ -44,25 +43,19 @@ func PrefixResolver(b *bot.Bot) func(s *discordgo.Session, m *discordgo.MessageC
 //NotCommand is executed on every message that isn't a command.
 func NotCommand(b *bot.Bot) func(*gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
-		var (
-			dm    = ctx.Event.GuildID == ""
-			guild *guilds.Guild
-		)
-
-		if dm {
-			guild = guilds.DefaultGuild("")
-		} else {
-			var err error
-			guild, err = b.Guilds.FindOne(context.Background(), ctx.Event.GuildID)
-			if err != nil {
-				return err
-			}
+		guild, err := b.Guilds.FindOne(context.Background(), ctx.Event.GuildID)
+		if err != nil {
+			return err
 		}
 
 		allSent := make([]*cache.MessageInfo, 0)
 		if len(guild.ArtChannels) == 0 || arrays.AnyString(guild.ArtChannels, ctx.Event.ChannelID) {
 			rx := xurls.Strict()
 			urls := rx.FindAllString(ctx.Event.Content, -1)
+
+			if len(urls) == 0 {
+				return nil
+			}
 
 			p := post.New(b, ctx, urls...)
 
@@ -72,7 +65,6 @@ func NotCommand(b *bot.Bot) func(*gumi.Ctx) error {
 			}
 
 			allSent = append(allSent, sent...)
-
 			user, err := b.Users.FindOne(context.Background(), ctx.Event.Author.ID)
 			if err != nil {
 				if !errors.Is(err, mongo.ErrNoDocuments) {

@@ -64,7 +64,7 @@ func (p *Post) Send() ([]*cache.MessageInfo, error) {
 		return nil, err
 	}
 
-	res, err := p.fetch(guild, p.ctx.Event.ChannelID)
+	res, err := p.fetch(guild, p.ctx.Event.ChannelID, false)
 	if err != nil {
 		return nil, err
 	}
@@ -123,18 +123,20 @@ func (p *Post) Crosspost(userID, group string, channels []string) ([]*cache.Mess
 				return nil
 			}
 
-			if guild.Crosspost && len(guild.ArtChannels) == 0 || arrays.AnyString(guild.ArtChannels, ch.ID) {
-				res, err := p.fetch(guild, channelID)
-				if err != nil {
-					return err
-				}
+			if guild.Crosspost {
+				if len(guild.ArtChannels) == 0 || arrays.AnyString(guild.ArtChannels, ch.ID) {
+					res, err := p.fetch(guild, channelID, true)
+					if err != nil {
+						return err
+					}
 
-				sent, err := p.send(guild, channelID, res.Artworks, true)
-				if err != nil {
-					return err
-				}
+					sent, err := p.send(guild, channelID, res.Artworks, true)
+					if err != nil {
+						return err
+					}
 
-				msgChan <- sent
+					msgChan <- sent
+				}
 			}
 
 			return nil
@@ -181,7 +183,7 @@ func (p *Post) providers(guild *guilds.Guild) []artworks.Provider {
 	return providers
 }
 
-func (p *Post) fetch(guild *guilds.Guild, channelID string) (*fetchResult, error) {
+func (p *Post) fetch(guild *guilds.Guild, channelID string, crosspost bool) (*fetchResult, error) {
 	var (
 		wg, _        = errgroup.WithContext(context.Background())
 		providers    = p.providers(guild)
@@ -200,14 +202,20 @@ func (p *Post) fetch(guild *guilds.Guild, channelID string) (*fetchResult, error
 
 					var isRepost bool
 					if guild.Repost != "disabled" {
-						if rep, _ := p.bot.RepostDetector.Find(channelID, id); rep != nil {
+						rep, err := p.bot.RepostDetector.Find(channelID, id)
+						if err != nil {
+							p.bot.Log.Warnf("RepostDetector.Find(): %v. ChannelID: %v. Crosspost: %v", err, channelID, crosspost)
+						}
+
+						if rep != nil {
 							artworksChan <- rep
 
-							isRepost = true
 							//If strict return nothing, otherwise add both repost message and an artwork
-							if guild.Repost == "strict" {
+							if guild.Repost == "strict" || crosspost {
 								return nil
 							}
+
+							isRepost = true
 						}
 					}
 
