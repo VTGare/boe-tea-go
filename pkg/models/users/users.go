@@ -128,6 +128,7 @@ func (u userService) InsertFavourite(ctx context.Context, id string, fav *Favour
 			sessionCtx,
 			bson.M{"artwork_id": fav.ArtworkID},
 			bson.M{"$inc": bson.M{"favourites": 1, "nsfw": nsfw}},
+			options.FindOneAndUpdate().SetReturnDocument(options.After),
 		)
 
 		var artwork artworks.Artwork
@@ -184,6 +185,7 @@ func (u userService) DeleteFavourite(ctx context.Context, id string, fav *Favour
 			sessionCtx,
 			bson.M{"artwork_id": fav.ArtworkID},
 			bson.M{"$inc": bson.M{"favourites": -1, "nsfw": nsfw}},
+			options.FindOneAndUpdate().SetReturnDocument(options.After),
 		)
 
 		var artwork artworks.Artwork

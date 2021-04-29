@@ -137,6 +137,7 @@ func (g guildService) InsertArtChannels(ctx context.Context, guildID string, cha
 		ctx,
 		bson.M{"guild_id": guildID, "art_channels": bson.M{"$nin": channels}},
 		bson.M{"$addToSet": bson.M{"art_channels": bson.M{"$each": channels}}},
+		options.FindOneAndUpdate().SetReturnDocument(options.After),
 	)
 
 	var guild Guild
@@ -154,6 +155,7 @@ func (g guildService) DeleteArtChannels(ctx context.Context, guildID string, cha
 		ctx,
 		bson.M{"guild_id": guildID, "art_channels": bson.M{"$all": channels}},
 		bson.M{"$pullAll": bson.M{"art_channels": channels}},
+		options.FindOneAndUpdate().SetReturnDocument(options.After),
 	)
 
 	var guild Guild
