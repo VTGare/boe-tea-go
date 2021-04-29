@@ -5,18 +5,9 @@ services:
         network_mode: host
         depends_on:
             - redis
-            - mongodb
+        restart: on-failure
     redis:
         image: redis:latest
         logging:
             driver: none
-# Uncomment everything below if you run mongodb locally.
-    mongodb:
-        image: mongo:latest
-        volumes:
-            - "mongodata:/data/db"
-        network_mode: host
-        logging:
-            driver: none
-volumes:
-    mongodata:
+        restart: on-failure
