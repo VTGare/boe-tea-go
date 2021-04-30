@@ -1,4 +1,4 @@
-version: "2.0"
+version: '3'
 services:
     bot:
         build: .
@@ -10,4 +10,10 @@ services:
         image: redis:latest
         logging:
             driver: none
+        network_mode: host
+        command: ["redis-server", "--appendonly", "yes"]
+        volumes:
+            - redis-data:/data
         restart: on-failure
+volumes:
+    redis-data:
