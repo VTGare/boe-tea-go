@@ -15,7 +15,7 @@ type redisDetector struct {
 func NewRedis(addr string) (Detector, error) {
 	client := redis.NewClient(&redis.Options{
 		Addr:       addr,
-		MaxConnAge: 5 * time.Minute,
+		MaxRetries: 5,
 	})
 
 	status := client.Ping(context.Background())
@@ -83,7 +83,7 @@ func (rd redisDetector) Create(repost *Repost, duration time.Duration) error {
 			return err
 		}
 
-		if _, err := rd.client.Expire(ctx, key, duration).Result(); err != nil {
+		if _, err := rd.client.ExpireAt(ctx, key, time.Now().Add(duration)).Result(); err != nil {
 			return err
 		}
 

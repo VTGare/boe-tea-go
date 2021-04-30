@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/VTGare/boe-tea-go/internal/database/mongodb"
-	"github.com/VTGare/boe-tea-go/internal/validate"
 	mo "github.com/VTGare/boe-tea-go/pkg/models/artworks/options"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -103,10 +102,6 @@ func (a artwork) FindOne(ctx context.Context, filter *mo.FilterOne) (*Artwork, e
 }
 
 func (a artwork) InsertOne(ctx context.Context, req *ArtworkInsert) (*Artwork, error) {
-	if errs := validate.Struct(req); len(errs) != 0 {
-		return nil, errs[0]
-	}
-
 	wc := writeconcern.New(writeconcern.WMajority())
 	rc := readconcern.Snapshot()
 	opts := options.Transaction().SetWriteConcern(wc).SetReadConcern(rc)

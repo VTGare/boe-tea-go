@@ -6,7 +6,6 @@ import (
 
 	"github.com/VTGare/boe-tea-go/internal/cache"
 	"github.com/VTGare/boe-tea-go/internal/database/mongodb"
-	"github.com/VTGare/boe-tea-go/internal/validate"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -117,11 +116,6 @@ func (g guildService) DeleteOne(ctx context.Context, id string) (*Guild, error) 
 }
 
 func (g guildService) ReplaceOne(ctx context.Context, guild *Guild) (*Guild, error) {
-	errs := validate.Struct(guild)
-	if len(errs) != 0 {
-		return nil, errs[0]
-	}
-
 	guild.UpdatedAt = time.Now()
 	_, err := g.col().ReplaceOne(ctx, bson.M{"guild_id": guild.ID}, guild, options.Replace().SetUpsert(false))
 	if err != nil {
