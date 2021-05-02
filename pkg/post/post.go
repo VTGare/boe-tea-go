@@ -83,7 +83,7 @@ func (p *Post) Send() ([]*cache.MessageInfo, error) {
 			}
 		}
 
-		p.sendReposts(guild, res.Reposts, p.ctx.Event.ChannelID, p.ctx.Event.ID)
+		p.sendReposts(guild, res.Reposts, 15*time.Second)
 	}
 
 	return p.send(guild, p.ctx.Event.ChannelID, res.Artworks, false)
@@ -162,13 +162,15 @@ func (p *Post) SetSkip(indices map[int]struct{}, mode SkipMode) {
 	p.skipMode = mode
 }
 
-func (p *Post) providers(guild *guilds.Guild) []artworks.Provider {
+func (p *Post) providers(guild *guilds.Guild, crosspost bool) []artworks.Provider {
 	providers := make([]artworks.Provider, 0)
 
 	for _, provider := range p.bot.ArtworkProviders {
 		switch provider.(type) {
 		case *twitter.Twitter:
-			if !guild.Twitter {
+			//Allow twitter crossposts even if Twitter is turned off,
+			//due to the nature of Twitter embeds on Discord.
+			if !guild.Twitter && !crosspost {
 				continue
 			}
 		case *pixiv.Pixiv:
@@ -186,7 +188,7 @@ func (p *Post) providers(guild *guilds.Guild) []artworks.Provider {
 func (p *Post) fetch(guild *guilds.Guild, channelID string, crosspost bool) (*fetchResult, error) {
 	var (
 		wg, _        = errgroup.WithContext(context.Background())
-		providers    = p.providers(guild)
+		providers    = p.providers(guild, crosspost)
 		matched      int64
 		artworksChan = make(chan interface{}, len(p.urls)*2)
 	)
@@ -202,11 +204,7 @@ func (p *Post) fetch(guild *guilds.Guild, channelID string, crosspost bool) (*fe
 
 					var isRepost bool
 					if guild.Repost != "disabled" {
-						rep, err := p.bot.RepostDetector.Find(channelID, id)
-						if err != nil {
-							p.bot.Log.Warnf("RepostDetector.Find(): %v. ChannelID: %v. Crosspost: %v", err, channelID, crosspost)
-						}
-
+						rep, _ := p.bot.RepostDetector.Find(channelID, id)
 						if rep != nil {
 							artworksChan <- rep
 
@@ -274,14 +272,14 @@ func (p *Post) fetch(guild *guilds.Guild, channelID string, crosspost bool) (*fe
 	return res, nil
 }
 
-func (p *Post) sendReposts(guild *guilds.Guild, reposts []*repost.Repost, channelID, messageID string) {
+func (p *Post) sendReposts(guild *guilds.Guild, reposts []*repost.Repost, timeout time.Duration) {
 	local := messages.RepostEmbed()
 
 	eb := embeds.NewBuilder()
 	eb.Title(local.Title)
 	for _, rep := range reposts {
 		eb.AddField(
-			rep.ID,
+			fmt.Sprintf("Artwork ID: %v", rep.ID),
 			fmt.Sprintf(
 				"**%v:** %v\n**%v:** %v\n**URL:** %v",
 				local.OriginalMessage, messages.ClickHere(fmt.Sprintf("https://discord.com/channels/%v/%v/%v", rep.GuildID, rep.ChannelID, rep.MessageID)),
@@ -294,7 +292,7 @@ func (p *Post) sendReposts(guild *guilds.Guild, reposts []*repost.Repost, channe
 	msg, _ := p.ctx.Session.ChannelMessageSendEmbed(p.ctx.Event.ChannelID, eb.Finalize())
 	if msg != nil {
 		go func() {
-			time.Sleep(15 * time.Second)
+			time.Sleep(timeout)
 
 			p.ctx.Session.ChannelMessageDelete(msg.ChannelID, msg.ID)
 		}()

@@ -3,18 +3,4 @@ services:
     bot:
         build: .
         network_mode: host
-        depends_on:
-            - redis
         restart: on-failure
-    redis:
-        image: redis:latest
-        logging:
-            driver: none
-        network_mode: host
-        command: ["redis-server", "--appendonly", "yes"]
-        volumes:
-            - redisdata:/data
-        restart: on-failure
-volumes:
-    redisdata:
-        driver: "local"
