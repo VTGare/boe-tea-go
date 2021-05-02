@@ -193,10 +193,18 @@ func (p *Post) providers(guild *guilds.Guild, crosspost bool) []artworks.Provide
 func (p *Post) fetch(guild *guilds.Guild, channelID string, crosspost bool) (*fetchResult, error) {
 	var (
 		wg, _        = errgroup.WithContext(context.Background())
-		providers    = p.providers(guild, crosspost)
 		matched      int64
 		artworksChan = make(chan interface{}, len(p.urls)*2)
 	)
+
+	// Allow all providers if it's a command to make it possible to
+	// make auto-embedding an on-demand feature.
+	var providers []artworks.Provider
+	if p.ctx.Command != nil {
+		providers = p.bot.ArtworkProviders
+	} else {
+		providers = p.providers(guild, crosspost)
+	}
 
 	for _, url := range p.urls {
 		url := url //shadowing loop variables to pass them to wg.Go. It's required otherwise variables will stay the same every loop.
@@ -206,6 +214,10 @@ func (p *Post) fetch(guild *guilds.Guild, channelID string, crosspost bool) (*fe
 				if id, ok := provider.Match(url); ok {
 					p.bot.Log.Infof("Matched a URL: %v. Provider: %v", url, reflect.TypeOf(provider))
 					atomic.AddInt64(&matched, 1)
+
+					if guild.Reactions {
+						p.addReactions(p.ctx.Event.Message)
+					}
 
 					var isRepost bool
 					if guild.Repost != "disabled" {
@@ -343,13 +355,7 @@ func (p *Post) send(guild *guilds.Guild, channelID string, artworks []artworks.A
 			})
 
 			if guild.Reactions {
-				p.ctx.Session.MessageReactionAdd(
-					msg.ChannelID, msg.ID, "💖",
-				)
-
-				p.ctx.Session.MessageReactionAdd(
-					msg.ChannelID, msg.ID, "🤤",
-				)
+				p.addReactions(msg)
 			}
 		}
 	}
@@ -442,6 +448,16 @@ func (p *Post) generateEmbeds(artworks []artworks.Artwork, channelID string, cro
 	}
 
 	return allEmbeds, nil
+}
+
+func (p *Post) addReactions(msg *discordgo.Message) {
+	p.ctx.Session.MessageReactionAdd(
+		msg.ChannelID, msg.ID, "💖",
+	)
+
+	p.ctx.Session.MessageReactionAdd(
+		msg.ChannelID, msg.ID, "🤤",
+	)
 }
 
 func (p *Post) skipArtworks(embeds []*discordgo.MessageEmbed) []*discordgo.MessageEmbed {

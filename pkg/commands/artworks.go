@@ -50,7 +50,6 @@ func artworksGroup(b *bot.Bot) {
 			"limit":  "**Options:** `any integer number up to 100`. **Default:** 100. Limits the size of a leaderboard.",
 			"during": "**Options:** `[day, week, month]`. **Default:** all time. Filters artworks by time.",
 		},
-		NSFW:        true,
 		RateLimiter: gumi.NewRateLimiter(10 * time.Second),
 		Exec:        leaderboard(b),
 	})

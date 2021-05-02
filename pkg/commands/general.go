@@ -186,12 +186,16 @@ func help(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			eb.Description(sb.String())
 
 			eb.AddField(
-				"Description", "```"+cmd.Description+"```", true,
+				"Description", "```"+cmd.Description+"```",
 			).AddField(
-				"Usage", "```"+cmd.Usage+"```", true,
+				"Usage", "```"+cmd.Usage+"```",
 			).AddField(
-				"Example", "```"+cmd.Example+"```", true,
+				"Example", "```"+cmd.Example+"```",
 			)
+
+			for name, desc := range cmd.Flags {
+				eb.AddField(name, desc)
+			}
 
 			if cmd.RateLimiter != nil {
 				eb.AddField("Cooldown", cmd.RateLimiter.Cooldown.String(), true)

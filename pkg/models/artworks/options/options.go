@@ -74,14 +74,14 @@ func (o *Filter) BSON() bson.D {
 	filter := bson.D{}
 
 	regex := func(key, value string) bson.E {
-		return bson.E{key, bson.D{{"$regex", ".*" + value + ".*"}, {"$options", "i"}}}
+		return bson.E{Key: key, Value: bson.D{{Key: "$regex", Value: ".*" + value + ".*"}, {Key: "$options", Value: "i"}}}
 	}
 
 	switch {
 	case len(o.IDs) != 0:
-		filter = append(filter, bson.E{"artwork_id", bson.M{"$in": o.IDs}})
+		filter = append(filter, bson.E{Key: "artwork_id", Value: bson.M{"$in": o.IDs}})
 	case o.URL != "":
-		filter = append(filter, bson.E{"url", o.URL})
+		filter = append(filter, bson.E{Key: "url", Value: o.URL})
 	default:
 		if o.Author != "" {
 			filter = append(filter, regex("author", o.Author))
@@ -92,7 +92,7 @@ func (o *Filter) BSON() bson.D {
 		}
 
 		if o.Time != 0 {
-			filter = append(filter, bson.E{"created_at", bson.M{"$gte": time.Now().Add(-o.Time)}})
+			filter = append(filter, bson.E{Key: "created_at", Value: bson.M{"$gte": time.Now().Add(-o.Time)}})
 		}
 	}
 
