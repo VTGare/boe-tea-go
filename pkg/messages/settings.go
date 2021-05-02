@@ -8,6 +8,7 @@ type SetCommand struct {
 	Features        *Features
 	PixivSettings   *PixivSettings
 	TwitterSettings *TwitterSettings
+	DeviantSettings *DeviantSettings
 	ArtChannels     string
 }
 
@@ -26,7 +27,11 @@ type PixivSettings struct {
 type TwitterSettings struct {
 	Title   string
 	Enabled string
-	Prompt  string
+}
+
+type DeviantSettings struct {
+	Title   string
+	Enabled string
 }
 
 type Features struct {
@@ -48,7 +53,10 @@ func Set() *SetCommand {
 		TwitterSettings: &TwitterSettings{
 			Title:   "Twitter settings",
 			Enabled: "Status (twitter)",
-			Prompt:  "Prompt",
+		},
+		DeviantSettings: &DeviantSettings{
+			Title:   "DeviantArt settings",
+			Enabled: "Status (deviant)",
 		},
 		PixivSettings: &PixivSettings{
 			Title:   "Pixiv settings",

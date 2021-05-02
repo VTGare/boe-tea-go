@@ -419,6 +419,14 @@ func set(b *bot.Bot) func(ctx *gumi.Ctx) error {
 				),
 			)
 
+			eb.AddField(
+				msg.DeviantSettings.Title,
+				fmt.Sprintf(
+					"**%v**: %v",
+					msg.DeviantSettings.Enabled, messages.FormatBool(guild.Deviant),
+				),
+			)
+
 			if len(guild.ArtChannels) > 0 {
 				eb.AddField(
 					msg.ArtChannels,
@@ -532,6 +540,15 @@ func set(b *bot.Bot) func(ctx *gumi.Ctx) error {
 				oldSettingEmbed = guild.Twitter
 				newSettingEmbed = new
 				guild.Twitter = new
+			case "deviant":
+				new, err := parseBool(newSetting.Raw)
+				if err != nil {
+					return err
+				}
+
+				oldSettingEmbed = guild.Deviant
+				newSettingEmbed = new
+				guild.Deviant = new
 			default:
 				return messages.ErrUnknownSetting(settingName.Raw)
 			}
