@@ -522,6 +522,10 @@ func search(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			return err
 		}
 
+		if len(artworks) == 0 {
+			return messages.ErrArtworkNotFound(query)
+		}
+
 		artworkEmbeds := make([]*discordgo.MessageEmbed, 0, len(artworks))
 
 		ch, err := ctx.Session.Channel(ctx.Event.ChannelID)
@@ -543,10 +547,6 @@ func search(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			if len(artwork.Images) > 0 {
 				artworkEmbeds = append(artworkEmbeds, artworkToEmbed(artwork, artwork.Images[0], ind, len(artworks)))
 			}
-		}
-
-		if len(artworkEmbeds) == 0 {
-			return messages.ErrArtworkNotFound(query)
 		}
 
 		wg := dgoutils.NewWidget(ctx.Session, ctx.Event.Author.ID, artworkEmbeds)
