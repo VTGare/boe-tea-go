@@ -12,6 +12,7 @@ import (
 	"github.com/VTGare/boe-tea-go/internal/cache"
 	"github.com/VTGare/boe-tea-go/internal/dgoutils"
 	"github.com/VTGare/boe-tea-go/pkg/artworks"
+	"github.com/VTGare/boe-tea-go/pkg/artworks/deviant"
 	"github.com/VTGare/boe-tea-go/pkg/artworks/pixiv"
 	"github.com/VTGare/boe-tea-go/pkg/artworks/twitter"
 	"github.com/VTGare/boe-tea-go/pkg/bot"
@@ -175,6 +176,10 @@ func (p *Post) providers(guild *guilds.Guild, crosspost bool) []artworks.Provide
 			}
 		case *pixiv.Pixiv:
 			if !guild.Pixiv {
+				continue
+			}
+		case *deviant.DeviantArt:
+			if !guild.Deviant {
 				continue
 			}
 		}
