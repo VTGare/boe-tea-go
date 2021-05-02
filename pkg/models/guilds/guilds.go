@@ -19,6 +19,7 @@ type Guild struct {
 	NSFW        bool      `json:"nsfw" bson:"nsfw"`
 	Pixiv       bool      `json:"pixiv" bson:"pixiv"`
 	Twitter     bool      `json:"twitter" bson:"twitter"`
+	Deviant     bool      `json:"deviant" bson:"deviant"`
 	Crosspost   bool      `json:"crosspost" bson:"crosspost"`
 	Reactions   bool      `json:"reactions" bson:"reactions"`
 	Repost      string    `json:"repost" bson:"repost" validate:"required"`
@@ -53,7 +54,7 @@ func NewService(db *mongodb.Mongo, logger *zap.SugaredLogger) Service {
 }
 
 func (g guildService) col() *mongo.Collection {
-	return g.db.Database.Collection("guildsettings")
+	return g.db.Database.Collection("guilds")
 }
 
 func (g guildService) All(ctx context.Context) ([]*Guild, error) {
@@ -183,6 +184,7 @@ func DefaultGuild(id string) *Guild {
 		NSFW:        true,
 		Pixiv:       true,
 		Twitter:     true,
+		Deviant:     true,
 		Repost:      "enabled",
 		Crosspost:   true,
 		Reactions:   true,
@@ -200,6 +202,7 @@ func UserGuild() *Guild {
 		NSFW:        true,
 		Pixiv:       true,
 		Twitter:     true,
+		Deviant:     true,
 		Repost:      "disabled",
 		Crosspost:   true,
 		Reactions:   true,

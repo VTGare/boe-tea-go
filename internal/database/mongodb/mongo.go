@@ -53,7 +53,7 @@ func (m *Mongo) CreateCollections() error {
 
 	err = m.Database.CreateCollection(
 		context.Background(),
-		"guildsettings",
+		"guilds",
 	)
 
 	if err != nil && !errors.As(err, &mongo.CommandError{}) {
@@ -62,7 +62,7 @@ func (m *Mongo) CreateCollections() error {
 
 	err = m.Database.CreateCollection(
 		context.Background(),
-		"user_settings",
+		"users",
 	)
 
 	if err != nil && !errors.As(err, &mongo.CommandError{}) {

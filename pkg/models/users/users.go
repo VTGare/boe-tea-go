@@ -65,7 +65,7 @@ func NewService(db *mongodb.Mongo, logger *zap.SugaredLogger) Service {
 }
 
 func (u userService) col() *mongo.Collection {
-	return u.db.Database.Collection("user_settings")
+	return u.db.Database.Collection("users")
 }
 
 func (u userService) artworks() *mongo.Collection {
