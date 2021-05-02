@@ -93,7 +93,7 @@ func ErrUserNotFound(err error, id string) error {
 func ErrChannelNotFound(err error, id string) error {
 	return newUserError(
 		fmt.Sprintf(
-			"Channel with ID `%v` couldn't be fetched. Please make sure Boe Tea has access to it.",
+			"Channel with ID `%v` couldn't be fetched. Please make sure Boe Tea has access to it. If you believe it's a mistake please report it to the dev `bt!feedback`",
 			id,
 		),
 		err,

@@ -16,6 +16,7 @@ import (
 	"github.com/VTGare/boe-tea-go/pkg/messages"
 	"github.com/VTGare/boe-tea-go/pkg/models/artworks/options"
 	"github.com/VTGare/boe-tea-go/pkg/post"
+	"github.com/VTGare/embeds"
 	"github.com/VTGare/gumi"
 	"github.com/bwmarrin/discordgo"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -54,18 +55,22 @@ func artworksGroup(b *bot.Bot) {
 		Exec:        leaderboard(b),
 	})
 
-	// TODO: search command to look up artworks by author name etc.
-	// b.Router.RegisterCmd(&gumi.Command{
-	// 	Name:        "search",
-	// 	Group:       group,
-	// 	Aliases:     []string{},
-	// 	Description: "Search artworks in Boe Tea's database.",
-	// 	Usage:       "bt!search <query>" [flags],
-	// 	Example:     "bt!search hews limit:10 sort:favourites",
-	// 	Flags: map[string]string{},
-	// 	RateLimiter: gumi.NewRateLimiter(10 * time.Second),
-	// 	Exec:        search(b),
-	// })
+	b.Router.RegisterCmd(&gumi.Command{
+		Name:        "search",
+		Group:       group,
+		Aliases:     []string{},
+		Description: "Search artworks in Boe Tea's database.",
+		Usage:       "bt!search <query> [flags]",
+		Example:     "bt!search hews limit:10 sort:favourites",
+		Flags: map[string]string{
+			"sort":   "**Options:** `[time, favourites]`. **Default:** time. Changes sort type.",
+			"order":  "**Options:** `[asc, desc]`. **Default:** desc. Changes order of sorted artworks.",
+			"limit":  "**Options:** `any integer number up to 100`. **Default:** 100. Limits the size of a leaderboard.",
+			"during": "**Options:** `[day, week, month]`. **Default:** all time. Filters artworks by time.",
+		},
+		RateLimiter: gumi.NewRateLimiter(10 * time.Second),
+		Exec:        search(b),
+	})
 
 	b.Router.RegisterCmd(&gumi.Command{
 		Name:        "share",
@@ -429,12 +434,119 @@ func leaderboard(b *bot.Bot) func(ctx *gumi.Ctx) error {
 		}
 
 		artworkEmbeds := make([]*discordgo.MessageEmbed, 0, len(artworks))
+
+		ch, err := ctx.Session.Channel(ctx.Event.ChannelID)
+		if err != nil {
+			return messages.ErrChannelNotFound(err, ctx.Event.ChannelID)
+		}
+
+		if !ch.NSFW {
+			locale := messages.SearchWarning()
+			eb := embeds.NewBuilder()
+			embed := eb.Title(locale.Title).Description(locale.Description).Finalize()
+
+			artworkEmbeds = append(artworkEmbeds, embed)
+		}
+
 		for ind, artwork := range artworks {
 			//TODO: Clean up the database off artworks without images
 			//and remove this fix.
 			if len(artwork.Images) > 0 {
 				artworkEmbeds = append(artworkEmbeds, artworkToEmbed(artwork, artwork.Images[0], ind, len(artworks)))
 			}
+		}
+
+		wg := dgoutils.NewWidget(ctx.Session, ctx.Event.Author.ID, artworkEmbeds)
+		return wg.Start(ctx.Event.ChannelID)
+	}
+}
+
+func search(b *bot.Bot) func(ctx *gumi.Ctx) error {
+	return func(ctx *gumi.Ctx) error {
+		if ctx.Args.Len() < 1 {
+			return messages.ErrIncorrectCmd(ctx.Command)
+		}
+
+		//Remove $'s to sanitize the input
+		query := strings.Replace(ctx.Args.Get(0).Raw, "$", "", -1)
+
+		var (
+			limit  int64 = 100
+			order        = options.Descending
+			sort         = options.ByTime
+			args         = strings.Fields(ctx.Args.Raw)
+			filter       = &options.Filter{
+				Query: query,
+			}
+		)
+
+		flagsMap, err := flags.FromArgs(
+			args,
+			flags.FlagTypeDuring,
+			flags.FlagTypeLimit,
+			flags.FlagTypeSort,
+			flags.FlagTypeOrder,
+		)
+
+		if err != nil {
+			return err
+		}
+
+		for key, val := range flagsMap {
+			switch key {
+			case flags.FlagTypeDuring:
+				filter.Time = val.(time.Duration)
+			case flags.FlagTypeLimit:
+				limit = val.(int64)
+				if limit > 100 {
+					return messages.ErrLimitTooHigh(limit)
+				}
+			case flags.FlagTypeOrder:
+				order = val.(options.Order)
+			case flags.FlagTypeSort:
+				sort = val.(options.Sort)
+			}
+		}
+
+		artworks, err := b.Artworks.FindMany(
+			context.Background(),
+			options.Find{
+				Limit:  limit,
+				Order:  order,
+				Sort:   sort,
+				Filter: filter,
+			},
+		)
+
+		if err != nil {
+			return err
+		}
+
+		artworkEmbeds := make([]*discordgo.MessageEmbed, 0, len(artworks))
+
+		ch, err := ctx.Session.Channel(ctx.Event.ChannelID)
+		if err != nil {
+			return messages.ErrChannelNotFound(err, ctx.Event.ChannelID)
+		}
+
+		if !ch.NSFW {
+			locale := messages.SearchWarning()
+			eb := embeds.NewBuilder()
+			embed := eb.Title(locale.Title).Description(locale.Description).Finalize()
+
+			artworkEmbeds = append(artworkEmbeds, embed)
+		}
+
+		for ind, artwork := range artworks {
+			//TODO: Clean up the database off artworks without images
+			//and remove this fix.
+			if len(artwork.Images) > 0 {
+				artworkEmbeds = append(artworkEmbeds, artworkToEmbed(artwork, artwork.Images[0], ind, len(artworks)))
+			}
+		}
+
+		if len(artworkEmbeds) == 0 {
+			return messages.ErrArtworkNotFound(query)
 		}
 
 		wg := dgoutils.NewWidget(ctx.Session, ctx.Event.Author.ID, artworkEmbeds)

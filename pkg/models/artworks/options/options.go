@@ -48,6 +48,7 @@ type Filter struct {
 	IDs    []int  `query:"id"`
 	Title  string `query:"title"`
 	Author string `query:"author"`
+	Query  string `query:"query"`
 	URL    string `query:"url"`
 	Time   time.Duration
 	//TODO: Tags   []string
@@ -77,11 +78,19 @@ func (o *Filter) BSON() bson.D {
 		return bson.E{Key: key, Value: bson.D{{Key: "$regex", Value: ".*" + value + ".*"}, {Key: "$options", Value: "i"}}}
 	}
 
+	regexM := func(key, value string) bson.M {
+		return bson.M{key: bson.D{{Key: "$regex", Value: ".*" + value + ".*"}, {Key: "$options", Value: "i"}}}
+	}
+
 	switch {
 	case len(o.IDs) != 0:
 		filter = append(filter, bson.E{Key: "artwork_id", Value: bson.M{"$in": o.IDs}})
 	case o.URL != "":
 		filter = append(filter, bson.E{Key: "url", Value: o.URL})
+	case o.Query != "":
+		filter = bson.D{
+			{Key: "$or", Value: []bson.M{regexM("author", o.Query), regexM("title", o.Query)}},
+		}
 	default:
 		if o.Author != "" {
 			filter = append(filter, regex("author", o.Author))

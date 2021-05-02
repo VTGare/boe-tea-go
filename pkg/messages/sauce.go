@@ -26,7 +26,7 @@ func Sauce() *SauceEmbed {
 func SauceNotFound(uri string) error {
 	return newUserError(
 		fmt.Sprintf(
-			"Sorry, Boe Tea couldnt find source of the image, press one of the links below to use other methods:\n%v\n%v",
+			"Sorry, Boe Tea couldn't find source of the image, press one of the links below to use other methods:\n%v\n%v",
 			NamedLink(
 				"• ascii2d [recommended, will search directly for your image]",
 				"https://ascii2d.net/search/url/"+url.QueryEscape(uri),
