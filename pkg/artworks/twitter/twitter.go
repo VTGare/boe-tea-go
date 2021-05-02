@@ -88,7 +88,7 @@ func (t Twitter) Match(s string) (string, bool) {
 }
 
 func (t Twitter) Find(snowflake string) (artworks.Artwork, error) {
-	if a, ok := t.Get(snowflake); ok {
+	if a, ok := t.get(snowflake); ok {
 		return a, nil
 	}
 
@@ -98,7 +98,7 @@ func (t Twitter) Find(snowflake string) (artworks.Artwork, error) {
 			continue
 		}
 
-		t.Set(snowflake, a)
+		t.set(snowflake, a)
 		return a, nil
 	}
 
@@ -187,7 +187,7 @@ func parse(s string) int {
 	return num
 }
 
-func (t Twitter) Get(snowflake string) (*Artwork, bool) {
+func (t Twitter) get(snowflake string) (*Artwork, bool) {
 	a, ok := t.cache.Get(snowflake)
 	if !ok {
 		return nil, ok
@@ -196,7 +196,7 @@ func (t Twitter) Get(snowflake string) (*Artwork, bool) {
 	return a.(*Artwork), ok
 }
 
-func (t Twitter) Set(snowflake string, artwork *Artwork) {
+func (t Twitter) set(snowflake string, artwork *Artwork) {
 	t.cache.Set(snowflake, artwork)
 }
 

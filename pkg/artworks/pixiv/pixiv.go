@@ -101,6 +101,10 @@ func (p Pixiv) Match(s string) (string, bool) {
 }
 
 func (p Pixiv) Find(id string) (artworks.Artwork, error) {
+	if a, ok := p.get(id); ok {
+		return a, nil
+	}
+
 	i, err := strconv.ParseUint(id, 10, 64)
 	if err != nil {
 		return nil, err
@@ -149,7 +153,7 @@ func (p Pixiv) Find(id string) (artworks.Artwork, error) {
 		images = append(images, img)
 	}
 
-	return &Artwork{
+	artwork := &Artwork{
 		ID:     id,
 		url:    "https://pixiv.net/en/artworks/" + id,
 		Title:  illust.Title,
@@ -160,7 +164,23 @@ func (p Pixiv) Find(id string) (artworks.Artwork, error) {
 		Type:   illust.Type,
 		Pages:  illust.PageCount,
 		Likes:  illust.TotalBookmarks,
-	}, nil
+	}
+
+	p.set(id, artwork)
+	return artwork, nil
+}
+
+func (p Pixiv) get(id string) (*Artwork, bool) {
+	a, ok := p.cache.Get(id)
+	if !ok {
+		return nil, ok
+	}
+
+	return a.(*Artwork), ok
+}
+
+func (p Pixiv) set(id string, artwork *Artwork) {
+	p.cache.Set(id, artwork)
 }
 
 func (a Artwork) ToModel() *models.ArtworkInsert {

@@ -8,6 +8,7 @@ import (
 
 	"github.com/VTGare/boe-tea-go/internal/config"
 	"github.com/VTGare/boe-tea-go/internal/database/mongodb"
+	"github.com/VTGare/boe-tea-go/pkg/artworks/deviant"
 	"github.com/VTGare/boe-tea-go/pkg/artworks/pixiv"
 	"github.com/VTGare/boe-tea-go/pkg/artworks/twitter"
 	"github.com/VTGare/boe-tea-go/pkg/bot"
@@ -61,6 +62,7 @@ func main() {
 	}
 
 	b.AddProvider(twitter.New())
+	b.AddProvider(deviant.New())
 	if pixiv, err := pixiv.New(cfg.Pixiv.AuthToken, cfg.Pixiv.RefreshToken); err == nil {
 		log.Info("Successfully logged into Pixiv.")
 		b.AddProvider(pixiv)
