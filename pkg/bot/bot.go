@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/ReneKroon/ttlcache"
+	"github.com/VTGare/boe-tea-go/internal/apis/nhentai"
 	"github.com/VTGare/boe-tea-go/internal/cache"
 	"github.com/VTGare/boe-tea-go/internal/config"
 	"github.com/VTGare/boe-tea-go/pkg/artworks"
@@ -31,6 +32,7 @@ type Bot struct {
 	BannedUsers      *ttlcache.Cache
 	EmbedCache       *cache.EmbedCache
 	Sengoku          *sengoku.Sengoku
+	NHentai          *nhentai.API
 	Metrics          *metrics.Metrics
 	s                *discordgo.Session
 }
@@ -60,6 +62,7 @@ func New(config *config.Config, models *models.Models, logger *zap.SugaredLogger
 		BannedUsers:    banned,
 		EmbedCache:     cache.NewEmbedCache(),
 		Metrics:        metrics.New(),
+		NHentai:        nhentai.New(),
 		Sengoku:        sg,
 		s:              dg,
 	}, nil

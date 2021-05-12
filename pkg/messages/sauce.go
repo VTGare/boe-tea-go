@@ -57,3 +57,9 @@ func SauceError(err error) error {
 		err,
 	)
 }
+
+func DoujinNotFound(id string) error {
+	return newUserError(
+		fmt.Sprintf("Couldn't find a doujin with `%v` ID. It doesn't exist or the server is not responding.", id),
+	)
+}

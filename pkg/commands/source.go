@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	nhAPI "github.com/VTGare/boe-tea-go/internal/apis/nhentai"
 	"github.com/VTGare/boe-tea-go/internal/dgoutils"
 	"github.com/VTGare/boe-tea-go/pkg/bot"
 	"github.com/VTGare/boe-tea-go/pkg/messages"
@@ -36,6 +37,103 @@ func sourceGroup(b *bot.Bot) {
 		RateLimiter: gumi.NewRateLimiter(15 * time.Second),
 		Exec:        sauce(b),
 	})
+
+	b.Router.RegisterCmd(&gumi.Command{
+		Name:        "nhentai",
+		Group:       group,
+		Aliases:     []string{"nh"},
+		Description: "Displays more info about an nhentai doujin",
+		Usage:       "bt!nhentai <nuke code>",
+		Example:     "bt!nhentai 177013",
+		NSFW:        true,
+		RateLimiter: gumi.NewRateLimiter(15 * time.Second),
+		Exec:        nhentai(b),
+	})
+}
+
+func nhentai(b *bot.Bot) func(ctx *gumi.Ctx) error {
+	return func(ctx *gumi.Ctx) error {
+		if ctx.Args.Len() == 0 {
+			return messages.ErrIncorrectCmd(ctx.Command)
+		}
+
+		id := ctx.Args.Get(0).Raw
+		hentai, err := b.NHentai.FindHentai(id)
+		if err != nil {
+			return messages.DoujinNotFound(id)
+		}
+
+		eb := embeds.NewBuilder()
+
+		eb.Title(hentai.Titles.Pretty)
+		eb.Image(hentai.Cover)
+		eb.Timestamp(hentai.UploadedAt)
+
+		tagsToString := func(tags []*nhAPI.Tag) string {
+			ss := make([]string, 0, len(tags))
+			for _, tag := range tags {
+				ss = append(ss, tag.Name)
+			}
+
+			return strings.Join(ss, " • ")
+		}
+
+		tagsToNamedLinks := func(tags []*nhAPI.Tag) string {
+			ss := make([]string, 0, len(tags))
+			for _, tag := range tags {
+				ss = append(ss, messages.NamedLink(tag.Name, tag.URL))
+			}
+
+			return strings.Join(ss, " • ")
+		}
+
+		eb.AddField(
+			"Pages", strconv.Itoa(hentai.Pages), true,
+		).AddField(
+			"Favourites", strconv.Itoa(hentai.Favourites), true,
+		)
+
+		if artists := hentai.Artists(); len(artists) > 0 {
+			eb.AddField(
+				"Artists",
+				tagsToNamedLinks(artists),
+				true,
+			)
+		}
+
+		if characters := hentai.Characters(); len(characters) > 0 {
+			eb.AddField(
+				"Characters",
+				tagsToNamedLinks(characters),
+				true,
+			)
+		}
+
+		if padories := hentai.Parodies(); len(padories) > 0 {
+			eb.AddField(
+				"Parodies",
+				tagsToNamedLinks(padories),
+				true,
+			)
+		}
+
+		if lang, ok := hentai.Language(); ok {
+			eb.AddField(
+				"Language",
+				strings.Title(lang.String()),
+				true,
+			)
+		}
+
+		if genres := hentai.Genres(); len(genres) > 0 {
+			eb.AddField(
+				"Tags",
+				tagsToString(genres),
+			)
+		}
+
+		return ctx.ReplyEmbed(eb.Finalize())
+	}
 }
 
 func sauce(b *bot.Bot) func(ctx *gumi.Ctx) error {

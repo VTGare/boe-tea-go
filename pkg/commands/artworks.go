@@ -131,22 +131,15 @@ func artwork(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			}
 		}
 
-		//TODO: Clean up the database off artworks without images
-		//and remove this fix.
-		if len(artwork.Images) > 0 {
-			embeds := make([]*discordgo.MessageEmbed, 0, len(artwork.Images))
-			for _, image := range artwork.Images {
-				embed := artworkToEmbed(artwork, image, 0, 1)
+		embeds := make([]*discordgo.MessageEmbed, 0, len(artwork.Images))
+		for _, image := range artwork.Images {
+			embed := artworkToEmbed(artwork, image, 0, 1)
 
-				embeds = append(embeds, embed)
-			}
-
-			wid := dgoutils.NewWidget(ctx.Session, ctx.Event.Author.ID, embeds)
-			return wid.Start(ctx.Event.ChannelID)
+			embeds = append(embeds, embed)
 		}
 
-		embed := artworkToEmbed(artwork, "", 0, 1)
-		return ctx.ReplyEmbed(embed)
+		widget := dgoutils.NewWidget(ctx.Session, ctx.Event.Author.ID, embeds)
+		return widget.Start(ctx.Event.ChannelID)
 	}
 }
 
@@ -449,11 +442,7 @@ func leaderboard(b *bot.Bot) func(ctx *gumi.Ctx) error {
 		}
 
 		for ind, artwork := range artworks {
-			//TODO: Clean up the database off artworks without images
-			//and remove this fix.
-			if len(artwork.Images) > 0 {
-				artworkEmbeds = append(artworkEmbeds, artworkToEmbed(artwork, artwork.Images[0], ind, len(artworks)))
-			}
+			artworkEmbeds = append(artworkEmbeds, artworkToEmbed(artwork, artwork.Images[0], ind, len(artworks)))
 		}
 
 		wg := dgoutils.NewWidget(ctx.Session, ctx.Event.Author.ID, artworkEmbeds)
@@ -542,11 +531,7 @@ func search(b *bot.Bot) func(ctx *gumi.Ctx) error {
 		}
 
 		for ind, artwork := range artworks {
-			//TODO: Clean up the database off artworks without images
-			//and remove this fix.
-			if len(artwork.Images) > 0 {
-				artworkEmbeds = append(artworkEmbeds, artworkToEmbed(artwork, artwork.Images[0], ind, len(artworks)))
-			}
+			artworkEmbeds = append(artworkEmbeds, artworkToEmbed(artwork, artwork.Images[0], ind, len(artworks)))
 		}
 
 		wg := dgoutils.NewWidget(ctx.Session, ctx.Event.Author.ID, artworkEmbeds)

@@ -543,11 +543,7 @@ func favourites(b *bot.Bot) func(ctx *gumi.Ctx) error {
 
 		artworkEmbeds := make([]*discordgo.MessageEmbed, 0, len(artworks))
 		for ind, artwork := range artworks {
-			//TODO: Clean up the database off artworks without images
-			//and remove this fix.
-			if len(artwork.Images) > 0 {
-				artworkEmbeds = append(artworkEmbeds, artworkToEmbed(artwork, artwork.Images[0], ind, len(artworks)))
-			}
+			artworkEmbeds = append(artworkEmbeds, artworkToEmbed(artwork, artwork.Images[0], ind, len(artworks)))
 		}
 
 		wg := dgoutils.NewWidget(ctx.Session, ctx.Event.Author.ID, artworkEmbeds)
