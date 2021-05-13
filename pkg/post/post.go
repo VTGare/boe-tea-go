@@ -225,8 +225,8 @@ func (p *Post) fetch(guild *guilds.Guild, channelID string, crosspost bool) (*fe
 						if rep != nil {
 							artworksChan <- rep
 
-							//If strict return nothing, otherwise add both repost message and an artwork
-							if guild.Repost == "strict" || crosspost {
+							//If crosspost don't do anything and move on with your life.
+							if crosspost {
 								return nil
 							}
 
@@ -234,14 +234,8 @@ func (p *Post) fetch(guild *guilds.Guild, channelID string, crosspost bool) (*fe
 						}
 					}
 
-					artwork, err := provider.Find(id)
-					if err != nil {
-						return err
-					}
-
-					artworksChan <- artwork
 					if guild.Repost != "disabled" && !isRepost {
-						err = p.bot.RepostDetector.Create(
+						err := p.bot.RepostDetector.Create(
 							&repost.Repost{
 								ID:        id,
 								URL:       url,
@@ -255,7 +249,18 @@ func (p *Post) fetch(guild *guilds.Guild, channelID string, crosspost bool) (*fe
 						if err != nil {
 							p.bot.Log.Errorf("Error creating a repost: %v", err)
 						}
+
+						if guild.Repost == "strict" {
+							return nil
+						}
 					}
+
+					artwork, err := provider.Find(id)
+					if err != nil {
+						return err
+					}
+
+					artworksChan <- artwork
 
 					break
 				}
