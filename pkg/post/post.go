@@ -226,7 +226,7 @@ func (p *Post) fetch(guild *guilds.Guild, channelID string, crosspost bool) (*fe
 							artworksChan <- rep
 
 							//If crosspost don't do anything and move on with your life.
-							if crosspost {
+							if crosspost || guild.Repost == "strict" {
 								return nil
 							}
 
@@ -248,10 +248,6 @@ func (p *Post) fetch(guild *guilds.Guild, channelID string, crosspost bool) (*fe
 
 						if err != nil {
 							p.bot.Log.Errorf("Error creating a repost: %v", err)
-						}
-
-						if guild.Repost == "strict" {
-							return nil
 						}
 					}
 
