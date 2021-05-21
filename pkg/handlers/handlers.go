@@ -40,6 +40,12 @@ func PrefixResolver(b *bot.Bot) func(s *discordgo.Session, m *discordgo.MessageC
 	}
 }
 
+func OnPanic(b *bot.Bot) func(*gumi.Ctx, interface{}) {
+	return func(ctx *gumi.Ctx, r interface{}) {
+		b.Log.Errorf("%v", r)
+	}
+}
+
 //NotCommand is executed on every message that isn't a command.
 func NotCommand(b *bot.Bot) func(*gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {

@@ -12,6 +12,7 @@ type Config struct {
 	Repost   *Repost  `json:"repost"`
 	Pixiv    *Pixiv   `json:"pixiv"`
 	SauceNAO string   `json:"saucenao"`
+	Sentry   string   `json:"sentry"`
 	Quotes   []*Quote `json:"quotes"`
 }
 

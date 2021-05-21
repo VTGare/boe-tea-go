@@ -5,9 +5,11 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/VTGare/boe-tea-go/internal/config"
 	"github.com/VTGare/boe-tea-go/internal/database/mongodb"
+	"github.com/VTGare/boe-tea-go/internal/logger"
 	"github.com/VTGare/boe-tea-go/pkg/artworks/deviant"
 	"github.com/VTGare/boe-tea-go/pkg/artworks/pixiv"
 	"github.com/VTGare/boe-tea-go/pkg/artworks/twitter"
@@ -17,21 +19,35 @@ import (
 	"github.com/VTGare/boe-tea-go/pkg/models"
 	"github.com/VTGare/boe-tea-go/pkg/repost"
 	"github.com/VTGare/gumi"
+	"github.com/getsentry/sentry-go"
 	"go.uber.org/zap"
 )
 
 func main() {
-	prod, err := zap.NewProduction()
+	cfg, err := config.FromFile("config.json")
+	if err != nil {
+		fmt.Println("Config not found: ", err)
+		os.Exit(1)
+	}
+
+	zapLogger, err := zap.NewProduction()
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
-	log := prod.Sugar()
 
-	cfg, err := config.FromFile("config.json")
-	if err != nil {
-		log.Fatal("Config not found: ", err)
+	if cfg.Sentry != "" {
+		sentryOption, err := logger.Sentry(cfg.Sentry)
+		if err != nil {
+			fmt.Println("Error initializing Sentry: ", err)
+			os.Exit(1)
+		}
+		defer sentry.Flush(10 * time.Second)
+
+		zapLogger = zapLogger.WithOptions(sentryOption)
 	}
+
+	log := zapLogger.Sugar()
 
 	db, err := mongodb.New(cfg.Mongo.URI, cfg.Mongo.Database)
 	if err != nil {
@@ -78,6 +94,7 @@ func main() {
 		OnNSFWCallback:          handlers.OnNSFW(b),
 		OnExecuteCallback:       handlers.OnExecute(b),
 		OnNoPermissionsCallback: handlers.OnNoPerms(b),
+		OnPanicCallBack:         handlers.OnPanic(b),
 	})
 
 	handlers.RegisterHandlers(b)
