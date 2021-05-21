@@ -11,6 +11,7 @@ import (
 	"github.com/VTGare/boe-tea-go/pkg/artworks"
 	"github.com/VTGare/boe-tea-go/pkg/messages"
 	models "github.com/VTGare/boe-tea-go/pkg/models/artworks"
+	"github.com/VTGare/boe-tea-go/pkg/models/guilds"
 	"github.com/VTGare/embeds"
 	"github.com/bwmarrin/discordgo"
 	"github.com/gocolly/colly/v2"
@@ -70,16 +71,20 @@ func (t Twitter) Match(s string) (string, bool) {
 		return "", false
 	}
 
-	parts := strings.Split(u.Path, "/")
-	if len(parts) <= 2 {
+	parts := strings.FieldsFunc(u.Path, func(r rune) bool {
+		return r == '/'
+	})
+
+	if len(parts) < 3 {
 		return "", false
 	}
 
-	if parts[len(parts)-2] != "status" {
-		return "", false
+	parts = parts[2:]
+	if parts[0] == "status" {
+		parts = parts[1:]
 	}
 
-	snowflake := parts[len(parts)-1]
+	snowflake := parts[0]
 	if _, err := strconv.ParseUint(snowflake, 10, 64); err != nil {
 		return "", false
 	}
@@ -103,6 +108,10 @@ func (t Twitter) Find(snowflake string) (artworks.Artwork, error) {
 	}
 
 	return nil, nil
+}
+
+func (t Twitter) Enabled(g *guilds.Guild) bool {
+	return g.Twitter
 }
 
 func (t Twitter) scrapeTwitter(snowflake, nitter string) (*Artwork, error) {

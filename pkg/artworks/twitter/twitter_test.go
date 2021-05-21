@@ -58,6 +58,13 @@ func TestTwitterMatch(t *testing.T) {
 			expectedSnowflake: "12345678",
 		},
 		{
+			name:              "With /photo/1 suffix",
+			tr:                Twitter{},
+			url:               "https://twitter.com/i/web/status/1371674594675937282/photo/1",
+			expectedBool:      true,
+			expectedSnowflake: "1371674594675937282",
+		},
+		{
 			name:              "Profile URL",
 			tr:                Twitter{},
 			url:               "https://twitter.com/vtgare",

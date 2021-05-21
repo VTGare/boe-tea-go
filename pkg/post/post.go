@@ -12,7 +12,6 @@ import (
 	"github.com/VTGare/boe-tea-go/internal/cache"
 	"github.com/VTGare/boe-tea-go/internal/dgoutils"
 	"github.com/VTGare/boe-tea-go/pkg/artworks"
-	"github.com/VTGare/boe-tea-go/pkg/artworks/deviant"
 	"github.com/VTGare/boe-tea-go/pkg/artworks/pixiv"
 	"github.com/VTGare/boe-tea-go/pkg/artworks/twitter"
 	"github.com/VTGare/boe-tea-go/pkg/bot"
@@ -163,33 +162,6 @@ func (p *Post) SetSkip(indices map[int]struct{}, mode SkipMode) {
 	p.skipMode = mode
 }
 
-func (p *Post) providers(guild *guilds.Guild, crosspost bool) []artworks.Provider {
-	providers := make([]artworks.Provider, 0)
-
-	for _, provider := range p.bot.ArtworkProviders {
-		switch provider.(type) {
-		case *twitter.Twitter:
-			//Allow twitter crossposts even if Twitter is turned off,
-			//due to the nature of Twitter embeds on Discord.
-			if !guild.Twitter && !crosspost {
-				continue
-			}
-		case *pixiv.Pixiv:
-			if !guild.Pixiv {
-				continue
-			}
-		case *deviant.DeviantArt:
-			if !guild.Deviant {
-				continue
-			}
-		}
-
-		providers = append(providers, provider)
-	}
-
-	return providers
-}
-
 func (p *Post) fetch(guild *guilds.Guild, channelID string, crosspost bool) (*fetchResult, error) {
 	var (
 		wg, _        = errgroup.WithContext(context.Background())
@@ -197,20 +169,11 @@ func (p *Post) fetch(guild *guilds.Guild, channelID string, crosspost bool) (*fe
 		artworksChan = make(chan interface{}, len(p.urls)*2)
 	)
 
-	// Allow all providers if it's a command to make it possible to
-	// make auto-embedding an on-demand feature.
-	var providers []artworks.Provider
-	if p.ctx.Command != nil {
-		providers = p.bot.ArtworkProviders
-	} else {
-		providers = p.providers(guild, crosspost)
-	}
-
 	for _, url := range p.urls {
 		url := url //shadowing loop variables to pass them to wg.Go. It's required otherwise variables will stay the same every loop.
 
 		wg.Go(func() error {
-			for _, provider := range providers {
+			for _, provider := range p.bot.ArtworkProviders {
 				if id, ok := provider.Match(url); ok {
 					p.bot.Log.Infof("Matched a URL: %v. Provider: %v", url, reflect.TypeOf(provider))
 					atomic.AddInt64(&matched, 1)
@@ -251,12 +214,16 @@ func (p *Post) fetch(guild *guilds.Guild, channelID string, crosspost bool) (*fe
 						}
 					}
 
-					artwork, err := provider.Find(id)
-					if err != nil {
-						return err
-					}
+					//Only post the picture if the provider is enabled or
+					//the function is called from a command.
+					if provider.Enabled(guild) || p.ctx.Command != nil {
+						artwork, err := provider.Find(id)
+						if err != nil {
+							return err
+						}
 
-					artworksChan <- artwork
+						artworksChan <- artwork
+					}
 
 					break
 				}

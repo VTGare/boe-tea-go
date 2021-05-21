@@ -12,6 +12,7 @@ import (
 	"github.com/VTGare/boe-tea-go/pkg/artworks"
 	"github.com/VTGare/boe-tea-go/pkg/messages"
 	models "github.com/VTGare/boe-tea-go/pkg/models/artworks"
+	"github.com/VTGare/boe-tea-go/pkg/models/guilds"
 	"github.com/VTGare/embeds"
 	"github.com/bwmarrin/discordgo"
 	"github.com/everpcpc/pixiv"
@@ -168,6 +169,10 @@ func (p Pixiv) Find(id string) (artworks.Artwork, error) {
 
 	p.set(id, artwork)
 	return artwork, nil
+}
+
+func (p Pixiv) Enabled(g *guilds.Guild) bool {
+	return g.Pixiv
 }
 
 func (p Pixiv) get(id string) (*Artwork, bool) {

@@ -184,10 +184,17 @@ func help(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			}
 
 			eb.Description(sb.String())
-
 			eb.AddField(
 				"Description", "```"+cmd.Description+"```",
-			).AddField(
+			)
+
+			if len(cmd.Aliases) > 0 {
+				eb.AddField(
+					"Aliases", "```"+strings.Join(cmd.Aliases, " • ")+"```",
+				)
+			}
+
+			eb.AddField(
 				"Usage", "```"+cmd.Usage+"```",
 			).AddField(
 				"Example", "```"+cmd.Example+"```",

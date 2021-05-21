@@ -49,7 +49,7 @@ func userGroup(b *bot.Bot) {
 	b.Router.RegisterCmd(&gumi.Command{
 		Name:        "newgroup",
 		Group:       group,
-		Aliases:     []string{"addgroup"},
+		Aliases:     []string{"addgroup", "create"},
 		Description: "Creates a new crosspost group.",
 		Usage:       "bt!newgroup <group name> <parent channel>",
 		Example:     "bt!newgroup lewds #nsfw",

@@ -15,6 +15,7 @@ import (
 	"github.com/VTGare/boe-tea-go/pkg/artworks"
 	"github.com/VTGare/boe-tea-go/pkg/messages"
 	models "github.com/VTGare/boe-tea-go/pkg/models/artworks"
+	"github.com/VTGare/boe-tea-go/pkg/models/guilds"
 	"github.com/VTGare/embeds"
 	"github.com/bwmarrin/discordgo"
 )
@@ -112,6 +113,10 @@ func (d DeviantArt) Match(s string) (string, bool) {
 	}
 
 	return res[1], true
+}
+
+func (d DeviantArt) Enabled(g *guilds.Guild) bool {
+	return g.Deviant
 }
 
 func (a Artwork) Embeds(footer string) []*discordgo.MessageEmbed {
