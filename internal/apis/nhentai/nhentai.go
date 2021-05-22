@@ -28,6 +28,7 @@ type nhentaiResult struct {
 
 type Hentai struct {
 	ID         int
+	URL        string
 	Cover      string
 	MediaID    string
 	Titles     *Titles
@@ -100,6 +101,7 @@ func (n *API) FindHentai(id string) (*Hentai, error) {
 	return &Hentai{
 		Titles:     res.Titles,
 		MediaID:    res.MediaID,
+		URL:        fmt.Sprintf("https://nhentai.net/g/%v", res.ID),
 		Tags:       tags,
 		Cover:      fmt.Sprintf("https://t.nhentai.net/galleries/%v/cover.jpg", res.MediaID),
 		ID:         interfaceToInt(res.ID),
