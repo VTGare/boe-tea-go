@@ -204,6 +204,14 @@ func (a Artwork) Embeds(quote string) []*discordgo.MessageEmbed {
 		eb     = embeds.NewBuilder()
 	)
 
+	if length == 0 {
+		eb.Title("❎ An error has occured.")
+		eb.Description("Pixiv artwork has been deleted or the ID does not exist.")
+		eb.Footer(quote, "")
+
+		return []*discordgo.MessageEmbed{eb.Finalize()}
+	}
+
 	if length > 1 {
 		eb.Title(fmt.Sprintf("%v by %v | Page %v / %v", a.Title, a.Author, 1, length))
 	} else {

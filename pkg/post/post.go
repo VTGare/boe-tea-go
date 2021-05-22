@@ -178,7 +178,7 @@ func (p *Post) fetch(guild *guilds.Guild, channelID string, crosspost bool) (*fe
 					p.bot.Log.Infof("Matched a URL: %v. Provider: %v", url, reflect.TypeOf(provider))
 					atomic.AddInt64(&matched, 1)
 
-					if guild.Reactions {
+					if guild.Reactions && p.ctx.Command == nil {
 						p.addReactions(p.ctx.Event.Message)
 					}
 
@@ -322,7 +322,8 @@ func (p *Post) send(guild *guilds.Guild, channelID string, artworks []artworks.A
 				ChannelID: msg.ChannelID,
 			})
 
-			if guild.Reactions {
+			//If URL doesn't exist then the embed contains an error message, instead of an artwork.
+			if guild.Reactions && embed.URL != "" {
 				p.addReactions(msg)
 			}
 		}
