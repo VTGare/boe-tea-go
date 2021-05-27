@@ -18,6 +18,7 @@ func ownerGroup(b *bot.Bot) {
 		Description: "Owner's command to reply to feedback",
 		Usage:       "bt!reply <wall of text>",
 		Example:     "bt!reply You know who else is shit? Your momma :)",
+		AuthorOnly:  true,
 		Exec:        reply(b),
 	})
 }
