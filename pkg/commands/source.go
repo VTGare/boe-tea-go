@@ -65,7 +65,12 @@ func nhentai(b *bot.Bot) func(ctx *gumi.Ctx) error {
 
 		eb := embeds.NewBuilder()
 
-		eb.Title(hentai.Titles.Pretty)
+		if hentai.Titles != nil {
+			eb.Title(hentai.Titles.Pretty)
+		} else {
+			eb.Title("Unable to fetch the title")
+		}
+
 		eb.URL(hentai.URL)
 		eb.Image(hentai.Cover)
 		eb.Timestamp(hentai.UploadedAt)
