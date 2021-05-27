@@ -293,28 +293,29 @@ func (p *Post) send(guild *guilds.Guild, channelID string, artworks []artworks.A
 		p.bot.Metrics.IncrementArtwork()
 	}
 
-	allEmbeds, err := p.generateEmbeds(artworks, channelID, crosspost)
+	allMessages, err := p.generateMessages(artworks, channelID, crosspost)
 	if err != nil {
 		return nil, err
+	}
+
+	if len(allMessages) == 0 {
+		return nil, nil
 	}
 
 	//If skipMode not equals none, remove certain indices from the embeds array.
 	//It only happens from the command so only one artwork should be affected.
 	if p.skipMode != SkipModeNone {
-		allEmbeds[0] = p.skipArtworks(allEmbeds[0])
+		allMessages[0] = p.skipArtworks(allMessages[0])
 	}
 
 	count := 0
-	for _, embeds := range allEmbeds {
-		count += len(embeds)
+	for _, messages := range allMessages {
+		count += len(messages)
 	}
 
 	sent := make([]*cache.MessageInfo, 0, count)
-	sendMessage := func(embed *discordgo.MessageEmbed, content string) {
-		msg, _ := p.ctx.Session.ChannelMessageSendComplex(channelID, &discordgo.MessageSend{
-			Content: content,
-			Embed:   embed,
-		})
+	sendMessage := func(send *discordgo.MessageSend) {
+		msg, _ := p.ctx.Session.ChannelMessageSendComplex(channelID, send)
 
 		if msg != nil {
 			sent = append(sent, &cache.MessageInfo{
@@ -323,39 +324,39 @@ func (p *Post) send(guild *guilds.Guild, channelID string, artworks []artworks.A
 			})
 
 			//If URL doesn't exist then the embed contains an error message, instead of an artwork.
-			if guild.Reactions && embed.URL != "" {
-				p.addReactions(msg)
+			if guild.Reactions && send.Embed != nil {
+				if send.Embed.URL != "" {
+					p.addReactions(msg)
+				}
 			}
 		}
 	}
 
 	if count > guild.Limit {
-		first := allEmbeds[0][0]
-		content := messages.LimitExceeded(guild.Limit, count)
+		first := allMessages[0][0]
+		first.Content = messages.LimitExceeded(guild.Limit, count)
 		if crosspost {
-			content = first.URL + "\n" + content
+			first.Content = first.Embed.URL + "\n" + first.Content
 		}
 
-		sendMessage(first, content)
-		if len(allEmbeds) > 1 {
-			for _, embeds := range allEmbeds[1:] {
-				var content string
+		sendMessage(first)
+		if len(allMessages) > 1 {
+			for _, messages := range allMessages[1:] {
 				if crosspost {
-					content = embeds[0].URL
+					messages[0].Content = messages[0].Embed.URL
 				}
 
-				sendMessage(embeds[0], content)
+				sendMessage(messages[0])
 			}
 		}
 	} else {
-		for _, embeds := range allEmbeds {
-			for _, embed := range embeds {
-				var content string
+		for _, messages := range allMessages {
+			for _, message := range messages {
 				if crosspost {
-					content = embed.URL
+					message.Content = message.Embed.URL
 				}
 
-				sendMessage(embed, content)
+				sendMessage(message)
 			}
 		}
 	}
@@ -363,8 +364,8 @@ func (p *Post) send(guild *guilds.Guild, channelID string, artworks []artworks.A
 	return sent, nil
 }
 
-func (p *Post) generateEmbeds(artworks []artworks.Artwork, channelID string, crosspost bool) ([][]*discordgo.MessageEmbed, error) {
-	allEmbeds := make([][]*discordgo.MessageEmbed, 0, len(artworks))
+func (p *Post) generateMessages(artworks []artworks.Artwork, channelID string, crosspost bool) ([][]*discordgo.MessageSend, error) {
+	messageSends := make([][]*discordgo.MessageSend, 0, len(artworks))
 	for _, artwork := range artworks {
 		if artwork != nil {
 			skipFirst := false
@@ -396,27 +397,31 @@ func (p *Post) generateEmbeds(artworks []artworks.Artwork, channelID string, cro
 				quote = p.bot.Config.Quotes[r.Intn(l)].Content
 			}
 
-			embeds := artwork.Embeds(quote)
+			sends, err := artwork.MessageSends(quote)
+			if err != nil {
+				return nil, err
+			}
+
 			if skipFirst {
-				embeds = embeds[1:]
+				sends = sends[1:]
 			}
 
 			if crosspost {
-				for _, embed := range embeds {
-					embed.Author = &discordgo.MessageEmbedAuthor{
+				for _, msg := range sends {
+					msg.Embed.Author = &discordgo.MessageEmbedAuthor{
 						Name:    messages.CrosspostBy(p.ctx.Event.Author.String()),
 						IconURL: p.ctx.Event.Author.AvatarURL(""),
 					}
 				}
 			}
 
-			if len(embeds) > 0 {
-				allEmbeds = append(allEmbeds, embeds)
+			if len(sends) > 0 {
+				messageSends = append(messageSends, sends)
 			}
 		}
 	}
 
-	return allEmbeds, nil
+	return messageSends, nil
 }
 
 func (p *Post) addReactions(msg *discordgo.Message) {
@@ -429,8 +434,8 @@ func (p *Post) addReactions(msg *discordgo.Message) {
 	)
 }
 
-func (p *Post) skipArtworks(embeds []*discordgo.MessageEmbed) []*discordgo.MessageEmbed {
-	filtered := make([]*discordgo.MessageEmbed, 0)
+func (p *Post) skipArtworks(embeds []*discordgo.MessageSend) []*discordgo.MessageSend {
+	filtered := make([]*discordgo.MessageSend, 0)
 	switch p.skipMode {
 	case SkipModeExclude:
 		for ind, val := range embeds {

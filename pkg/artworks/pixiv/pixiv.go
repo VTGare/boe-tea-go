@@ -28,12 +28,13 @@ type Artwork struct {
 	Type   string
 	Author string
 	Title  string
-	url    string
 	Likes  int
 	Pages  int
 	Tags   []string
 	Images []*Image
 	NSFW   bool
+	Ugoira *Ugoira
+	url    string
 }
 
 type Image struct {
@@ -167,6 +168,16 @@ func (p Pixiv) Find(id string) (artworks.Artwork, error) {
 		Likes:  illust.TotalBookmarks,
 	}
 
+	if illust.Type == "ugoira" {
+		ugoira, err := p.app.UgoiraMetadata(i)
+
+		if err != nil {
+			return nil, err
+		}
+
+		artwork.Ugoira = &Ugoira{ugoira.UgoiraMetadataUgoiraMetadata}
+	}
+
 	p.set(id, artwork)
 	return artwork, nil
 }
@@ -197,10 +208,10 @@ func (a Artwork) ToModel() *models.ArtworkInsert {
 	}
 }
 
-func (a Artwork) Embeds(quote string) []*discordgo.MessageEmbed {
+func (a Artwork) MessageSends(quote string) ([]*discordgo.MessageSend, error) {
 	var (
 		length = len(a.Images)
-		pages  = make([]*discordgo.MessageEmbed, 0, length)
+		pages  = make([]*discordgo.MessageSend, 0, length)
 		eb     = embeds.NewBuilder()
 	)
 
@@ -209,7 +220,9 @@ func (a Artwork) Embeds(quote string) []*discordgo.MessageEmbed {
 		eb.Description("Pixiv artwork has been deleted or the ID does not exist.")
 		eb.Footer(quote, "")
 
-		return []*discordgo.MessageEmbed{eb.Finalize()}
+		return []*discordgo.MessageSend{
+			{Embed: eb.Finalize()},
+		}, nil
 	}
 
 	if length > 1 {
@@ -218,19 +231,27 @@ func (a Artwork) Embeds(quote string) []*discordgo.MessageEmbed {
 		eb.Title(fmt.Sprintf("%v by %v", a.Title, a.Author))
 	}
 
-	eb.URL(a.url)
-	eb.Image(a.Images[0].previewPixivMoe())
-
 	tags := arrays.MapString(a.Tags, func(s string) string {
 		return fmt.Sprintf("[%v](https://pixiv.net/en/tags/%v/artworks)", s, s)
 	})
 	eb.Description(fmt.Sprintf("**Tags**\n%v", strings.Join(tags, " • ")))
 
-	eb.AddField("Likes", strconv.Itoa(a.Likes), true)
-	eb.AddField("Original quality", messages.ClickHere(a.Images[0].originalPixivMoe()), true)
-	eb.Timestamp(time.Now()).Footer(quote, "")
-	pages = append(pages, eb.Finalize())
+	eb.URL(
+		a.url,
+	).AddField(
+		"Likes", strconv.Itoa(a.Likes), true,
+	).AddField(
+		"Original quality",
+		messages.ClickHere(a.Images[0].originalPixivMoe()),
+		true,
+	).Timestamp(
+		time.Now(),
+	).Footer(
+		quote, "",
+	)
 
+	eb.Image(a.Images[0].previewPixivMoe())
+	pages = append(pages, &discordgo.MessageSend{Embed: eb.Finalize()})
 	if length > 1 {
 		for ind, image := range a.Images[1:] {
 			eb := embeds.NewBuilder()
@@ -241,11 +262,11 @@ func (a Artwork) Embeds(quote string) []*discordgo.MessageEmbed {
 			eb.AddField("Likes", strconv.Itoa(a.Likes), true)
 			eb.AddField("Original quality", messages.ClickHere(image.originalPixivMoe()), true)
 
-			pages = append(pages, eb.Finalize())
+			pages = append(pages, &discordgo.MessageSend{Embed: eb.Finalize()})
 		}
 	}
 
-	return pages
+	return pages, nil
 }
 
 func (a Artwork) URL() string {

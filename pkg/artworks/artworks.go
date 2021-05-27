@@ -7,13 +7,13 @@ import (
 )
 
 type Provider interface {
-	Match(string) (string, bool)
-	Find(string) (Artwork, error)
+	Match(url string) (string, bool)
+	Find(id string) (Artwork, error)
 	Enabled(*guilds.Guild) bool
 }
 
 type Artwork interface {
 	ToModel() *artworks.ArtworkInsert
-	Embeds(string) []*discordgo.MessageEmbed
+	MessageSends(footer string) ([]*discordgo.MessageSend, error)
 	URL() string
 }

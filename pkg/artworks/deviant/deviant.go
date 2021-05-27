@@ -119,7 +119,7 @@ func (d DeviantArt) Enabled(g *guilds.Guild) bool {
 	return g.Deviant
 }
 
-func (a Artwork) Embeds(footer string) []*discordgo.MessageEmbed {
+func (a Artwork) MessageSends(footer string) ([]*discordgo.MessageSend, error) {
 	eb := embeds.NewBuilder()
 
 	eb.Title(
@@ -142,7 +142,9 @@ func (a Artwork) Embeds(footer string) []*discordgo.MessageEmbed {
 	)
 
 	eb.Footer(footer, "")
-	return []*discordgo.MessageEmbed{eb.Finalize()}
+	return []*discordgo.MessageSend{
+		{Embed: eb.Finalize()},
+	}, nil
 }
 
 func (a Artwork) ToModel() *models.ArtworkInsert {

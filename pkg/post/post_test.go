@@ -15,8 +15,8 @@ func TestPost_skipArtworks(t *testing.T) {
 	tests := []struct {
 		name   string
 		fields fields
-		embeds []*discordgo.MessageEmbed
-		want   []*discordgo.MessageEmbed
+		embeds []*discordgo.MessageSend
+		want   []*discordgo.MessageSend
 	}{
 		{
 			name: "exclude",
@@ -24,11 +24,13 @@ func TestPost_skipArtworks(t *testing.T) {
 				indices:  map[int]struct{}{1: {}, 2: {}},
 				skipMode: SkipModeExclude,
 			},
-			embeds: []*discordgo.MessageEmbed{
-				{Title: "1"}, {Title: "2"}, {Title: "3"},
+			embeds: []*discordgo.MessageSend{
+				{Embed: &discordgo.MessageEmbed{Title: "1"}},
+				{Embed: &discordgo.MessageEmbed{Title: "2"}},
+				{Embed: &discordgo.MessageEmbed{Title: "3"}},
 			},
-			want: []*discordgo.MessageEmbed{
-				{Title: "3"},
+			want: []*discordgo.MessageSend{
+				{Embed: &discordgo.MessageEmbed{Title: "3"}},
 			},
 		},
 		{
@@ -37,11 +39,14 @@ func TestPost_skipArtworks(t *testing.T) {
 				indices:  map[int]struct{}{1: {}, 2: {}},
 				skipMode: SkipModeInclude,
 			},
-			embeds: []*discordgo.MessageEmbed{
-				{Title: "1"}, {Title: "2"}, {Title: "3"},
+			embeds: []*discordgo.MessageSend{
+				{Embed: &discordgo.MessageEmbed{Title: "1"}},
+				{Embed: &discordgo.MessageEmbed{Title: "2"}},
+				{Embed: &discordgo.MessageEmbed{Title: "3"}},
 			},
-			want: []*discordgo.MessageEmbed{
-				{Title: "1"}, {Title: "2"},
+			want: []*discordgo.MessageSend{
+				{Embed: &discordgo.MessageEmbed{Title: "1"}},
+				{Embed: &discordgo.MessageEmbed{Title: "2"}},
 			},
 		},
 	}

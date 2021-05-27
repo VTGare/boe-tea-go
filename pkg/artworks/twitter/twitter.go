@@ -220,13 +220,13 @@ func (a Artwork) ToModel() *models.ArtworkInsert {
 }
 
 //Embeds transforms an artwork to DiscordGo embeds.
-func (a Artwork) Embeds(footer string) []*discordgo.MessageEmbed {
+func (a Artwork) MessageSends(footer string) ([]*discordgo.MessageSend, error) {
 	var (
 		eb     = embeds.NewBuilder()
 		length = a.Gallery.Len()
 	)
 
-	tweets := make([]*discordgo.MessageEmbed, 0, length)
+	tweets := make([]*discordgo.MessageSend, 0, length)
 
 	if length > 1 {
 		eb.Title(fmt.Sprintf("%v (%v) | Page %v / %v", a.FullName, a.Username, 1, length))
@@ -247,7 +247,7 @@ func (a Artwork) Embeds(footer string) []*discordgo.MessageEmbed {
 		}
 	}
 
-	tweets = append(tweets, eb.Finalize())
+	tweets = append(tweets, &discordgo.MessageSend{Embed: eb.Finalize()})
 
 	if length > 1 {
 		for ind, art := range a.Gallery[1:] {
@@ -256,11 +256,11 @@ func (a Artwork) Embeds(footer string) []*discordgo.MessageEmbed {
 			eb.Title(fmt.Sprintf("%v (%v) | Page %v / %v", a.FullName, a.Username, ind+2, length)).URL(a.url)
 			eb.Image(art.URL).Footer(footer, "").TimestampString(a.Timestamp)
 
-			tweets = append(tweets, eb.Finalize())
+			tweets = append(tweets, &discordgo.MessageSend{Embed: eb.Finalize()})
 		}
 	}
 
-	return tweets
+	return tweets, nil
 }
 
 func (a Artwork) URL() string {
