@@ -101,7 +101,12 @@ func testChannel(b *bot.Bot) func(ctx *gumi.Ctx) error {
 					return "The channel is located in art channels or art channels are empty.", true
 				}
 
-				return "Artworks won't be sent", false
+				return fmt.Sprintf(
+					"Artworks won't be sent.\nArtChannels == 0: %v\n In ArtChannels: %v\nArtChannels: %v",
+					len(guild.ArtChannels) == 0,
+					arrays.AnyString(guild.ArtChannels, channelID),
+					guild.ArtChannels,
+				), false
 			},
 			func() (string, bool) {
 				url := "https://pixiv.net/artworks/90260843"
@@ -118,7 +123,7 @@ func testChannel(b *bot.Bot) func(ctx *gumi.Ctx) error {
 						}
 
 						if len(sends) > 0 {
-							err = ctx.ReplyTextEmbed(sends[0].Content, sends[0].Embed)
+							_, err := ctx.Session.ChannelMessageSendComplex(channelID, sends[0])
 							if err != nil {
 								return err.Error(), false
 							}
