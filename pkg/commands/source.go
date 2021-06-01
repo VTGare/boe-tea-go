@@ -172,7 +172,6 @@ func sauce(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			config.APIKey = key
 		}
 
-		b.Log.Infof("Default key: %v | Used key: %v", b.Sengoku.DefaultConfig.APIKey, config.APIKey)
 		sauces, err := b.Sengoku.SearchWithConfig(url, config)
 		if err != nil {
 			switch {
