@@ -48,6 +48,25 @@ func SauceNoImage() error {
 	)
 }
 
+func SauceRateLimit() error {
+	return newUserError(
+		fmt.Sprintf(
+			"Boe Tea's been rate limited by SauceNAO.\n%v\n%v",
+			"Please ask a server mod to set SauceNAO API key using `bt!set saucenao <api_key>` command.",
+			"Don't be concerned, the key will be securely encrypted.",
+		),
+	)
+}
+
+func SauceInvalidKey() error {
+	return newUserError(
+		fmt.Sprintf(
+			"Server's custom API key is invalid.\n%v",
+			"Please re-set the key to a valid one using `bt!set saucenao <api_key>` command.",
+		),
+	)
+}
+
 func SauceError(err error) error {
 	return newUserError(
 		fmt.Sprintf(

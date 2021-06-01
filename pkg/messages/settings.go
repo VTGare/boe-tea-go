@@ -13,9 +13,10 @@ type SetCommand struct {
 }
 
 type General struct {
-	Title  string
-	Prefix string
-	NSFW   string
+	Title       string
+	Prefix      string
+	NSFW        string
+	SauceNAOKey string
 }
 
 type PixivSettings struct {
@@ -46,9 +47,10 @@ func Set() *SetCommand {
 		CurrentSettings: "Current settings",
 		ArtChannels:     "Art channels",
 		General: &General{
-			Title:  "General",
-			Prefix: "Prefix",
-			NSFW:   "NSFW",
+			Title:       "General",
+			Prefix:      "Prefix",
+			NSFW:        "NSFW",
+			SauceNAOKey: "SauceNAO custom key",
 		},
 		TwitterSettings: &TwitterSettings{
 			Title:   "Twitter settings",

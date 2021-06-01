@@ -382,7 +382,8 @@ func (p *Post) generateMessages(artworks []artworks.Artwork, channelID string, c
 					return nil, err
 				}
 
-				//Silently skip NSFW artworks in safe channels
+				// TODO: send feedback instead
+				// Silently skip NSFW artworks in safe channels
 				if !ch.NSFW && artwork.NSFW {
 					continue
 				}

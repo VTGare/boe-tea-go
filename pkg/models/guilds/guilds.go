@@ -15,6 +15,7 @@ import (
 type Guild struct {
 	ID          string    `json:"id" bson:"guild_id" validate:"required"`
 	Prefix      string    `json:"prefix" bson:"prefix" validate:"required,max=5"`
+	SauceNAOKey string    `json:"saucenao_key" bson:"saucenao_key"`
 	Limit       int       `json:"limit" bson:"limit" validate:"required"`
 	NSFW        bool      `json:"nsfw" bson:"nsfw"`
 	Pixiv       bool      `json:"pixiv" bson:"pixiv"`

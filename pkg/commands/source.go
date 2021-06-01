@@ -1,6 +1,8 @@
 package commands
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"net/url"
 	"regexp"
@@ -10,6 +12,7 @@ import (
 
 	nhAPI "github.com/VTGare/boe-tea-go/internal/apis/nhentai"
 	"github.com/VTGare/boe-tea-go/internal/dgoutils"
+	"github.com/VTGare/boe-tea-go/internal/encrypt"
 	"github.com/VTGare/boe-tea-go/pkg/bot"
 	"github.com/VTGare/boe-tea-go/pkg/messages"
 	"github.com/VTGare/embeds"
@@ -144,6 +147,11 @@ func nhentai(b *bot.Bot) func(ctx *gumi.Ctx) error {
 
 func sauce(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
+		guild, err := b.Guilds.FindOne(context.Background(), ctx.Event.GuildID)
+		if err != nil {
+			return err
+		}
+
 		url, ok := findImage(
 			ctx.Session,
 			ctx.Event,
@@ -154,9 +162,27 @@ func sauce(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			return messages.SauceNoImage()
 		}
 
-		sauces, err := b.Sengoku.Search(url)
+		config := sengoku.DefaultConfig()
+		if guild.SauceNAOKey != "" {
+			key, err := encrypt.Decrypt([]byte(b.Config.Encryption), guild.SauceNAOKey)
+			if err != nil {
+				return err
+			}
+
+			config.APIKey = key
+		}
+
+		b.Log.Infof("Default key: %v | Used key: %v", b.Sengoku.DefaultConfig.APIKey, config.APIKey)
+		sauces, err := b.Sengoku.SearchWithConfig(url, config)
 		if err != nil {
-			return messages.SauceError(err)
+			switch {
+			case errors.Is(err, sengoku.ErrRateLimitReached):
+				return messages.SauceRateLimit()
+			case errors.Is(err, sengoku.ErrInvalidAPIKey):
+				return messages.SauceInvalidKey()
+			default:
+				return messages.SauceError(err)
+			}
 		}
 
 		filtered := make([]*sengoku.Sauce, 0)

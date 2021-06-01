@@ -13,6 +13,7 @@ import (
 
 	"github.com/VTGare/boe-tea-go/internal/arrays"
 	"github.com/VTGare/boe-tea-go/internal/dgoutils"
+	"github.com/VTGare/boe-tea-go/internal/encrypt"
 	"github.com/VTGare/boe-tea-go/pkg/bot"
 	"github.com/VTGare/boe-tea-go/pkg/messages"
 	"github.com/VTGare/embeds"
@@ -397,9 +398,10 @@ func set(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			eb.AddField(
 				msg.General.Title,
 				fmt.Sprintf(
-					"**%v**: %v | **%v**: %v",
+					"**%v**: %v | **%v**: %v | **%v**: %v",
 					msg.General.Prefix, guild.Prefix,
 					msg.General.NSFW, messages.FormatBool(guild.NSFW),
+					msg.General.SauceNAOKey, messages.FormatBool(guild.SauceNAOKey != ""),
 				),
 			)
 
@@ -442,6 +444,10 @@ func set(b *bot.Bot) func(ctx *gumi.Ctx) error {
 				eb.AddField(
 					msg.ArtChannels,
 					strings.Join(arrays.MapString(guild.ArtChannels, func(s string) string {
+						if len(guild.ArtChannels) > 15 {
+							return fmt.Sprintf("`%v`", s)
+						}
+
 						return fmt.Sprintf("<#%v> | `%v`", s, s)
 					}), "\n"),
 				)
@@ -560,6 +566,22 @@ func set(b *bot.Bot) func(ctx *gumi.Ctx) error {
 				oldSettingEmbed = guild.Deviant
 				newSettingEmbed = new
 				guild.Deviant = new
+			case "saucenao":
+				apiKey := newSetting.Raw
+
+				oldSettingEmbed = guild.SauceNAOKey != ""
+				if apiKey == "default" || apiKey == "off" || apiKey == "reset" {
+					newSettingEmbed = false
+					guild.SauceNAOKey = ""
+				} else {
+					encrypted, err := encrypt.Encrypt([]byte(b.Config.Encryption), apiKey)
+					if err != nil {
+						return err
+					}
+
+					newSettingEmbed = true
+					guild.SauceNAOKey = encrypted
+				}
 			default:
 				return messages.ErrUnknownSetting(settingName.Raw)
 			}
