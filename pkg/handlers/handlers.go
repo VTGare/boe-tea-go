@@ -332,6 +332,11 @@ func OnReactionAdd(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageReacti
 				URL: artwork.URL(),
 			}, insert)
 
+			if err != nil {
+				b.Log.Warn("OnReactionAdd -> Artworks.FindOneOrCreate: ", err)
+				return
+			}
+
 			if created {
 				b.Log.Infof(
 					"Created a new artwork. ID: %v. URL: %v. Images: %v",
@@ -339,11 +344,6 @@ func OnReactionAdd(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageReacti
 					artworkDB.URL,
 					len(artworkDB.Images),
 				)
-			}
-
-			if err != nil {
-				b.Log.Warn("OnReactionAdd -> Artworks.FindOneOrCreate: ", err)
-				return
 			}
 
 			user, err := b.Users.FindOneOrCreate(context.Background(), r.UserID)
