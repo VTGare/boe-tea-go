@@ -347,7 +347,7 @@ func stats(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			true,
 		).AddField(
 			"Uptime",
-			b.Metrics.Uptime.String(),
+			messages.FormatDuration(b.Metrics.Uptime),
 			true,
 		).AddField(
 			"Commands executed",

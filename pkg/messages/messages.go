@@ -55,3 +55,27 @@ func ListChannels(channels []string) string {
 		" • ",
 	)
 }
+
+func FormatDuration(d time.Duration) string {
+	d = d.Round(1 * time.Second)
+
+	hours := d / time.Hour
+	d -= hours * time.Hour
+
+	minutes := d / time.Minute
+	d -= minutes * time.Minute
+
+	seconds := d / time.Second
+	d -= seconds * time.Second
+
+	sb := strings.Builder{}
+	if hours != 0 {
+		sb.WriteString(fmt.Sprintf("%02d hours ", hours))
+	}
+	if minutes != 0 {
+		sb.WriteString(fmt.Sprintf("%02d minutes ", minutes))
+	}
+
+	sb.WriteString(fmt.Sprintf("%02d seconds", seconds))
+	return sb.String()
+}
