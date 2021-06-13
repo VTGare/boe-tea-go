@@ -205,15 +205,23 @@ func sauceNAOEmbeds(sauces []*sengoku.Sauce) []*discordgo.MessageEmbed {
 	sauceEmbeds := make([]*discordgo.MessageEmbed, 0, len(sauces))
 	locale := messages.SauceEmbed()
 
-	toEmbed := func(sauce *sengoku.Sauce) *discordgo.MessageEmbed {
+	toEmbed := func(sauce *sengoku.Sauce, index, l int) *discordgo.MessageEmbed {
 		eb := embeds.NewBuilder()
 
-		if sauce.Title == "" {
-			eb.Title(locale.NoTitle)
-		} else {
-			eb.Title(sauce.Title)
+		titleBuilder := strings.Builder{}
+		if l > 1 {
+			titleBuilder.WriteString(
+				fmt.Sprintf("[%v/%v] ", index+1, l),
+			)
 		}
 
+		if sauce.Title == "" {
+			titleBuilder.WriteString(locale.NoTitle)
+		} else {
+			titleBuilder.WriteString(sauce.Title)
+		}
+
+		eb.Title(titleBuilder.String())
 		if sauce.Author != nil {
 			eb.AddField(
 				locale.Author,
@@ -276,13 +284,9 @@ func sauceNAOEmbeds(sauces []*sengoku.Sauce) []*discordgo.MessageEmbed {
 		return eb.Finalize()
 	}
 
-	embed := toEmbed(sauces[0])
-	sauceEmbeds = append(sauceEmbeds, embed)
-	if len(sauces) > 1 {
-		for _, sauce := range sauces[1:] {
-			embed := toEmbed(sauce)
-			sauceEmbeds = append(sauceEmbeds, embed)
-		}
+	for index, sauce := range sauces {
+		embed := toEmbed(sauce, index, len(sauces))
+		sauceEmbeds = append(sauceEmbeds, embed)
 	}
 
 	return sauceEmbeds
