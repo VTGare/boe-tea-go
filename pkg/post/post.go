@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/rand"
 	"reflect"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -90,64 +91,65 @@ func (p *Post) Send() ([]*cache.MessageInfo, error) {
 }
 
 func (p *Post) Crosspost(userID, group string, channels []string) ([]*cache.MessageInfo, error) {
-	wg, _ := errgroup.WithContext(context.Background())
+	var (
+		wg      = sync.WaitGroup{}
+		msgChan = make(chan []*cache.MessageInfo, len(channels))
+	)
 
-	msgChan := make(chan []*cache.MessageInfo, len(channels))
+	wg.Add(len(channels))
 	for _, channelID := range channels {
-		channelID := channelID
+		log := p.bot.Log.With(
+			"userID", userID,
+			"group", group,
+			"channelID", channelID,
+		)
 
-		wg.Go(func() error {
+		go func(channelID string) {
+			defer wg.Done()
 			ch, err := p.ctx.Session.Channel(channelID)
 			if err != nil {
-				return nil
+				log.Infow("Couldn't crosspost. Error: %v", err)
+				return
 			}
 
 			if _, err := p.ctx.Session.GuildMember(ch.GuildID, userID); err != nil {
-				p.bot.Log.Infof(
-					"Couldn't crosspost. User: %v. Group: %v. Channel: %v. Error: %v. Removing the channel from user's group.",
-					userID, group, channelID, err,
-				)
-
+				log.Infof("Removing a channel from user's group. User left the server.")
 				if _, err := p.bot.Users.DeleteFromGroup(context.Background(), userID, group, channelID); err != nil {
-					p.bot.Log.Errorf(
-						"Failed to remove a channel from user's group. User: %v. Group: %v. Channel: %v. Error: %v",
-						userID, group, channelID, err,
-					)
+					log.Errorf("Failed to remove a channel from user's group. Error: %v", err)
 				}
 
-				return nil
+				return
 			}
 
 			guild, err := p.bot.Guilds.FindOne(context.Background(), ch.GuildID)
 			if err != nil {
-				return nil
+				log.Infof("Couldn't crosspost. Find Guild error: %v", err)
+				return
 			}
 
 			if guild.Crosspost {
 				if len(guild.ArtChannels) == 0 || arrays.AnyString(guild.ArtChannels, ch.ID) {
 					res, err := p.fetch(guild, channelID, true)
 					if err != nil {
-						return err
+						log.Infof("Couldn't crosspost. Fetch error: %v", err)
+						return
 					}
 
 					sent, err := p.send(guild, channelID, res.Artworks, true)
 					if err != nil {
-						return err
+						log.Infof("Couldn't crosspost. Send error: %v", err)
+						return
 					}
-
 					msgChan <- sent
 				}
 			}
-
-			return nil
-		})
+		}(channelID)
 	}
 
-	if err := wg.Wait(); err != nil {
-		return nil, err
-	}
-
-	close(msgChan)
+	go func() {
+		wg.Wait()
+		close(msgChan)
+	}()
 
 	sent := make([]*cache.MessageInfo, 0)
 	for msg := range msgChan {
