@@ -93,3 +93,10 @@ func ErrUnknownUserSetting(setting string) error {
 		fmt.Sprintf("Setting `%v` doesn't exist. Please use `bt!profile` to see existing settings.", setting),
 	)
 }
+
+func ErrUserUnfavouriteFail(query interface{}, err error) error {
+	return newUserError(
+		fmt.Sprintf("Failed to remove a favourite `[%v]`. Unexpected error occured: %v.", query, err),
+		err,
+	)
+}

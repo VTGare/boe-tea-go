@@ -99,6 +99,7 @@ func userGroup(b *bot.Bot) {
 		RateLimiter: gumi.NewRateLimiter(10 * time.Second),
 		Exec:        copygroup(b),
 	})
+
 	b.Router.RegisterCmd(&gumi.Command{
 		Name:        "favourites",
 		Group:       group,
@@ -114,6 +115,17 @@ func userGroup(b *bot.Bot) {
 		},
 		RateLimiter: gumi.NewRateLimiter(10 * time.Second),
 		Exec:        favourites(b),
+	})
+
+	b.Router.RegisterCmd(&gumi.Command{
+		Name:        "unfav",
+		Group:       group,
+		Aliases:     []string{"unfavourite", "unfavorite"},
+		Description: "Remove a favourite by its ID or URL",
+		Usage:       "bt!unfav <artwork ID or URL>",
+		Example:     "bt!unfav 69",
+		RateLimiter: gumi.NewRateLimiter(15 * time.Second),
+		Exec:        unfav(b),
 	})
 
 	b.Router.RegisterCmd(&gumi.Command{
@@ -605,6 +617,85 @@ func userset(b *bot.Bot) func(ctx *gumi.Ctx) error {
 
 		ctx.ReplyEmbed(eb.Finalize())
 		return nil
+	}
+}
+
+func unfav(b *bot.Bot) func(ctx *gumi.Ctx) error {
+	return func(ctx *gumi.Ctx) error {
+		if ctx.Args.Len() == 0 {
+			return messages.ErrIncorrectCmd(ctx.Command)
+		}
+
+		user, err := b.Users.FindOneOrCreate(context.Background(), ctx.Event.Author.ID)
+		if err != nil {
+			return err
+		}
+
+		if len(user.Favourites) == 0 {
+			return messages.ErrUserNoFavourites(ctx.Event.Author.ID)
+		}
+
+		var (
+			id    int
+			url   string
+			query = ctx.Args.Get(0).Raw
+		)
+
+		//If ID is not an integer assign query to the URL.
+		if id, err = strconv.Atoi(query); err != nil {
+			url = query
+		}
+
+		var artwork *artworks.Artwork
+		if url != "" {
+			artwork, err = b.Artworks.FindOne(context.Background(), &options.FilterOne{
+				URL: url,
+			})
+
+			if err != nil {
+				return messages.ErrArtworkNotFound(query)
+			}
+
+			id = artwork.ID
+		}
+
+		fav, ok := user.FindFavourite(id)
+		if !ok {
+			return messages.ErrArtworkNotFound(strconv.Itoa(id))
+		}
+
+		if _, err := b.Users.DeleteFavourite(context.Background(), user.ID, fav); err != nil {
+			return messages.ErrUserUnfavouriteFail(query, err)
+		}
+
+		eb := embeds.NewBuilder()
+		locale := messages.FavouriteRemovedEmbed()
+
+		eb.Title(
+			locale.Title,
+		).Description(
+			locale.Description,
+		)
+
+		eb.AddField(
+			"ID",
+			strconv.Itoa(artwork.ID),
+			true,
+		).AddField(
+			"URL",
+			messages.ClickHere(artwork.URL),
+			true,
+		).AddField(
+			"NSFW",
+			strconv.FormatBool(fav.NSFW),
+			true,
+		)
+
+		if len(artwork.Images) > 0 {
+			eb.Thumbnail(artwork.Images[0])
+		}
+
+		return ctx.ReplyEmbed(eb.Finalize())
 	}
 }
 
