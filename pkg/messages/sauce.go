@@ -5,24 +5,6 @@ import (
 	"net/url"
 )
 
-type SauceEmbed struct {
-	Author      string
-	Similarity  string
-	ExternalURL string
-	OtherURLs   string
-	NoTitle     string
-}
-
-func Sauce() *SauceEmbed {
-	return &SauceEmbed{
-		Author:      "Author",
-		Similarity:  "Similarity",
-		OtherURLs:   "Other URLs",
-		ExternalURL: "External URL",
-		NoTitle:     "No title",
-	}
-}
-
 func SauceNotFound(uri string) error {
 	return newUserError(
 		fmt.Sprintf(

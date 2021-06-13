@@ -4,14 +4,14 @@ import (
 	"fmt"
 )
 
-type UserProfile struct {
-	Title      string
-	Settings   string
-	DM         string
-	Crosspost  string
-	Stats      string
-	Groups     string
-	Favourites string
+func UserGroupsEmbed(username string) *UserGroups {
+	return &UserGroups{
+		Title:       fmt.Sprintf("%v's groups", username),
+		Description: "To add a new group use `bt!newgroup` command.",
+		Group:       "Group",
+		Parent:      "Parent",
+		Children:    "Children",
+	}
 }
 
 func UserProfileEmbed(username string) *UserProfile {
@@ -23,24 +23,6 @@ func UserProfileEmbed(username string) *UserProfile {
 		Stats:      "Stats",
 		Groups:     "Groups",
 		Favourites: "Favourites",
-	}
-}
-
-type UserGroups struct {
-	Title       string
-	Description string
-	Group       string
-	Parent      string
-	Children    string
-}
-
-func UserGroupsEmbed(username string) *UserGroups {
-	return &UserGroups{
-		Title:       fmt.Sprintf("%v's groups", username),
-		Description: "To add a new group use `bt!newgroup` command.",
-		Group:       "Group",
-		Parent:      "Parent",
-		Children:    "Children",
 	}
 }
 
@@ -104,25 +86,6 @@ func ErrUserNoFavourites(id string) error {
 	return newUserError(fmt.Sprintf(
 		"User <@%v> doesn't have any favourites", id,
 	))
-}
-
-type UserFavouriteDM struct {
-	Title       string
-	Description string
-}
-
-func UserFavouriteAdded() *UserFavouriteDM {
-	return &UserFavouriteDM{
-		Title:       "💖 Successfully added an artwork to favourites",
-		Description: "If you dislike direct messages disable them by running `bt!userset dm off` command",
-	}
-}
-
-func UserFavouriteRemoved() *UserFavouriteDM {
-	return &UserFavouriteDM{
-		Title:       "💔 Successfully removed an artwork from favourites",
-		Description: "If you dislike direct messages disable them by running `bt!userset dm off` command",
-	}
 }
 
 func ErrUnknownUserSetting(setting string) error {

@@ -2,18 +2,6 @@ package messages
 
 import "fmt"
 
-type ArtworkSearchWarning struct {
-	Title       string
-	Description string
-}
-
-func SearchWarning() *ArtworkSearchWarning {
-	return &ArtworkSearchWarning{
-		Title:       "⚠ Warning!",
-		Description: "Boe Tea's artworks database __may contain not safe for work results__, **there's no good way to filter them.** Use controls below to skip this warning.",
-	}
-}
-
 func ErrArtworkNotFound(arg string) error {
 	return newUserError(
 		fmt.Sprintf(

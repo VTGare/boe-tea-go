@@ -388,7 +388,7 @@ func set(b *bot.Bot) func(ctx *gumi.Ctx) error {
 
 			var (
 				eb  = embeds.NewBuilder()
-				msg = messages.Set()
+				msg = messages.SetEmbed()
 			)
 
 			eb.Title(msg.CurrentSettings).Description(fmt.Sprintf("**%v**", gd.Name))

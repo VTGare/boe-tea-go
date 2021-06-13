@@ -11,12 +11,7 @@ type IncorrectCmd struct {
 	Usage       string
 	Example     string
 	Description string
-	Embed       *IncorrectCmdEmbed
-}
-
-type IncorrectCmdEmbed struct {
-	Usage   string
-	Example string
+	Embed       *CommandHelp
 }
 
 func (cmd *IncorrectCmd) Error() string {
@@ -29,7 +24,7 @@ func ErrIncorrectCmd(cmd *gumi.Command) error {
 		Usage:       cmd.Usage,
 		Example:     cmd.Example,
 		Description: cmd.Description,
-		Embed: &IncorrectCmdEmbed{
+		Embed: &CommandHelp{
 			Usage:   "Usage",
 			Example: "Example",
 		},

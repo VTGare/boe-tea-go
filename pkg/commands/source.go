@@ -203,7 +203,7 @@ func sauce(b *bot.Bot) func(ctx *gumi.Ctx) error {
 
 func sauceNAOEmbeds(sauces []*sengoku.Sauce) []*discordgo.MessageEmbed {
 	sauceEmbeds := make([]*discordgo.MessageEmbed, 0, len(sauces))
-	locale := messages.Sauce()
+	locale := messages.SauceEmbed()
 
 	toEmbed := func(sauce *sengoku.Sauce) *discordgo.MessageEmbed {
 		eb := embeds.NewBuilder()

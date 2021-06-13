@@ -373,7 +373,7 @@ func OnReactionAdd(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageReacti
 				if err == nil {
 					var (
 						eb     = embeds.NewBuilder()
-						locale = messages.UserFavouriteAdded()
+						locale = messages.FavouriteAddedEmbed()
 					)
 
 					eb.Title(locale.Title).Description(locale.Description)
@@ -503,7 +503,7 @@ func OnReactionRemove(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageRea
 					if err == nil {
 						var (
 							eb     = embeds.NewBuilder()
-							locale = messages.UserFavouriteRemoved()
+							locale = messages.FavouriteRemovedEmbed()
 						)
 
 						eb.Title(locale.Title).Description(locale.Description)

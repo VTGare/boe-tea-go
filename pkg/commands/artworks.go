@@ -434,7 +434,7 @@ func leaderboard(b *bot.Bot) func(ctx *gumi.Ctx) error {
 		}
 
 		if !ch.NSFW {
-			locale := messages.SearchWarning()
+			locale := messages.SearchWarningEmbed()
 			eb := embeds.NewBuilder()
 			embed := eb.Title(locale.Title).Description(locale.Description).Finalize()
 
@@ -523,7 +523,7 @@ func search(b *bot.Bot) func(ctx *gumi.Ctx) error {
 		}
 
 		if !ch.NSFW {
-			locale := messages.SearchWarning()
+			locale := messages.SearchWarningEmbed()
 			eb := embeds.NewBuilder()
 			embed := eb.Title(locale.Title).Description(locale.Description).Finalize()
 
