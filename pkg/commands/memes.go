@@ -2,8 +2,6 @@ package commands
 
 import (
 	"bytes"
-	"math/rand"
-	"strings"
 	"text/template"
 	"time"
 
@@ -62,15 +60,6 @@ func memesGroup(b *bot.Bot) {
 		Example:     "bt!nuggets 2B 9S",
 		Exec:        nuggets(b),
 	})
-
-	b.Router.RegisterCmd(&gumi.Command{
-		Name:        "owo",
-		Group:       group,
-		Description: "owo uwu",
-		Usage:       "bt!owo [lots of text]",
-		Example:     "bt!owo rawr",
-		Exec:        owo(b),
-	})
 }
 
 func brainpower(b *bot.Bot) func(ctx *gumi.Ctx) error {
@@ -111,50 +100,5 @@ func nuggets(b *bot.Bot) func(ctx *gumi.Ctx) error {
 
 		ctx.Reply(buf.String())
 		return nil
-	}
-}
-
-func owo(b *bot.Bot) func(ctx *gumi.Ctx) error {
-	return func(ctx *gumi.Ctx) error {
-		if ctx.Args.Len() == 0 {
-			return messages.ErrIncorrectCmd(ctx.Command)
-		}
-
-		var (
-			wepwacer = strings.NewReplacer(
-				"r", "w",
-				"l", "w",
-				"love", "wuv",
-				"mr", "mistuh",
-				"dog", "doggo",
-				"cat", "kitten",
-				"hello", "henwo",
-				"fuck", "fwick",
-				"fuk", "fwick",
-				"shit", "shoot",
-				"friend", "fwen",
-				"god", "gosh",
-				"dick", "peepee",
-				"penis", "peepee",
-			)
-			suffixes = []string{
-				"(ﾉ´ з `)ノ", "( ´ ▽ ` ).｡ｏ♡", "(´,,•ω•,,)♡",
-				"(*≧▽≦)", "ɾ⚈▿⚈ɹ", "( ﾟ∀ ﾟ)", "( ・ ̫・)",
-				"( •́ .̫ •̀ )", "(▰˘v˘▰)", "(・ω・)", "✾(〜 ☌ω☌)〜✾",
-				"(ᗒᗨᗕ)", "(・`ω´・)", ":3", ">:3", "hehe", "xox",
-				">3<", "murr~", "UwU", "*gwomps*",
-			}
-			s = rand.NewSource(time.Now().Unix())
-			r = rand.New(s)
-		)
-
-		text := strings.ToLower(ctx.Args.Raw)
-
-		text = wepwacer.Replace(text)
-
-		index := r.Intn(len(suffixes))
-		text += " " + suffixes[index]
-
-		return ctx.Reply(text)
 	}
 }
