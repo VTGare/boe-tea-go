@@ -2,6 +2,8 @@ package commands
 
 import (
 	"bytes"
+	"math/rand"
+	"strings"
 	"text/template"
 	"time"
 
@@ -13,21 +15,21 @@ import (
 
 var (
 	nuggetsTemplate = template.Must(template.New("nuggets").Parse(`>{{.Ryo}} and {{.Amelia}} sits side by side watching a movie
-	>They're eating pack of chicken nuggets while watching
-	>Somehow the takeout didn't include much bbq sauce except for a half filled one
-	>Sauce has been depleted after {{.Ryo}} has eaten 3 nuggets
-	>{{.Ryo}}: {{.Amelia}}, we're out of sauce. Do you have any in your fridge?
-	>{{.Amelia}}: No sorry, I don't use any sauce
-	>{{.Ryo}} tries to eat the nuggets without any sauce but she has a hard time enjoying them
-	>{{.Amelia}} notices the predicament of {{.Ryo}}
-	>{{.Amelia}}: {{.Ryo}}, say "aahhh"~~
-	>{{.Ryo}}: a--- mmm!!??????
-	>Something went inside {{.Ryo}}’s mouth
-	>{{.Amelia}} fed a chicken nugget to {{.Ryo}}
-	>{{.Ryo}} notices that the nuggie has this wet feeling, almost like a sauce but not exactly like one
-	>{{.Ryo}}: oi {{.Amelia}}! What did you feed me??
-	>{{.Amelia}} licks a noticeable drool on her lips
-	>{{.Amelia}}: It's a secret~`))
+>They're eating pack of chicken nuggets while watching
+>Somehow the takeout didn't include much bbq sauce except for a half filled one
+>Sauce has been depleted after {{.Ryo}} has eaten 3 nuggets
+>{{.Ryo}}: {{.Amelia}}, we're out of sauce. Do you have any in your fridge?
+>{{.Amelia}}: No sorry, I don't use any sauce
+>{{.Ryo}} tries to eat the nuggets without any sauce but she has a hard time enjoying them
+>{{.Amelia}} notices the predicament of {{.Ryo}}
+>{{.Amelia}}: {{.Ryo}}, say "aahhh"~~
+>{{.Ryo}}: a--- mmm!!??????
+>Something went inside {{.Ryo}}’s mouth
+>{{.Amelia}} fed a chicken nugget to {{.Ryo}}
+>{{.Ryo}} notices that the nuggie has this wet feeling, almost like a sauce but not exactly like one
+>{{.Ryo}}: oi {{.Amelia}}! What did you feed me??
+>{{.Amelia}} licks a noticeable drool on her lips
+>{{.Amelia}}: It's a secret~`))
 )
 
 func memesGroup(b *bot.Bot) {
@@ -59,6 +61,15 @@ func memesGroup(b *bot.Bot) {
 		Usage:       "bt!nuggets <person 1> <person 2>",
 		Example:     "bt!nuggets 2B 9S",
 		Exec:        nuggets(b),
+	})
+
+	b.Router.RegisterCmd(&gumi.Command{
+		Name:        "owo",
+		Group:       group,
+		Description: "owo uwu",
+		Usage:       "bt!owo [lots of text]",
+		Example:     "bt!owo rawr",
+		Exec:        owo(b),
 	})
 }
 
@@ -100,5 +111,50 @@ func nuggets(b *bot.Bot) func(ctx *gumi.Ctx) error {
 
 		ctx.Reply(buf.String())
 		return nil
+	}
+}
+
+func owo(b *bot.Bot) func(ctx *gumi.Ctx) error {
+	return func(ctx *gumi.Ctx) error {
+		if ctx.Args.Len() == 0 {
+			return messages.ErrIncorrectCmd(ctx.Command)
+		}
+
+		var (
+			wepwacer = strings.NewReplacer(
+				"r", "w",
+				"l", "w",
+				"love", "wuv",
+				"mr", "mistuh",
+				"dog", "doggo",
+				"cat", "kitten",
+				"hello", "henwo",
+				"fuck", "fwick",
+				"fuk", "fwick",
+				"shit", "shoot",
+				"friend", "fwen",
+				"god", "gosh",
+				"dick", "peepee",
+				"penis", "peepee",
+			)
+			suffixes = []string{
+				"(ﾉ´ з `)ノ", "( ´ ▽ ` ).｡ｏ♡", "(´,,•ω•,,)♡",
+				"(*≧▽≦)", "ɾ⚈▿⚈ɹ", "( ﾟ∀ ﾟ)", "( ・ ̫・)",
+				"( •́ .̫ •̀ )", "(▰˘v˘▰)", "(・ω・)", "✾(〜 ☌ω☌)〜✾",
+				"(ᗒᗨᗕ)", "(・`ω´・)", ":3", ">:3", "hehe", "xox",
+				">3<", "murr~", "UwU", "*gwomps*",
+			}
+			s = rand.NewSource(time.Now().Unix())
+			r = rand.New(s)
+		)
+
+		text := strings.ToLower(ctx.Args.Raw)
+
+		text = wepwacer.Replace(text)
+
+		index := r.Intn(len(suffixes))
+		text += " " + suffixes[index]
+
+		return ctx.Reply(text)
 	}
 }
