@@ -216,9 +216,11 @@ func (p *Post) fetch(guild *guilds.Guild, channelID string, crosspost bool) (*fe
 						}
 					}
 
-					//Only post the picture if the provider is enabled or
-					//the function is called from a command.
-					if provider.Enabled(guild) || p.ctx.Command != nil {
+					// Only post the picture if the provider is enabled
+					// or the function is called from a command
+					// or we're crossposting a twitter artwork.
+					_, twitter := provider.(*twitter.Twitter)
+					if provider.Enabled(guild) || p.ctx.Command != nil || (crosspost && twitter) {
 						artwork, err := provider.Find(id)
 						if err != nil {
 							return err
@@ -374,8 +376,13 @@ func (p *Post) generateMessages(artworks []artworks.Artwork, channelID string, c
 
 			switch artwork := artwork.(type) {
 			case *twitter.Artwork:
-				//Skip first Twitter embed if not a command.
-				if p.ctx.Command == nil && !crosspost {
+				//Skip first Twitter embed if not a command or the media type is MediaTypeImage.
+				var image bool
+				if len(artwork.Gallery) > 0 {
+					image = artwork.Gallery[0].Type == twitter.MediaTypeImage
+				}
+
+				if p.ctx.Command == nil && !crosspost && image {
 					skipFirst = true
 				}
 			case *pixiv.Artwork:

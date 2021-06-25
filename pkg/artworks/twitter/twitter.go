@@ -1,7 +1,10 @@
 package twitter
 
 import (
+	"bytes"
 	"fmt"
+	"io"
+	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
@@ -9,12 +12,19 @@ import (
 
 	"github.com/ReneKroon/ttlcache"
 	"github.com/VTGare/boe-tea-go/pkg/artworks"
-	"github.com/VTGare/boe-tea-go/pkg/messages"
 	models "github.com/VTGare/boe-tea-go/pkg/models/artworks"
 	"github.com/VTGare/boe-tea-go/pkg/models/guilds"
 	"github.com/VTGare/embeds"
 	"github.com/bwmarrin/discordgo"
 	"github.com/gocolly/colly/v2"
+)
+
+type MediaType int
+
+const (
+	MediaTypeImage MediaType = iota
+	MediaTypeGIF
+	MediaTypeVideo
 )
 
 type Twitter struct {
@@ -38,9 +48,8 @@ type Artwork struct {
 
 //Media is tweet's media file which can be an image, a GIF, or a video. M3U8 is only present with video tweets.
 type Media struct {
-	URL      string
-	M3U8     string
-	Animated bool
+	URL  string
+	Type MediaType
 }
 
 //Gallery is an array of tweet's media files: images, GIFs, or videos.
@@ -127,8 +136,8 @@ func (t Twitter) scrapeTwitter(snowflake, nitter string) (*Artwork, error) {
 		imageURL = strings.Replace(imageURL, nitter+"/pic/media%2F", "https://pbs.twimg.com/media/", 1)
 		imageURL = strings.TrimSuffix(imageURL, "%3Fname%3Dorig")
 		res.Gallery = append(res.Gallery, &Media{
-			URL:      imageURL,
-			Animated: false,
+			URL:  imageURL,
+			Type: MediaTypeImage,
 		})
 	})
 
@@ -136,8 +145,24 @@ func (t Twitter) scrapeTwitter(snowflake, nitter string) (*Artwork, error) {
 		gif := strings.Replace(e.ChildAttr("source", "src"), "/pic/", "https://", 1)
 		gif, _ = url.QueryUnescape(gif)
 		res.Gallery = append(res.Gallery, &Media{
-			URL:      gif,
-			Animated: true,
+			URL:  gif,
+			Type: MediaTypeGIF,
+		})
+	})
+
+	c.OnHTML(".main-tweet .video-container", func(e *colly.HTMLElement) {
+		poster := e.ChildAttr("video", "poster")
+
+		poster = strings.Replace(poster, "/pic", "https://pbs.twimg.com", 1)
+		replacer := strings.NewReplacer(
+			"/pic", "https://pbs.twimg.com",
+			`%2F`, "/",
+			"%3Asmall", "",
+		)
+
+		res.Gallery = append(res.Gallery, &Media{
+			URL:  replacer.Replace(poster),
+			Type: MediaTypeVideo,
 		})
 	})
 
@@ -237,17 +262,38 @@ func (a Artwork) MessageSends(footer string) ([]*discordgo.MessageSend, error) {
 	eb.URL(a.url).Description(a.Content).TimestampString(a.Timestamp).Footer(footer, "")
 	eb.AddField("Retweets", strconv.Itoa(a.Retweets), true)
 	eb.AddField("Likes", strconv.Itoa(a.Likes), true)
+
+	msg := &discordgo.MessageSend{}
 	if length > 0 {
 		art := a.Gallery[0]
 
-		if art.Animated {
-			eb.AddField("Video", messages.ClickHere(art.URL))
-		} else {
+		switch art.Type {
+		case MediaTypeGIF:
+			resp, err := http.Get(art.URL)
+			if err != nil {
+				return nil, fmt.Errorf("error downloading twitter gif: %w", err)
+			}
+			defer resp.Body.Close()
+
+			b, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return nil, fmt.Errorf("error reading twitter gif: %w", err)
+			}
+
+			msg.Files = append(msg.Files, &discordgo.File{
+				Name:   fmt.Sprintf("%v.mp4", a.Snowflake),
+				Reader: bytes.NewReader(b),
+			})
+		case MediaTypeVideo:
+			eb.Image(art.URL)
+			eb.AddField("Info", "Embed image's a thumbnail.", true)
+		case MediaTypeImage:
 			eb.Image(art.URL)
 		}
 	}
 
-	tweets = append(tweets, &discordgo.MessageSend{Embed: eb.Finalize()})
+	msg.Embed = eb.Finalize()
+	tweets = append(tweets, msg)
 
 	if length > 1 {
 		for ind, art := range a.Gallery[1:] {

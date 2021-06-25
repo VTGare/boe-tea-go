@@ -100,3 +100,45 @@ func TestTwitterMatch(t *testing.T) {
 		assert.Equal(t, tt.expectedSnowflake, snowflake, tt.name)
 	}
 }
+
+func TestTwitterFind(t *testing.T) {
+	client := New()
+	tests := []struct {
+		name      string
+		snowflake string
+		want      func(*Artwork) bool
+		wantErr   error
+	}{
+		{
+			name:      "Twitter GIF",
+			snowflake: "1408344696980529153",
+			want: func(a *Artwork) bool {
+				if len(a.Gallery) == 0 {
+					return false
+				}
+
+				gif := a.Gallery[0]
+				return gif.Type == MediaTypeGIF && gif.URL == "https://video.twimg.com/tweet_video/E4tx4P5VcAMGP4F.mp4"
+			},
+		},
+		{
+			name:      "Twitter video",
+			snowflake: "1399456145236848640",
+			want: func(a *Artwork) bool {
+				if len(a.Gallery) == 0 {
+					return false
+				}
+
+				video := a.Gallery[0]
+				return video.Type == MediaTypeVideo && video.URL == "https://pbs.twimg.com/ext_tw_video_thumb/1399377616600141833/pu/img/q1nnSghkCfGlD7mM.jpg"
+			},
+		},
+	}
+
+	for _, test := range tests {
+		artwork, err := client.Find(test.snowflake)
+
+		assert.True(t, test.want(artwork.(*Artwork)), test.name)
+		assert.Equal(t, test.wantErr, err, test.name)
+	}
+}
