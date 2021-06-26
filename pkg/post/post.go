@@ -372,18 +372,19 @@ func (p *Post) generateMessages(artworks []artworks.Artwork, channelID string, c
 	messageSends := make([][]*discordgo.MessageSend, 0, len(artworks))
 	for _, artwork := range artworks {
 		if artwork != nil {
-			skipFirst := false
+			skipFirst := true
 
 			switch artwork := artwork.(type) {
 			case *twitter.Artwork:
 				//Skip first Twitter embed if not a command or the media type is MediaTypeImage.
-				var image bool
+				var animated bool
 				if len(artwork.Gallery) > 0 {
-					image = artwork.Gallery[0].Type == twitter.MediaTypeImage
+					t := artwork.Gallery[0].Type
+					animated = t == twitter.MediaTypeGIF || t == twitter.MediaTypeVideo
 				}
 
-				if p.ctx.Command == nil && !crosspost && image {
-					skipFirst = true
+				if p.ctx.Command != nil || crosspost || animated {
+					skipFirst = false
 				}
 			case *pixiv.Artwork:
 				ch, err := p.ctx.Session.Channel(channelID)
