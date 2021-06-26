@@ -202,7 +202,6 @@ func share(b *bot.Bot) func(ctx *gumi.Ctx) error {
 		allSent = append(allSent, sent...)
 
 		user, _ := b.Users.FindOne(context.Background(), ctx.Event.Author.ID)
-
 		if user != nil {
 			if group, ok := user.FindGroup(ctx.Event.ChannelID); ok {
 				sent, err := p.Crosspost(user.ID, group.Name, group.Children)

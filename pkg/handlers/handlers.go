@@ -212,6 +212,13 @@ func OnReactionAdd(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageReacti
 			return
 		}
 
+		log := b.Log.With(
+			"guild", r.GuildID,
+			"channel", r.ChannelID,
+			"message", r.MessageID,
+			"user", r.UserID,
+		)
+
 		name := r.Emoji.APIName()
 		switch {
 		case name == "❌":
@@ -227,7 +234,7 @@ func OnReactionAdd(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageReacti
 				return
 			}
 
-			b.Log.Infof(
+			log.Infof(
 				"Removing a message by reacting. Channel ID: %v. Message ID: %v. User ID: %v.",
 				r.ChannelID,
 				r.MessageID,
@@ -240,11 +247,11 @@ func OnReactionAdd(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageReacti
 
 			err := s.ChannelMessageDelete(r.ChannelID, r.MessageID)
 			if err != nil {
-				b.Log.Warn("OnReactionAdd -> s.ChannelMessageDelete: ", err)
+				log.Warn("OnReactionAdd -> s.ChannelMessageDelete: ", err)
 			}
 
 			if msg.Parent {
-				b.Log.Infof(
+				log.Infof(
 					"Removing children messages. Channel ID: %v. Parent ID: %v. User ID: %v.",
 					r.ChannelID,
 					r.MessageID,
@@ -252,7 +259,7 @@ func OnReactionAdd(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageReacti
 				)
 
 				for _, child := range msg.Children {
-					b.Log.Infof(
+					log.Infof(
 						"Removing a child message. Parent ID: %v. Channel ID: %v. Message ID: %v. User ID: %v.",
 						r.MessageID,
 						child.ChannelID,
@@ -266,7 +273,7 @@ func OnReactionAdd(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageReacti
 
 					err := s.ChannelMessageDelete(child.ChannelID, child.MessageID)
 					if err != nil {
-						b.Log.Warn("OnReactionAdd -> s.ChannelMessageDelete: ", err)
+						log.Warn("OnReactionAdd -> s.ChannelMessageDelete: ", err)
 					}
 				}
 			}
@@ -275,13 +282,13 @@ func OnReactionAdd(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageReacti
 
 			msg, err := s.ChannelMessage(r.ChannelID, r.MessageID)
 			if err != nil {
-				b.Log.Warn("OnReactionAdd -> ChannelMessage: ", err)
+				log.Warn("OnReactionAdd -> ChannelMessage: ", err)
 				return
 			}
 
 			dgUser, err := s.User(r.UserID)
 			if err != nil {
-				b.Log.Warn("OnReactionRemove -> User: ", err)
+				log.Warn("OnReactionRemove -> User: ", err)
 				return
 			}
 
@@ -306,7 +313,7 @@ func OnReactionAdd(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageReacti
 					if id, ok := provider.Match(url); ok {
 						artwork, err = provider.Find(id)
 						if err != nil {
-							b.Log.Warn("OnReactionAdd -> provider.Find: ", err)
+							log.Warn("OnReactionAdd -> provider.Find: ", err)
 							return
 						}
 
@@ -333,12 +340,12 @@ func OnReactionAdd(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageReacti
 			}, insert)
 
 			if err != nil {
-				b.Log.Warn("OnReactionAdd -> Artworks.FindOneOrCreate: ", err)
+				log.Warn("OnReactionAdd -> Artworks.FindOneOrCreate: ", err)
 				return
 			}
 
 			if created {
-				b.Log.Infof(
+				log.Infof(
 					"Created a new artwork. ID: %v. URL: %v. Images: %v",
 					artworkDB.ID,
 					artworkDB.URL,
@@ -348,11 +355,11 @@ func OnReactionAdd(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageReacti
 
 			user, err := b.Users.FindOneOrCreate(context.Background(), r.UserID)
 			if err != nil {
-				b.Log.Warn("OnReactionAdd -> Users.FindOneOrCreate: ", err)
+				log.Warn("OnReactionAdd -> Users.FindOneOrCreate: ", err)
 				return
 			}
 
-			b.Log.Infof("Inserting a favourite. User ID: %v. Artwork ID: %v", r.UserID, artworkDB.ID)
+			log.Infof("Inserting a favourite. User ID: %v. Artwork ID: %v", r.UserID, artworkDB.ID)
 			_, err = b.Users.InsertFavourite(context.Background(), r.UserID, &users.Favourite{
 				ArtworkID: artworkDB.ID,
 				NSFW:      nsfw,
@@ -363,7 +370,7 @@ func OnReactionAdd(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageReacti
 				switch {
 				case errors.Is(err, mongo.ErrNoDocuments):
 				default:
-					b.Log.Warn("OnReactionAdd -> InsertFavourite: ", err)
+					log.Warn("OnReactionAdd -> InsertFavourite: ", err)
 					return
 				}
 			}
@@ -395,6 +402,76 @@ func OnReactionAdd(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageReacti
 					}
 
 					s.ChannelMessageSendEmbed(ch.ID, eb.Finalize())
+				}
+			}
+		case name == "📫" || name == "📩":
+			msg, err := s.ChannelMessage(r.ChannelID, r.MessageID)
+			if err != nil {
+				log.Warn("OnReactionAdd (crosspost) -> ChannelMessage: ", err)
+				return
+			}
+
+			dgUser, err := s.User(r.UserID)
+			if err != nil {
+				log.Warn("OnReactionAdd (crosspost) -> User: ", err)
+				return
+			}
+
+			if dgUser.Bot {
+				return
+			}
+
+			url := ""
+			if len(msg.Embeds) > 0 {
+				embed := msg.Embeds[0]
+				url = embed.URL
+			}
+
+			regex := xurls.Strict()
+			if url == "" {
+				url = regex.FindString(msg.Content)
+			}
+
+			if url == "" {
+				return
+			}
+
+			msg.Author = dgUser
+			p := post.New(b, &gumi.Ctx{
+				Session: s,
+				Event: &discordgo.MessageCreate{
+					Message: msg,
+				},
+				Router: b.Router,
+			}, url)
+
+			sent := make([]*cache.MessageInfo, 0)
+			user, _ := b.Users.FindOne(context.Background(), r.UserID)
+			if user != nil {
+				if group, ok := user.FindGroup(r.ChannelID); ok {
+					sent, err = p.Crosspost(user.ID, group.Name, group.Children)
+					if err != nil {
+						log.Warn("OnReactionAdd (crosspost) -> post.Crosspost(): ", err)
+					}
+				}
+			}
+
+			if len(sent) > 0 {
+				b.EmbedCache.Set(
+					r.UserID,
+					r.ChannelID,
+					r.MessageID,
+					true,
+					sent...,
+				)
+
+				for _, msg := range sent {
+					b.EmbedCache.Set(
+						r.UserID,
+						msg.ChannelID,
+						msg.MessageID,
+						false,
+					)
 				}
 			}
 		}
