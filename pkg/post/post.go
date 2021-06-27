@@ -372,7 +372,7 @@ func (p *Post) generateMessages(artworks []artworks.Artwork, channelID string, c
 	messageSends := make([][]*discordgo.MessageSend, 0, len(artworks))
 	for _, artwork := range artworks {
 		if artwork != nil {
-			skipFirst := true
+			skipFirst := false
 
 			switch artwork := artwork.(type) {
 			case *twitter.Artwork:
@@ -383,8 +383,8 @@ func (p *Post) generateMessages(artworks []artworks.Artwork, channelID string, c
 					animated = t == twitter.MediaTypeGIF || t == twitter.MediaTypeVideo
 				}
 
-				if p.ctx.Command != nil || crosspost || animated {
-					skipFirst = false
+				if p.ctx.Command == nil && !crosspost && !animated {
+					skipFirst = true
 				}
 			case *pixiv.Artwork:
 				ch, err := p.ctx.Session.Channel(channelID)
