@@ -380,7 +380,7 @@ func (p *Post) generateMessages(artworks []artworks.Artwork, channelID string, c
 				var animated bool
 				if len(artwork.Gallery) > 0 {
 					t := artwork.Gallery[0].Type
-					animated = t == twitter.MediaTypeGIF || t == twitter.MediaTypeVideo
+					animated = t == twitter.MediaTypeGIF
 				}
 
 				if p.ctx.Command == nil && !crosspost && !animated {

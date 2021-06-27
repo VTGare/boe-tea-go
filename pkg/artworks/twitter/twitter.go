@@ -150,7 +150,7 @@ func (t Twitter) scrapeTwitter(snowflake, nitter string) (*Artwork, error) {
 		})
 	})
 
-	c.OnHTML(".main-tweet .video-container", func(e *colly.HTMLElement) {
+	/*c.OnHTML(".main-tweet .video-container", func(e *colly.HTMLElement) {
 		poster := e.ChildAttr("video", "poster")
 
 		poster = strings.Replace(poster, "/pic", "https://pbs.twimg.com", 1)
@@ -164,7 +164,7 @@ func (t Twitter) scrapeTwitter(snowflake, nitter string) (*Artwork, error) {
 			URL:  replacer.Replace(poster),
 			Type: MediaTypeVideo,
 		})
-	})
+	})*/
 
 	c.OnHTML(".main-tweet .icon-container", func(e *colly.HTMLElement) {
 		children := e.DOM.Children()
@@ -284,9 +284,6 @@ func (a Artwork) MessageSends(footer string) ([]*discordgo.MessageSend, error) {
 				Name:   fmt.Sprintf("%v.mp4", a.Snowflake),
 				Reader: bytes.NewReader(b),
 			})
-		case MediaTypeVideo:
-			eb.Image(art.URL)
-			eb.AddField("Info", "Embed image's a thumbnail.", true)
 		case MediaTypeImage:
 			eb.Image(art.URL)
 		}
