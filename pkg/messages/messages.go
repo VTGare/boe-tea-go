@@ -79,3 +79,7 @@ func FormatDuration(d time.Duration) string {
 	sb.WriteString(fmt.Sprintf("%02d seconds", seconds))
 	return sb.String()
 }
+
+func RelativeTimestamp(t time.Time) string {
+	return fmt.Sprintf("<t:%v:R>", t.Unix())
+}

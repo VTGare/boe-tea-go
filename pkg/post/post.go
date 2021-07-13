@@ -262,18 +262,18 @@ func (p *Post) fetch(guild *guilds.Guild, channelID string, crosspost bool) (*fe
 }
 
 func (p *Post) sendReposts(guild *guilds.Guild, reposts []*repost.Repost, timeout time.Duration) {
-	local := messages.RepostEmbed()
+	locale := messages.RepostEmbed()
 
 	eb := embeds.NewBuilder()
-	eb.Title(local.Title)
-	for _, rep := range reposts {
+	eb.Title(locale.Title)
+	for ind, rep := range reposts {
 		eb.AddField(
-			fmt.Sprintf("Artwork ID: %v", rep.ID),
+			fmt.Sprintf("#%v | %v", ind+1, rep.ID),
 			fmt.Sprintf(
-				"**%v:** %v\n**%v:** %v\n**URL:** %v",
-				local.OriginalMessage, messages.ClickHere(fmt.Sprintf("https://discord.com/channels/%v/%v/%v", rep.GuildID, rep.ChannelID, rep.MessageID)),
-				local.ExpiresIn, time.Until(rep.Expire).Round(time.Second),
-				messages.ClickHere(rep.URL),
+				"**%v %v**\n**URL:** %v\n\n%v",
+				locale.Expires, messages.RelativeTimestamp(rep.ExpiresAt),
+				rep.URL,
+				messages.NamedLink(locale.OriginalMessage, fmt.Sprintf("https://discord.com/channels/%v/%v/%v", rep.GuildID, rep.ChannelID, rep.MessageID)),
 			),
 		)
 	}
@@ -293,9 +293,8 @@ func (p *Post) send(guild *guilds.Guild, channelID string, artworks []artworks.A
 		return nil, nil
 	}
 
-	for range artworks {
-		p.bot.Metrics.IncrementArtwork()
-	}
+	lenArtworks := int64(len(artworks))
+	p.bot.Metrics.IncrementArtwork(lenArtworks)
 
 	allMessages, err := p.generateMessages(artworks, channelID, crosspost)
 	if err != nil {

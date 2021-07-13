@@ -16,7 +16,7 @@ func NewMemory() Detector {
 }
 
 func (rd inMemory) Create(rep *Repost, ttl time.Duration) error {
-	rep.Expire = time.Now().Add(ttl)
+	rep.ExpiresAt = time.Now().Add(ttl)
 	rd.cache.SetWithTTL(rd.key(rep), rep, ttl)
 
 	return nil

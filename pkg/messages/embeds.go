@@ -35,7 +35,7 @@ type CommandHelp struct {
 type Repost struct {
 	Title           string
 	OriginalMessage string
-	ExpiresIn       string
+	Expires         string
 }
 
 type About struct {
@@ -121,8 +121,8 @@ var embeds = map[Language]map[EmbedType]interface{}{
 
 		repost: &Repost{
 			Title:           "Repost detected",
-			OriginalMessage: "Original message",
-			ExpiresIn:       "Expires in",
+			OriginalMessage: "Jump to original message.",
+			Expires:         "Expires",
 		},
 
 		about: &About{

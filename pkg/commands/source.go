@@ -234,7 +234,7 @@ func sauceNAOEmbeds(sauces []*sengoku.Sauce) []*discordgo.MessageEmbed {
 				eb.URL(uri.String())
 				eb.AddField(
 					"URL",
-					messages.ClickHere(uri.String()),
+					uri.String(),
 				)
 			}
 

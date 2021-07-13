@@ -27,6 +27,6 @@ func (m *Metrics) IncrementCommand() {
 	atomic.AddInt64(&m.CommandsExecuted, 1)
 }
 
-func (m *Metrics) IncrementArtwork() {
-	atomic.AddInt64(&m.ArtworksSent, 1)
+func (m *Metrics) IncrementArtwork(delta int64) {
+	atomic.AddInt64(&m.ArtworksSent, delta)
 }

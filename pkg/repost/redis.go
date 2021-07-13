@@ -63,7 +63,7 @@ func (rd redisDetector) Find(channelID, artworkID string) (*Repost, error) {
 		return nil, err
 	}
 
-	rep.Expire = time.Now().Add(ttl)
+	rep.ExpiresAt = time.Now().Add(ttl)
 	return &rep, nil
 }
 

@@ -21,5 +21,5 @@ type Repost struct {
 	GuildID   string `redis:"guild_id"`
 	ChannelID string `redis:"channel_id"`
 	MessageID string `redis:"message_id"`
-	Expire    time.Time
+	ExpiresAt time.Time
 }
