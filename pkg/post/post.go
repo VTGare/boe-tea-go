@@ -3,7 +3,6 @@ package post
 import (
 	"context"
 	"fmt"
-	"math/rand"
 	"reflect"
 	"sync"
 	"sync/atomic"
@@ -296,7 +295,7 @@ func (p *Post) send(guild *guilds.Guild, channelID string, artworks []artworks.A
 	lenArtworks := int64(len(artworks))
 	p.bot.Metrics.IncrementArtwork(lenArtworks)
 
-	allMessages, err := p.generateMessages(artworks, channelID, crosspost)
+	allMessages, err := p.generateMessages(guild, artworks, channelID, crosspost)
 	if err != nil {
 		return nil, err
 	}
@@ -367,7 +366,7 @@ func (p *Post) send(guild *guilds.Guild, channelID string, artworks []artworks.A
 	return sent, nil
 }
 
-func (p *Post) generateMessages(artworks []artworks.Artwork, channelID string, crosspost bool) ([][]*discordgo.MessageSend, error) {
+func (p *Post) generateMessages(guild *guilds.Guild, artworks []artworks.Artwork, channelID string, crosspost bool) ([][]*discordgo.MessageSend, error) {
 	messageSends := make([][]*discordgo.MessageSend, 0, len(artworks))
 	for _, artwork := range artworks {
 		if artwork != nil {
@@ -398,15 +397,7 @@ func (p *Post) generateMessages(artworks []artworks.Artwork, channelID string, c
 				}
 			}
 
-			//Random number generator for a quote.
-			s := rand.NewSource(time.Now().Unix())
-			r := rand.New(s)
-
-			var quote string
-			if l := len(p.bot.Config.Quotes); l > 0 {
-				quote = p.bot.Config.Quotes[r.Intn(l)].Content
-			}
-
+			quote := p.bot.Config.RandomQuote(guild.NSFW)
 			sends, err := artwork.MessageSends(quote)
 			if err != nil {
 				return nil, err

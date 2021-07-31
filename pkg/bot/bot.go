@@ -21,20 +21,28 @@ import (
 )
 
 type Bot struct {
-	Guilds           guilds.Service
-	Users            users.Service
-	Artworks         artworksModel.Service
-	Log              *zap.SugaredLogger
-	Config           *config.Config
-	Router           *gumi.Router
-	ArtworkProviders []artworks.Provider
-	RepostDetector   repost.Detector
-	BannedUsers      *ttlcache.Cache
-	EmbedCache       *cache.EmbedCache
+	// models
+	Guilds   guilds.Service
+	Users    users.Service
+	Artworks artworksModel.Service
+
+	// misc.
+	Log    *zap.SugaredLogger
+	Config *config.Config
+	Router *gumi.Router
+
+	// caches
+	BannedUsers *ttlcache.Cache
+	EmbedCache  *cache.EmbedCache
+
+	// services
 	Sengoku          *sengoku.Sengoku
 	NHentai          *nhentai.API
 	Metrics          *metrics.Metrics
-	s                *discordgo.Session
+	ArtworkProviders []artworks.Provider
+	RepostDetector   repost.Detector
+
+	s *discordgo.Session
 }
 
 func New(config *config.Config, models *models.Models, logger *zap.SugaredLogger, rd repost.Detector) (*Bot, error) {

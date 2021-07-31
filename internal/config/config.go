@@ -2,7 +2,9 @@ package config
 
 import (
 	"encoding/json"
+	"math/rand"
 	"os"
+	"time"
 )
 
 //Config is an application configuration struct.
@@ -15,6 +17,8 @@ type Config struct {
 	Sentry     string   `json:"sentry"`
 	Encryption string   `json:"encryption"`
 	Quotes     []*Quote `json:"quotes"`
+
+	safeQuotes []*Quote
 }
 
 //Discord stores Discord bot configuration. Acquire bot token on Discord's Developer Portal. Prefixes must be below 5 characters each.
@@ -60,5 +64,33 @@ func FromFile(path string) (*Config, error) {
 		return nil, err
 	}
 
+	if len(cfg.Quotes) > 0 {
+		cfg.safeQuotes = make([]*Quote, 0)
+
+		for _, quote := range cfg.Quotes {
+			if !quote.NSFW {
+				cfg.safeQuotes = append(cfg.safeQuotes, quote)
+			}
+		}
+	}
+
 	return &cfg, nil
+}
+
+func (c *Config) RandomQuote(nsfw bool) string {
+	var quotes []*Quote
+	if nsfw {
+		quotes = c.Quotes
+	} else {
+		quotes = c.safeQuotes
+	}
+
+	if l := len(quotes); l > 0 {
+		s := rand.NewSource(time.Now().Unix())
+		r := rand.New(s)
+
+		return quotes[r.Intn(l)].Content
+	}
+
+	return ""
 }
