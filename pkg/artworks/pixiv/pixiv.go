@@ -2,7 +2,7 @@ package pixiv
 
 import (
 	"fmt"
-	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -21,6 +21,7 @@ import (
 type Pixiv struct {
 	app   *pixiv.AppPixivAPI
 	cache *ttlcache.Cache
+	regex *regexp.Regexp
 }
 
 type Artwork struct {
@@ -51,55 +52,22 @@ func New(authToken, refreshToken string) (artworks.Provider, error) {
 	cache := ttlcache.NewCache()
 	cache.SetTTL(30 * time.Minute)
 
-	return &Pixiv{pixiv.NewApp(), cache}, nil
+	return &Pixiv{
+		app:   pixiv.NewApp(),
+		cache: cache,
+		regex: regexp.MustCompile(
+			`(?i)http(?:s)?:\/\/(?:www\.)?pixiv\.net\/(?:en\/)?(?:artworks\/|member_illust\.php\?)(?:mode=medium\&)?(?:illust_id=)?([0-9]+)`,
+		),
+	}, nil
 }
 
 func (p Pixiv) Match(s string) (string, bool) {
-	u, err := url.ParseRequestURI(s)
-	if err != nil {
+	res := p.regex.FindStringSubmatch(s)
+	if res == nil {
 		return "", false
 	}
 
-	if !strings.Contains(u.Host, "pixiv.net") {
-		return "", false
-	}
-
-	parts := strings.FieldsFunc(u.Path, func(r rune) bool {
-		return r == '/'
-	})
-
-	if len(parts) == 0 || len(parts) == 1 && parts[0] == "en" {
-		return "", false
-	}
-
-	if parts[0] == "en" {
-		parts = parts[1:]
-	}
-
-	switch parts[0] {
-	case "artworks":
-		if len(parts) < 2 {
-			return "", false
-		}
-
-		id := parts[1]
-		if _, err := strconv.ParseUint(id, 10, 64); err != nil {
-			return "", false
-		}
-
-		return id, true
-	case "member_illust.php":
-		query := u.Query()
-
-		id := query.Get("illust_id")
-		if _, err := strconv.ParseUint(id, 10, 64); err != nil {
-			return "", false
-		}
-
-		return id, true
-	default:
-		return "", false
-	}
+	return res[1], true
 }
 
 func (p Pixiv) Find(id string) (artworks.Artwork, error) {
