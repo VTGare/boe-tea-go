@@ -24,17 +24,6 @@ import (
 
 func userGroup(b *bot.Bot) {
 	group := "user"
-
-	b.Router.RegisterCmd(&gumi.Command{
-		Name:        "profile",
-		Group:       group,
-		Description: "Shows user's profile and settings.",
-		Usage:       "bt!profile",
-		Example:     "bt!profile",
-		RateLimiter: gumi.NewRateLimiter(10 * time.Second),
-		Exec:        profile(b),
-	})
-
 	b.Router.RegisterCmd(&gumi.Command{
 		Name:        "groups",
 		Group:       group,
@@ -130,48 +119,18 @@ func userGroup(b *bot.Bot) {
 
 	b.Router.RegisterCmd(&gumi.Command{
 		Name:        "userset",
+		Aliases:     []string{"profile"},
 		Group:       group,
 		Description: "Changes user's settings.",
 		Usage:       "bt!userset <setting name> <new setting>",
 		Example:     "bt!userset dm false",
+		Flags: map[string]string{
+			"dm":        "**Options:** `[on, off]`. Switches most direct messages from the bot.",
+			"crosspost": "**Options:** `[on, off]`. Switches crossposting in general.",
+		},
 		RateLimiter: gumi.NewRateLimiter(10 * time.Second),
 		Exec:        userset(b),
 	})
-}
-
-func profile(b *bot.Bot) func(ctx *gumi.Ctx) error {
-	return func(ctx *gumi.Ctx) error {
-		user, err := b.Users.FindOneOrCreate(context.Background(), ctx.Event.Author.ID)
-		if err != nil {
-			return err
-		}
-
-		locale := messages.UserProfileEmbed(ctx.Event.Author.Username)
-		eb := embeds.NewBuilder()
-		eb.Title(locale.Title)
-		eb.Thumbnail(ctx.Event.Author.AvatarURL(""))
-
-		eb.AddField(
-			locale.Settings,
-			fmt.Sprintf(
-				"**%v:** %v | **%v:** %v",
-				locale.Crosspost, messages.FormatBool(user.Crosspost),
-				locale.DM, messages.FormatBool(user.DM),
-			),
-		)
-
-		eb.AddField(
-			locale.Stats,
-			fmt.Sprintf(
-				"**%v:** %v | **%v:** %v",
-				locale.Groups, len(user.Groups),
-				locale.Favourites, len(user.Favourites),
-			),
-		)
-
-		ctx.ReplyEmbed(eb.Finalize())
-		return nil
-	}
 }
 
 func groups(b *bot.Bot) func(ctx *gumi.Ctx) error {
@@ -565,58 +524,90 @@ func favourites(b *bot.Bot) func(ctx *gumi.Ctx) error {
 
 func userset(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
-		if ctx.Args.Len() < 2 {
+		switch {
+		case ctx.Args.Len() == 0:
+			user, err := b.Users.FindOneOrCreate(context.Background(), ctx.Event.Author.ID)
+			if err != nil {
+				return err
+			}
+
+			locale := messages.UserProfileEmbed(ctx.Event.Author.Username)
+			eb := embeds.NewBuilder()
+			eb.Title(locale.Title)
+			eb.Thumbnail(ctx.Event.Author.AvatarURL(""))
+
+			eb.AddField(
+				locale.Settings,
+				fmt.Sprintf(
+					"**%v:** %v | **%v:** %v",
+					locale.Crosspost, messages.FormatBool(user.Crosspost),
+					locale.DM, messages.FormatBool(user.DM),
+				),
+			)
+
+			eb.AddField(
+				locale.Stats,
+				fmt.Sprintf(
+					"**%v:** %v | **%v:** %v",
+					locale.Groups, len(user.Groups),
+					locale.Favourites, len(user.Favourites),
+				),
+			)
+
+			ctx.ReplyEmbed(eb.Finalize())
+			return nil
+		case ctx.Args.Len() < 2:
+			user, err := b.Users.FindOneOrCreate(context.Background(), ctx.Event.GuildID)
+			if err != nil {
+				return err
+			}
+
+			var (
+				settingName     = ctx.Args.Get(0)
+				newSetting      = ctx.Args.Get(1)
+				newSettingEmbed interface{}
+				oldSettingEmbed interface{}
+			)
+
+			switch settingName.Raw {
+			case "dm":
+				new, err := parseBool(newSetting.Raw)
+				if err != nil {
+					return err
+				}
+
+				oldSettingEmbed = user.DM
+				newSettingEmbed = new
+				user.DM = new
+			case "crosspost":
+				new, err := parseBool(newSetting.Raw)
+				if err != nil {
+					return err
+				}
+
+				oldSettingEmbed = user.Crosspost
+				newSettingEmbed = new
+				user.Crosspost = new
+			default:
+				return messages.ErrUnknownUserSetting(settingName.Raw)
+			}
+
+			_, err = b.Users.ReplaceOne(context.Background(), user)
+			if err != nil {
+				return err
+			}
+
+			eb := embeds.NewBuilder()
+			eb.InfoTemplate("Successfully changed user setting.")
+			eb.AddField("Setting name", settingName.Raw, true)
+			eb.AddField("Old setting", fmt.Sprintf("%v", oldSettingEmbed), true)
+			eb.AddField("New setting", fmt.Sprintf("%v", newSettingEmbed), true)
+
+			ctx.ReplyEmbed(eb.Finalize())
+			return nil
+		default:
 			return messages.ErrIncorrectCmd(ctx.Command)
 		}
-
-		user, err := b.Users.FindOneOrCreate(context.Background(), ctx.Event.GuildID)
-		if err != nil {
-			return err
-		}
-
-		var (
-			settingName     = ctx.Args.Get(0)
-			newSetting      = ctx.Args.Get(1)
-			newSettingEmbed interface{}
-			oldSettingEmbed interface{}
-		)
-
-		switch settingName.Raw {
-		case "dm":
-			new, err := parseBool(newSetting.Raw)
-			if err != nil {
-				return err
-			}
-
-			oldSettingEmbed = user.DM
-			newSettingEmbed = new
-			user.DM = new
-		case "crosspost":
-			new, err := parseBool(newSetting.Raw)
-			if err != nil {
-				return err
-			}
-
-			oldSettingEmbed = user.Crosspost
-			newSettingEmbed = new
-			user.Crosspost = new
-		default:
-			return messages.ErrUnknownUserSetting(settingName.Raw)
-		}
-
-		_, err = b.Users.ReplaceOne(context.Background(), user)
-		if err != nil {
-			return err
-		}
-
-		eb := embeds.NewBuilder()
-		eb.InfoTemplate("Successfully changed user setting.")
-		eb.AddField("Setting name", settingName.Raw, true)
-		eb.AddField("Old setting", fmt.Sprintf("%v", oldSettingEmbed), true)
-		eb.AddField("New setting", fmt.Sprintf("%v", newSettingEmbed), true)
-
-		ctx.ReplyEmbed(eb.Finalize())
-		return nil
 	}
 }
 
