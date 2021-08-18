@@ -310,6 +310,10 @@ func (a Artwork) URL() string {
 	return a.url
 }
 
+func (a Artwork) Len() int {
+	return a.Gallery.Len()
+}
+
 //Len returns the length of Tweets gallery.
 func (g Gallery) Len() int { return len(g) }
 

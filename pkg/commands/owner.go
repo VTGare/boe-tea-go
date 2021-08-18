@@ -30,7 +30,9 @@ func reply(b *bot.Bot) func(ctx *gumi.Ctx) error {
 		}
 
 		userID := strings.Trim(ctx.Args.Get(0).Raw, "<@!>")
-		ch, err := ctx.Session.UserChannelCreate(userID)
+
+		s := b.ShardManager.SessionForDM()
+		ch, err := s.UserChannelCreate(userID)
 		if err != nil {
 			return err
 		}
@@ -54,7 +56,7 @@ func reply(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			}
 		}
 
-		_, err = ctx.Session.ChannelMessageSendEmbed(ch.ID, eb.Finalize())
+		_, err = s.ChannelMessageSendEmbed(ch.ID, eb.Finalize())
 		if err != nil {
 			return err
 		}

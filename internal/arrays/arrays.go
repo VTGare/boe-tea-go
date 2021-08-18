@@ -33,6 +33,10 @@ func FilterString(ss []string, f func(string) bool) []string {
 }
 
 func MapString(ss []string, f func(string) string) []string {
+	if len(ss) == 0 {
+		return nil
+	}
+
 	mapped := make([]string, 0)
 
 	for _, str := range ss {

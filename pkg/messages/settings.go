@@ -24,19 +24,25 @@ func ErrUnknownRepostOption(option string) error {
 
 func ErrForeignChannel(id string) error {
 	return newUserError(
-		fmt.Sprintf("Cannot get channel <#%v>. The channel is from foreign server.", id),
+		fmt.Sprintf("Cannot get channel <#%v>. It's from a foreign server.", id),
 	)
 }
 
 func ErrAlreadyArtChannel(id string) error {
 	return newUserError(
-		fmt.Sprintf("Cannot add channel <#%v> to art channels. The channel is already an art channel.", id),
+		fmt.Sprintf("Cannot add channel <#%v> to art channels. It's already an art channel.", id),
+	)
+}
+
+func ErrNotArtChannel(id string) error {
+	return newUserError(
+		fmt.Sprintf("Cannot remove channel <#%v> from art channels. It's not an art channel.", id),
 	)
 }
 
 func ErrWrongChannelType(id string) error {
 	return newUserError(
-		fmt.Sprintf("Cannot add channel <#%v> to art channels. The channel is not a text channel or a category.", id),
+		fmt.Sprintf("Cannot add channel <#%v> to art channels. It's not a text channel or a category.", id),
 	)
 }
 

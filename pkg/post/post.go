@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -179,10 +180,6 @@ func (p *Post) fetch(guild *guilds.Guild, channelID string, crosspost bool) (*fe
 					p.bot.Log.Infof("Matched a URL: %v. Provider: %v", url, reflect.TypeOf(provider))
 					atomic.AddInt64(&matched, 1)
 
-					if guild.Reactions && p.ctx.Command == nil {
-						p.addReactions(p.ctx.Event.Message)
-					}
-
 					var isRepost bool
 					if guild.Repost != "disabled" {
 						rep, _ := p.bot.RepostDetector.Find(channelID, id)
@@ -215,14 +212,21 @@ func (p *Post) fetch(guild *guilds.Guild, channelID string, crosspost bool) (*fe
 						}
 					}
 
+					_, isTwitter := provider.(*twitter.Twitter)
 					// Only post the picture if the provider is enabled
 					// or the function is called from a command
 					// or we're crossposting a twitter artwork.
-					_, twitter := provider.(*twitter.Twitter)
-					if provider.Enabled(guild) || p.ctx.Command != nil || (crosspost && twitter) {
+					if provider.Enabled(guild) || p.ctx.Command != nil || (crosspost && isTwitter) {
 						artwork, err := provider.Find(id)
 						if err != nil {
 							return err
+						}
+
+						// Only add reactions to the original message for Twitter links.
+						if isTwitter && artwork != nil && artwork.Len() > 0 {
+							if guild.Reactions && p.ctx.Command == nil && isTwitter {
+								p.addReactions(p.ctx.Event.Message)
+							}
 						}
 
 						artworksChan <- artwork
@@ -317,7 +321,15 @@ func (p *Post) send(guild *guilds.Guild, channelID string, artworks []artworks.A
 
 	sent := make([]*cache.MessageInfo, 0, count)
 	sendMessage := func(send *discordgo.MessageSend) {
-		msg, _ := p.ctx.Session.ChannelMessageSendComplex(channelID, send)
+		var s *discordgo.Session
+		if crosspost {
+			guildID, _ := strconv.ParseInt(guild.ID, 10, 64)
+			s = p.bot.ShardManager.SessionForGuild(guildID)
+		} else {
+			s = p.ctx.Session
+		}
+
+		msg, _ := s.ChannelMessageSendComplex(channelID, send)
 
 		if msg != nil {
 			sent = append(sent, &cache.MessageInfo{

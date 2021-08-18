@@ -159,3 +159,7 @@ func (a Artwork) ToModel() *models.ArtworkInsert {
 func (a Artwork) URL() string {
 	return a.url
 }
+
+func (a Artwork) Len() int {
+	return 1
+}

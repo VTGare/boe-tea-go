@@ -241,6 +241,10 @@ func (a Artwork) URL() string {
 	return a.url
 }
 
+func (a Artwork) Len() int {
+	return a.Pages
+}
+
 func (a Artwork) imageURLs() []string {
 	urls := make([]string, 0, len(a.Images))
 

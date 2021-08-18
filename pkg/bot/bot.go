@@ -17,6 +17,7 @@ import (
 	"github.com/VTGare/gumi"
 	"github.com/VTGare/sengoku"
 	"github.com/bwmarrin/discordgo"
+	"github.com/servusdei2018/shards"
 	"go.uber.org/zap"
 )
 
@@ -27,9 +28,10 @@ type Bot struct {
 	Artworks artworksModel.Service
 
 	// misc.
-	Log    *zap.SugaredLogger
-	Config *config.Config
-	Router *gumi.Router
+	Log     *zap.SugaredLogger
+	Config  *config.Config
+	Metrics *metrics.Metrics
+	Router  *gumi.Router
 
 	// caches
 	BannedUsers *ttlcache.Cache
@@ -38,20 +40,19 @@ type Bot struct {
 	// services
 	Sengoku          *sengoku.Sengoku
 	NHentai          *nhentai.API
-	Metrics          *metrics.Metrics
 	ArtworkProviders []artworks.Provider
 	RepostDetector   repost.Detector
 
-	s *discordgo.Session
+	ShardManager *shards.Manager
 }
 
 func New(config *config.Config, models *models.Models, logger *zap.SugaredLogger, rd repost.Detector) (*Bot, error) {
-	dg, err := discordgo.New("Bot " + config.Discord.Token)
+	mgr, err := shards.New("Bot " + config.Discord.Token)
 	if err != nil {
 		return nil, err
 	}
-	dg.Identify.Intents = discordgo.IntentsAllWithoutPrivileged
 
+	mgr.RegisterIntent(discordgo.IntentsAllWithoutPrivileged)
 	banned := ttlcache.NewCache()
 	banned.SetTTL(15 * time.Second)
 
@@ -72,7 +73,7 @@ func New(config *config.Config, models *models.Models, logger *zap.SugaredLogger
 		Metrics:        metrics.New(),
 		NHentai:        nhentai.New(),
 		Sengoku:        sg,
-		s:              dg,
+		ShardManager:   mgr,
 	}, nil
 }
 
@@ -85,13 +86,13 @@ func (b *Bot) AddProvider(provider artworks.Provider) {
 }
 
 func (b *Bot) AddHandler(handler interface{}) {
-	b.s.AddHandler(handler)
+	b.ShardManager.AddHandler(handler)
 }
 
 func (b *Bot) Open() error {
-	b.Router.Initialize(b.s)
+	b.ShardManager.AddHandler(b.Router.Handler())
 
-	err := b.s.Open()
+	err := b.ShardManager.Start()
 	if err != nil {
 		return err
 	}
@@ -101,5 +102,5 @@ func (b *Bot) Open() error {
 }
 
 func (b *Bot) Close() error {
-	return b.s.Close()
+	return b.ShardManager.Shutdown()
 }

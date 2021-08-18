@@ -16,6 +16,7 @@ import (
 	"github.com/VTGare/boe-tea-go/internal/encrypt"
 	"github.com/VTGare/boe-tea-go/pkg/bot"
 	"github.com/VTGare/boe-tea-go/pkg/messages"
+	"github.com/VTGare/boe-tea-go/pkg/models/guilds"
 	"github.com/VTGare/embeds"
 	"github.com/VTGare/gumi"
 	"github.com/bwmarrin/discordgo"
@@ -92,9 +93,22 @@ func generalGroup(b *bot.Bot) {
 	})
 
 	b.Router.RegisterCmd(&gumi.Command{
+		Name:        "artchannels",
+		Group:       group,
+		Aliases:     []string{"ac", "artchannel"},
+		Description: "List or add/remove artchannels.",
+		Usage:       "bt!artchannels <add/remove> [channel ids/category id...]",
+		Example:     "bt!artchannels add #sfw #nsfw #basement",
+		GuildOnly:   true,
+		Permissions: discordgo.PermissionAdministrator | discordgo.PermissionManageServer,
+		RateLimiter: gumi.NewRateLimiter(5 * time.Second),
+		Exec:        artchannels(b),
+	})
+
+	b.Router.RegisterCmd(&gumi.Command{
 		Name:        "addchannel",
 		Group:       group,
-		Aliases:     []string{"artchannel"},
+		Aliases:     []string{"artchannels"},
 		Description: "Adds a new art channel to server settings.",
 		Usage:       "bt!addchannel [channel ids/category id...]",
 		Example:     "bt!addchannel #sfw #nsfw #basement",
@@ -107,7 +121,7 @@ func generalGroup(b *bot.Bot) {
 	b.Router.RegisterCmd(&gumi.Command{
 		Name:        "rmchannel",
 		Group:       group,
-		Aliases:     []string{"removechannel"},
+		Aliases:     []string{"remchannel", "removechannel"},
 		Description: "Removes an art channel from server settings.",
 		Usage:       "bt!rmchannel [channel ids/category id...]",
 		Example:     "bt!rmchannel #sfw #nsfw #basement",
@@ -323,45 +337,31 @@ func stats(b *bot.Bot) func(ctx *gumi.Ctx) error {
 		)
 		runtime.ReadMemStats(&mem)
 
-		guilds := len(s.State.Guilds)
-		channels := 0
-		for _, g := range s.State.Guilds {
-			channels += len(g.Channels)
+		guilds := b.ShardManager.GuildCount()
+		shards := b.ShardManager.ShardCount
+
+		b.ShardManager.RLock()
+		defer b.ShardManager.RUnlock()
+
+		var channels int
+		for _, shard := range b.ShardManager.Shards {
+			for _, guild := range shard.Session.State.Guilds {
+				channels += len(guild.Channels)
+			}
 		}
 
 		latency := s.HeartbeatLatency().Round(1 * time.Millisecond)
 
 		eb := embeds.NewBuilder()
 		eb.Title("Bot stats")
-		eb.AddField(
-			"Guilds",
-			strconv.Itoa(guilds),
-			true,
-		).AddField(
-			"Channels",
-			strconv.Itoa(channels),
-			true,
-		).AddField(
-			"Latency",
-			latency.String(),
-			true,
-		).AddField(
-			"Uptime",
-			messages.FormatDuration(b.Metrics.Uptime),
-			true,
-		).AddField(
-			"Commands executed",
-			strconv.FormatInt(b.Metrics.CommandsExecuted, 10),
-			true,
-		).AddField(
-			"Artworks sent",
-			strconv.FormatInt(b.Metrics.ArtworksSent, 10),
-			true,
-		).AddField(
-			"RAM used",
-			fmt.Sprintf("%v MB", mem.Alloc/1024/1024),
-			true,
-		)
+		eb.AddField("Guilds", strconv.Itoa(guilds), true).
+			AddField("Channels", strconv.Itoa(channels), true).
+			AddField("Shards", strconv.Itoa(shards), true).
+			AddField("Commands executed", strconv.FormatInt(b.Metrics.CommandsExecuted, 10), true).
+			AddField("Artworks sent", strconv.FormatInt(b.Metrics.ArtworksSent, 10), true).
+			AddField("Latency", latency.String(), true).
+			AddField("Uptime", messages.FormatDuration(b.Metrics.Uptime), true).
+			AddField("RAM used", fmt.Sprintf("%v MB", mem.Alloc/1024/1024), true)
 
 		return ctx.ReplyEmbed(eb.Finalize())
 	}
@@ -440,18 +440,17 @@ func set(b *bot.Bot) func(ctx *gumi.Ctx) error {
 				),
 			)
 
-			if len(guild.ArtChannels) > 0 {
-				eb.AddField(
-					msg.ArtChannels,
+			eb.AddField(
+				msg.ArtChannels,
+				"Use `bt!artchannels` command to list or manage art channels!\n"+
 					strings.Join(arrays.MapString(guild.ArtChannels, func(s string) string {
 						if len(guild.ArtChannels) > 15 {
-							return fmt.Sprintf("`%v`", s)
+							return ""
 						}
 
 						return fmt.Sprintf("<#%v> | `%v`", s, s)
 					}), "\n"),
-				)
-			}
+			)
 
 			ctx.ReplyEmbed(eb.Finalize())
 			return nil
@@ -599,6 +598,178 @@ func set(b *bot.Bot) func(ctx *gumi.Ctx) error {
 
 			ctx.ReplyEmbed(eb.Finalize())
 			return nil
+		default:
+			return messages.ErrIncorrectCmd(ctx.Command)
+		}
+	}
+}
+
+func artchannels(b *bot.Bot) func(ctx *gumi.Ctx) error {
+	return func(ctx *gumi.Ctx) error {
+		switch {
+		case ctx.Args.Len() == 0:
+			guild, err := b.Guilds.FindOne(context.Background(), ctx.Event.GuildID)
+			if err != nil {
+				return messages.ErrGuildNotFound(err, ctx.Event.GuildID)
+			}
+
+			gd, err := ctx.Session.Guild(ctx.Event.GuildID)
+			if err != nil {
+				return messages.ErrGuildNotFound(err, ctx.Event.GuildID)
+			}
+
+			var (
+				eb = embeds.NewBuilder()
+				sb = &strings.Builder{}
+
+				added int
+			)
+
+			eb.Title("Art channels")
+			eb.Thumbnail(gd.IconURL())
+			if len(guild.ArtChannels) == 0 {
+				eb.Description("You haven't added any art channels yet. Add your first art channel using `bt!artchannels add <channel mention>` command.")
+
+				return ctx.ReplyEmbed(eb.Finalize())
+			}
+
+			eb.Footer("Total: "+strconv.Itoa(len(guild.ArtChannels)), "")
+			channelEmbeds := make([]*discordgo.MessageEmbed, 0)
+			for _, channel := range guild.ArtChannels {
+				sb.WriteString(
+					fmt.Sprintf("%v. <#%v> | `%v`\n", added+1, channel, channel),
+				)
+
+				added++
+				if added%10 == 0 {
+					eb.Description(sb.String())
+					channelEmbeds = append(channelEmbeds, eb.Finalize())
+
+					eb = embeds.NewBuilder()
+					eb.Title("Art channels")
+					eb.Thumbnail(gd.IconURL())
+					eb.Footer("Total: "+strconv.Itoa(len(guild.ArtChannels)), "")
+
+					sb.Reset()
+				}
+			}
+
+			if added%10 > 0 {
+				eb.Description(sb.String())
+				channelEmbeds = append(channelEmbeds, eb.Finalize())
+			}
+
+			wg := dgoutils.NewWidget(ctx.Session, ctx.Event.Author.ID, channelEmbeds)
+			return wg.Start(ctx.Event.ChannelID)
+		case ctx.Args.Len() >= 2:
+			var (
+				action = ctx.Args.Get(0)
+
+				filter  func(guild *guilds.Guild, channelID string) error
+				execute func(guildID string, channels []string) error
+			)
+
+			switch action.Raw {
+			case "add":
+				execute = func(guildID string, channels []string) error {
+					if _, err := b.Guilds.InsertArtChannels(context.Background(), guildID, channels); err != nil {
+						return err
+					}
+
+					eb := embeds.NewBuilder()
+					eb.SuccessTemplate(messages.AddArtChannelSuccess(channels))
+					return ctx.ReplyEmbed(eb.Finalize())
+				}
+
+				filter = func(guild *guilds.Guild, channelID string) error {
+					exists := false
+					for _, artChannelID := range guild.ArtChannels {
+						if artChannelID == channelID {
+							exists = true
+						}
+					}
+
+					if exists {
+						return messages.ErrAlreadyArtChannel(channelID)
+					}
+
+					return nil
+				}
+			case "remove":
+				execute = func(guildID string, channels []string) error {
+					if _, err := b.Guilds.DeleteArtChannels(context.Background(), guildID, channels); err != nil {
+						return err
+					}
+
+					eb := embeds.NewBuilder()
+					eb.SuccessTemplate(messages.RemoveArtChannelSuccess(channels))
+					return ctx.ReplyEmbed(eb.Finalize())
+				}
+
+				filter = func(guild *guilds.Guild, channelID string) error {
+					exists := false
+					for _, artChannelID := range guild.ArtChannels {
+						if artChannelID == channelID {
+							exists = true
+						}
+					}
+
+					if !exists {
+						return messages.ErrNotArtChannel(channelID)
+					}
+
+					return nil
+				}
+			}
+
+			guild, err := b.Guilds.FindOne(context.Background(), ctx.Event.GuildID)
+			if err != nil {
+				return messages.ErrGuildNotFound(err, ctx.Event.GuildID)
+			}
+
+			channels := make([]string, 0)
+			for _, arg := range ctx.Args.Arguments[1:] {
+				ch, err := ctx.Session.Channel(strings.Trim(arg.Raw, "<#>"))
+				if err != nil {
+					return err
+				}
+
+				if ch.GuildID != guild.ID {
+					return messages.ErrForeignChannel(ch.ID)
+				}
+
+				switch ch.Type {
+				case discordgo.ChannelTypeGuildText:
+					if err := filter(guild, ch.ID); err != nil {
+						return err
+					}
+
+					channels = append(channels, ch.ID)
+				case discordgo.ChannelTypeGuildCategory:
+					gcs, err := ctx.Session.GuildChannels(guild.ID)
+					if err != nil {
+						return err
+					}
+
+					for _, gc := range gcs {
+						if gc.Type != discordgo.ChannelTypeGuildText {
+							continue
+						}
+
+						if gc.ParentID == ch.ID {
+							if err := filter(guild, ch.ID); err != nil {
+								return err
+							}
+
+							channels = append(channels, gc.ID)
+						}
+					}
+				default:
+					return nil
+				}
+			}
+
+			return execute(guild.ID, channels)
 		default:
 			return messages.ErrIncorrectCmd(ctx.Command)
 		}

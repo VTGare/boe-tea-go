@@ -376,6 +376,7 @@ func OnReactionAdd(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageReacti
 			}
 
 			if user.DM {
+				s := b.ShardManager.SessionForDM()
 				ch, err := s.UserChannelCreate(user.ID)
 				if err == nil {
 					var (
@@ -576,6 +577,7 @@ func OnReactionRemove(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageRea
 				}
 
 				if user.DM {
+					s := b.ShardManager.SessionForDM()
 					ch, err := s.UserChannelCreate(user.ID)
 					if err == nil {
 						var (
