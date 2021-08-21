@@ -557,7 +557,7 @@ func userset(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			ctx.ReplyEmbed(eb.Finalize())
 			return nil
 		case ctx.Args.Len() >= 2:
-			user, err := b.Users.FindOneOrCreate(context.Background(), ctx.Event.GuildID)
+			user, err := b.Users.FindOneOrCreate(context.Background(), ctx.Event.Author.ID)
 			if err != nil {
 				return err
 			}
