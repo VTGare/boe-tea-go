@@ -210,7 +210,7 @@ func (a Artwork) MessageSends(quote string) ([]*discordgo.MessageSend, error) {
 		"Likes", strconv.Itoa(a.Likes), true,
 	).AddField(
 		"Original quality",
-		messages.ClickHere(a.Images[0].originalPixivMoe()),
+		messages.ClickHere(a.Images[0].originalProxy()),
 		true,
 	).Timestamp(
 		time.Now(),
@@ -218,17 +218,17 @@ func (a Artwork) MessageSends(quote string) ([]*discordgo.MessageSend, error) {
 		quote, "",
 	)
 
-	eb.Image(a.Images[0].previewPixivMoe())
+	eb.Image(a.Images[0].previewProxy())
 	pages = append(pages, &discordgo.MessageSend{Embed: eb.Finalize()})
 	if length > 1 {
 		for ind, image := range a.Images[1:] {
 			eb := embeds.NewBuilder()
 
 			eb.Title(fmt.Sprintf("%v by %v | Page %v / %v", a.Title, a.Author, ind+2, length))
-			eb.Image(image.previewPixivMoe())
+			eb.Image(image.previewProxy())
 			eb.URL(a.url).Timestamp(time.Now()).Footer(quote, "")
 			eb.AddField("Likes", strconv.Itoa(a.Likes), true)
-			eb.AddField("Original quality", messages.ClickHere(image.originalPixivMoe()), true)
+			eb.AddField("Original quality", messages.ClickHere(image.originalProxy()), true)
 
 			pages = append(pages, &discordgo.MessageSend{Embed: eb.Finalize()})
 		}
@@ -249,16 +249,16 @@ func (a Artwork) imageURLs() []string {
 	urls := make([]string, 0, len(a.Images))
 
 	for _, img := range a.Images {
-		urls = append(urls, img.originalPixivMoe())
+		urls = append(urls, img.originalProxy())
 	}
 
 	return urls
 }
 
-func (i Image) originalPixivMoe() string {
-	return "https://api.pixiv.moe/image/" + strings.TrimPrefix(i.Original, "https://")
+func (i Image) originalProxy() string {
+	return strings.Replace(i.Original, "https://i.pximg.net", "https://boe-tea-pximg.herokuapp.com", 1)
 }
 
-func (i Image) previewPixivMoe() string {
-	return "https://api.pixiv.moe/image/" + strings.TrimPrefix(i.Preview, "https://")
+func (i Image) previewProxy() string {
+	return strings.Replace(i.Preview, "https://i.pximg.net", "https://boe-tea-pximg.herokuapp.com", 1)
 }
