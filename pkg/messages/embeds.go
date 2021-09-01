@@ -88,10 +88,11 @@ type DeviantSettings struct {
 }
 
 type Features struct {
-	Title     string
-	Repost    string
-	Crosspost string
-	Reactions string
+	Title            string
+	Repost           string
+	RepostExpiration string
+	Crosspost        string
+	Reactions        string
 }
 
 type UserProfile struct {
@@ -131,7 +132,7 @@ var embeds = map[Language]map[EmbedType]interface{}{
 				"Boe Tea is an ultimate artwork bot for all your artwork related needs. %v\n***%v:***\n%v\nYou guys are epic!",
 				"If you want to copy the invite link, simply right-click it and press Copy Link.",
 				"Many thanks to our patrons",
-				"• Nom\n• Danyo\n• tuba\n• Jeffrey",
+				"• Nom\n• Danyo\n• tuba\n• Jeffrey\n• ... and other anonymous supporters!",
 			),
 			SupportServer: "Support server",
 			InviteLink:    "Invite link",
@@ -153,26 +154,27 @@ var embeds = map[Language]map[EmbedType]interface{}{
 				Title:       "General",
 				Prefix:      "Prefix",
 				NSFW:        "NSFW",
-				SauceNAOKey: "SauceNAO custom key",
+				SauceNAOKey: "SauceNAO API key __(saucenao)__",
 			},
 			TwitterSettings: &TwitterSettings{
 				Title:   "Twitter settings",
-				Enabled: "Status (twitter)",
+				Enabled: "Status __(twitter)__",
 			},
 			DeviantSettings: &DeviantSettings{
 				Title:   "DeviantArt settings",
-				Enabled: "Status (deviant)",
+				Enabled: "Status __(deviant)__",
 			},
 			PixivSettings: &PixivSettings{
 				Title:   "Pixiv settings",
-				Enabled: "Status (pixiv)",
+				Enabled: "Status __(pixiv)__",
 				Limit:   "Limit",
 			},
 			Features: &Features{
-				Title:     "Features",
-				Repost:    "Repost",
-				Crosspost: "Crosspost",
-				Reactions: "Reactions",
+				Title:            "Features",
+				Repost:           "Repost",
+				RepostExpiration: "Expiration __(repost.expiration)__",
+				Crosspost:        "Crosspost",
+				Reactions:        "Reactions",
 			},
 		},
 

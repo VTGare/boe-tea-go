@@ -408,8 +408,9 @@ func set(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			eb.AddField(
 				msg.Features.Title,
 				fmt.Sprintf(
-					"**%v**: %v | **%v**: %v | **%v**: %v",
+					"**%v**: %v | **%v**: %v\n**%v**: %v | **%v**: %v",
 					msg.Features.Repost, guild.Repost,
+					msg.Features.RepostExpiration, guild.RepostExpiration,
 					msg.Features.Crosspost, messages.FormatBool(guild.Crosspost),
 					msg.Features.Reactions, messages.FormatBool(guild.Reactions),
 				),
@@ -511,6 +512,19 @@ func set(b *bot.Bot) func(ctx *gumi.Ctx) error {
 				oldSettingEmbed = guild.Repost
 				newSettingEmbed = newSetting.Raw
 				guild.Repost = newSetting.Raw
+			case "repost.expiration":
+				dur, err := time.ParseDuration(newSetting.Raw)
+				if err != nil {
+					return messages.ErrParseDuration(newSetting.Raw)
+				}
+
+				if dur < 1*time.Minute {
+					return messages.ErrExpirationTooShort(newSetting.Raw)
+				}
+
+				oldSettingEmbed = guild.RepostExpiration
+				newSettingEmbed = dur
+				guild.RepostExpiration = dur
 			case "nsfw":
 				nsfw, err := parseBool(newSetting.Raw)
 				if err != nil {
@@ -661,7 +675,22 @@ func artchannels(b *bot.Bot) func(ctx *gumi.Ctx) error {
 
 			wg := dgoutils.NewWidget(ctx.Session, ctx.Event.Author.ID, channelEmbeds)
 			return wg.Start(ctx.Event.ChannelID)
+
 		case ctx.Args.Len() >= 2:
+			perms, err := dgoutils.MemberHasPermission(
+				ctx.Session,
+				ctx.Event.GuildID,
+				ctx.Event.Author.ID,
+				discordgo.PermissionAdministrator|discordgo.PermissionManageServer,
+			)
+			if err != nil {
+				return err
+			}
+
+			if !perms {
+				return ctx.Router.OnNoPermissionsCallback(ctx)
+			}
+
 			var (
 				action = ctx.Args.Get(0)
 

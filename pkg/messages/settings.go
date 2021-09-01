@@ -18,6 +18,21 @@ func ErrParseInt(value string) error {
 	return newUserError(fmt.Sprintf("Failed to parse %v to integer", value))
 }
 
+func ErrParseDuration(value string) error {
+	return newUserError(
+		fmt.Sprintf("Failed to parse `%v` to duration. Valid time units are \"ns\", \"ms\", \"s\", \"m\", \"h\".\n%v",
+			value,
+			"**Example:**\n 1h30m",
+		),
+	)
+}
+
+func ErrExpirationTooShort(value string) error {
+	return newUserError(
+		fmt.Sprintf("Duration `%v` is too short. Minimum one minute `1m` is required.", value),
+	)
+}
+
 func ErrUnknownRepostOption(option string) error {
 	return newUserError(fmt.Sprintf("Repost option `%v` doesn't exist. Available options are `[enabled, disabled, strict]`", option))
 }

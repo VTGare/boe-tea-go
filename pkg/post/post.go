@@ -204,7 +204,7 @@ func (p *Post) fetch(guild *guilds.Guild, channelID string, crosspost bool) (*fe
 								ChannelID: channelID,
 								MessageID: p.ctx.Event.ID,
 							},
-							24*time.Hour,
+							guild.RepostExpiration,
 						)
 
 						if err != nil {
