@@ -46,7 +46,7 @@ func reply(b *bot.Bot) func(ctx *gumi.Ctx) error {
 		).Description(
 			strings.TrimPrefix(
 				strings.TrimSpace(ctx.Args.Raw),
-				userID,
+				ctx.Args.Get(0).Raw,
 			),
 		)
 

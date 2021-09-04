@@ -108,7 +108,7 @@ func generalGroup(b *bot.Bot) {
 	b.Router.RegisterCmd(&gumi.Command{
 		Name:        "addchannel",
 		Group:       group,
-		Aliases:     []string{"artchannels"},
+		Aliases:     []string{},
 		Description: "Adds a new art channel to server settings.",
 		Usage:       "bt!addchannel [channel ids/category id...]",
 		Example:     "bt!addchannel #sfw #nsfw #basement",
@@ -518,8 +518,8 @@ func set(b *bot.Bot) func(ctx *gumi.Ctx) error {
 					return messages.ErrParseDuration(newSetting.Raw)
 				}
 
-				if dur < 1*time.Minute {
-					return messages.ErrExpirationTooShort(newSetting.Raw)
+				if dur < 1*time.Minute || dur > 168*time.Hour {
+					return messages.ErrExpirationOutOfRange(newSetting.Raw)
 				}
 
 				oldSettingEmbed = guild.RepostExpiration

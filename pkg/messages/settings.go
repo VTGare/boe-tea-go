@@ -27,9 +27,9 @@ func ErrParseDuration(value string) error {
 	)
 }
 
-func ErrExpirationTooShort(value string) error {
+func ErrExpirationOutOfRange(value string) error {
 	return newUserError(
-		fmt.Sprintf("Duration `%v` is too short. Minimum one minute `1m` is required.", value),
+		fmt.Sprintf("Duration `%v` is too short or too long. Minimum expiration is one minute `1m`, maximum expiration is `168h`.", value),
 	)
 }
 

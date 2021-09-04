@@ -12,7 +12,8 @@ import (
 )
 
 var (
-	nuggetsTemplate = template.Must(template.New("nuggets").Parse(`>{{.Ryo}} and {{.Amelia}} sits side by side watching a movie
+	nuggetsTemplatePart1 = template.Must(template.New("nuggets").Parse(
+		`>{{.Ryo}} and {{.Amelia}} sits side by side watching a movie
 >They're eating pack of chicken nuggets while watching
 >Somehow the takeout didn't include much bbq sauce except for a half filled one
 >Sauce has been depleted after {{.Ryo}} has eaten 3 nuggets
@@ -28,6 +29,37 @@ var (
 >{{.Ryo}}: oi {{.Amelia}}! What did you feed me??
 >{{.Amelia}} licks a noticeable drool on her lips
 >{{.Amelia}}: It's a secret~`))
+
+	nuggetsTemplatePart2 = template.Must(template.New("nuggets2").Parse(
+		`The smell of roasted beans fills the air inside a building with plastered white walls engraved with vine-like looking aesthetics. Potted plants lined up outside a humongous window of this one-story building. Outside the window shows a street parked with cars, varying vehicles being driven, and pedestrians walking on their lanes, crossing modern city streets.
+This window was engraved with the letters, "ADB Cafe"
+The placed was almost crowded. It was a weekend after all. It was one of Holocity's trending establishments.
+"Teamates only!" The manager dressed in a yellow shirt, black pants and black leather shoes told a customer in line. It didn't take long for a security guard to approach this unwelcomed guest.
+Among this crowd, sits {{.Shinaro}}. He was muttering... contemplating—reflecting on what words to say next. He kept talking to himself for a while now. Twenty minutes have passed from the time he agreed on with the person he was meeting.
+"We will..." 
+He stuttered. 
+"No," He changed his mind. "Let's have a nice cup of coffee together," He finally settled with what he'll say next. He thought, that it had to be perfect.
+This meeting... it has to be perfect. He thought.
+After all, he was meeting someone special.
+A bell chimed as a person entered the door. {{.Shinaro}} turned his head to look.
+A woman with blonde hair, in a detective's cap and a monocle-style hairpin entered. She was happy seeing the teamates enjoying the cafe. As she walked in, the customer being warned by the manager was already being forcefully kicked out the door that was already behind her.
+She paid no heed to this as she entered hiccuping.
+{{.Shinaro}} turned his head away from this woman. She wasn't the one he was looking for. He waited, looking at his golden watch as the time continues to pass just to see this person he wanted to see the most.`))
+
+	nuggetsTemplatePart3 = template.Must(template.New("nuggets3").Parse(
+		`The cafe's bell chimed once more. {{.Shinaro}} turned to look, eager to finally meet the person he wanted to see for so long.
+A man with white hair, dressed in an all-black shirt, pants, tie and shoes in a detective's cap entered. He had a plastic bag. Who knows what is inside it.
+It was {{.VT}}.
+{{.Shinaro}}'s pupils dilated upon seeing this man.
+{{.VT}} looked around the crowded cafe. It didn't take long for him to find {{.Shinaro}}. He smiled at him.
+{{.VT}} walked to {{.Shinaro}}'s table. He sat down with him on a chair across the table they reserved.
+"You're late." {{.Shinaro}} said.
+"I know."
+{{.Shinaro}} was worried. He practiced and thought of what to say for so long, but the words he planned to say at first didn't come to his mind.
+"So, to apologize for making you wait this long, I brought a little something," {{.VT}} placed the plastic bag on the table, and pulled out a red and white box that was labeled "KFP"
+He opened the box, to present its contents.
+"N-Nuggets...?" {{.Shinaro}} said.
+"Yes." {{.VT}} said with the chicken nugget held on his fingertips, placed near his mouth, as he stared intently into {{.Shinaro}}'s eyes.`))
 )
 
 func memesGroup(b *bot.Bot) {
@@ -96,9 +128,45 @@ func nuggets(b *bot.Bot) func(ctx *gumi.Ctx) error {
 		}{Amelia: ctx.Args.Get(1).Raw, Ryo: ctx.Args.Get(0).Raw}
 
 		buf := new(bytes.Buffer)
-		nuggetsTemplate.Execute(buf, n)
+		nuggetsTemplatePart1.Execute(buf, n)
 
 		ctx.Reply(buf.String())
 		return nil
+	}
+}
+
+func nuggets2(b *bot.Bot) func(ctx *gumi.Ctx) error {
+	return func(ctx *gumi.Ctx) error {
+		if ctx.Args.Len() < 2 {
+			return messages.ErrIncorrectCmd(ctx.Command)
+		}
+
+		n := &struct {
+			VT      string
+			Shinaro string
+		}{VT: ctx.Args.Get(0).Raw, Shinaro: ctx.Args.Get(1).Raw}
+
+		buf := new(bytes.Buffer)
+		nuggetsTemplatePart2.Execute(buf, n)
+
+		part2 := buf.String()
+		buf.Reset()
+
+		nuggetsTemplatePart3.Execute(buf, n)
+		part3 := buf.String()
+
+		reply := func() error {
+			if err := ctx.Reply(part2); err != nil {
+				return err
+			}
+
+			if err := ctx.Reply(part3); err != nil {
+				return err
+			}
+
+			return nil
+		}
+
+		return reply()
 	}
 }
