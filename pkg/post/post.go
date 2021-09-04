@@ -386,14 +386,8 @@ func (p *Post) generateMessages(guild *guilds.Guild, artworks []artworks.Artwork
 
 			switch artwork := artwork.(type) {
 			case *twitter.Artwork:
-				//Skip first Twitter embed if not a command or the media type is MediaTypeImage.
-				var animated bool
-				if len(artwork.Gallery) > 0 {
-					t := artwork.Gallery[0].Type
-					animated = t == twitter.MediaTypeGIF
-				}
-
-				if p.ctx.Command == nil && !crosspost && !animated {
+				//Skip first Twitter embed if not a command.
+				if p.ctx.Command == nil && !crosspost {
 					skipFirst = true
 				}
 			case *pixiv.Artwork:
