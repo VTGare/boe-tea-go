@@ -92,6 +92,15 @@ func memesGroup(b *bot.Bot) {
 		Example:     "bt!nuggets 2B 9S",
 		Exec:        nuggets(b),
 	})
+
+	b.Router.RegisterCmd(&gumi.Command{
+		Name:        "nuggets2",
+		Group:       group,
+		Description: "Long awaited nuggets sequel.",
+		Usage:       "bt!nuggets2 <person 1> <person 2>",
+		Example:     "bt!nuggets2 vt Shinaro",
+		Exec:        nuggets2(b),
+	})
 }
 
 func brainpower(b *bot.Bot) func(ctx *gumi.Ctx) error {
