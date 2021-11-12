@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/VTGare/boe-tea-go/internal/cache"
+	"github.com/ReneKroon/ttlcache"
 	"github.com/VTGare/boe-tea-go/internal/database/mongodb"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -35,7 +35,6 @@ type Guild struct {
 }
 
 type Service interface {
-	All(ctx context.Context) ([]*Guild, error)
 	FindOne(ctx context.Context, guildID string) (*Guild, error)
 	InsertOne(ctx context.Context, guildID string) (*Guild, error)
 	DeleteOne(ctx context.Context, guildID string) (*Guild, error)
@@ -47,14 +46,12 @@ type Service interface {
 type guildService struct {
 	db     *mongodb.Mongo
 	logger *zap.SugaredLogger
-	cache  *cache.Cache
+	cache  *ttlcache.Cache
 }
 
 func NewService(db *mongodb.Mongo, logger *zap.SugaredLogger) Service {
-	cache := cache.New()
-
-	//If guild ID is empty, return DM guild settings.
-	cache.Set("", UserGuild())
+	cache := ttlcache.NewCache()
+	cache.SetTTL(1 * time.Hour)
 
 	return &guildService{db, logger, cache}
 }
@@ -63,25 +60,12 @@ func (g guildService) col() *mongo.Collection {
 	return g.db.Database.Collection("guilds")
 }
 
-func (g guildService) All(ctx context.Context) ([]*Guild, error) {
-	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
-	defer cancel()
-
-	cur, err := g.col().Find(ctx, bson.D{})
-	if err != nil {
-		return nil, err
-	}
-
-	guilds := make([]*Guild, 0)
-	err = cur.All(ctx, &guilds)
-	if err != nil {
-		return nil, err
-	}
-
-	return guilds, nil
-}
-
 func (g guildService) FindOne(ctx context.Context, id string) (*Guild, error) {
+	//If guild ID is empty, return DM guild settings.
+	if id == "" {
+		return UserGuild(), nil
+	}
+
 	if guild, ok := g.get(id); ok {
 		return guild, nil
 	}
