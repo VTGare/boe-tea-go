@@ -55,13 +55,14 @@ type Sauce struct {
 }
 
 type SetCommand struct {
-	CurrentSettings string
-	General         *General
-	Features        *Features
-	PixivSettings   *PixivSettings
-	TwitterSettings *TwitterSettings
-	DeviantSettings *DeviantSettings
-	ArtChannels     string
+	CurrentSettings    string
+	General            *General
+	Features           *Features
+	PixivSettings      *PixivSettings
+	TwitterSettings    *ProviderSettings
+	DeviantSettings    *ProviderSettings
+	ArtstationSettings *ProviderSettings
+	ArtChannels        string
 }
 
 type General struct {
@@ -70,20 +71,14 @@ type General struct {
 	NSFW   string
 }
 
+type ProviderSettings struct {
+	Title   string
+	Enabled string
+}
+
 type PixivSettings struct {
-	Title   string
-	Enabled string
-	Limit   string
-}
-
-type TwitterSettings struct {
-	Title   string
-	Enabled string
-}
-
-type DeviantSettings struct {
-	Title   string
-	Enabled string
+	ProviderSettings
+	Limit string
 }
 
 type Features struct {
@@ -154,18 +149,24 @@ var embeds = map[Language]map[EmbedType]interface{}{
 				Prefix: "Prefix",
 				NSFW:   "NSFW",
 			},
-			TwitterSettings: &TwitterSettings{
+			TwitterSettings: &ProviderSettings{
 				Title:   "Twitter settings",
 				Enabled: "Status __(twitter)__",
 			},
-			DeviantSettings: &DeviantSettings{
+			DeviantSettings: &ProviderSettings{
 				Title:   "DeviantArt settings",
 				Enabled: "Status __(deviant)__",
 			},
+			ArtstationSettings: &ProviderSettings{
+				Title:   "ArtStation settings",
+				Enabled: "Status __(artstation)__",
+			},
 			PixivSettings: &PixivSettings{
-				Title:   "Pixiv settings",
-				Enabled: "Status __(pixiv)__",
-				Limit:   "Limit",
+				ProviderSettings: ProviderSettings{
+					Title:   "Pixiv settings",
+					Enabled: "Status __(pixiv)__",
+				},
+				Limit: "Limit",
 			},
 			Features: &Features{
 				Title:            "Features",

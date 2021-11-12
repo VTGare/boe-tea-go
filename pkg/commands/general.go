@@ -440,6 +440,14 @@ func set(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			)
 
 			eb.AddField(
+				msg.ArtstationSettings.Title,
+				fmt.Sprintf(
+					"**%v**: %v",
+					msg.ArtstationSettings.Enabled, messages.FormatBool(guild.Artstation),
+				),
+			)
+
+			eb.AddField(
 				msg.ArtChannels,
 				"Use `bt!artchannels` command to list or manage art channels!\n"+strings.Join(
 					arrays.MapString(guild.ArtChannels, func(s string) string {
@@ -578,6 +586,15 @@ func set(b *bot.Bot) func(ctx *gumi.Ctx) error {
 				oldSettingEmbed = guild.Deviant
 				newSettingEmbed = new
 				guild.Deviant = new
+			case "artstation":
+				new, err := parseBool(newSetting.Raw)
+				if err != nil {
+					return err
+				}
+
+				oldSettingEmbed = guild.Artstation
+				newSettingEmbed = new
+				guild.Artstation = new
 			default:
 				return messages.ErrUnknownSetting(settingName.Raw)
 			}
