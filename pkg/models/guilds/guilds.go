@@ -29,7 +29,6 @@ type Guild struct {
 
 	ArtChannels []string `json:"art_channels" bson:"art_channels" validate:"required"`
 	NSFW        bool     `json:"nsfw" bson:"nsfw"`
-	SauceNAOKey string   `json:"saucenao_key" bson:"saucenao_key"`
 
 	CreatedAt time.Time `json:"created_at" bson:"created_at" validate:"required"`
 	UpdatedAt time.Time `json:"updated_at" bson:"updated_at"`

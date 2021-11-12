@@ -65,10 +65,9 @@ type SetCommand struct {
 }
 
 type General struct {
-	Title       string
-	Prefix      string
-	NSFW        string
-	SauceNAOKey string
+	Title  string
+	Prefix string
+	NSFW   string
 }
 
 type PixivSettings struct {
@@ -151,10 +150,9 @@ var embeds = map[Language]map[EmbedType]interface{}{
 			CurrentSettings: "Current settings",
 			ArtChannels:     "Art channels",
 			General: &General{
-				Title:       "General",
-				Prefix:      "Prefix",
-				NSFW:        "NSFW",
-				SauceNAOKey: "SauceNAO API key __(saucenao)__",
+				Title:  "General",
+				Prefix: "Prefix",
+				NSFW:   "NSFW",
 			},
 			TwitterSettings: &TwitterSettings{
 				Title:   "Twitter settings",
