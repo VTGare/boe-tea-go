@@ -21,9 +21,30 @@ To invite him please follow the link above. It requires following permissions to
 
 If you ran into a problem or have a suggestion create an issue here, use bt!feedback command or contact me on Discord at _VTGare#3599_.
 
-## Documentation
+## Privacy policy
 
-Bot's documentation is currently getting rewritten and won't be publicly available until website release. Please use `bt!help` command instead.
+By inviting the bot to your Discord server you accept to share the following information with the developer.
+
+### The types of personal data Boe Tea logs temporarily (up to 2 weeks):
+- Artwork URLs users post paired with guild/channel ID;
+- Image URLs sent to all commands that require them (sauce, share);
+
+These are stored for debugging purposes, if something unexpected goes wrong with a specific image or command,
+the developer can easily track down the issue with a URL of an artwork user posted. Guild and channel IDs are required to apply
+the exact guild configuration to the test environment.
+
+- Artwork URL, message timestamp and URL are stored for every artwork to enable repost detection for
+the server specific repost expiration period of time (from 1 minute to 1 week).
+
+### The types of personal data Boe Tea stores forever:
+- The artworks you favourited and when you favourited them;
+- Channel IDs added to crosspost groups.
+
+To opt-out from sharing any personal data that can be used to somehow track down your activity on Discord disable crossposting and
+repost detection on your Discord server.
+
+## Documentation
+Please use `bt!help` command for documentation. Complete documentation is coming soon:tm:, maybe even this year.
 
 ## Deployment
 
