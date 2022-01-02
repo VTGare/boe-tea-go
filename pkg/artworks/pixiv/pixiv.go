@@ -176,7 +176,7 @@ func (a Artwork) ToModel() *models.ArtworkInsert {
 	}
 }
 
-func (a Artwork) MessageSends(quote string) ([]*discordgo.MessageSend, error) {
+func (a Artwork) MessageSends(footer string, hasTags bool) ([]*discordgo.MessageSend, error) {
 	var (
 		length = len(a.Images)
 		pages  = make([]*discordgo.MessageSend, 0, length)
@@ -186,7 +186,7 @@ func (a Artwork) MessageSends(quote string) ([]*discordgo.MessageSend, error) {
 	if length == 0 {
 		eb.Title("❎ An error has occured.")
 		eb.Description("Pixiv artwork has been deleted or the ID does not exist.")
-		eb.Footer(quote, "")
+		eb.Footer(footer, "")
 
 		return []*discordgo.MessageSend{
 			{Embed: eb.Finalize()},
@@ -199,10 +199,13 @@ func (a Artwork) MessageSends(quote string) ([]*discordgo.MessageSend, error) {
 		eb.Title(fmt.Sprintf("%v by %v", a.Title, a.Author))
 	}
 
-	tags := arrays.MapString(a.Tags, func(s string) string {
-		return fmt.Sprintf("[%v](https://pixiv.net/en/tags/%v/artworks)", s, s)
-	})
-	eb.Description(fmt.Sprintf("**Tags**\n%v", strings.Join(tags, " • ")))
+	if hasTags {
+		tags := arrays.MapString(a.Tags, func(s string) string {
+			return fmt.Sprintf("[%v](https://pixiv.net/en/tags/%v/artworks)", s, s)
+		})
+
+		eb.Description(fmt.Sprintf("**Tags**\n%v", strings.Join(tags, " • ")))
+	}
 
 	eb.URL(
 		a.url,
@@ -214,9 +217,11 @@ func (a Artwork) MessageSends(quote string) ([]*discordgo.MessageSend, error) {
 		true,
 	).Timestamp(
 		time.Now(),
-	).Footer(
-		quote, "",
 	)
+
+	if footer != "" {
+		eb.Footer(footer, "")
+	}
 
 	eb.Image(a.Images[0].previewProxy())
 	pages = append(pages, &discordgo.MessageSend{Embed: eb.Finalize()})
@@ -226,7 +231,12 @@ func (a Artwork) MessageSends(quote string) ([]*discordgo.MessageSend, error) {
 
 			eb.Title(fmt.Sprintf("%v by %v | Page %v / %v", a.Title, a.Author, ind+2, length))
 			eb.Image(image.previewProxy())
-			eb.URL(a.url).Timestamp(time.Now()).Footer(quote, "")
+			eb.URL(a.url).Timestamp(time.Now())
+
+			if footer != "" {
+				eb.Footer(footer, "")
+			}
+
 			eb.AddField("Likes", strconv.Itoa(a.Likes), true)
 			eb.AddField("Original quality", messages.ClickHere(image.originalProxy()), true)
 

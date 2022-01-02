@@ -629,20 +629,22 @@ func OnError(b *bot.Bot) func(*gumi.Ctx, error) {
 		case errors.As(err, &usrErr):
 			if err := usrErr.Unwrap(); err != nil {
 				if ctx.Command != nil {
-					b.Log.Errorf("An error occured. Command: %v. Arguments: [%v]. Error: %v", ctx.Command.Name, ctx.Args.Raw, err)
+					b.Log.Infof("A user error occured. Command: %v. Arguments: [%v]. Error: %v", ctx.Command.Name, ctx.Args.Raw, err)
 				} else {
-					b.Log.Errorf("An error occured. Error: %v", err)
+					b.Log.Infof("A user error occured. Error: %v", err)
 				}
 			}
 
 			eb.FailureTemplate(usrErr.Error())
 		default:
 			if ctx.Command != nil {
-				b.Log.Errorf("An error occured. Command: %v. Arguments: [%v]. Error: %v", ctx.Command.Name, ctx.Args.Raw, err)
+				b.Log.Errorf("An error occured. Command: %v. Arguments: [%v]", ctx.Command.Name, ctx.Args.Raw, err)
 			} else {
 				b.Log.Errorf("An error occured. Error: %v", err)
 			}
 
+			eb.FailureTemplate("An unexpected error occured. Please try again later.\n" +
+				"If error persists, please let the developer know about it with `bt!feedback` command.")
 			eb.ErrorTemplate(err.Error())
 		}
 

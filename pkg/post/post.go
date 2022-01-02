@@ -403,8 +403,12 @@ func (p *Post) generateMessages(guild *guilds.Guild, artworks []artworks.Artwork
 				}
 			}
 
-			quote := p.bot.Config.RandomQuote(guild.NSFW)
-			sends, err := artwork.MessageSends(quote)
+			var quote string
+			if guild.FlavourText {
+				quote = p.bot.Config.RandomQuote(guild.NSFW)
+			}
+
+			sends, err := artwork.MessageSends(quote, guild.Tags)
 			if err != nil {
 				return nil, err
 			}

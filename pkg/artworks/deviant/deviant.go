@@ -119,29 +119,30 @@ func (d DeviantArt) Enabled(g *guilds.Guild) bool {
 	return g.Deviant
 }
 
-func (a Artwork) MessageSends(footer string) ([]*discordgo.MessageSend, error) {
+func (a Artwork) MessageSends(footer string, hasTags bool) ([]*discordgo.MessageSend, error) {
 	eb := embeds.NewBuilder()
 
-	eb.Title(
-		fmt.Sprintf("%v by %v", a.Title, a.Author.Name),
-	)
-	eb.Image(a.ImageURL).URL(a.url).Timestamp(a.CreatedAt)
+	eb.Title(fmt.Sprintf("%v by %v", a.Title, a.Author.Name)).
+		Image(a.ImageURL).
+		URL(a.url).
+		Timestamp(a.CreatedAt).
+		AddField("Views", strconv.Itoa(a.Views), true).
+		AddField("Favourites", strconv.Itoa(a.Favourites), true)
 
-	tags := arrays.MapString(a.Tags, func(s string) string {
-		return messages.NamedLink(
-			s, "https://www.deviantart.com/tag/"+s,
-		)
-	})
+	if hasTags {
+		tags := arrays.MapString(a.Tags, func(s string) string {
+			return messages.NamedLink(
+				s, "https://www.deviantart.com/tag/"+s,
+			)
+		})
 
-	eb.Description("**Tags:**\n" + strings.Join(tags, " • "))
+		eb.Description("**Tags:**\n" + strings.Join(tags, " • "))
+	}
 
-	eb.AddField(
-		"Views", strconv.Itoa(a.Views), true,
-	).AddField(
-		"Favourites", strconv.Itoa(a.Favourites), true,
-	)
+	if footer != "" {
+		eb.Footer(footer, "")
+	}
 
-	eb.Footer(footer, "")
 	return []*discordgo.MessageSend{
 		{Embed: eb.Finalize()},
 	}, nil

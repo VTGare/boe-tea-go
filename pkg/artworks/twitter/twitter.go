@@ -245,7 +245,7 @@ func (a Artwork) ToModel() *models.ArtworkInsert {
 }
 
 //Embeds transforms an artwork to DiscordGo embeds.
-func (a Artwork) MessageSends(footer string) ([]*discordgo.MessageSend, error) {
+func (a Artwork) MessageSends(footer string, _ bool) ([]*discordgo.MessageSend, error) {
 	var (
 		eb     = embeds.NewBuilder()
 		length = a.Gallery.Len()
@@ -259,9 +259,13 @@ func (a Artwork) MessageSends(footer string) ([]*discordgo.MessageSend, error) {
 		eb.Title(fmt.Sprintf("%v (%v)", a.FullName, a.Username))
 	}
 
-	eb.URL(a.url).Description(a.Content).TimestampString(a.Timestamp).Footer(footer, "")
+	eb.URL(a.url).Description(a.Content).TimestampString(a.Timestamp)
 	eb.AddField("Retweets", strconv.Itoa(a.Retweets), true)
 	eb.AddField("Likes", strconv.Itoa(a.Likes), true)
+
+	if footer != "" {
+		eb.Footer(footer, "")
+	}
 
 	msg := &discordgo.MessageSend{}
 	if length > 0 {
@@ -297,7 +301,11 @@ func (a Artwork) MessageSends(footer string) ([]*discordgo.MessageSend, error) {
 			eb := embeds.NewBuilder()
 
 			eb.Title(fmt.Sprintf("%v (%v) | Page %v / %v", a.FullName, a.Username, ind+2, length)).URL(a.url)
-			eb.Image(art.URL).Footer(footer, "").TimestampString(a.Timestamp)
+			eb.Image(art.URL).TimestampString(a.Timestamp)
+
+			if footer != "" {
+				eb.Footer(footer, "")
+			}
 
 			tweets = append(tweets, &discordgo.MessageSend{Embed: eb.Finalize()})
 		}

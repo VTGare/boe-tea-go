@@ -137,7 +137,7 @@ func (artwork ArtstationResponse) ToModel() *models.ArtworkInsert {
 	}
 }
 
-func (artwork ArtstationResponse) MessageSends(footer string) ([]*discordgo.MessageSend, error) {
+func (artwork ArtstationResponse) MessageSends(footer string, hasTags bool) ([]*discordgo.MessageSend, error) {
 	var (
 		length = len(artwork.Assets)
 		pages  = make([]*discordgo.MessageSend, 0, length)
@@ -160,20 +160,19 @@ func (artwork ArtstationResponse) MessageSends(footer string) ([]*discordgo.Mess
 		eb.Title(fmt.Sprintf("%v by %v", artwork.Title, artwork.User.Name))
 	}
 
-	desc := bluemonday.StrictPolicy().Sanitize(artwork.Description)
-	eb.Description(desc)
+	if hasTags {
+		desc := bluemonday.StrictPolicy().Sanitize(artwork.Description)
+		eb.Description(desc)
+	}
 
-	eb.URL(
-		artwork.URL(),
-	).AddField(
-		"Likes", strconv.Itoa(artwork.LikesCount), true,
-	).AddField(
-		"Views", strconv.Itoa(artwork.ViewsCount), true,
-	).Timestamp(
-		artwork.CreatedAt,
-	).Footer(
-		footer, "",
-	)
+	eb.URL(artwork.URL()).
+		AddField("Likes", strconv.Itoa(artwork.LikesCount), true).
+		AddField("Views", strconv.Itoa(artwork.ViewsCount), true).
+		Timestamp(artwork.CreatedAt)
+
+	if footer != "" {
+		eb.Footer(footer, "")
+	}
 
 	eb.Image(artwork.Assets[0].ImageURL)
 	pages = append(pages, &discordgo.MessageSend{Embed: eb.Finalize()})
@@ -181,9 +180,14 @@ func (artwork ArtstationResponse) MessageSends(footer string) ([]*discordgo.Mess
 		for ind, image := range artwork.Assets[1:] {
 			eb := embeds.NewBuilder()
 
-			eb.Title(fmt.Sprintf("%v by %v | Page %v / %v", artwork.Title, artwork.User.Name, ind+2, length))
-			eb.Image(image.ImageURL)
-			eb.URL(artwork.URL()).Timestamp(artwork.CreatedAt).Footer(footer, "")
+			eb.Title(fmt.Sprintf("%v by %v | Page %v / %v", artwork.Title, artwork.User.Name, ind+2, length)).
+				Image(image.ImageURL).
+				URL(artwork.URL()).
+				Timestamp(artwork.CreatedAt)
+
+			if footer != "" {
+				eb.Footer(footer, "")
+			}
 
 			eb.AddField("Likes", strconv.Itoa(artwork.LikesCount), true)
 			pages = append(pages, &discordgo.MessageSend{Embed: eb.Finalize()})

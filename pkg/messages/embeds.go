@@ -87,6 +87,8 @@ type Features struct {
 	RepostExpiration string
 	Crosspost        string
 	Reactions        string
+	Tags             string
+	FlavourText      string
 }
 
 type UserProfile struct {
@@ -174,6 +176,8 @@ var embeds = map[Language]map[EmbedType]interface{}{
 				RepostExpiration: "Expiration __(repost.expiration)__",
 				Crosspost:        "Crosspost",
 				Reactions:        "Reactions",
+				Tags:             "Tags",
+				FlavourText:      "Footer quotes __(footer)__",
 			},
 		},
 

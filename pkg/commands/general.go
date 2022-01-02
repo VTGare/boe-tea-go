@@ -368,8 +368,7 @@ func stats(b *bot.Bot) func(ctx *gumi.Ctx) error {
 
 func set(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
-		switch {
-		case ctx.Args.Len() == 0:
+		showSettings := func() error {
 			gd, err := ctx.Session.Guild(ctx.Event.GuildID)
 			if err != nil {
 				return messages.ErrGuildNotFound(err, ctx.Event.GuildID)
@@ -406,11 +405,13 @@ func set(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			eb.AddField(
 				msg.Features.Title,
 				fmt.Sprintf(
-					"**%v**: %v | **%v**: %v\n**%v**: %v | **%v**: %v",
+					"**%v**: %v | **%v**: %v\n**%v**: %v | **%v**: %v\n**%v**: %v | **%v**: %v",
 					msg.Features.Repost, guild.Repost,
 					msg.Features.RepostExpiration, guild.RepostExpiration,
 					msg.Features.Crosspost, messages.FormatBool(guild.Crosspost),
 					msg.Features.Reactions, messages.FormatBool(guild.Reactions),
+					msg.Features.Tags, messages.FormatBool(guild.Tags),
+					msg.Features.FlavourText, messages.FormatBool(guild.FlavourText),
 				),
 			)
 
@@ -462,13 +463,16 @@ func set(b *bot.Bot) func(ctx *gumi.Ctx) error {
 
 			ctx.ReplyEmbed(eb.Finalize())
 			return nil
-		case ctx.Args.Len() >= 2:
+		}
+
+		changeSetting := func() error {
 			perms, err := dgoutils.MemberHasPermission(
 				ctx.Session,
 				ctx.Event.GuildID,
 				ctx.Event.Author.ID,
 				discordgo.PermissionAdministrator|discordgo.PermissionManageServer,
 			)
+
 			if err != nil {
 				return err
 			}
@@ -595,6 +599,24 @@ func set(b *bot.Bot) func(ctx *gumi.Ctx) error {
 				oldSettingEmbed = guild.Artstation
 				newSettingEmbed = new
 				guild.Artstation = new
+			case "tags":
+				new, err := parseBool(newSetting.Raw)
+				if err != nil {
+					return err
+				}
+
+				oldSettingEmbed = guild.Tags
+				newSettingEmbed = new
+				guild.Tags = new
+			case "footer":
+				new, err := parseBool(newSetting.Raw)
+				if err != nil {
+					return err
+				}
+
+				oldSettingEmbed = guild.FlavourText
+				newSettingEmbed = new
+				guild.FlavourText = new
 			default:
 				return messages.ErrUnknownSetting(settingName.Raw)
 			}
@@ -612,6 +634,13 @@ func set(b *bot.Bot) func(ctx *gumi.Ctx) error {
 
 			ctx.ReplyEmbed(eb.Finalize())
 			return nil
+		}
+
+		switch {
+		case ctx.Args.Len() == 0:
+			return showSettings()
+		case ctx.Args.Len() >= 2:
+			return changeSetting()
 		default:
 			return messages.ErrIncorrectCmd(ctx.Command)
 		}

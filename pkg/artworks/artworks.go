@@ -14,7 +14,7 @@ type Provider interface {
 
 type Artwork interface {
 	ToModel() *artworks.ArtworkInsert
-	MessageSends(footer string) ([]*discordgo.MessageSend, error)
+	MessageSends(footer string, tags bool) ([]*discordgo.MessageSend, error)
 	URL() string
 	Len() int
 }
