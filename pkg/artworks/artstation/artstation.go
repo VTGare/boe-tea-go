@@ -9,22 +9,14 @@ import (
 	"time"
 
 	"github.com/ReneKroon/ttlcache"
+	"github.com/VTGare/boe-tea-go/internal/arikawautils/embeds"
 	"github.com/VTGare/boe-tea-go/pkg/artworks"
 	models "github.com/VTGare/boe-tea-go/pkg/models/artworks"
 	"github.com/VTGare/boe-tea-go/pkg/models/guilds"
-	"github.com/VTGare/embeds"
-	"github.com/bwmarrin/discordgo"
+	"github.com/diamondburned/arikawa/v3/api"
+	"github.com/diamondburned/arikawa/v3/discord"
 	"github.com/microcosm-cc/bluemonday"
 )
-
-/*
-type Artwork interface {
-	ToModel() *artworks.ArtworkInsert
-	MessageSends(footer string) ([]*discordgo.MessageSend, error)
-	URL() string
-	Len() int
-}
-*/
 
 type Artstation struct {
 	regex *regexp.Regexp
@@ -137,10 +129,10 @@ func (artwork ArtstationResponse) ToModel() *models.ArtworkInsert {
 	}
 }
 
-func (artwork ArtstationResponse) MessageSends(footer string) ([]*discordgo.MessageSend, error) {
+func (artwork ArtstationResponse) MessageSends(footer string) ([]api.SendMessageData, error) {
 	var (
 		length = len(artwork.Assets)
-		pages  = make([]*discordgo.MessageSend, 0, length)
+		pages  = make([]api.SendMessageData, 0, length)
 		eb     = embeds.NewBuilder()
 	)
 
@@ -149,9 +141,9 @@ func (artwork ArtstationResponse) MessageSends(footer string) ([]*discordgo.Mess
 		eb.Description("Artwork has been deleted or the ID does not exist.")
 		eb.Footer(footer, "")
 
-		return []*discordgo.MessageSend{
-			{Embed: eb.Finalize()},
-		}, nil
+		return []api.SendMessageData{{
+			Embeds: []discord.Embed{eb.Build()},
+		}}, nil
 	}
 
 	if length > 1 {
@@ -176,7 +168,7 @@ func (artwork ArtstationResponse) MessageSends(footer string) ([]*discordgo.Mess
 	)
 
 	eb.Image(artwork.Assets[0].ImageURL)
-	pages = append(pages, &discordgo.MessageSend{Embed: eb.Finalize()})
+	pages = append(pages, api.SendMessageData{Embeds: []discord.Embed{eb.Build()}})
 	if length > 1 {
 		for ind, image := range artwork.Assets[1:] {
 			eb := embeds.NewBuilder()
@@ -186,7 +178,7 @@ func (artwork ArtstationResponse) MessageSends(footer string) ([]*discordgo.Mess
 			eb.URL(artwork.URL()).Timestamp(artwork.CreatedAt).Footer(footer, "")
 
 			eb.AddField("Likes", strconv.Itoa(artwork.LikesCount), true)
-			pages = append(pages, &discordgo.MessageSend{Embed: eb.Finalize()})
+			pages = append(pages, api.SendMessageData{Embeds: []discord.Embed{eb.Build()}})
 		}
 	}
 

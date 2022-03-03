@@ -2,8 +2,6 @@ package messages
 
 import (
 	"fmt"
-
-	"github.com/VTGare/gumi"
 )
 
 type IncorrectCmd struct {
@@ -18,7 +16,7 @@ func (cmd *IncorrectCmd) Error() string {
 	return fmt.Sprintf("Command `%v` was used incorrectly", cmd.Name)
 }
 
-func ErrIncorrectCmd(cmd *gumi.Command) error {
+/*func ErrIncorrectCmd(cmd *gumi.Command) error {
 	return &IncorrectCmd{
 		Name:        cmd.Name,
 		Usage:       cmd.Usage,
@@ -29,7 +27,7 @@ func ErrIncorrectCmd(cmd *gumi.Command) error {
 			Example: "Example",
 		},
 	}
-}
+}*/
 
 type UserErr struct {
 	msg string

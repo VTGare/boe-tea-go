@@ -9,17 +9,26 @@ import (
 
 //Config is an application configuration struct.
 type Config struct {
-	Discord    *Discord `json:"discord"`
-	Mongo      *Mongo   `json:"mongo"`
-	Repost     *Repost  `json:"repost"`
-	Pixiv      *Pixiv   `json:"pixiv"`
-	SauceNAO   string   `json:"saucenao"`
-	Sentry     string   `json:"sentry"`
-	Encryption string   `json:"encryption"`
-	Quotes     []*Quote `json:"quotes"`
+	Env         EnvironmentType `json:"env"`
+	TestGuildID uint64          `json:"test_guild_id"`
+	Discord     *Discord        `json:"discord"`
+	Mongo       *Mongo          `json:"mongo"`
+	Repost      *Repost         `json:"repost"`
+	Pixiv       *Pixiv          `json:"pixiv"`
+	SauceNAO    string          `json:"saucenao"`
+	Sentry      string          `json:"sentry"`
+	Encryption  string          `json:"encryption"`
+	Quotes      []*Quote        `json:"quotes"`
 
 	safeQuotes []*Quote
 }
+
+type EnvironmentType string
+
+const (
+	DevEnvironment  EnvironmentType = "dev"
+	ProdEnvironment EnvironmentType = "prod"
+)
 
 //Discord stores Discord bot configuration. Acquire bot token on Discord's Developer Portal. Prefixes must be below 5 characters each.
 //AuthorID is required to enable developer commands. Empty AuthorID may lead to undefined behavior.

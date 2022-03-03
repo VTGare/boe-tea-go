@@ -3,7 +3,7 @@ package artworks
 import (
 	"github.com/VTGare/boe-tea-go/pkg/models/artworks"
 	"github.com/VTGare/boe-tea-go/pkg/models/guilds"
-	"github.com/bwmarrin/discordgo"
+	"github.com/diamondburned/arikawa/v3/api"
 )
 
 type Provider interface {
@@ -14,7 +14,7 @@ type Provider interface {
 
 type Artwork interface {
 	ToModel() *artworks.ArtworkInsert
-	MessageSends(footer string) ([]*discordgo.MessageSend, error)
+	MessageSends(footer string) ([]api.SendMessageData, error)
 	URL() string
 	Len() int
 }

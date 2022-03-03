@@ -2,6 +2,7 @@ package repost
 
 import (
 	"errors"
+	"fmt"
 	"time"
 )
 
@@ -22,4 +23,8 @@ type Repost struct {
 	ChannelID string `redis:"channel_id"`
 	MessageID string `redis:"message_id"`
 	ExpiresAt time.Time
+}
+
+func (r *Repost) String() string {
+	return fmt.Sprintf("https://discord.com/channels/%v/%v/%v", r.GuildID, r.ChannelID, r.MessageID)
 }

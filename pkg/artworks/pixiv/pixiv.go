@@ -8,13 +8,14 @@ import (
 	"time"
 
 	"github.com/ReneKroon/ttlcache"
+	"github.com/VTGare/boe-tea-go/internal/arikawautils/embeds"
 	"github.com/VTGare/boe-tea-go/internal/arrays"
 	"github.com/VTGare/boe-tea-go/pkg/artworks"
 	"github.com/VTGare/boe-tea-go/pkg/messages"
 	models "github.com/VTGare/boe-tea-go/pkg/models/artworks"
 	"github.com/VTGare/boe-tea-go/pkg/models/guilds"
-	"github.com/VTGare/embeds"
-	"github.com/bwmarrin/discordgo"
+	"github.com/diamondburned/arikawa/v3/api"
+	"github.com/diamondburned/arikawa/v3/discord"
 	"github.com/everpcpc/pixiv"
 )
 
@@ -176,10 +177,10 @@ func (a Artwork) ToModel() *models.ArtworkInsert {
 	}
 }
 
-func (a Artwork) MessageSends(quote string) ([]*discordgo.MessageSend, error) {
+func (a Artwork) MessageSends(quote string) ([]api.SendMessageData, error) {
 	var (
 		length = len(a.Images)
-		pages  = make([]*discordgo.MessageSend, 0, length)
+		pages  = make([]api.SendMessageData, 0, length)
 		eb     = embeds.NewBuilder()
 	)
 
@@ -188,8 +189,8 @@ func (a Artwork) MessageSends(quote string) ([]*discordgo.MessageSend, error) {
 		eb.Description("Pixiv artwork has been deleted or the ID does not exist.")
 		eb.Footer(quote, "")
 
-		return []*discordgo.MessageSend{
-			{Embed: eb.Finalize()},
+		return []api.SendMessageData{
+			{Embeds: []discord.Embed{eb.Build()}},
 		}, nil
 	}
 
@@ -219,7 +220,7 @@ func (a Artwork) MessageSends(quote string) ([]*discordgo.MessageSend, error) {
 	)
 
 	eb.Image(a.Images[0].previewProxy())
-	pages = append(pages, &discordgo.MessageSend{Embed: eb.Finalize()})
+	pages = append(pages, api.SendMessageData{Embeds: []discord.Embed{eb.Build()}})
 	if length > 1 {
 		for ind, image := range a.Images[1:] {
 			eb := embeds.NewBuilder()
@@ -230,7 +231,7 @@ func (a Artwork) MessageSends(quote string) ([]*discordgo.MessageSend, error) {
 			eb.AddField("Likes", strconv.Itoa(a.Likes), true)
 			eb.AddField("Original quality", messages.ClickHere(image.originalProxy()), true)
 
-			pages = append(pages, &discordgo.MessageSend{Embed: eb.Finalize()})
+			pages = append(pages, api.SendMessageData{Embeds: []discord.Embed{eb.Build()}})
 		}
 	}
 

@@ -4,14 +4,14 @@ import (
 	"context"
 	"fmt"
 	"reflect"
-	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/VTGare/boe-tea-go/internal/arikawautils"
+	"github.com/VTGare/boe-tea-go/internal/arikawautils/embeds"
 	"github.com/VTGare/boe-tea-go/internal/arrays"
 	"github.com/VTGare/boe-tea-go/internal/cache"
-	"github.com/VTGare/boe-tea-go/internal/dgoutils"
 	"github.com/VTGare/boe-tea-go/pkg/artworks"
 	"github.com/VTGare/boe-tea-go/pkg/artworks/pixiv"
 	"github.com/VTGare/boe-tea-go/pkg/artworks/twitter"
@@ -19,9 +19,11 @@ import (
 	"github.com/VTGare/boe-tea-go/pkg/messages"
 	"github.com/VTGare/boe-tea-go/pkg/models/guilds"
 	"github.com/VTGare/boe-tea-go/pkg/repost"
-	"github.com/VTGare/embeds"
-	"github.com/VTGare/gumi"
 	"github.com/bwmarrin/discordgo"
+	"github.com/diamondburned/arikawa/v3/api"
+	"github.com/diamondburned/arikawa/v3/discord"
+	"github.com/diamondburned/arikawa/v3/gateway"
+	"github.com/diamondburned/arikawa/v3/state"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -37,7 +39,8 @@ const (
 
 type Post struct {
 	bot      *bot.Bot
-	ctx      *gumi.Ctx
+	state    *state.State
+	event    *gateway.MessageCreateEvent
 	urls     []string
 	indices  map[int]struct{}
 	skipMode SkipMode
@@ -49,10 +52,11 @@ type fetchResult struct {
 	Matched  int
 }
 
-func New(bot *bot.Bot, ctx *gumi.Ctx, urls ...string) *Post {
+func New(bot *bot.Bot, state *state.State, event *gateway.MessageCreateEvent, urls ...string) *Post {
 	return &Post{
 		bot:      bot,
-		ctx:      ctx,
+		state:    state,
+		event:    event,
 		urls:     urls,
 		indices:  make(map[int]struct{}),
 		skipMode: SkipModeNone,
@@ -60,37 +64,42 @@ func New(bot *bot.Bot, ctx *gumi.Ctx, urls ...string) *Post {
 }
 
 func (p *Post) Send() ([]*cache.MessageInfo, error) {
-	guild, err := p.bot.Guilds.FindOne(context.Background(), p.ctx.Event.GuildID)
+	guild, err := p.bot.Guilds.FindOne(context.Background(), p.event.GuildID.String())
 	if err != nil {
 		return nil, err
 	}
 
-	res, err := p.fetch(guild, p.ctx.Event.ChannelID, false)
+	guildID, err := arikawautils.GuildID(guild.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	res, err := p.fetch(guild, p.event.ChannelID, false)
 	if err != nil {
 		return nil, err
 	}
 
 	if len(res.Reposts) > 0 {
 		if guild.Repost == "strict" {
-			perm, _ := dgoutils.MemberHasPermission(
-				p.ctx.Session,
-				guild.ID,
-				p.ctx.Session.State.User.ID,
+			perm, _ := arikawautils.MemberHasPermission(
+				p.state,
+				guildID,
+				p.bot.Me.ID,
 				discordgo.PermissionAdministrator|discordgo.PermissionManageMessages,
 			)
 
 			if perm && res.Matched == len(res.Reposts) {
-				p.ctx.Session.ChannelMessageDelete(p.ctx.Event.ChannelID, p.ctx.Event.ID)
+				p.state.DeleteMessage(p.event.ChannelID, p.event.ID, "Art repost.")
 			}
 		}
 
 		p.sendReposts(guild, res.Reposts, 15*time.Second)
 	}
 
-	return p.send(guild, p.ctx.Event.ChannelID, res.Artworks, false)
+	return p.send(guild, p.event.ChannelID, res.Artworks, false)
 }
 
-func (p *Post) Crosspost(userID, group string, channels []string) ([]*cache.MessageInfo, error) {
+func (p *Post) Crosspost(userID discord.UserID, group string, channels []string) ([]*cache.MessageInfo, error) {
 	var (
 		wg      = sync.WaitGroup{}
 		msgChan = make(chan []*cache.MessageInfo, len(channels))
@@ -104,31 +113,36 @@ func (p *Post) Crosspost(userID, group string, channels []string) ([]*cache.Mess
 			"channelID", channelID,
 		)
 
-		go func(channelID string) {
+		channelID, err := arikawautils.ChannelID(channelID)
+		if err != nil {
+			return nil, err
+		}
+
+		go func(channelID discord.ChannelID) {
 			defer wg.Done()
-			ch, err := p.ctx.Session.Channel(channelID)
+			ch, err := p.state.Channel(channelID)
 			if err != nil {
 				log.Infow("Couldn't crosspost. Error: %v", err)
 				return
 			}
 
-			if _, err := p.ctx.Session.GuildMember(ch.GuildID, userID); err != nil {
+			if _, err := p.state.Member(ch.GuildID, userID); err != nil {
 				log.Infof("Removing a channel from user's group. User left the server.")
-				if _, err := p.bot.Users.DeleteFromGroup(context.Background(), userID, group, channelID); err != nil {
+				if _, err := p.bot.Users.DeleteFromGroup(context.Background(), userID.String(), group, channelID.String()); err != nil {
 					log.Errorf("Failed to remove a channel from user's group. Error: %v", err)
 				}
 
 				return
 			}
 
-			guild, err := p.bot.Guilds.FindOne(context.Background(), ch.GuildID)
+			guild, err := p.bot.Guilds.FindOne(context.Background(), ch.GuildID.String())
 			if err != nil {
 				log.Infof("Couldn't crosspost. Find Guild error: %v", err)
 				return
 			}
 
 			if guild.Crosspost {
-				if len(guild.ArtChannels) == 0 || arrays.AnyString(guild.ArtChannels, ch.ID) {
+				if len(guild.ArtChannels) == 0 || arrays.AnyString(guild.ArtChannels, ch.ID.String()) {
 					res, err := p.fetch(guild, channelID, true)
 					if err != nil {
 						log.Infof("Couldn't crosspost. Fetch error: %v", err)
@@ -164,7 +178,7 @@ func (p *Post) SetSkip(indices map[int]struct{}, mode SkipMode) {
 	p.skipMode = mode
 }
 
-func (p *Post) fetch(guild *guilds.Guild, channelID string, crosspost bool) (*fetchResult, error) {
+func (p *Post) fetch(guild *guilds.Guild, channelID discord.ChannelID, crosspost bool) (*fetchResult, error) {
 	var (
 		wg, _        = errgroup.WithContext(context.Background())
 		matched      int64
@@ -182,7 +196,7 @@ func (p *Post) fetch(guild *guilds.Guild, channelID string, crosspost bool) (*fe
 
 					var isRepost bool
 					if guild.Repost != "disabled" {
-						rep, _ := p.bot.RepostDetector.Find(channelID, id)
+						rep, _ := p.bot.RepostDetector.Find(channelID.String(), id)
 						if rep != nil {
 							artworksChan <- rep
 
@@ -201,8 +215,8 @@ func (p *Post) fetch(guild *guilds.Guild, channelID string, crosspost bool) (*fe
 								ID:        id,
 								URL:       url,
 								GuildID:   guild.ID,
-								ChannelID: channelID,
-								MessageID: p.ctx.Event.ID,
+								ChannelID: channelID.String(),
+								MessageID: p.event.ID.String(),
 							},
 							guild.RepostExpiration,
 						)
@@ -216,7 +230,9 @@ func (p *Post) fetch(guild *guilds.Guild, channelID string, crosspost bool) (*fe
 					// Only post the picture if the provider is enabled
 					// or the function is called from a command
 					// or we're crossposting a twitter artwork.
-					if provider.Enabled(guild) || p.ctx.Command != nil || (crosspost && isTwitter) {
+
+					// TODO: or command != nil
+					if provider.Enabled(guild) || (crosspost && isTwitter) {
 						artwork, err := provider.Find(id)
 						if err != nil {
 							return err
@@ -224,8 +240,9 @@ func (p *Post) fetch(guild *guilds.Guild, channelID string, crosspost bool) (*fe
 
 						// Only add reactions to the original message for Twitter links.
 						if isTwitter && artwork != nil && artwork.Len() > 0 {
-							if guild.Reactions && p.ctx.Command == nil && isTwitter {
-								p.addReactions(p.ctx.Event.Message)
+							// TODO: or command == nil
+							if guild.Reactions && isTwitter {
+								p.addReactions(p.event.Message)
 							}
 						}
 
@@ -281,17 +298,17 @@ func (p *Post) sendReposts(guild *guilds.Guild, reposts []*repost.Repost, timeou
 		)
 	}
 
-	msg, _ := p.ctx.Session.ChannelMessageSendEmbed(p.ctx.Event.ChannelID, eb.Finalize())
+	msg, _ := p.state.SendEmbeds(p.event.ChannelID, eb.Build())
 	if msg != nil {
 		go func() {
 			time.Sleep(timeout)
 
-			p.ctx.Session.ChannelMessageDelete(msg.ChannelID, msg.ID)
+			p.state.DeleteMessage(msg.ChannelID, msg.ID, "")
 		}()
 	}
 }
 
-func (p *Post) send(guild *guilds.Guild, channelID string, artworks []artworks.Artwork, crosspost bool) ([]*cache.MessageInfo, error) {
+func (p *Post) send(guild *guilds.Guild, channelID discord.ChannelID, artworks []artworks.Artwork, crosspost bool) ([]*cache.MessageInfo, error) {
 	if len(artworks) == 0 {
 		return nil, nil
 	}
@@ -320,17 +337,15 @@ func (p *Post) send(guild *guilds.Guild, channelID string, artworks []artworks.A
 	}
 
 	sent := make([]*cache.MessageInfo, 0, count)
-	sendMessage := func(send *discordgo.MessageSend) {
-		var s *discordgo.Session
+	sendMessage := func(data api.SendMessageData) {
+		s := p.state
 		if crosspost {
-			guildID, _ := strconv.ParseInt(guild.ID, 10, 64)
-			s = p.bot.ShardManager.SessionForGuild(guildID)
-		} else {
-			s = p.ctx.Session
+			guildID, _ := arikawautils.GuildID(guild.ID)
+			shard, _ := p.bot.ShardManager.FromGuildID(guildID)
+			s = shard.(*state.State)
 		}
 
-		msg, _ := s.ChannelMessageSendComplex(channelID, send)
-
+		msg, _ := s.SendMessageComplex(channelID, data)
 		if msg != nil {
 			sent = append(sent, &cache.MessageInfo{
 				MessageID: msg.ID,
@@ -338,9 +353,9 @@ func (p *Post) send(guild *guilds.Guild, channelID string, artworks []artworks.A
 			})
 
 			//If URL doesn't exist then the embed contains an error message, instead of an artwork.
-			if guild.Reactions && send.Embed != nil {
-				if send.Embed.URL != "" {
-					p.addReactions(msg)
+			if guild.Reactions && len(data.Embeds) != 0 {
+				if data.Embeds[0].URL != "" {
+					p.addReactions(*msg)
 				}
 			}
 		}
@@ -350,14 +365,14 @@ func (p *Post) send(guild *guilds.Guild, channelID string, artworks []artworks.A
 		first := allMessages[0][0]
 		first.Content = messages.LimitExceeded(guild.Limit, count)
 		if crosspost {
-			first.Content = first.Embed.URL + "\n" + first.Content
+			first.Content = first.Embeds[0].URL + "\n" + first.Content
 		}
 
 		sendMessage(first)
 		if len(allMessages) > 1 {
 			for _, messages := range allMessages[1:] {
 				if crosspost {
-					messages[0].Content = messages[0].Embed.URL
+					messages[0].Content = messages[0].Embeds[0].URL
 				}
 
 				sendMessage(messages[0])
@@ -367,7 +382,7 @@ func (p *Post) send(guild *guilds.Guild, channelID string, artworks []artworks.A
 		for _, messages := range allMessages {
 			for _, message := range messages {
 				if crosspost {
-					message.Content = message.Embed.URL
+					message.Content = message.Embeds[0].URL
 				}
 
 				sendMessage(message)
@@ -378,8 +393,8 @@ func (p *Post) send(guild *guilds.Guild, channelID string, artworks []artworks.A
 	return sent, nil
 }
 
-func (p *Post) generateMessages(guild *guilds.Guild, artworks []artworks.Artwork, channelID string, crosspost bool) ([][]*discordgo.MessageSend, error) {
-	messageSends := make([][]*discordgo.MessageSend, 0, len(artworks))
+func (p *Post) generateMessages(guild *guilds.Guild, artworks []artworks.Artwork, channelID discord.ChannelID, crosspost bool) ([][]api.SendMessageData, error) {
+	messageSends := make([][]api.SendMessageData, 0, len(artworks))
 	for _, artwork := range artworks {
 		if artwork != nil {
 			skipFirst := false
@@ -387,11 +402,13 @@ func (p *Post) generateMessages(guild *guilds.Guild, artworks []artworks.Artwork
 			switch artwork := artwork.(type) {
 			case *twitter.Artwork:
 				//Skip first Twitter embed if not a command.
-				if p.ctx.Command == nil && !crosspost {
+
+				// TODO: Skip if command.
+				if !crosspost {
 					skipFirst = true
 				}
 			case *pixiv.Artwork:
-				ch, err := p.ctx.Session.Channel(channelID)
+				ch, err := p.state.Channel(channelID)
 				if err != nil {
 					return nil, err
 				}
@@ -415,9 +432,9 @@ func (p *Post) generateMessages(guild *guilds.Guild, artworks []artworks.Artwork
 
 			if crosspost {
 				for _, msg := range sends {
-					msg.Embed.Author = &discordgo.MessageEmbedAuthor{
-						Name:    messages.CrosspostBy(p.ctx.Event.Author.String()),
-						IconURL: p.ctx.Event.Author.AvatarURL(""),
+					msg.Embeds[0].Author = &discord.EmbedAuthor{
+						Name: messages.CrosspostBy(p.event.Author.Tag()),
+						Icon: p.event.Author.AvatarURL(),
 					}
 				}
 			}
@@ -431,18 +448,17 @@ func (p *Post) generateMessages(guild *guilds.Guild, artworks []artworks.Artwork
 	return messageSends, nil
 }
 
-func (p *Post) addReactions(msg *discordgo.Message) {
-	p.ctx.Session.MessageReactionAdd(
-		msg.ChannelID, msg.ID, "💖",
-	)
-
-	p.ctx.Session.MessageReactionAdd(
-		msg.ChannelID, msg.ID, "🤤",
-	)
+func (p *Post) addReactions(msg discord.Message) {
+	p.state.React(msg.ChannelID, msg.ID, "💖")
+	p.state.React(msg.ChannelID, msg.ID, "🤤")
 }
 
-func (p *Post) skipArtworks(embeds []*discordgo.MessageSend) []*discordgo.MessageSend {
-	filtered := make([]*discordgo.MessageSend, 0)
+func (p *Post) skipArtworks(embeds []api.SendMessageData) []api.SendMessageData {
+	if p.skipMode == SkipModeNone {
+		return embeds
+	}
+
+	filtered := make([]api.SendMessageData, 0)
 	switch p.skipMode {
 	case SkipModeExclude:
 		for ind, val := range embeds {
@@ -456,8 +472,6 @@ func (p *Post) skipArtworks(embeds []*discordgo.MessageSend) []*discordgo.Messag
 				filtered = append(filtered, val)
 			}
 		}
-	case SkipModeNone:
-		return embeds
 	}
 
 	return filtered

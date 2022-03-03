@@ -11,13 +11,14 @@ import (
 	"time"
 
 	"github.com/ReneKroon/ttlcache"
+	"github.com/VTGare/boe-tea-go/internal/arikawautils/embeds"
 	"github.com/VTGare/boe-tea-go/internal/arrays"
 	"github.com/VTGare/boe-tea-go/pkg/artworks"
 	"github.com/VTGare/boe-tea-go/pkg/messages"
 	models "github.com/VTGare/boe-tea-go/pkg/models/artworks"
 	"github.com/VTGare/boe-tea-go/pkg/models/guilds"
-	"github.com/VTGare/embeds"
-	"github.com/bwmarrin/discordgo"
+	"github.com/diamondburned/arikawa/v3/api"
+	"github.com/diamondburned/arikawa/v3/discord"
 )
 
 type DeviantArt struct {
@@ -119,7 +120,7 @@ func (d DeviantArt) Enabled(g *guilds.Guild) bool {
 	return g.Deviant
 }
 
-func (a Artwork) MessageSends(footer string) ([]*discordgo.MessageSend, error) {
+func (a Artwork) MessageSends(footer string) ([]api.SendMessageData, error) {
 	eb := embeds.NewBuilder()
 
 	eb.Title(
@@ -142,9 +143,9 @@ func (a Artwork) MessageSends(footer string) ([]*discordgo.MessageSend, error) {
 	)
 
 	eb.Footer(footer, "")
-	return []*discordgo.MessageSend{
-		{Embed: eb.Finalize()},
-	}, nil
+	return []api.SendMessageData{{
+		Embeds: []discord.Embed{eb.Build()},
+	}}, nil
 }
 
 func (a Artwork) ToModel() *models.ArtworkInsert {

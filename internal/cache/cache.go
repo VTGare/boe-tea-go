@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/ReneKroon/ttlcache"
+	"github.com/diamondburned/arikawa/v3/discord"
 )
 
 //Cache represents a thread-safe map
@@ -67,8 +68,8 @@ type EmbedCache struct {
 
 //MessageInfo is a message/channel ID pair.
 type MessageInfo struct {
-	MessageID string
-	ChannelID string
+	MessageID discord.MessageID
+	ChannelID discord.ChannelID
 }
 
 // CachedEmbed stores information about an embed that's later retrieved in
@@ -77,20 +78,20 @@ type MessageInfo struct {
 // Children array is filled for parent messages only and it contains
 // all embeds sent by Boe Tea by posting the message, including crossposted messages.
 type CachedPost struct {
-	AuthorID string
+	AuthorID discord.UserID
 	Parent   bool
 	Children []*MessageInfo
 }
 
-func (ec *EmbedCache) makeKey(channelID, messageID string) string {
+func (ec *EmbedCache) makeKey(channelID discord.ChannelID, messageID discord.MessageID) string {
 	return fmt.Sprintf(
 		"channel:%v:message:%v",
-		channelID,
-		messageID,
+		channelID.String(),
+		messageID.String(),
 	)
 }
 
-func (ec *EmbedCache) Get(channelID, messageID string) (*CachedPost, bool) {
+func (ec *EmbedCache) Get(channelID discord.ChannelID, messageID discord.MessageID) (*CachedPost, bool) {
 	key := ec.makeKey(
 		channelID, messageID,
 	)
@@ -104,7 +105,13 @@ func (ec *EmbedCache) Get(channelID, messageID string) (*CachedPost, bool) {
 	return nil, false
 }
 
-func (ec *EmbedCache) Set(userID, channelID, messageID string, parent bool, children ...*MessageInfo) {
+func (ec *EmbedCache) Set(
+	userID discord.UserID,
+	channelID discord.ChannelID,
+	messageID discord.MessageID,
+	parent bool,
+	children ...*MessageInfo,
+) {
 	key := ec.makeKey(
 		channelID, messageID,
 	)
@@ -116,7 +123,7 @@ func (ec *EmbedCache) Set(userID, channelID, messageID string, parent bool, chil
 	})
 }
 
-func (ec *EmbedCache) Remove(channelID, messageID string) bool {
+func (ec *EmbedCache) Remove(channelID discord.ChannelID, messageID discord.MessageID) bool {
 	key := ec.makeKey(
 		channelID, messageID,
 	)

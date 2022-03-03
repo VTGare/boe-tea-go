@@ -7,17 +7,22 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/VTGare/boe-tea-go/internal/arrays"
+	"github.com/VTGare/boe-tea-go/internal/arikawautils"
+	"github.com/VTGare/boe-tea-go/internal/arikawautils/embeds"
 	"github.com/VTGare/boe-tea-go/internal/cache"
+	"github.com/VTGare/boe-tea-go/internal/config"
 	"github.com/VTGare/boe-tea-go/pkg/artworks"
 	"github.com/VTGare/boe-tea-go/pkg/bot"
+	"github.com/VTGare/boe-tea-go/pkg/commands"
 	"github.com/VTGare/boe-tea-go/pkg/messages"
 	"github.com/VTGare/boe-tea-go/pkg/models/artworks/options"
 	"github.com/VTGare/boe-tea-go/pkg/models/users"
 	"github.com/VTGare/boe-tea-go/pkg/post"
-	"github.com/VTGare/embeds"
-	"github.com/VTGare/gumi"
 	"github.com/bwmarrin/discordgo"
+	"github.com/diamondburned/arikawa/v3/api"
+	"github.com/diamondburned/arikawa/v3/discord"
+	"github.com/diamondburned/arikawa/v3/gateway"
+	"github.com/diamondburned/arikawa/v3/state"
 	"go.mongodb.org/mongo-driver/mongo"
 	"mvdan.cc/xurls/v2"
 )
@@ -40,13 +45,606 @@ func PrefixResolver(b *bot.Bot) func(s *discordgo.Session, m *discordgo.MessageC
 	}
 }
 
+func All(b *bot.Bot, s *state.State) []interface{} {
+	return []interface{}{
+		OnReady(b, s), OnMessageCreate(b, s), OnMessageRemove(b, s), OnGuildCreate(b, s), OnGuildDelete(b, s),
+		OnReactionRemove(b, s), OnReactionAdd(b, s), OnGuildBanAdd(b, s), OnInteractionCreate(b, s),
+	}
+}
+
+func OnMessageCreate(b *bot.Bot, s *state.State) func(m *gateway.MessageCreateEvent) {
+	return func(m *gateway.MessageCreateEvent) {
+		if b.Config.Env == config.DevEnvironment && m.GuildID != discord.GuildID(b.Config.TestGuildID) {
+			return
+		}
+
+		log := b.Log.With(
+			"author_id", m.Author.ID,
+			"guild_id", m.GuildID,
+			"message_id", m.ID,
+		)
+
+		if m.Author.Bot {
+			return
+		}
+
+		regex := xurls.Strict()
+		url := regex.FindString(m.Content)
+		if url == "" {
+			return
+		}
+
+		p := post.New(b, s, m, url)
+		if _, err := p.Send(); err != nil {
+			log.With("error", err).Warn("send error")
+			return
+		}
+
+		user, _ := b.Users.FindOne(context.Background(), m.Author.ID.String())
+		if user != nil {
+			if group, ok := user.FindGroup(m.ChannelID.String()); ok {
+				_, err := p.Crosspost(m.Author.ID, group.Name, group.Children)
+				if err != nil {
+					log.With("error", err).Warn("crosspost error")
+				}
+			}
+		}
+	}
+}
+
+func OnInteractionCreate(b *bot.Bot, s *state.State) func(e *gateway.InteractionCreateEvent) {
+	return func(e *gateway.InteractionCreateEvent) {
+		if b.Config.Env == config.DevEnvironment && e.GuildID != discord.GuildID(b.Config.TestGuildID) {
+			return
+		}
+
+		var err error
+		switch interaction := e.Data.(type) {
+		case *discord.PingInteraction:
+			err = s.RespondInteraction(e.ID, e.Token, api.InteractionResponse{
+				Type: api.PongInteraction,
+			})
+
+		case *discord.CommandInteraction:
+			cmd, ok := commands.Find(interaction.Name)
+			if !ok {
+				return
+			}
+
+			var resp api.InteractionResponse
+			resp, err = cmd.Exec(b, s)
+			if err != nil {
+				b.Log.With("error", err).Error("failed to execute a command")
+			}
+
+			err = s.RespondInteraction(e.ID, e.Token, resp)
+		case *discord.AutocompleteInteraction:
+		case *discord.ButtonInteraction:
+		case *discord.SelectInteraction:
+		case *discord.ModalInteraction:
+		}
+
+		if err != nil {
+			b.Log.With("error", err).Error("failed to respond to interaction")
+		}
+	}
+}
+
+//OnReady logs that bot's up.
+func OnReady(b *bot.Bot, s *state.State) func(*gateway.ReadyEvent) {
+	return func(r *gateway.ReadyEvent) {
+		b.Log.Infof("%v is online. Session ID: %v. Guilds: %v", r.User.Username, r.SessionID, len(r.Guilds))
+	}
+}
+
+//OnGuildCreate loads server configuration on launch and creates new database entries when joining a new server.
+func OnGuildCreate(b *bot.Bot, _ *state.State) func(*gateway.GuildCreateEvent) {
+	return func(g *gateway.GuildCreateEvent) {
+		_, err := b.Guilds.FindOne(context.Background(), g.ID.String())
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			b.Log.Infof("Joined a guild. Name: %v. ID: %v", g.Name, g.ID)
+
+			_, err := b.Guilds.InsertOne(context.Background(), g.ID.String())
+			if err != nil {
+				b.Log.Errorf("Error while inserting guild %v: %v", g.ID, err)
+			}
+		}
+	}
+}
+
+//OnGuildDelete logs guild outages and guilds that kicked the bot out.
+func OnGuildDelete(b *bot.Bot, s *state.State) func(*gateway.GuildDeleteEvent) {
+	return func(g *gateway.GuildDeleteEvent) {
+		if g.Unavailable {
+			b.Log.Infof("Guild outage. ID: %v", g.ID)
+		} else {
+			b.Log.Infof("Kicked/banned from guild: %v", g.ID)
+		}
+	}
+}
+
+//OnGuildBanAdd adds a banned server member to temporary banned users cache to prevent them from losing all their favourites
+//on that server due to Discord removing all reactions of banned users.
+func OnGuildBanAdd(b *bot.Bot, _ *state.State) func(*gateway.GuildBanAddEvent) {
+	return func(g *gateway.GuildBanAddEvent) {
+		if b.Config.Env == config.DevEnvironment && g.GuildID != discord.GuildID(b.Config.TestGuildID) {
+			return
+		}
+
+		b.BannedUsers.Set(g.User.ID.String(), struct{}{})
+	}
+}
+
+func OnMessageRemove(b *bot.Bot, s *state.State) func(*gateway.MessageDeleteEvent) {
+	return func(m *gateway.MessageDeleteEvent) {
+		if b.Config.Env == config.DevEnvironment && m.GuildID != discord.GuildID(b.Config.TestGuildID) {
+			return
+		}
+
+		msg, ok := b.EmbedCache.Get(
+			m.ChannelID, m.ID,
+		)
+		if !ok {
+			return
+		}
+
+		log := b.Log.With("channel", m.ChannelID, "message", m.ID, "user", msg.AuthorID)
+
+		log.Info("removing message cache")
+		b.EmbedCache.Remove(m.ChannelID, m.ID)
+		if !msg.Parent {
+			return
+		}
+
+		for _, child := range msg.Children {
+			log := log.With("parent", m.ID, "message", child.MessageID, "channel", child.ChannelID)
+
+			log.Info("removing child message")
+			b.EmbedCache.Remove(child.ChannelID, child.MessageID)
+			if err := s.DeleteMessage(child.ChannelID, child.MessageID, "Removing artwork embeds on user request."); err != nil {
+				log.With("error", err).Error("failed to delete message")
+			}
+		}
+	}
+}
+
+func OnReactionAdd(b *bot.Bot, s *state.State) func(*gateway.MessageReactionAddEvent) {
+	return func(r *gateway.MessageReactionAddEvent) {
+		if b.Config.Env == config.DevEnvironment && r.GuildID != discord.GuildID(b.Config.TestGuildID) {
+			return
+		}
+
+		//Do nothing for bot's own reactions
+		if me, err := s.Me(); err != nil {
+			if r.UserID == me.ID {
+				return
+			}
+		}
+
+		var (
+			log = b.Log.With(
+				"guild", r.GuildID,
+				"channel", r.ChannelID,
+				"message", r.MessageID,
+				"user", r.UserID,
+			)
+			name = r.Emoji.APIString()
+		)
+
+		deleteEmbed := func() error {
+			msg, ok := b.EmbedCache.Get(r.ChannelID, r.MessageID)
+			if !ok {
+				return nil
+			}
+
+			if msg.AuthorID != r.UserID {
+				return nil
+			}
+
+			log.Infof("deleting a message from reaction event")
+			b.EmbedCache.Remove(
+				r.ChannelID, r.MessageID,
+			)
+
+			reason := api.AuditLogReason("Deleted artwork on user's request.")
+			err := s.DeleteMessage(r.ChannelID, r.MessageID, reason)
+			if err != nil {
+				return err
+			}
+
+			if !msg.Parent {
+				return nil
+			}
+
+			log.Infof("removing children messages")
+			childrenIDs := make(map[discord.ChannelID][]discord.MessageID)
+			for _, child := range msg.Children {
+				log.With(
+					"parent", r.MessageID,
+					"channel", child.ChannelID,
+					"message", child.MessageID,
+					"user", r.UserID,
+				).Infof("removing a child message")
+
+				b.EmbedCache.Remove(
+					child.ChannelID, child.MessageID,
+				)
+
+				if _, ok := childrenIDs[child.ChannelID]; !ok {
+					childrenIDs[child.ChannelID] = make([]discord.MessageID, 0)
+				}
+
+				childrenIDs[child.ChannelID] = append(childrenIDs[child.ChannelID], child.MessageID)
+			}
+
+			for channelID, messageIDs := range childrenIDs {
+				if err := s.DeleteMessages(channelID, messageIDs, reason); err != nil {
+					log.With("error", err).Warn("failed to delete children messages")
+				}
+			}
+
+			return nil
+		}
+
+		crosspost := func() error {
+			msg, err := s.Message(r.ChannelID, r.MessageID)
+			if err != nil {
+				return err
+			}
+
+			dgUser, err := s.User(r.UserID)
+			if err != nil {
+				return err
+			}
+
+			if dgUser.Bot {
+				return nil
+			}
+
+			url := ""
+			if len(msg.Embeds) > 0 {
+				embed := msg.Embeds[0]
+				url = embed.URL
+			}
+
+			regex := xurls.Strict()
+			if url == "" {
+				url = regex.FindString(msg.Content)
+			}
+
+			if url == "" {
+				return nil
+			}
+
+			msg.Author = *dgUser
+			p := post.New(b, s, &gateway.MessageCreateEvent{*msg, &discord.Member{User: *dgUser}})
+
+			sent := make([]*cache.MessageInfo, 0)
+			user, _ := b.Users.FindOne(context.Background(), r.UserID.String())
+			if user != nil {
+				if group, ok := user.FindGroup(r.ChannelID.String()); ok {
+					userID, err := arikawautils.UserID(user.ID)
+					if err != nil {
+						return err
+					}
+
+					sent, err = p.Crosspost(userID, group.Name, group.Children)
+					if err != nil {
+						return err
+					}
+				}
+			}
+
+			if len(sent) > 0 {
+				b.EmbedCache.Set(r.UserID, r.ChannelID, r.MessageID, true, sent...)
+				for _, msg := range sent {
+					b.EmbedCache.Set(r.UserID, msg.ChannelID, msg.MessageID, false)
+				}
+			}
+
+			return nil
+		}
+
+		addFavourite := func() error {
+			msg, err := s.Message(r.ChannelID, r.MessageID)
+			if err != nil {
+				return fmt.Errorf("failed to get a discord message: %w", err)
+			}
+
+			dgUser, err := s.User(r.UserID)
+			if err != nil {
+				return fmt.Errorf("failed to get a discord user: %w", err)
+			}
+
+			if dgUser.Bot {
+				return nil
+			}
+
+			urls := make([]string, 0, 2)
+			if len(msg.Embeds) > 0 {
+				embed := msg.Embeds[0]
+				urls = append(urls, embed.URL)
+			}
+
+			regex := xurls.Strict()
+			if url := regex.FindString(msg.Content); url != "" {
+				urls = append(urls, url)
+			}
+
+			var artwork artworks.Artwork
+			for _, url := range urls {
+				for _, provider := range b.ArtworkProviders {
+					if id, ok := provider.Match(url); ok {
+						artwork, err = provider.Find(id)
+						if err != nil {
+							return fmt.Errorf("failed to find an artwork: %w", err)
+						}
+
+						break
+					}
+				}
+
+				if artwork != nil {
+					break
+				}
+			}
+
+			if artwork == nil {
+				return nil
+			}
+
+			insert := artwork.ToModel()
+			if len(insert.Images) == 0 {
+				return nil
+			}
+
+			artworkDB, created, err := b.Artworks.FindOneOrCreate(context.Background(), &options.FilterOne{
+				URL: artwork.URL(),
+			}, insert)
+
+			if err != nil {
+				return fmt.Errorf("failed to find or create an artwork: %w", err)
+			}
+
+			if created {
+				log.With(
+					"artwork_id", artworkDB.ID,
+					"artwork_url", artworkDB.URL,
+					"images", len(artworkDB.Images),
+				).Infof("created a new artwork")
+			}
+
+			user, err := b.Users.FindOneOrCreate(context.Background(), r.UserID.String())
+			if err != nil {
+				return fmt.Errorf("failed to find or create a user: %w", err)
+			}
+
+			log := log.With(
+				"user", r.UserID,
+				"artwork_id", artworkDB.ID,
+			)
+
+			log.Info("inserting a favourite")
+
+			nsfw := name == "🤤"
+			_, err = b.Users.InsertFavourite(context.Background(), r.UserID.String(), &users.Favourite{
+				ArtworkID: artworkDB.ID,
+				NSFW:      nsfw,
+				CreatedAt: time.Now(),
+			})
+
+			if err != nil {
+				if !errors.Is(err, mongo.ErrNoDocuments) {
+					return fmt.Errorf("failed to insert a favourite: %w", err)
+				}
+			}
+
+			if !user.DM {
+				return nil
+			}
+
+			userID, err := arikawautils.UserID(user.ID)
+			if err != nil {
+				return fmt.Errorf("failed to parse snowflake: %w", err)
+			}
+
+			ch, err := s.CreatePrivateChannel(userID)
+			if err != nil {
+				return fmt.Errorf("failed to create private channel: %w", err)
+			}
+
+			var (
+				locale = messages.FavouriteAddedEmbed()
+				eb     = embeds.NewBuilder()
+			)
+
+			if len(artworkDB.Images) > 0 {
+				eb.Thumbnail(artworkDB.Images[0])
+			}
+
+			eb.Title(locale.Title).
+				Description(locale.Description).
+				AddField("ID", strconv.Itoa(artworkDB.ID), true).
+				AddField("URL", messages.ClickHere(artworkDB.URL), true).
+				AddField("NSFW", strconv.FormatBool(nsfw), true)
+
+			s.SendMessage(ch.ID, "", eb.Build())
+			return nil
+		}
+
+		switch {
+		case name == "❌":
+			if err := deleteEmbed(); err != nil {
+				log.With("error", err).Error("failed to delete an embed on reaction")
+			}
+		case name == "💖" || name == "🤤":
+			if err := addFavourite(); err != nil {
+				log.With("error", err).Error("failed to add favourite")
+			}
+
+		case name == "📫" || name == "📩":
+			if err := crosspost(); err != nil {
+				log.With("error", err).Error("failed to crosspost artwork on reaction")
+			}
+		}
+	}
+}
+
+func OnReactionRemove(b *bot.Bot, s *state.State) func(*gateway.MessageReactionRemoveEvent) {
+	return func(r *gateway.MessageReactionRemoveEvent) {
+		if b.Config.Env == config.DevEnvironment && r.GuildID != discord.GuildID(b.Config.TestGuildID) {
+			return
+		}
+
+		//Do nothing for bot's own reactions
+		if me, err := s.Me(); err != nil {
+			if r.UserID == me.ID {
+				return
+			}
+		}
+
+		log := b.Log.With(
+			"guild", r.GuildID,
+			"channel", r.ChannelID,
+			"message", r.MessageID,
+			"user", r.UserID,
+		)
+
+		//Do nothing if user was banned recently. Discord removes all reactions
+		//of banned users on the server which in turn removes all favourites.
+		if _, ok := b.BannedUsers.Get(r.UserID.String()); ok {
+			return
+		}
+
+		if r.Emoji.APIString() != "💖" && r.Emoji.APIString() != "🤤" {
+			return
+		}
+
+		msg, err := s.Message(r.ChannelID, r.MessageID)
+		if err != nil {
+			log.With("error", err).Error("failed to get discord message")
+			return
+		}
+
+		dgUser, err := s.User(r.UserID)
+		if err != nil {
+			log.With("error", err).Error("failed to get discord user")
+			return
+		}
+
+		if dgUser.Bot {
+			return
+		}
+
+		urls := make([]string, 0, 2)
+		if len(msg.Embeds) > 0 {
+			embed := msg.Embeds[0]
+			urls = append(urls, embed.URL)
+		}
+
+		regex := xurls.Strict()
+		if url := regex.FindString(msg.Content); url != "" {
+			urls = append(urls, url)
+		}
+
+		var artwork artworks.Artwork
+		for _, url := range urls {
+			for _, provider := range b.ArtworkProviders {
+				if id, ok := provider.Match(url); ok {
+					artwork, err = provider.Find(id)
+					if err != nil {
+						log.With("error", err).Error("failed to find an artwork")
+						return
+					}
+
+					break
+				}
+			}
+
+			if artwork != nil {
+				break
+			}
+		}
+
+		if artwork == nil {
+			return
+		}
+
+		artworkDB, err := b.Artworks.FindOne(context.Background(), &options.FilterOne{
+			URL: artwork.URL(),
+		})
+
+		if err != nil {
+			if !errors.Is(err, mongo.ErrNoDocuments) {
+				log.With("error", err).Error("failed to find an artwork")
+			}
+
+			return
+		}
+
+		user, err := b.Users.FindOne(context.Background(), r.UserID.String())
+		if err != nil {
+			if !errors.Is(err, mongo.ErrNoDocuments) {
+				log.With("error", err).Error("failed to find a user")
+			}
+
+			return
+		}
+
+		fav, ok := user.FindFavourite(artworkDB.ID)
+		if !ok {
+			return
+		}
+
+		log.With("user", r.UserID, "artwork", artworkDB.ID).Info("removing a favourite")
+		if _, err := b.Users.DeleteFavourite(context.Background(), user.ID, fav); err != nil {
+			log.With("error", err).Error("failed to remove a favourite")
+			return
+		}
+
+		if !user.DM {
+			return
+		}
+
+		userID, err := arikawautils.UserID(user.ID)
+		if err != nil {
+			log.With("error", err).Warn("failed to parse snowflake")
+			return
+		}
+
+		ch, err := s.CreatePrivateChannel(userID)
+		if err != nil {
+			log.With("error", err).Error("failed to create private channel")
+			return
+		}
+
+		var (
+			eb     = embeds.NewBuilder()
+			locale = messages.FavouriteRemovedEmbed()
+		)
+
+		eb.Title(locale.Title).
+			Description(locale.Description).
+			AddField("ID", strconv.Itoa(artworkDB.ID), true).
+			AddField("URL", messages.ClickHere(artworkDB.URL), true).
+			AddField("NSFW", strconv.FormatBool(fav.NSFW), true)
+
+		if len(artworkDB.Images) > 0 {
+			eb.Thumbnail(artworkDB.Images[0])
+		}
+
+		s.SendMessage(ch.ID, "", eb.Build())
+	}
+}
+
+/*
+
 func OnPanic(b *bot.Bot) func(*gumi.Ctx, interface{}) {
 	return func(ctx *gumi.Ctx, r interface{}) {
 		b.Log.Errorf("%v", r)
 	}
 }
 
-//NotCommand is executed on every message that isn't a command.
 func NotCommand(b *bot.Bot) func(*gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
 		guild, err := b.Guilds.FindOne(context.Background(), ctx.Event.GuildID)
@@ -110,508 +708,6 @@ func NotCommand(b *bot.Bot) func(*gumi.Ctx) error {
 	}
 }
 
-func RegisterHandlers(b *bot.Bot) {
-	b.AddHandler(OnReady(b))
-	b.AddHandler(OnGuildCreate(b))
-	b.AddHandler(OnGuildDelete(b))
-	b.AddHandler(OnGuildBanAdd(b))
-	b.AddHandler(OnReactionAdd(b))
-	b.AddHandler(OnReactionRemove(b))
-	b.AddHandler(OnMessageRemove(b))
-}
-
-//OnReady logs that bot's up.
-func OnReady(b *bot.Bot) func(*discordgo.Session, *discordgo.Ready) {
-	return func(s *discordgo.Session, r *discordgo.Ready) {
-		b.Log.Infof("%v is online. Session ID: %v. Guilds: %v", r.User.String(), r.SessionID, len(r.Guilds))
-	}
-}
-
-//OnGuildCreate loads server configuration on launch and creates new database entries when joining a new server.
-func OnGuildCreate(b *bot.Bot) func(*discordgo.Session, *discordgo.GuildCreate) {
-	return func(s *discordgo.Session, g *discordgo.GuildCreate) {
-		_, err := b.Guilds.FindOne(context.Background(), g.ID)
-		if errors.Is(err, mongo.ErrNoDocuments) {
-			b.Log.Infof("Joined a guild. Name: %v. ID: %v", g.Name, g.ID)
-			_, err := b.Guilds.InsertOne(context.Background(), g.ID)
-			if err != nil {
-				b.Log.Errorf("Error while inserting guild %v: %v", g.ID, err)
-			}
-		}
-	}
-}
-
-//OnGuildDelete logs guild outages and guilds that kicked the bot out.
-func OnGuildDelete(b *bot.Bot) func(*discordgo.Session, *discordgo.GuildDelete) {
-	return func(s *discordgo.Session, g *discordgo.GuildDelete) {
-		if g.Unavailable {
-			b.Log.Infof("Guild outage. ID: %v", g.ID)
-		} else {
-			b.Log.Infof("Kicked/banned from guild: %v", g.ID)
-		}
-	}
-}
-
-//OnGuildBanAdd adds a banned server member to temporary banned users cache to prevent them from losing all their favourites
-//on that server due to Discord removing all reactions of banned users.
-func OnGuildBanAdd(b *bot.Bot) func(*discordgo.Session, *discordgo.GuildBanAdd) {
-	return func(s *discordgo.Session, gb *discordgo.GuildBanAdd) {
-		b.BannedUsers.Set(gb.User.ID, struct{}{})
-	}
-}
-
-func OnMessageRemove(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageDelete) {
-	return func(s *discordgo.Session, m *discordgo.MessageDelete) {
-		msg, ok := b.EmbedCache.Get(
-			m.ChannelID,
-			m.ID,
-		)
-
-		if !ok {
-			return
-		}
-
-		b.EmbedCache.Remove(
-			m.ChannelID, m.ID,
-		)
-
-		if msg.Parent {
-			b.Log.Infof(
-				"Removing children messages. Channel ID: %v. Parent ID: %v. User ID: %v.",
-				m.ChannelID,
-				m.ID,
-				msg.AuthorID,
-			)
-
-			for _, child := range msg.Children {
-				b.Log.Infof(
-					"Removing a child message. Parent ID: %v. Channel ID: %v. Message ID: %v. User ID: %v.",
-					m.ID,
-					child.ChannelID,
-					child.MessageID,
-					msg.AuthorID,
-				)
-
-				b.EmbedCache.Remove(
-					child.ChannelID, child.MessageID,
-				)
-
-				err := s.ChannelMessageDelete(child.ChannelID, child.MessageID)
-				if err != nil {
-					b.Log.Warn("OnMessageRemove -> s.ChannelMessageDelete: ", err)
-				}
-			}
-		}
-	}
-}
-
-func OnReactionAdd(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageReactionAdd) {
-	return func(s *discordgo.Session, r *discordgo.MessageReactionAdd) {
-		//Do nothing if Boe Tea adds reactions
-		if r.UserID == s.State.User.ID {
-			return
-		}
-
-		log := b.Log.With(
-			"guild", r.GuildID,
-			"channel", r.ChannelID,
-			"message", r.MessageID,
-			"user", r.UserID,
-		)
-
-		name := r.Emoji.APIName()
-		switch {
-		case name == "❌":
-			msg, ok := b.EmbedCache.Get(
-				r.ChannelID, r.MessageID,
-			)
-
-			if !ok {
-				return
-			}
-
-			if msg.AuthorID != r.UserID {
-				return
-			}
-
-			log.Infof(
-				"Removing a message by reacting. Channel ID: %v. Message ID: %v. User ID: %v.",
-				r.ChannelID,
-				r.MessageID,
-				r.UserID,
-			)
-
-			b.EmbedCache.Remove(
-				r.ChannelID, r.MessageID,
-			)
-
-			err := s.ChannelMessageDelete(r.ChannelID, r.MessageID)
-			if err != nil {
-				log.Warn("OnReactionAdd -> s.ChannelMessageDelete: ", err)
-			}
-
-			if msg.Parent {
-				log.Infof(
-					"Removing children messages. Channel ID: %v. Parent ID: %v. User ID: %v.",
-					r.ChannelID,
-					r.MessageID,
-					r.UserID,
-				)
-
-				for _, child := range msg.Children {
-					log.Infof(
-						"Removing a child message. Parent ID: %v. Channel ID: %v. Message ID: %v. User ID: %v.",
-						r.MessageID,
-						child.ChannelID,
-						child.MessageID,
-						r.UserID,
-					)
-
-					b.EmbedCache.Remove(
-						child.ChannelID, child.MessageID,
-					)
-
-					err := s.ChannelMessageDelete(child.ChannelID, child.MessageID)
-					if err != nil {
-						log.Warn("OnReactionAdd -> s.ChannelMessageDelete: ", err)
-					}
-				}
-			}
-		case name == "💖" || name == "🤤":
-			nsfw := name == "🤤"
-
-			msg, err := s.ChannelMessage(r.ChannelID, r.MessageID)
-			if err != nil {
-				log.Warn("OnReactionAdd -> ChannelMessage: ", err)
-				return
-			}
-
-			dgUser, err := s.User(r.UserID)
-			if err != nil {
-				log.Warn("OnReactionRemove -> User: ", err)
-				return
-			}
-
-			if dgUser.Bot {
-				return
-			}
-
-			urls := make([]string, 0, 2)
-			if len(msg.Embeds) > 0 {
-				embed := msg.Embeds[0]
-				urls = append(urls, embed.URL)
-			}
-
-			regex := xurls.Strict()
-			if url := regex.FindString(msg.Content); url != "" {
-				urls = append(urls, url)
-			}
-
-			var artwork artworks.Artwork
-			for _, url := range urls {
-				for _, provider := range b.ArtworkProviders {
-					if id, ok := provider.Match(url); ok {
-						artwork, err = provider.Find(id)
-						if err != nil {
-							log.Warn("OnReactionAdd -> provider.Find: ", err)
-							return
-						}
-
-						break
-					}
-				}
-
-				if artwork != nil {
-					break
-				}
-			}
-
-			if artwork == nil {
-				return
-			}
-
-			insert := artwork.ToModel()
-			if len(insert.Images) == 0 {
-				return
-			}
-
-			artworkDB, created, err := b.Artworks.FindOneOrCreate(context.Background(), &options.FilterOne{
-				URL: artwork.URL(),
-			}, insert)
-
-			if err != nil {
-				log.Warn("OnReactionAdd -> Artworks.FindOneOrCreate: ", err)
-				return
-			}
-
-			if created {
-				log.Infof(
-					"Created a new artwork. ID: %v. URL: %v. Images: %v",
-					artworkDB.ID,
-					artworkDB.URL,
-					len(artworkDB.Images),
-				)
-			}
-
-			user, err := b.Users.FindOneOrCreate(context.Background(), r.UserID)
-			if err != nil {
-				log.Warn("OnReactionAdd -> Users.FindOneOrCreate: ", err)
-				return
-			}
-
-			log.Infof("Inserting a favourite. User ID: %v. Artwork ID: %v", r.UserID, artworkDB.ID)
-			_, err = b.Users.InsertFavourite(context.Background(), r.UserID, &users.Favourite{
-				ArtworkID: artworkDB.ID,
-				NSFW:      nsfw,
-				CreatedAt: time.Now(),
-			})
-
-			if err != nil {
-				switch {
-				case errors.Is(err, mongo.ErrNoDocuments):
-				default:
-					log.Warn("OnReactionAdd -> InsertFavourite: ", err)
-					return
-				}
-			}
-
-			if user.DM {
-				s := b.ShardManager.SessionForDM()
-				ch, err := s.UserChannelCreate(user.ID)
-				if err == nil {
-					var (
-						eb     = embeds.NewBuilder()
-						locale = messages.FavouriteAddedEmbed()
-					)
-
-					eb.Title(locale.Title).Description(locale.Description)
-					eb.AddField(
-						"ID",
-						strconv.Itoa(artworkDB.ID),
-						true,
-					).AddField(
-						"URL",
-						messages.ClickHere(artworkDB.URL),
-						true,
-					).AddField(
-						"NSFW",
-						strconv.FormatBool(nsfw),
-						true,
-					)
-					if len(artworkDB.Images) > 0 {
-						eb.Thumbnail(artworkDB.Images[0])
-					}
-
-					s.ChannelMessageSendEmbed(ch.ID, eb.Finalize())
-				}
-			}
-		case name == "📫" || name == "📩":
-			msg, err := s.ChannelMessage(r.ChannelID, r.MessageID)
-			if err != nil {
-				log.Warn("OnReactionAdd (crosspost) -> ChannelMessage: ", err)
-				return
-			}
-
-			dgUser, err := s.User(r.UserID)
-			if err != nil {
-				log.Warn("OnReactionAdd (crosspost) -> User: ", err)
-				return
-			}
-
-			if dgUser.Bot {
-				return
-			}
-
-			url := ""
-			if len(msg.Embeds) > 0 {
-				embed := msg.Embeds[0]
-				url = embed.URL
-			}
-
-			regex := xurls.Strict()
-			if url == "" {
-				url = regex.FindString(msg.Content)
-			}
-
-			if url == "" {
-				return
-			}
-
-			msg.Author = dgUser
-			p := post.New(b, &gumi.Ctx{
-				Session: s,
-				Event: &discordgo.MessageCreate{
-					Message: msg,
-				},
-				Router: b.Router,
-			}, url)
-
-			sent := make([]*cache.MessageInfo, 0)
-			user, _ := b.Users.FindOne(context.Background(), r.UserID)
-			if user != nil {
-				if group, ok := user.FindGroup(r.ChannelID); ok {
-					sent, err = p.Crosspost(user.ID, group.Name, group.Children)
-					if err != nil {
-						log.Warn("OnReactionAdd (crosspost) -> post.Crosspost(): ", err)
-					}
-				}
-			}
-
-			if len(sent) > 0 {
-				b.EmbedCache.Set(
-					r.UserID,
-					r.ChannelID,
-					r.MessageID,
-					true,
-					sent...,
-				)
-
-				for _, msg := range sent {
-					b.EmbedCache.Set(
-						r.UserID,
-						msg.ChannelID,
-						msg.MessageID,
-						false,
-					)
-				}
-			}
-		}
-	}
-}
-
-func OnReactionRemove(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageReactionRemove) {
-	return func(s *discordgo.Session, r *discordgo.MessageReactionRemove) {
-		//Do nothing if Boe Tea adds reactions
-		if r.UserID == s.State.User.ID {
-			return
-		}
-
-		//Do nothing if user was banned recently. Discord removes all reactions
-		//of banned users on the server which in turn removes all favourites.
-		if _, ok := b.BannedUsers.Get(r.UserID); ok {
-			return
-		}
-
-		if r.Emoji.APIName() == "💖" || r.Emoji.APIName() == "🤤" {
-			msg, err := s.ChannelMessage(r.ChannelID, r.MessageID)
-			if err != nil {
-				b.Log.Warn("OnReactionRemove -> ChannelMessage: ", err)
-				return
-			}
-
-			dgUser, err := s.User(r.UserID)
-			if err != nil {
-				b.Log.Warn("OnReactionRemove -> User: ", err)
-				return
-			}
-
-			if dgUser.Bot {
-				return
-			}
-
-			urls := make([]string, 0, 2)
-			if len(msg.Embeds) > 0 {
-				embed := msg.Embeds[0]
-				urls = append(urls, embed.URL)
-			}
-
-			regex := xurls.Strict()
-			if url := regex.FindString(msg.Content); url != "" {
-				urls = append(urls, url)
-			}
-
-			var artwork artworks.Artwork
-			for _, url := range urls {
-				for _, provider := range b.ArtworkProviders {
-					if id, ok := provider.Match(url); ok {
-						artwork, err = provider.Find(id)
-						if err != nil {
-							b.Log.Warn("OnReactionRemove -> provider.Find: ", err)
-							return
-						}
-
-						break
-					}
-				}
-
-				if artwork != nil {
-					break
-				}
-			}
-
-			if artwork == nil {
-				return
-			}
-
-			artworkDB, err := b.Artworks.FindOne(context.Background(), &options.FilterOne{
-				URL: artwork.URL(),
-			})
-
-			if err != nil {
-				if !errors.Is(err, mongo.ErrNoDocuments) {
-					b.Log.Warn("OnReactionRemove -> Artworks.FindOneOrCreate: ", err)
-				}
-				return
-			}
-
-			user, err := b.Users.FindOne(context.Background(), r.UserID)
-			if err != nil {
-				if !errors.Is(err, mongo.ErrNoDocuments) {
-					b.Log.Warn("OnReactionRemove -> Users.FindOneOrCreate: ", err)
-				}
-
-				return
-			}
-
-			if fav, ok := user.FindFavourite(artworkDB.ID); ok {
-				b.Log.Infof("Removing a favourite. User ID: %v. Artwork ID: %v", r.UserID, artworkDB.ID)
-				_, err := b.Users.DeleteFavourite(
-					context.Background(),
-					user.ID,
-					fav,
-				)
-
-				if err != nil {
-					b.Log.Warn("OnReactionRemove -> Users.DeleteFavourite: ", err)
-					return
-				}
-
-				if user.DM {
-					s := b.ShardManager.SessionForDM()
-					ch, err := s.UserChannelCreate(user.ID)
-					if err == nil {
-						var (
-							eb     = embeds.NewBuilder()
-							locale = messages.FavouriteRemovedEmbed()
-						)
-
-						eb.Title(locale.Title).Description(locale.Description)
-						eb.AddField(
-							"ID",
-							strconv.Itoa(artworkDB.ID),
-							true,
-						).AddField(
-							"URL",
-							messages.ClickHere(artworkDB.URL),
-							true,
-						).AddField(
-							"NSFW",
-							strconv.FormatBool(fav.NSFW),
-							true,
-						)
-						if len(artworkDB.Images) > 0 {
-							eb.Thumbnail(artworkDB.Images[0])
-						}
-
-						s.ChannelMessageSendEmbed(ch.ID, eb.Finalize())
-					}
-				}
-			}
-		}
-	}
-}
-
-//OnError creates an error response, logs them and sends the response on Discord.
 func OnError(b *bot.Bot) func(*gumi.Ctx, error) {
 	return func(ctx *gumi.Ctx, err error) {
 		eb := embeds.NewBuilder()
@@ -650,7 +746,6 @@ func OnError(b *bot.Bot) func(*gumi.Ctx, error) {
 	}
 }
 
-//OnRateLimit creates a response for users who use bot's command too frequently
 func OnRateLimit(b *bot.Bot) func(*gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
 		duration, err := ctx.Command.RateLimiter.Expires(ctx.Event.Author.ID)
@@ -665,7 +760,6 @@ func OnRateLimit(b *bot.Bot) func(*gumi.Ctx) error {
 	}
 }
 
-//OnNoPerms creates a response for users who used a command without required permissions.
 func OnNoPerms(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
 		eb := embeds.NewBuilder()
@@ -675,7 +769,6 @@ func OnNoPerms(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	}
 }
 
-//OnNSFW creates a response for users who used a NSFW command in a SFW channel
 func OnNSFW(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
 		eb := embeds.NewBuilder()
@@ -686,7 +779,6 @@ func OnNSFW(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	}
 }
 
-//OnExecute logs every executed command.
 func OnExecute(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
 		b.Log.Infof("Executing command [%v]. Arguments: [%v]. Guild ID: %v, channel ID: %v", ctx.Command.Name, ctx.Args.Raw, ctx.Event.GuildID, ctx.Event.ChannelID)
@@ -695,3 +787,5 @@ func OnExecute(b *bot.Bot) func(ctx *gumi.Ctx) error {
 		return nil
 	}
 }
+
+*/

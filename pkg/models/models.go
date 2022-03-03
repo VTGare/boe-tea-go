@@ -9,6 +9,7 @@ import (
 )
 
 type Models struct {
+	DB       *mongodb.Mongo
 	Artworks artworks.Service
 	Guilds   guilds.Service
 	Users    users.Service
@@ -16,6 +17,7 @@ type Models struct {
 
 func New(db *mongodb.Mongo, logger *zap.SugaredLogger) *Models {
 	return &Models{
+		DB:       db,
 		Artworks: artworks.NewService(db, logger),
 		Guilds:   guilds.NewService(db, logger),
 		Users:    users.NewService(db, logger),

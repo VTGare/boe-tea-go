@@ -45,3 +45,32 @@ func MapString(ss []string, f func(string) string) []string {
 
 	return mapped
 }
+
+func FilterInt(slice []int, f func(int) bool) []int {
+	filtered := make([]int, 0)
+
+	for _, num := range slice {
+		if f(num) {
+			filtered = append(filtered, num)
+		}
+	}
+
+	return filtered
+}
+
+func MapInt(slice []int, f func(int) int) []int {
+	if len(slice) == 0 {
+		return nil
+	}
+
+	mapped := make([]int, 0)
+	for _, num := range slice {
+		mapped = append(mapped, f(num))
+	}
+
+	return mapped
+}
+
+func RemoveInt(slice []int, s int) []int {
+	return append(slice[:s], slice[s+1:]...)
+}
