@@ -52,8 +52,7 @@ Please use `bt!help` command for documentation. Complete documentation is coming
 ## Deployment
 
 ### Requirements
-- Golang (1.16+). Download Golang from https://golang.org or using any package manager for your platform (e.g. Chocolatey on Windows or pacman on ArchLinux).
-- ffmpeg
+- Golang (1.16+). Download Golang from https://golang.org or by using a package manager (e.g. Chocolatey on Windows, homebrew on Mac or pacman on ArchLinux).
 
 ### Locally
 1. Clone this repository. `git clone https://github.com/VTGare/boe-tea-go.git`
