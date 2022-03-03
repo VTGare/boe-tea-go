@@ -10,13 +10,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/PuerkitoBio/goquery"
 	"github.com/ReneKroon/ttlcache"
 	"github.com/VTGare/boe-tea-go/pkg/artworks"
 	models "github.com/VTGare/boe-tea-go/pkg/models/artworks"
 	"github.com/VTGare/boe-tea-go/pkg/models/guilds"
 	"github.com/VTGare/embeds"
 	"github.com/bwmarrin/discordgo"
-	"github.com/gocolly/colly/v2"
 )
 
 type MediaType int
@@ -123,26 +123,41 @@ func (t Twitter) Enabled(g *guilds.Guild) bool {
 	return g.Twitter
 }
 
-func (t Twitter) scrapeTwitter(snowflake, nitter string) (*Artwork, error) {
-	var (
-		res      = &Artwork{Snowflake: snowflake}
-		visitURL = fmt.Sprintf(nitter+"/i/status/%v", res.Snowflake)
-		c        = colly.NewCollector()
-	)
+func (t Twitter) scrapeTwitter(snowflake, baseURL string) (*Artwork, error) {
+	resp, err := http.Get(baseURL + "/i/status/" + snowflake)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
 
-	c.OnHTML(".main-tweet .still-image", func(e *colly.HTMLElement) {
-		imageURL := nitter + e.Attr("href")
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("unexpected status code: %v", resp.Status)
+	}
 
-		imageURL = strings.Replace(imageURL, nitter+"/pic/media%2F", "https://pbs.twimg.com/media/", 1)
-		imageURL = strings.TrimSuffix(imageURL, "%3Fname%3Dorig")
+	doc, err := goquery.NewDocumentFromReader(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open a document: %w", err)
+	}
+
+	res := &Artwork{Snowflake: snowflake}
+	res.Content = doc.Find(".main-tweet .tweet-content").Text()
+	res.FullName = doc.Find(".main-tweet .fullname").Text()
+	res.Username = doc.Find(".main-tweet .username").Text()
+
+	doc.Find(".main-tweet .still-image").Each(func(_ int, image *goquery.Selection) {
+		url, _ := image.Attr("href")
+
+		imageURL := strings.Replace(baseURL+url, baseURL+"/pic/media%2F", "https://pbs.twimg.com/media/", 1)
 		res.Gallery = append(res.Gallery, &Media{
-			URL:  imageURL,
+			URL:  strings.TrimSuffix(imageURL, "%3Fname%3Dorig"),
 			Type: MediaTypeImage,
 		})
 	})
 
-	c.OnHTML(".main-tweet .gif", func(e *colly.HTMLElement) {
-		gif := strings.Replace(e.ChildAttr("source", "src"), "/pic/", "https://", 1)
+	doc.Find(".main-tweet .gif").Each(func(i int, s *goquery.Selection) {
+		src, _ := s.Find("source").Attr("src")
+
+		gif := strings.Replace(src, "/pic/", "https://", 1)
 		gif, _ = url.QueryUnescape(gif)
 		res.Gallery = append(res.Gallery, &Media{
 			URL:  gif,
@@ -150,72 +165,27 @@ func (t Twitter) scrapeTwitter(snowflake, nitter string) (*Artwork, error) {
 		})
 	})
 
-	/*c.OnHTML(".main-tweet .video-container", func(e *colly.HTMLElement) {
-		poster := e.ChildAttr("video", "poster")
+	res.Likes = parseCount(doc.Find(".main-tweet .icon-container").Has(".icon-heart").Text())
+	res.Retweets = parseCount(doc.Find(".main-tweet .icon-container").Has(".icon-retweet").Text())
+	res.Comments = parseCount(doc.Find(".main-tweet .icon-container").Has(".icon-comment").Text())
 
-		poster = strings.Replace(poster, "/pic", "https://pbs.twimg.com", 1)
-		replacer := strings.NewReplacer(
-			"/pic", "https://pbs.twimg.com",
-			`%2F`, "/",
-			"%3Asmall", "",
-		)
+	date, _ := doc.Find(".main-tweet .tweet-date").Find("a").Attr("title")
+	ts, _ := time.Parse("Jan 2, 2006 · 3:04 PM UTC", date)
+	res.Timestamp = ts.Format(time.RFC3339)
 
-		res.Gallery = append(res.Gallery, &Media{
-			URL:  replacer.Replace(poster),
-			Type: MediaTypeVideo,
-		})
-	})*/
-
-	c.OnHTML(".main-tweet .icon-container", func(e *colly.HTMLElement) {
-		children := e.DOM.Children()
-
-		switch {
-		case children.HasClass("icon-comment"):
-			num := strings.TrimSpace(e.Text)
-			res.Comments = parse(num)
-		case children.HasClass("icon-retweet"):
-			num := strings.TrimSpace(e.Text)
-			res.Retweets = parse(num)
-		case children.HasClass("icon-heart"):
-			num := strings.TrimSpace(e.Text)
-			res.Likes = parse(num)
-		}
-	})
-
-	c.OnHTML(".main-tweet .tweet-date", func(e *colly.HTMLElement) {
-		t, _ := time.Parse("2/1/2006, 15:04:05", e.ChildAttr("a", "title"))
-		res.Timestamp = t.Format(time.RFC3339)
-	})
-
-	c.OnHTML(".main-tweet .tweet-content", func(e *colly.HTMLElement) {
-		res.Content = e.Text
-	})
-
-	c.OnHTML(".main-tweet .fullname", func(e *colly.HTMLElement) {
-		res.FullName = e.Text
-	})
-
-	c.OnHTML(".main-tweet .username", func(e *colly.HTMLElement) {
-		res.Username = e.Text
-	})
-
-	err := c.Visit(visitURL)
-
-	if err != nil {
-		return nil, err
+	username := ""
+	if res.Username == "" {
+		username = "i"
+	} else {
+		username = strings.TrimLeft(res.Username, "@")
 	}
 
-	c.Wait()
-
-	res.url = fmt.Sprintf("https://twitter.com/%v/status/%v", strings.TrimLeft(res.Username, "@"), res.Snowflake)
-
+	res.url = fmt.Sprintf("https://twitter.com/%v/status/%v", username, res.Snowflake)
 	return res, nil
 }
 
-func parse(s string) int {
-	if strings.Contains(s, ",") {
-		s = strings.ReplaceAll(s, ",", "")
-	}
+func parseCount(s string) int {
+	s = strings.ReplaceAll(strings.TrimSpace(s), ",", "")
 
 	num, _ := strconv.Atoi(s)
 	return num
