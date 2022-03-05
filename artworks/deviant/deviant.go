@@ -11,12 +11,12 @@ import (
 	"time"
 
 	"github.com/ReneKroon/ttlcache"
+	"github.com/VTGare/boe-tea-go/artworks"
 	"github.com/VTGare/boe-tea-go/internal/arikawautils/embeds"
 	"github.com/VTGare/boe-tea-go/internal/arrays"
-	"github.com/VTGare/boe-tea-go/pkg/artworks"
-	"github.com/VTGare/boe-tea-go/pkg/messages"
-	models "github.com/VTGare/boe-tea-go/pkg/models/artworks"
-	"github.com/VTGare/boe-tea-go/pkg/models/guilds"
+	"github.com/VTGare/boe-tea-go/messages"
+	models "github.com/VTGare/boe-tea-go/models/artworks"
+	"github.com/VTGare/boe-tea-go/models/guilds"
 	"github.com/diamondburned/arikawa/v3/api"
 	"github.com/diamondburned/arikawa/v3/discord"
 )

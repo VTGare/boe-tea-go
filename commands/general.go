@@ -1,8 +1,8 @@
 package commands
 
 import (
+	"github.com/VTGare/boe-tea-go/bot"
 	"github.com/VTGare/boe-tea-go/internal/arikawautils/embeds"
-	"github.com/VTGare/boe-tea-go/pkg/bot"
 	"github.com/diamondburned/arikawa/v3/api"
 	"github.com/diamondburned/arikawa/v3/discord"
 	"github.com/diamondburned/arikawa/v3/state"

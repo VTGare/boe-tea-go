@@ -1,8 +1,8 @@
 package artworks
 
 import (
-	"github.com/VTGare/boe-tea-go/pkg/models/artworks"
-	"github.com/VTGare/boe-tea-go/pkg/models/guilds"
+	"github.com/VTGare/boe-tea-go/models/artworks"
+	"github.com/VTGare/boe-tea-go/models/guilds"
 	"github.com/diamondburned/arikawa/v3/api"
 )
 

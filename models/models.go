@@ -2,9 +2,9 @@ package models
 
 import (
 	"github.com/VTGare/boe-tea-go/internal/database/mongodb"
-	"github.com/VTGare/boe-tea-go/pkg/models/artworks"
-	"github.com/VTGare/boe-tea-go/pkg/models/guilds"
-	"github.com/VTGare/boe-tea-go/pkg/models/users"
+	"github.com/VTGare/boe-tea-go/models/artworks"
+	"github.com/VTGare/boe-tea-go/models/guilds"
+	"github.com/VTGare/boe-tea-go/models/users"
 	"go.uber.org/zap"
 )
 

@@ -17,7 +17,6 @@ type Config struct {
 	Pixiv       *Pixiv          `json:"pixiv"`
 	SauceNAO    string          `json:"saucenao"`
 	Sentry      string          `json:"sentry"`
-	Encryption  string          `json:"encryption"`
 	Quotes      []*Quote        `json:"quotes"`
 
 	safeQuotes []*Quote

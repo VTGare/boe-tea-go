@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/VTGare/boe-tea-go/internal/database/mongodb"
-	mo "github.com/VTGare/boe-tea-go/pkg/models/artworks/options"
+	mo "github.com/VTGare/boe-tea-go/models/artworks/options"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
