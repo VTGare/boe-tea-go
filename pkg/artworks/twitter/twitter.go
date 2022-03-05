@@ -172,7 +172,7 @@ func (t Twitter) scrapeTwitter(snowflake, baseURL string) (*Artwork, error) {
 	res.Comments = parseCount(doc.Find(".main-tweet .icon-container").Has(".icon-comment").Text())
 
 	date, _ := doc.Find(".main-tweet .tweet-date").Find("a").Attr("title")
-	ts, _ := time.Parse("Jan 02, 2006 · 3:04 PM UTC", date)
+	ts, _ := time.Parse("Jan 2, 2006 · 3:04 PM UTC", date)
 	res.Timestamp = ts.Format(time.RFC3339)
 
 	username := ""
