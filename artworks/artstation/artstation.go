@@ -11,8 +11,7 @@ import (
 	"github.com/ReneKroon/ttlcache"
 	"github.com/VTGare/boe-tea-go/artworks"
 	"github.com/VTGare/boe-tea-go/internal/arikawautils/embeds"
-	models "github.com/VTGare/boe-tea-go/models/artworks"
-	"github.com/VTGare/boe-tea-go/models/guilds"
+	"github.com/VTGare/boe-tea-go/store"
 	"github.com/diamondburned/arikawa/v3/api"
 	"github.com/diamondburned/arikawa/v3/discord"
 	"github.com/microcosm-cc/bluemonday"
@@ -111,17 +110,17 @@ func (as Artstation) Match(url string) (string, bool) {
 	return res[1], true
 }
 
-func (Artstation) Enabled(g *guilds.Guild) bool {
+func (Artstation) Enabled(g *store.Guild) bool {
 	return true
 }
 
-func (artwork ArtstationResponse) ToModel() *models.ArtworkInsert {
+func (artwork ArtstationResponse) StoreArtwork() *store.Artwork {
 	images := make([]string, 0, len(artwork.Assets))
 	for _, asset := range artwork.Assets {
 		images = append(images, asset.ImageURL)
 	}
 
-	return &models.ArtworkInsert{
+	return &store.Artwork{
 		Title:  artwork.Title,
 		Author: artwork.User.Name,
 		URL:    artwork.Permalink,

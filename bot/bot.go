@@ -10,12 +10,8 @@ import (
 	"github.com/VTGare/boe-tea-go/internal/apis/nhentai"
 	"github.com/VTGare/boe-tea-go/internal/cache"
 	"github.com/VTGare/boe-tea-go/internal/config"
-	"github.com/VTGare/boe-tea-go/metrics"
-	"github.com/VTGare/boe-tea-go/models"
-	artworksModel "github.com/VTGare/boe-tea-go/models/artworks"
-	"github.com/VTGare/boe-tea-go/models/guilds"
-	"github.com/VTGare/boe-tea-go/models/users"
 	"github.com/VTGare/boe-tea-go/repost"
+	"github.com/VTGare/boe-tea-go/store"
 	"github.com/VTGare/sengoku"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
@@ -27,15 +23,11 @@ import (
 )
 
 type Bot struct {
-	// models
-	Guilds   guilds.Service
-	Users    users.Service
-	Artworks artworksModel.Service
+	Store store.Store
 
 	// misc.
-	Log     *zap.SugaredLogger
-	Config  *config.Config
-	Metrics *metrics.Metrics
+	Log    *zap.SugaredLogger
+	Config *config.Config
 
 	// caches
 	BannedUsers *ttlcache.Cache
@@ -52,10 +44,7 @@ type Bot struct {
 	ShardManager *shard.Manager
 }
 
-func New(
-	config *config.Config, models *models.Models, logger *zap.SugaredLogger,
-	rd repost.Detector, handlers ...interface{},
-) (*Bot, error) {
+func New(config *config.Config, store store.Store, logger *zap.SugaredLogger, rd repost.Detector) (*Bot, error) {
 	banned := ttlcache.NewCache()
 	banned.SetTTL(15 * time.Second)
 
@@ -65,15 +54,12 @@ func New(
 	})
 
 	return &Bot{
-		Guilds:         models.Guilds,
-		Users:          models.Users,
-		Artworks:       models.Artworks,
 		Log:            logger,
 		Config:         config,
+		Store:          store,
 		RepostDetector: rd,
 		BannedUsers:    banned,
 		EmbedCache:     cache.NewEmbedCache(),
-		Metrics:        metrics.New(),
 		NHentai:        nhentai.New(),
 		Sengoku:        sg,
 	}, nil

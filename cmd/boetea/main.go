@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/signal"
@@ -15,10 +16,10 @@ import (
 	"github.com/VTGare/boe-tea-go/commands"
 	"github.com/VTGare/boe-tea-go/handlers"
 	"github.com/VTGare/boe-tea-go/internal/config"
-	"github.com/VTGare/boe-tea-go/internal/database/mongodb"
 	"github.com/VTGare/boe-tea-go/internal/logger"
-	"github.com/VTGare/boe-tea-go/models"
 	"github.com/VTGare/boe-tea-go/repost"
+	"github.com/VTGare/boe-tea-go/store"
+	"github.com/VTGare/boe-tea-go/store/mongo"
 	"github.com/diamondburned/arikawa/v3/gateway"
 	"github.com/diamondburned/arikawa/v3/session/shard"
 	"github.com/diamondburned/arikawa/v3/state"
@@ -81,18 +82,20 @@ func newRepostDetector(t string, redisURI ...string) (repost.Detector, error) {
 	return repost.NewMemory(), nil
 }
 
-func initialiseDatabase(log *zap.SugaredLogger, mongoURI, database string) (*models.Models, error) {
-	db, err := mongodb.New(mongoURI, database)
+func initStore(mongoURI, database string) (store.Store, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	store, err := mongo.New(ctx, mongoURI, database)
 	if err != nil {
 		return nil, err
 	}
 
-	err = db.CreateCollections()
-	if err != nil {
+	if err := store.Init(ctx); err != nil {
 		return nil, err
 	}
 
-	return models.New(db, log), nil
+	return store, nil
 }
 
 func main() {
@@ -113,12 +116,12 @@ func main() {
 		log.Fatalf("failed to initialise a repost detector: %v", err)
 	}
 
-	m, err := initialiseDatabase(log, cfg.Mongo.URI, cfg.Mongo.Database)
+	store, err := initStore(cfg.Mongo.URI, cfg.Mongo.Database)
 	if err != nil {
 		log.Fatalf("failed to initialise a database: %v", err)
 	}
 
-	b, err := bot.New(cfg, m, log, rep)
+	b, err := bot.New(cfg, store, log, rep)
 	if err != nil {
 		log.Fatalf("failed to create a new bot: %v", err)
 	}
@@ -147,7 +150,7 @@ func main() {
 	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
 	<-sc
 
-	m.DB.Close()
+	store.Close(context.Background())
 	rep.Close()
 	b.Close()
 }

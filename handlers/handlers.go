@@ -15,9 +15,8 @@ import (
 	"github.com/VTGare/boe-tea-go/internal/cache"
 	"github.com/VTGare/boe-tea-go/internal/config"
 	"github.com/VTGare/boe-tea-go/messages"
-	"github.com/VTGare/boe-tea-go/models/artworks/options"
-	"github.com/VTGare/boe-tea-go/models/users"
 	"github.com/VTGare/boe-tea-go/post"
+	"github.com/VTGare/boe-tea-go/store"
 	"github.com/bwmarrin/discordgo"
 	"github.com/diamondburned/arikawa/v3/api"
 	"github.com/diamondburned/arikawa/v3/discord"
@@ -36,7 +35,7 @@ func PrefixResolver(b *bot.Bot) func(s *discordgo.Session, m *discordgo.MessageC
 		mention := fmt.Sprintf("<@%v> ", s.State.User.ID)
 		mentionExcl := fmt.Sprintf("<@!%v> ", s.State.User.ID)
 
-		g, _ := b.Guilds.FindOne(ctx, m.GuildID)
+		g, _ := b.Store.Guild(ctx, m.GuildID)
 		if g == nil || g.Prefix == "bt!" {
 			return []string{mention, mentionExcl, "bt!", "bt ", "bt.", "bt?"}
 		}
@@ -80,7 +79,7 @@ func OnMessageCreate(b *bot.Bot, s *state.State) func(m *gateway.MessageCreateEv
 			return
 		}
 
-		user, _ := b.Users.FindOne(context.Background(), m.Author.ID.String())
+		user, _ := b.Store.User(context.Background(), m.Author.ID.String())
 		if user != nil {
 			if group, ok := user.FindGroup(m.ChannelID.String()); ok {
 				_, err := p.Crosspost(m.Author.ID, group.Name, group.Children)
@@ -140,11 +139,14 @@ func OnReady(b *bot.Bot, s *state.State) func(*gateway.ReadyEvent) {
 //OnGuildCreate loads server configuration on launch and creates new database entries when joining a new server.
 func OnGuildCreate(b *bot.Bot, _ *state.State) func(*gateway.GuildCreateEvent) {
 	return func(g *gateway.GuildCreateEvent) {
-		_, err := b.Guilds.FindOne(context.Background(), g.ID.String())
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		_, err := b.Store.Guild(ctx, g.ID.String())
 		if errors.Is(err, mongo.ErrNoDocuments) {
 			b.Log.Infof("Joined a guild. Name: %v. ID: %v", g.Name, g.ID)
 
-			_, err := b.Guilds.InsertOne(context.Background(), g.ID.String())
+			_, err := b.Store.CreateGuild(ctx, g.ID.String())
 			if err != nil {
 				b.Log.Errorf("Error while inserting guild %v: %v", g.ID, err)
 			}
@@ -228,8 +230,11 @@ func OnReactionAdd(b *bot.Bot, s *state.State) func(*gateway.MessageReactionAddE
 				"message", r.MessageID,
 				"user", r.UserID,
 			)
-			name = r.Emoji.APIString()
+			name        = r.Emoji.APIString()
+			ctx, cancel = context.WithTimeout(context.Background(), 10*time.Second)
 		)
+
+		defer cancel()
 
 		deleteEmbed := func() error {
 			msg, ok := b.EmbedCache.Get(r.ChannelID, r.MessageID)
@@ -320,7 +325,7 @@ func OnReactionAdd(b *bot.Bot, s *state.State) func(*gateway.MessageReactionAddE
 			p := post.New(b, s, &gateway.MessageCreateEvent{*msg, &discord.Member{User: *dgUser}})
 
 			sent := make([]*cache.MessageInfo, 0)
-			user, _ := b.Users.FindOne(context.Background(), r.UserID.String())
+			user, _ := b.Store.User(ctx, r.UserID.String())
 			if user != nil {
 				if group, ok := user.FindGroup(r.ChannelID.String()); ok {
 					userID, err := arikawautils.UserID(user.ID)
@@ -393,50 +398,41 @@ func OnReactionAdd(b *bot.Bot, s *state.State) func(*gateway.MessageReactionAddE
 				return nil
 			}
 
-			insert := artwork.ToModel()
-			if len(insert.Images) == 0 {
+			if artwork.Len() == 0 {
 				return nil
 			}
 
-			artworkDB, created, err := b.Artworks.FindOneOrCreate(context.Background(), &options.FilterOne{
-				URL: artwork.URL(),
-			}, insert)
+			artworkDB, err := b.Store.Artwork(ctx, 0, artwork.URL())
+			if errors.Is(err, store.ErrArtworkNotFound) {
+				artworkDB, err = b.Store.CreateArtwork(ctx, artwork.StoreArtwork())
+			}
 
 			if err != nil {
 				return fmt.Errorf("failed to find or create an artwork: %w", err)
 			}
 
-			if created {
-				log.With(
-					"artwork_id", artworkDB.ID,
-					"artwork_url", artworkDB.URL,
-					"images", len(artworkDB.Images),
-				).Infof("created a new artwork")
-			}
-
-			user, err := b.Users.FindOneOrCreate(context.Background(), r.UserID.String())
+			user, err := b.Store.User(ctx, r.UserID.String())
 			if err != nil {
 				return fmt.Errorf("failed to find or create a user: %w", err)
 			}
 
-			log := log.With(
-				"user", r.UserID,
-				"artwork_id", artworkDB.ID,
+			var (
+				nsfw = name == "🤤"
+				fav  = &store.Favourite{
+					ArtworkID: artworkDB.ID,
+					NSFW:      nsfw,
+					CreatedAt: time.Now(),
+				}
+				log = log.With(
+					"user", r.UserID,
+					"artwork_id", artworkDB.ID,
+					"nsfw", nsfw,
+				)
 			)
 
 			log.Info("inserting a favourite")
-
-			nsfw := name == "🤤"
-			_, err = b.Users.InsertFavourite(context.Background(), r.UserID.String(), &users.Favourite{
-				ArtworkID: artworkDB.ID,
-				NSFW:      nsfw,
-				CreatedAt: time.Now(),
-			})
-
-			if err != nil {
-				if !errors.Is(err, mongo.ErrNoDocuments) {
-					return fmt.Errorf("failed to insert a favourite: %w", err)
-				}
+			if err := b.Store.AddFavourite(ctx, r.UserID.String(), fav); err != nil {
+				return fmt.Errorf("failed to insert a favourite: %w", err)
 			}
 
 			if !user.DM {
@@ -510,6 +506,9 @@ func OnReactionRemove(b *bot.Bot, s *state.State) func(*gateway.MessageReactionR
 			"user", r.UserID,
 		)
 
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
 		//Do nothing if user was banned recently. Discord removes all reactions
 		//of banned users on the server which in turn removes all favourites.
 		if _, ok := b.BannedUsers.Get(r.UserID.String()); ok {
@@ -570,9 +569,7 @@ func OnReactionRemove(b *bot.Bot, s *state.State) func(*gateway.MessageReactionR
 			return
 		}
 
-		artworkDB, err := b.Artworks.FindOne(context.Background(), &options.FilterOne{
-			URL: artwork.URL(),
-		})
+		artworkDB, err := b.Store.Artwork(ctx, 0, artwork.URL())
 
 		if err != nil {
 			if !errors.Is(err, mongo.ErrNoDocuments) {
@@ -582,7 +579,7 @@ func OnReactionRemove(b *bot.Bot, s *state.State) func(*gateway.MessageReactionR
 			return
 		}
 
-		user, err := b.Users.FindOne(context.Background(), r.UserID.String())
+		user, err := b.Store.User(ctx, r.UserID.String())
 		if err != nil {
 			if !errors.Is(err, mongo.ErrNoDocuments) {
 				log.With("error", err).Error("failed to find a user")
@@ -597,7 +594,7 @@ func OnReactionRemove(b *bot.Bot, s *state.State) func(*gateway.MessageReactionR
 		}
 
 		log.With("user", r.UserID, "artwork", artworkDB.ID).Info("removing a favourite")
-		if _, err := b.Users.DeleteFavourite(context.Background(), user.ID, fav); err != nil {
+		if err := b.Store.DeleteFavourite(ctx, user.ID, fav); err != nil {
 			log.With("error", err).Error("failed to remove a favourite")
 			return
 		}
@@ -647,7 +644,7 @@ func OnPanic(b *bot.Bot) func(*gumi.Ctx, interface{}) {
 
 func NotCommand(b *bot.Bot) func(*gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
-		guild, err := b.Guilds.FindOne(context.Background(), ctx.Event.GuildID)
+		guild, err := b.Store.Guild(ctx, ctx.Event.GuildID)
 		if err != nil {
 			return err
 		}
@@ -669,7 +666,7 @@ func NotCommand(b *bot.Bot) func(*gumi.Ctx) error {
 			}
 
 			allSent = append(allSent, sent...)
-			user, err := b.Users.FindOne(context.Background(), ctx.Event.Author.ID)
+			user, err := b.Store.User(ctx, ctx.Event.Author.ID)
 			if err != nil {
 				if !errors.Is(err, mongo.ErrNoDocuments) {
 					return err

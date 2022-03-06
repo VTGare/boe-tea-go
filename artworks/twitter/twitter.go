@@ -14,8 +14,7 @@ import (
 	"github.com/ReneKroon/ttlcache"
 	"github.com/VTGare/boe-tea-go/artworks"
 	"github.com/VTGare/boe-tea-go/internal/arikawautils/embeds"
-	models "github.com/VTGare/boe-tea-go/models/artworks"
-	"github.com/VTGare/boe-tea-go/models/guilds"
+	"github.com/VTGare/boe-tea-go/store"
 	"github.com/diamondburned/arikawa/v3/api"
 	"github.com/diamondburned/arikawa/v3/discord"
 	"github.com/diamondburned/arikawa/v3/utils/sendpart"
@@ -121,7 +120,7 @@ func (t Twitter) Find(snowflake string) (artworks.Artwork, error) {
 	return nil, nil
 }
 
-func (t Twitter) Enabled(g *guilds.Guild) bool {
+func (t Twitter) Enabled(g *store.Guild) bool {
 	return g.Twitter
 }
 
@@ -206,9 +205,9 @@ func (t Twitter) set(snowflake string, artwork *Artwork) {
 	t.cache.Set(snowflake, artwork)
 }
 
-//ToModel transforms an artwork to an insertable to database artwork model.
-func (a Artwork) ToModel() *models.ArtworkInsert {
-	return &models.ArtworkInsert{
+//StoreArtwork transforms an artwork to an insertable to database artwork model.
+func (a Artwork) StoreArtwork() *store.Artwork {
+	return &store.Artwork{
 		Title:  "",
 		Author: a.Username,
 		URL:    a.url,

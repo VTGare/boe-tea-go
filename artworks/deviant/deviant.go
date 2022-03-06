@@ -15,8 +15,7 @@ import (
 	"github.com/VTGare/boe-tea-go/internal/arikawautils/embeds"
 	"github.com/VTGare/boe-tea-go/internal/arrays"
 	"github.com/VTGare/boe-tea-go/messages"
-	models "github.com/VTGare/boe-tea-go/models/artworks"
-	"github.com/VTGare/boe-tea-go/models/guilds"
+	"github.com/VTGare/boe-tea-go/store"
 	"github.com/diamondburned/arikawa/v3/api"
 	"github.com/diamondburned/arikawa/v3/discord"
 )
@@ -116,7 +115,7 @@ func (d DeviantArt) Match(s string) (string, bool) {
 	return res[1], true
 }
 
-func (d DeviantArt) Enabled(g *guilds.Guild) bool {
+func (d DeviantArt) Enabled(g *store.Guild) bool {
 	return g.Deviant
 }
 
@@ -148,8 +147,8 @@ func (a Artwork) MessageSends(footer string) ([]api.SendMessageData, error) {
 	}}, nil
 }
 
-func (a Artwork) ToModel() *models.ArtworkInsert {
-	return &models.ArtworkInsert{
+func (a Artwork) StoreArtwork() *store.Artwork {
+	return &store.Artwork{
 		Title:  a.Title,
 		Author: a.Author.Name,
 		URL:    a.url,

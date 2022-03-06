@@ -12,8 +12,7 @@ import (
 	"github.com/VTGare/boe-tea-go/internal/arikawautils/embeds"
 	"github.com/VTGare/boe-tea-go/internal/arrays"
 	"github.com/VTGare/boe-tea-go/messages"
-	models "github.com/VTGare/boe-tea-go/models/artworks"
-	"github.com/VTGare/boe-tea-go/models/guilds"
+	"github.com/VTGare/boe-tea-go/store"
 	"github.com/diamondburned/arikawa/v3/api"
 	"github.com/diamondburned/arikawa/v3/discord"
 	"github.com/everpcpc/pixiv"
@@ -151,7 +150,7 @@ func (p Pixiv) Find(id string) (artworks.Artwork, error) {
 	return artwork, nil
 }
 
-func (p Pixiv) Enabled(g *guilds.Guild) bool {
+func (p Pixiv) Enabled(g *store.Guild) bool {
 	return g.Pixiv
 }
 
@@ -168,8 +167,8 @@ func (p Pixiv) set(id string, artwork *Artwork) {
 	p.cache.Set(id, artwork)
 }
 
-func (a Artwork) ToModel() *models.ArtworkInsert {
-	return &models.ArtworkInsert{
+func (a Artwork) StoreArtwork() *store.Artwork {
+	return &store.Artwork{
 		Title:  a.Title,
 		Author: a.Author,
 		URL:    a.url,

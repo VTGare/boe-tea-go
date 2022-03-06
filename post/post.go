@@ -17,8 +17,8 @@ import (
 	"github.com/VTGare/boe-tea-go/internal/arrays"
 	"github.com/VTGare/boe-tea-go/internal/cache"
 	"github.com/VTGare/boe-tea-go/messages"
-	"github.com/VTGare/boe-tea-go/models/guilds"
 	"github.com/VTGare/boe-tea-go/repost"
+	"github.com/VTGare/boe-tea-go/store"
 	"github.com/bwmarrin/discordgo"
 	"github.com/diamondburned/arikawa/v3/api"
 	"github.com/diamondburned/arikawa/v3/discord"
@@ -64,7 +64,7 @@ func New(bot *bot.Bot, state *state.State, event *gateway.MessageCreateEvent, ur
 }
 
 func (p *Post) Send() ([]*cache.MessageInfo, error) {
-	guild, err := p.bot.Guilds.FindOne(context.Background(), p.event.GuildID.String())
+	guild, err := p.bot.Store.Guild(context.Background(), p.event.GuildID.String())
 	if err != nil {
 		return nil, err
 	}
@@ -128,14 +128,14 @@ func (p *Post) Crosspost(userID discord.UserID, group string, channels []string)
 
 			if _, err := p.state.Member(ch.GuildID, userID); err != nil {
 				log.Infof("Removing a channel from user's group. User left the server.")
-				if _, err := p.bot.Users.DeleteFromGroup(context.Background(), userID.String(), group, channelID.String()); err != nil {
+				if _, err := p.bot.Store.DeleteCrosspostChannel(context.Background(), userID.String(), group, channelID.String()); err != nil {
 					log.Errorf("Failed to remove a channel from user's group. Error: %v", err)
 				}
 
 				return
 			}
 
-			guild, err := p.bot.Guilds.FindOne(context.Background(), ch.GuildID.String())
+			guild, err := p.bot.Store.Guild(context.Background(), ch.GuildID.String())
 			if err != nil {
 				log.Infof("Couldn't crosspost. Find Guild error: %v", err)
 				return
@@ -178,7 +178,7 @@ func (p *Post) SetSkip(indices map[int]struct{}, mode SkipMode) {
 	p.skipMode = mode
 }
 
-func (p *Post) fetch(guild *guilds.Guild, channelID discord.ChannelID, crosspost bool) (*fetchResult, error) {
+func (p *Post) fetch(guild *store.Guild, channelID discord.ChannelID, crosspost bool) (*fetchResult, error) {
 	var (
 		wg, _        = errgroup.WithContext(context.Background())
 		matched      int64
@@ -281,7 +281,7 @@ func (p *Post) fetch(guild *guilds.Guild, channelID discord.ChannelID, crosspost
 	return res, nil
 }
 
-func (p *Post) sendReposts(guild *guilds.Guild, reposts []*repost.Repost, timeout time.Duration) {
+func (p *Post) sendReposts(guild *store.Guild, reposts []*repost.Repost, timeout time.Duration) {
 	locale := messages.RepostEmbed()
 
 	eb := embeds.NewBuilder()
@@ -308,13 +308,10 @@ func (p *Post) sendReposts(guild *guilds.Guild, reposts []*repost.Repost, timeou
 	}
 }
 
-func (p *Post) send(guild *guilds.Guild, channelID discord.ChannelID, artworks []artworks.Artwork, crosspost bool) ([]*cache.MessageInfo, error) {
+func (p *Post) send(guild *store.Guild, channelID discord.ChannelID, artworks []artworks.Artwork, crosspost bool) ([]*cache.MessageInfo, error) {
 	if len(artworks) == 0 {
 		return nil, nil
 	}
-
-	lenArtworks := int64(len(artworks))
-	p.bot.Metrics.IncrementArtwork(lenArtworks)
 
 	allMessages, err := p.generateMessages(guild, artworks, channelID, crosspost)
 	if err != nil {
@@ -393,7 +390,7 @@ func (p *Post) send(guild *guilds.Guild, channelID discord.ChannelID, artworks [
 	return sent, nil
 }
 
-func (p *Post) generateMessages(guild *guilds.Guild, artworks []artworks.Artwork, channelID discord.ChannelID, crosspost bool) ([][]api.SendMessageData, error) {
+func (p *Post) generateMessages(guild *store.Guild, artworks []artworks.Artwork, channelID discord.ChannelID, crosspost bool) ([][]api.SendMessageData, error) {
 	messageSends := make([][]api.SendMessageData, 0, len(artworks))
 	for _, artwork := range artworks {
 		if artwork != nil {
