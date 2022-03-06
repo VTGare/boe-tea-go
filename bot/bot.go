@@ -30,8 +30,9 @@ type Bot struct {
 	Config *config.Config
 
 	// caches
-	BannedUsers *gocache.Cache
-	EmbedCache  *cache.EmbedCache
+	ArtworkCache *gocache.Cache
+	BannedUsers  *gocache.Cache
+	EmbedCache   *cache.EmbedCache
 
 	// services
 	Sengoku          *sengoku.Sengoku
@@ -45,17 +46,18 @@ type Bot struct {
 }
 
 func New(config *config.Config, store store.Store, logger *zap.SugaredLogger, rd repost.Detector) (*Bot, error) {
-	banned := gocache.New(5*time.Second, 5*time.Second)
-	sg := sengoku.NewSengoku(config.SauceNAO, sengoku.Config{
-		DB:      999,
-		Results: 10,
-	})
+	var (
+		banned       = gocache.New(5*time.Second, 5*time.Second)
+		artworkCache = gocache.New(30*time.Minute, 45*time.Hour)
+		sg           = sengoku.NewSengoku(config.SauceNAO, sengoku.Config{DB: 999, Results: 10})
+	)
 
 	return &Bot{
 		Log:            logger,
 		Config:         config,
 		Store:          store,
 		RepostDetector: rd,
+		ArtworkCache:   artworkCache,
 		BannedUsers:    banned,
 		EmbedCache:     cache.NewEmbedCache(),
 		NHentai:        nhentai.New(),

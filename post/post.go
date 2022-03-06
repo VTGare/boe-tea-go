@@ -233,9 +233,17 @@ func (p *Post) fetch(guild *store.Guild, channelID discord.ChannelID, crosspost 
 
 					// TODO: or command != nil
 					if provider.Enabled(guild) || (crosspost && isTwitter) {
-						artwork, err := provider.Find(id)
-						if err != nil {
-							return err
+						var artwork artworks.Artwork
+						if i, ok := p.bot.ArtworkCache.Get(id); ok {
+							artwork = i.(artworks.Artwork)
+						} else {
+							var err error
+							artwork, err = provider.Find(id)
+							if err != nil {
+								return err
+							}
+
+							p.bot.ArtworkCache.Set(id, artwork, 0)
 						}
 
 						// Only add reactions to the original message for Twitter links.
