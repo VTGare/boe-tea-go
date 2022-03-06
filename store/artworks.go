@@ -8,7 +8,7 @@ import (
 type ArtworkStore interface {
 	Artwork(ctx context.Context, id int, url string) (*Artwork, error)
 	CreateArtwork(context.Context, *Artwork) (*Artwork, error)
-	SearchArtworks(context.Context, ...ArtworkSearchOptions) ([]*Artwork, error)
+	SearchArtworks(context.Context, ArtworkFilter, ...ArtworkSearchOptions) ([]*Artwork, error)
 }
 
 type Artwork struct {
@@ -46,11 +46,10 @@ func (s ArtworkSort) String() string {
 }
 
 type ArtworkSearchOptions struct {
-	Limit  int64
-	Page   int64
-	Order  Order
-	Sort   ArtworkSort
-	Filter ArtworkFilter
+	Limit int64
+	Page  int64
+	Order Order
+	Sort  ArtworkSort
 }
 
 type ArtworkFilter struct {
@@ -64,10 +63,9 @@ type ArtworkFilter struct {
 
 func DefaultSearchOptions() ArtworkSearchOptions {
 	return ArtworkSearchOptions{
-		Limit:  100,
-		Page:   0,
-		Order:  Descending,
-		Sort:   ByTime,
-		Filter: ArtworkFilter{},
+		Limit: 100,
+		Page:  0,
+		Order: Descending,
+		Sort:  ByTime,
 	}
 }

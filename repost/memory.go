@@ -4,20 +4,20 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ReneKroon/ttlcache"
+	cache "github.com/patrickmn/go-cache"
 )
 
 type inMemory struct {
-	cache *ttlcache.Cache
+	cache *cache.Cache
 }
 
 func NewMemory() Detector {
-	return &inMemory{cache: ttlcache.NewCache()}
+	return &inMemory{cache: cache.New(0, 5*time.Minute)}
 }
 
 func (rd inMemory) Create(rep *Repost, ttl time.Duration) error {
 	rep.ExpiresAt = time.Now().Add(ttl)
-	rd.cache.SetWithTTL(rd.key(rep), rep, ttl)
+	rd.cache.Set(rd.key(rep), rep, ttl)
 
 	return nil
 }
@@ -36,7 +36,6 @@ func (rd inMemory) key(rep *Repost) string {
 }
 
 func (rd inMemory) Close() error {
-	rd.cache.Close()
-
+	rd.cache.Flush()
 	return nil
 }

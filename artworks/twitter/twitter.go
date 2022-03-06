@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/ReneKroon/ttlcache"
 	"github.com/VTGare/boe-tea-go/artworks"
 	"github.com/VTGare/boe-tea-go/internal/arikawautils/embeds"
 	"github.com/VTGare/boe-tea-go/store"
@@ -29,7 +28,6 @@ const (
 )
 
 type Twitter struct {
-	cache  *ttlcache.Cache
 	nitter []string
 }
 
@@ -58,10 +56,7 @@ type Gallery []*Media
 
 //New creates a new Twitter artwork provider.
 func New() artworks.Provider {
-	c := ttlcache.NewCache()
-	c.SetTTL(30 * time.Minute)
-
-	return &Twitter{cache: c, nitter: []string{
+	return &Twitter{nitter: []string{
 		"https://nitter.snopyta.org",
 		"https://nitter.42l.fr",
 		"https://nitter.nixnet.services",
@@ -103,17 +98,12 @@ func (t Twitter) Match(s string) (string, bool) {
 }
 
 func (t Twitter) Find(snowflake string) (artworks.Artwork, error) {
-	if a, ok := t.get(snowflake); ok {
-		return a, nil
-	}
-
 	for _, nitter := range t.nitter {
 		a, err := t.scrapeTwitter(snowflake, nitter)
 		if err != nil {
 			continue
 		}
 
-		t.set(snowflake, a)
 		return a, nil
 	}
 
@@ -190,19 +180,6 @@ func parseCount(s string) int {
 
 	num, _ := strconv.Atoi(s)
 	return num
-}
-
-func (t Twitter) get(snowflake string) (*Artwork, bool) {
-	a, ok := t.cache.Get(snowflake)
-	if !ok {
-		return nil, ok
-	}
-
-	return a.(*Artwork), ok
-}
-
-func (t Twitter) set(snowflake string, artwork *Artwork) {
-	t.cache.Set(snowflake, artwork)
 }
 
 //StoreArtwork transforms an artwork to an insertable to database artwork model.

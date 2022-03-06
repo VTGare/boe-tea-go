@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ReneKroon/ttlcache"
 	"github.com/VTGare/boe-tea-go/artworks"
 	"github.com/VTGare/boe-tea-go/internal/arikawautils/embeds"
 	"github.com/VTGare/boe-tea-go/internal/arrays"
@@ -22,7 +21,6 @@ import (
 
 type DeviantArt struct {
 	regex *regexp.Regexp
-	cache *ttlcache.Cache
 }
 
 type Artwork struct {
@@ -66,12 +64,8 @@ type deviantEmbed struct {
 }
 
 func New() artworks.Provider {
-	c := ttlcache.NewCache()
-	c.SetTTL(30 * time.Minute)
-
 	return &DeviantArt{
 		regex: regexp.MustCompile(`(?i)https:\/\/(?:www\.)?deviantart\.com\/[\w]+\/art\/([\w\-]+)`),
-		cache: c,
 	}
 }
 

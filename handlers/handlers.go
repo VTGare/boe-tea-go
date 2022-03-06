@@ -173,7 +173,7 @@ func OnGuildBanAdd(b *bot.Bot, _ *state.State) func(*gateway.GuildBanAddEvent) {
 			return
 		}
 
-		b.BannedUsers.Set(g.User.ID.String(), struct{}{})
+		b.BannedUsers.Set(g.User.ID.String(), struct{}{}, 0)
 	}
 }
 
@@ -193,7 +193,7 @@ func OnMessageRemove(b *bot.Bot, s *state.State) func(*gateway.MessageDeleteEven
 		log := b.Log.With("channel", m.ChannelID, "message", m.ID, "user", msg.AuthorID)
 
 		log.Info("removing message cache")
-		b.EmbedCache.Remove(m.ChannelID, m.ID)
+		b.EmbedCache.Delete(m.ChannelID, m.ID)
 		if !msg.Parent {
 			return
 		}
@@ -202,7 +202,7 @@ func OnMessageRemove(b *bot.Bot, s *state.State) func(*gateway.MessageDeleteEven
 			log := log.With("parent", m.ID, "message", child.MessageID, "channel", child.ChannelID)
 
 			log.Info("removing child message")
-			b.EmbedCache.Remove(child.ChannelID, child.MessageID)
+			b.EmbedCache.Delete(child.ChannelID, child.MessageID)
 			if err := s.DeleteMessage(child.ChannelID, child.MessageID, "Removing artwork embeds on user request."); err != nil {
 				log.With("error", err).Error("failed to delete message")
 			}
@@ -247,9 +247,7 @@ func OnReactionAdd(b *bot.Bot, s *state.State) func(*gateway.MessageReactionAddE
 			}
 
 			log.Infof("deleting a message from reaction event")
-			b.EmbedCache.Remove(
-				r.ChannelID, r.MessageID,
-			)
+			b.EmbedCache.Delete(r.ChannelID, r.MessageID)
 
 			reason := api.AuditLogReason("Deleted artwork on user's request.")
 			err := s.DeleteMessage(r.ChannelID, r.MessageID, reason)
@@ -271,9 +269,7 @@ func OnReactionAdd(b *bot.Bot, s *state.State) func(*gateway.MessageReactionAddE
 					"user", r.UserID,
 				).Infof("removing a child message")
 
-				b.EmbedCache.Remove(
-					child.ChannelID, child.MessageID,
-				)
+				b.EmbedCache.Delete(child.ChannelID, child.MessageID)
 
 				if _, ok := childrenIDs[child.ChannelID]; !ok {
 					childrenIDs[child.ChannelID] = make([]discord.MessageID, 0)
@@ -322,7 +318,8 @@ func OnReactionAdd(b *bot.Bot, s *state.State) func(*gateway.MessageReactionAddE
 			}
 
 			msg.Author = *dgUser
-			p := post.New(b, s, &gateway.MessageCreateEvent{*msg, &discord.Member{User: *dgUser}})
+			event := &gateway.MessageCreateEvent{Message: *msg, Member: &discord.Member{User: *dgUser}}
+			p := post.New(b, s, event, url)
 
 			sent := make([]*cache.MessageInfo, 0)
 			user, _ := b.Store.User(ctx, r.UserID.String())
@@ -570,7 +567,6 @@ func OnReactionRemove(b *bot.Bot, s *state.State) func(*gateway.MessageReactionR
 		}
 
 		artworkDB, err := b.Store.Artwork(ctx, 0, artwork.URL())
-
 		if err != nil {
 			if !errors.Is(err, mongo.ErrNoDocuments) {
 				log.With("error", err).Error("failed to find an artwork")

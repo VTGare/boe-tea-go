@@ -24,6 +24,7 @@ import (
 	"github.com/diamondburned/arikawa/v3/session/shard"
 	"github.com/diamondburned/arikawa/v3/state"
 	"github.com/getsentry/sentry-go"
+	cache "github.com/patrickmn/go-cache"
 	"go.uber.org/zap"
 )
 
@@ -86,15 +87,16 @@ func initStore(mongoURI, database string) (store.Store, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	store, err := mongo.New(ctx, mongoURI, database)
+	mongo, err := mongo.New(ctx, mongoURI, database)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := store.Init(ctx); err != nil {
+	if err := mongo.Init(ctx); err != nil {
 		return nil, err
 	}
 
+	store := store.NewStatefulStore(mongo, cache.New(30*time.Minute, 1*time.Hour))
 	return store, nil
 }
 

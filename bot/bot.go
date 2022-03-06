@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ReneKroon/ttlcache"
 	"github.com/VTGare/boe-tea-go/artworks"
 	"github.com/VTGare/boe-tea-go/internal/apis/nhentai"
 	"github.com/VTGare/boe-tea-go/internal/cache"
@@ -13,6 +12,7 @@ import (
 	"github.com/VTGare/boe-tea-go/repost"
 	"github.com/VTGare/boe-tea-go/store"
 	"github.com/VTGare/sengoku"
+	gocache "github.com/patrickmn/go-cache"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 
@@ -30,7 +30,7 @@ type Bot struct {
 	Config *config.Config
 
 	// caches
-	BannedUsers *ttlcache.Cache
+	BannedUsers *gocache.Cache
 	EmbedCache  *cache.EmbedCache
 
 	// services
@@ -45,9 +45,7 @@ type Bot struct {
 }
 
 func New(config *config.Config, store store.Store, logger *zap.SugaredLogger, rd repost.Detector) (*Bot, error) {
-	banned := ttlcache.NewCache()
-	banned.SetTTL(15 * time.Second)
-
+	banned := gocache.New(5*time.Second, 5*time.Second)
 	sg := sengoku.NewSengoku(config.SauceNAO, sengoku.Config{
 		DB:      999,
 		Results: 10,

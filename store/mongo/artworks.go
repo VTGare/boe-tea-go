@@ -55,13 +55,13 @@ func (a *artworkStore) Artwork(ctx context.Context, id int, url string) (*store.
 	return artwork, nil
 }
 
-func (a *artworkStore) SearchArtworks(ctx context.Context, opts ...store.ArtworkSearchOptions) ([]*store.Artwork, error) {
+func (a *artworkStore) SearchArtworks(ctx context.Context, filter store.ArtworkFilter, opts ...store.ArtworkSearchOptions) ([]*store.Artwork, error) {
 	opt := store.DefaultSearchOptions()
 	if len(opts) != 0 {
 		opt = opts[0]
 	}
 
-	cur, err := a.col.Find(ctx, filterBSON(opt.Filter), findOptions(opt))
+	cur, err := a.col.Find(ctx, filterBSON(filter), findOptions(opt))
 	if err != nil {
 		return nil, err
 	}
