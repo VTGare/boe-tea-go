@@ -227,36 +227,41 @@ func (p *Post) fetch(guild *store.Guild, channelID discord.ChannelID, crosspost 
 					}
 
 					_, isTwitter := provider.(*twitter.Twitter)
-					// Only post the picture if the provider is enabled
+					// Only embed if the provider is enabled
 					// or the function is called from a command
 					// or we're crossposting a twitter artwork.
 
 					// TODO: or command != nil
-					if provider.Enabled(guild) || (crosspost && isTwitter) {
-						var artwork artworks.Artwork
-						if i, ok := p.bot.ArtworkCache.Get(id); ok {
-							artwork = i.(artworks.Artwork)
-						} else {
-							var err error
-							artwork, err = provider.Find(id)
-							if err != nil {
-								return err
-							}
-
-							p.bot.ArtworkCache.Set(id, artwork, 0)
-						}
-
-						// Only add reactions to the original message for Twitter links.
-						if isTwitter && artwork != nil && artwork.Len() > 0 {
-							// TODO: or command == nil
-							if guild.Reactions && isTwitter {
-								p.addReactions(p.event.Message)
-							}
-						}
-
-						artworksChan <- artwork
+					if !provider.Enabled(guild) && !(isTwitter && crosspost) {
+						break
 					}
 
+					var (
+						artwork artworks.Artwork
+						key     = fmt.Sprintf("%T:%v", provider, id)
+					)
+
+					if i, ok := p.bot.ArtworkCache.Get(key); ok {
+						artwork = i.(artworks.Artwork)
+					} else {
+						var err error
+						artwork, err = provider.Find(id)
+						if err != nil {
+							return err
+						}
+
+						p.bot.ArtworkCache.Set(key, artwork, 0)
+					}
+
+					// Only add reactions to the original message for Twitter links.
+					if isTwitter && artwork != nil && artwork.Len() > 0 {
+						// TODO: or command == nil
+						if guild.Reactions && isTwitter {
+							p.addReactions(p.event.Message)
+						}
+					}
+
+					artworksChan <- artwork
 					break
 				}
 			}

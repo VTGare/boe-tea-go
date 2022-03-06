@@ -79,34 +79,14 @@ func (b *Bot) WithCommands(commands []api.CreateCommandData) error {
 		eg.Go(func() error {
 			state := shard.(*state.State)
 
-			registeredCommands, err := state.Commands(b.Application.ID)
-			if err != nil {
-				return fmt.Errorf("failed to get current commands: %w", err)
-			}
-
-			takenNames := make(map[string]discord.CommandID)
-			for _, cmd := range registeredCommands {
-				takenNames[cmd.Name] = cmd.ID
-			}
-
 			switch b.Config.Env {
 			case config.DevEnvironment:
 				if _, err := state.BulkOverwriteGuildCommands(b.Application.ID, discord.GuildID(b.Config.TestGuildID), commands); err != nil {
 					return fmt.Errorf("failed to overwrite guild commands: %w", err)
 				}
 			case config.ProdEnvironment:
-				for _, cmd := range commands {
-					if id, ok := takenNames[cmd.Name]; ok {
-						_, err := state.EditCommand(b.Application.ID, id, cmd)
-						if err != nil {
-							return fmt.Errorf("failed to edit a command: %w", err)
-						}
-					} else {
-						_, err := state.CreateCommand(b.Application.ID, cmd)
-						if err != nil {
-							return fmt.Errorf("failed to create a command: %w", err)
-						}
-					}
+				if _, err := state.BulkOverwriteCommands(b.Application.ID, commands); err != nil {
+					return fmt.Errorf("failed to overwrite commands: %w", err)
 				}
 			}
 
