@@ -7,7 +7,7 @@ import (
 )
 
 type Builder struct {
-	e *discord.Embed
+	e discord.Embed
 }
 
 const (
@@ -22,7 +22,7 @@ const (
 
 func NewBuilder() *Builder {
 	return &Builder{
-		e: &discord.Embed{
+		e: discord.Embed{
 			Type:  discord.NormalEmbed,
 			Color: ColorPurple,
 		},
@@ -31,7 +31,62 @@ func NewBuilder() *Builder {
 
 func NewBuilderFromEmbed(e discord.Embed) *Builder {
 	return &Builder{
-		e: &e,
+		e: e,
+	}
+}
+
+func NewInfo(message string) *Builder {
+	return &Builder{
+		e: discord.Embed{
+			Title:       "ℹ Info",
+			Description: message,
+			Type:        discord.NormalEmbed,
+			Color:       ColorBlue,
+		},
+	}
+}
+
+func NewSuccess(message string) *Builder {
+	return &Builder{
+		e: discord.Embed{
+			Title:       "✅ Success",
+			Description: message,
+			Type:        discord.NormalEmbed,
+			Color:       ColorGreen,
+		},
+	}
+}
+
+func NewFail(message string) *Builder {
+	return &Builder{
+		e: discord.Embed{
+			Title:       "❎ Fail",
+			Description: message,
+			Type:        discord.NormalEmbed,
+			Color:       ColorGreen,
+		},
+	}
+}
+
+func NewWarn(message string) *Builder {
+	return &Builder{
+		e: discord.Embed{
+			Title:       "⚠ Warning!",
+			Description: message,
+			Type:        discord.NormalEmbed,
+			Color:       ColorYellow,
+		},
+	}
+}
+
+func NewError(message string) *Builder {
+	return &Builder{
+		e: discord.Embed{
+			Title:       "🛑 Error!",
+			Description: message,
+			Type:        discord.NormalEmbed,
+			Color:       ColorRed,
+		},
 	}
 }
 
@@ -98,6 +153,15 @@ func (b *Builder) Footer(text, icon string) *Builder {
 	return b
 }
 
+func (b *Builder) Author(name, url, icon string) *Builder {
+	b.e.Author = &discord.EmbedAuthor{
+		Name: name,
+		URL:  url,
+		Icon: icon,
+	}
+	return b
+}
+
 func (b *Builder) Timestamp(t time.Time) *Builder {
 	b.e.Timestamp = discord.NewTimestamp(t)
 	return b
@@ -109,5 +173,5 @@ func (b *Builder) TimestampRFC3339(s string) *Builder {
 }
 
 func (b *Builder) Build() discord.Embed {
-	return *b.e
+	return b.e
 }

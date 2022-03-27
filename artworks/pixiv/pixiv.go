@@ -9,17 +9,19 @@ import (
 
 	"github.com/VTGare/boe-tea-go/artworks"
 	"github.com/VTGare/boe-tea-go/internal/arikawautils/embeds"
-	"github.com/VTGare/boe-tea-go/internal/arrays"
+	"github.com/VTGare/boe-tea-go/internal/slices"
 	"github.com/VTGare/boe-tea-go/messages"
 	"github.com/VTGare/boe-tea-go/store"
 	"github.com/diamondburned/arikawa/v3/api"
 	"github.com/diamondburned/arikawa/v3/discord"
 	"github.com/everpcpc/pixiv"
+	"go.uber.org/atomic"
 )
 
 type Pixiv struct {
 	app   *pixiv.AppPixivAPI
 	regex *regexp.Regexp
+	hits  atomic.Int64
 }
 
 type Artwork struct {
@@ -136,11 +138,16 @@ func (p Pixiv) Find(id string) (artworks.Artwork, error) {
 		artwork.Ugoira = &Ugoira{ugoira.UgoiraMetadataUgoiraMetadata}
 	}
 
+	p.hits.Add(1)
 	return artwork, nil
 }
 
 func (p Pixiv) Enabled(g *store.Guild) bool {
 	return g.Pixiv
+}
+
+func (p Pixiv) Hits() int64 {
+	return p.hits.Load()
 }
 
 func (a Artwork) StoreArtwork() *store.Artwork {
@@ -175,7 +182,7 @@ func (a Artwork) MessageSends(quote string) ([]api.SendMessageData, error) {
 		eb.Title(fmt.Sprintf("%v by %v", a.Title, a.Author))
 	}
 
-	tags := arrays.MapString(a.Tags, func(s string) string {
+	tags := slices.Map(a.Tags, func(_ int, s string) string {
 		return fmt.Sprintf("[%v](https://pixiv.net/en/tags/%v/artworks)", s, s)
 	})
 	eb.Description(fmt.Sprintf("**Tags**\n%v", strings.Join(tags, " • ")))

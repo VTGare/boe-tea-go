@@ -22,11 +22,11 @@ type Guild struct {
 	Deviant    bool `json:"deviant" bson:"deviant"`
 	Artstation bool `json:"artstation" bson:"artstation"`
 
-	Tags      bool `json:"tags" bson:"tags"`
-	Footer    bool `json:"footer" bson:"footer"`
-	Crosspost bool `json:"crosspost" bson:"crosspost"`
-	Reactions bool `json:"reactions" bson:"reactions"`
-	Limit     int  `json:"limit" bson:"limit" validate:"required"`
+	Tags        bool `json:"tags" bson:"tags"`
+	FlavourText bool `json:"flavour_text" bson:"flavour_text"`
+	Crosspost   bool `json:"crosspost" bson:"crosspost"`
+	Reactions   bool `json:"reactions" bson:"reactions"`
+	Limit       int  `json:"limit" bson:"limit" validate:"required"`
 
 	Repost           string        `json:"repost" bson:"repost" validate:"required"`
 	RepostExpiration time.Duration `json:"repost_expiration" bson:"repost_expiration"`
@@ -48,7 +48,7 @@ func DefaultGuild(id string) *Guild {
 		Twitter:          true,
 		Deviant:          true,
 		Tags:             true,
-		Footer:           true,
+		FlavourText:      true,
 		Repost:           "enabled",
 		RepostExpiration: 24 * time.Hour,
 		Crosspost:        true,
@@ -69,7 +69,7 @@ func UserGuild() *Guild {
 		Twitter:          true,
 		Deviant:          true,
 		Tags:             true,
-		Footer:           true,
+		FlavourText:      true,
 		Repost:           "disabled",
 		RepostExpiration: 24 * time.Hour,
 		Crosspost:        true,

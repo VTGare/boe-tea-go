@@ -43,6 +43,7 @@ type Bot struct {
 	Me           *discord.User
 	Application  *discord.Application
 	ShardManager *shard.Manager
+	StartupTime  time.Time
 }
 
 func New(config *config.Config, store store.Store, logger *zap.SugaredLogger, rd repost.Detector) (*Bot, error) {
@@ -81,7 +82,7 @@ func (b *Bot) WithCommands(commands []api.CreateCommandData) error {
 
 			switch b.Config.Env {
 			case config.DevEnvironment:
-				if _, err := state.BulkOverwriteGuildCommands(b.Application.ID, discord.GuildID(b.Config.TestGuildID), commands); err != nil {
+				if _, err := state.BulkOverwriteGuildCommands(b.Application.ID, b.Config.Discord.TestGuildID, commands); err != nil {
 					return fmt.Errorf("failed to overwrite guild commands: %w", err)
 				}
 			case config.ProdEnvironment:
@@ -122,6 +123,7 @@ func (b *Bot) Open() error {
 	}
 
 	b.Application = app
+	b.StartupTime = time.Now()
 	return nil
 }
 

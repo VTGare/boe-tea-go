@@ -12,15 +12,17 @@ import (
 
 	"github.com/VTGare/boe-tea-go/artworks"
 	"github.com/VTGare/boe-tea-go/internal/arikawautils/embeds"
-	"github.com/VTGare/boe-tea-go/internal/arrays"
+	"github.com/VTGare/boe-tea-go/internal/slices"
 	"github.com/VTGare/boe-tea-go/messages"
 	"github.com/VTGare/boe-tea-go/store"
 	"github.com/diamondburned/arikawa/v3/api"
 	"github.com/diamondburned/arikawa/v3/discord"
+	"go.uber.org/atomic"
 )
 
 type DeviantArt struct {
 	regex *regexp.Regexp
+	hits  atomic.Int64
 }
 
 type Artwork struct {
@@ -83,6 +85,7 @@ func (d DeviantArt) Find(id string) (artworks.Artwork, error) {
 		return nil, err
 	}
 
+	d.hits.Add(1)
 	return &Artwork{
 		Title: res.Title,
 		Author: &Author{
@@ -113,6 +116,10 @@ func (d DeviantArt) Enabled(g *store.Guild) bool {
 	return g.Deviant
 }
 
+func (d DeviantArt) Hits() int64 {
+	return d.hits.Load()
+}
+
 func (a Artwork) MessageSends(footer string) ([]api.SendMessageData, error) {
 	eb := embeds.NewBuilder()
 
@@ -121,7 +128,7 @@ func (a Artwork) MessageSends(footer string) ([]api.SendMessageData, error) {
 	)
 	eb.Image(a.ImageURL).URL(a.url).Timestamp(a.CreatedAt)
 
-	tags := arrays.MapString(a.Tags, func(s string) string {
+	tags := slices.Map(a.Tags, func(_ int, s string) string {
 		return messages.NamedLink(
 			s, "https://www.deviantart.com/tag/"+s,
 		)

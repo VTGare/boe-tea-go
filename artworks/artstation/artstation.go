@@ -14,10 +14,12 @@ import (
 	"github.com/diamondburned/arikawa/v3/api"
 	"github.com/diamondburned/arikawa/v3/discord"
 	"github.com/microcosm-cc/bluemonday"
+	"go.uber.org/atomic"
 )
 
 type Artstation struct {
 	regex *regexp.Regexp
+	hits  atomic.Int64
 }
 
 type ArtstationResponse struct {
@@ -92,6 +94,7 @@ func (as Artstation) Find(id string) (artworks.Artwork, error) {
 		return nil, err
 	}
 
+	as.hits.Add(1)
 	return res, nil
 }
 
@@ -106,6 +109,10 @@ func (as Artstation) Match(url string) (string, bool) {
 
 func (Artstation) Enabled(g *store.Guild) bool {
 	return true
+}
+
+func (as Artstation) Hits() int64 {
+	return as.hits.Load()
 }
 
 func (artwork ArtstationResponse) StoreArtwork() *store.Artwork {

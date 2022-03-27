@@ -9,6 +9,7 @@ type Provider interface {
 	Match(url string) (string, bool)
 	Find(id string) (Artwork, error)
 	Enabled(*store.Guild) bool
+	Hits() int64
 }
 
 type Artwork interface {

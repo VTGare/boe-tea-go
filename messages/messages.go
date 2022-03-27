@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/VTGare/boe-tea-go/internal/arrays"
+	"github.com/VTGare/boe-tea-go/internal/slices"
 )
 
 func FormatBool(b bool) string {
@@ -46,9 +46,9 @@ func NSFWCommand(cmd string) string {
 
 func ListChannels(channels []string) string {
 	return strings.Join(
-		arrays.MapString(
+		slices.Map(
 			channels,
-			func(s string) string {
+			func(_ int, s string) string {
 				return fmt.Sprintf("<#%v> | `%v`", s, s)
 			},
 		),

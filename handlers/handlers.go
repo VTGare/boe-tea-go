@@ -16,6 +16,7 @@ import (
 	"github.com/VTGare/boe-tea-go/internal/config"
 	"github.com/VTGare/boe-tea-go/messages"
 	"github.com/VTGare/boe-tea-go/post"
+	"github.com/VTGare/boe-tea-go/responses"
 	"github.com/VTGare/boe-tea-go/store"
 	"github.com/bwmarrin/discordgo"
 	"github.com/diamondburned/arikawa/v3/api"
@@ -53,7 +54,7 @@ func All(b *bot.Bot, s *state.State) []interface{} {
 
 func OnMessageCreate(b *bot.Bot, s *state.State) func(m *gateway.MessageCreateEvent) {
 	return func(m *gateway.MessageCreateEvent) {
-		if b.Config.Env == config.DevEnvironment && m.GuildID != discord.GuildID(b.Config.TestGuildID) {
+		if b.Config.Env == config.DevEnvironment && m.GuildID != b.Config.Discord.TestGuildID {
 			return
 		}
 
@@ -93,38 +94,91 @@ func OnMessageCreate(b *bot.Bot, s *state.State) func(m *gateway.MessageCreateEv
 
 func OnInteractionCreate(b *bot.Bot, s *state.State) func(e *gateway.InteractionCreateEvent) {
 	return func(e *gateway.InteractionCreateEvent) {
-		if b.Config.Env == config.DevEnvironment && e.GuildID != discord.GuildID(b.Config.TestGuildID) {
+		if b.Config.Env == config.DevEnvironment && e.GuildID != b.Config.Discord.TestGuildID {
 			return
 		}
 
-		var err error
-		switch interaction := e.Data.(type) {
-		case *discord.PingInteraction:
-			err = s.RespondInteraction(e.ID, e.Token, api.InteractionResponse{
-				Type: api.PongInteraction,
-			})
+		var (
+			ctx, cancel = context.WithTimeout(context.Background(), 15*time.Minute)
+			log         = b.Log.With(
+				"guild", e.GuildID,
+				"channel", e.ChannelID,
+				"sender", e.SenderID(),
+				"data", e.Data,
+			)
+		)
 
+		defer cancel()
+		/*defer func() {
+			if r := recover(); r != nil {
+				log.Error("recovered on interaction: ", r)
+			}
+		}()*/
+
+		switch interaction := e.Data.(type) {
 		case *discord.CommandInteraction:
 			cmd, ok := commands.Find(interaction.Name)
 			if !ok {
 				return
 			}
 
-			var resp api.InteractionResponse
-			resp, err = cmd.Exec(b, s)
-			if err != nil {
-				b.Log.With("error", err).Error("failed to execute a command")
+			if cmd.GuildOnly && e.GuildID.IsNull() {
+				if err := s.RespondInteraction(e.ID, e.Token, responses.GuildOnly); err != nil {
+					log.With("error", err).Error("failed to send a guild-only response")
+				}
+				return
 			}
 
-			err = s.RespondInteraction(e.ID, e.Token, resp)
-		case *discord.AutocompleteInteraction:
+			if cmd.AuthorOnly && e.SenderID() != b.Config.Discord.AuthorID {
+				if err := s.RespondInteraction(e.ID, e.Token, responses.AuthorOnly); err != nil {
+					log.With("error", err).Error("failed to send an author-only response")
+				}
+				return
+			}
+
+			if !cmd.Modal {
+				df := api.InteractionResponse{Type: api.DeferredMessageInteractionWithSource}
+				if err := s.RespondInteraction(e.ID, e.Token, df); err != nil {
+					log.With("error", err).Error("failed to defer an interaction")
+					return
+				}
+			}
+
+			resp, err := cmd.Exec(ctx, b, s, e.InteractionEvent)
+			if err != nil {
+				log.With("error", err).Error("failed to execute a command")
+				resp = responses.InternalError(err)
+			}
+
+			if cmd.Modal {
+				if err := s.RespondInteraction(e.ID, e.Token, resp); err != nil {
+					log.With("error", err).Error("failed to respond to interaction")
+				}
+			} else {
+				if _, err := s.CreateInteractionFollowup(b.Application.ID, e.Token, *resp.Data); err != nil {
+					log.With("error", err).Error("failed to respond to interaction")
+				}
+			}
+
+			commands.Hits[interaction.Name].Inc()
+
 		case *discord.ButtonInteraction:
 		case *discord.SelectInteraction:
 		case *discord.ModalInteraction:
-		}
+			exec, ok := commands.GetModalHandler(interaction.CustomID)
+			if !ok {
+				return
+			}
 
-		if err != nil {
-			b.Log.With("error", err).Error("failed to respond to interaction")
+			resp, err := exec(ctx, b, s, e.InteractionEvent)
+			if err != nil {
+				log.With("error", err).Error("failed to execute a command")
+				resp = responses.InternalError(err)
+			}
+
+			if err := s.RespondInteraction(e.ID, e.Token, resp); err != nil {
+				log.With("error", err).Error("failed to respond to interaction")
+			}
 		}
 	}
 }
@@ -169,7 +223,7 @@ func OnGuildDelete(b *bot.Bot, s *state.State) func(*gateway.GuildDeleteEvent) {
 //on that server due to Discord removing all reactions of banned users.
 func OnGuildBanAdd(b *bot.Bot, _ *state.State) func(*gateway.GuildBanAddEvent) {
 	return func(g *gateway.GuildBanAddEvent) {
-		if b.Config.Env == config.DevEnvironment && g.GuildID != discord.GuildID(b.Config.TestGuildID) {
+		if b.Config.Env == config.DevEnvironment && g.GuildID != b.Config.Discord.TestGuildID {
 			return
 		}
 
@@ -179,7 +233,7 @@ func OnGuildBanAdd(b *bot.Bot, _ *state.State) func(*gateway.GuildBanAddEvent) {
 
 func OnMessageRemove(b *bot.Bot, s *state.State) func(*gateway.MessageDeleteEvent) {
 	return func(m *gateway.MessageDeleteEvent) {
-		if b.Config.Env == config.DevEnvironment && m.GuildID != discord.GuildID(b.Config.TestGuildID) {
+		if b.Config.Env == config.DevEnvironment && m.GuildID != b.Config.Discord.TestGuildID {
 			return
 		}
 
@@ -212,7 +266,7 @@ func OnMessageRemove(b *bot.Bot, s *state.State) func(*gateway.MessageDeleteEven
 
 func OnReactionAdd(b *bot.Bot, s *state.State) func(*gateway.MessageReactionAddEvent) {
 	return func(r *gateway.MessageReactionAddEvent) {
-		if b.Config.Env == config.DevEnvironment && r.GuildID != discord.GuildID(b.Config.TestGuildID) {
+		if b.Config.Env == config.DevEnvironment && r.GuildID != b.Config.Discord.TestGuildID {
 			return
 		}
 
@@ -446,17 +500,13 @@ func OnReactionAdd(b *bot.Bot, s *state.State) func(*gateway.MessageReactionAddE
 				return fmt.Errorf("failed to create private channel: %w", err)
 			}
 
-			var (
-				locale = messages.FavouriteAddedEmbed()
-				eb     = embeds.NewBuilder()
-			)
-
+			eb := embeds.NewBuilder()
 			if len(artworkDB.Images) > 0 {
 				eb.Thumbnail(artworkDB.Images[0])
 			}
 
-			eb.Title(locale.Title).
-				Description(locale.Description).
+			eb.Title("💖 Successfully added an artwork to favourites").
+				Description("If you dislike direct messages disable them by running `bt!userset dm off` command").
 				AddField("ID", strconv.Itoa(artworkDB.ID), true).
 				AddField("URL", messages.ClickHere(artworkDB.URL), true).
 				AddField("NSFW", strconv.FormatBool(nsfw), true)
@@ -485,7 +535,7 @@ func OnReactionAdd(b *bot.Bot, s *state.State) func(*gateway.MessageReactionAddE
 
 func OnReactionRemove(b *bot.Bot, s *state.State) func(*gateway.MessageReactionRemoveEvent) {
 	return func(r *gateway.MessageReactionRemoveEvent) {
-		if b.Config.Env == config.DevEnvironment && r.GuildID != discord.GuildID(b.Config.TestGuildID) {
+		if b.Config.Env == config.DevEnvironment && r.GuildID != b.Config.Discord.TestGuildID {
 			return
 		}
 
@@ -611,13 +661,9 @@ func OnReactionRemove(b *bot.Bot, s *state.State) func(*gateway.MessageReactionR
 			return
 		}
 
-		var (
-			eb     = embeds.NewBuilder()
-			locale = messages.FavouriteRemovedEmbed()
-		)
-
-		eb.Title(locale.Title).
-			Description(locale.Description).
+		eb := embeds.NewBuilder()
+		eb.Title("💔 Successfully removed an artwork from favourites").
+			Description("If you dislike direct messages disable them by running `bt!userset dm off` command").
 			AddField("ID", strconv.Itoa(artworkDB.ID), true).
 			AddField("URL", messages.ClickHere(artworkDB.URL), true).
 			AddField("NSFW", strconv.FormatBool(fav.NSFW), true)
@@ -631,13 +677,6 @@ func OnReactionRemove(b *bot.Bot, s *state.State) func(*gateway.MessageReactionR
 }
 
 /*
-
-func OnPanic(b *bot.Bot) func(*gumi.Ctx, interface{}) {
-	return func(ctx *gumi.Ctx, r interface{}) {
-		b.Log.Errorf("%v", r)
-	}
-}
-
 func NotCommand(b *bot.Bot) func(*gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
 		guild, err := b.Store.Guild(ctx, ctx.Event.GuildID)
@@ -646,7 +685,7 @@ func NotCommand(b *bot.Bot) func(*gumi.Ctx) error {
 		}
 
 		allSent := make([]*cache.MessageInfo, 0)
-		if len(guild.ArtChannels) == 0 || arrays.AnyString(guild.ArtChannels, ctx.Event.ChannelID) {
+		if len(guild.ArtChannels) == 0 || slices.AnyString(guild.ArtChannels, ctx.Event.ChannelID) {
 			rx := xurls.Strict()
 			urls := rx.FindAllString(ctx.Event.Content, -1)
 
@@ -752,33 +791,4 @@ func OnRateLimit(b *bot.Bot) func(*gumi.Ctx) error {
 		return ctx.ReplyEmbed(eb.Finalize())
 	}
 }
-
-func OnNoPerms(b *bot.Bot) func(ctx *gumi.Ctx) error {
-	return func(ctx *gumi.Ctx) error {
-		eb := embeds.NewBuilder()
-		eb.FailureTemplate(messages.NoPerms())
-
-		return ctx.ReplyEmbed(eb.Finalize())
-	}
-}
-
-func OnNSFW(b *bot.Bot) func(ctx *gumi.Ctx) error {
-	return func(ctx *gumi.Ctx) error {
-		eb := embeds.NewBuilder()
-
-		eb.FailureTemplate(messages.NSFWCommand(ctx.Command.Name))
-
-		return ctx.ReplyEmbed(eb.Finalize())
-	}
-}
-
-func OnExecute(b *bot.Bot) func(ctx *gumi.Ctx) error {
-	return func(ctx *gumi.Ctx) error {
-		b.Log.Infof("Executing command [%v]. Arguments: [%v]. Guild ID: %v, channel ID: %v", ctx.Command.Name, ctx.Args.Raw, ctx.Event.GuildID, ctx.Event.ChannelID)
-
-		b.Metrics.IncrementCommand()
-		return nil
-	}
-}
-
 */

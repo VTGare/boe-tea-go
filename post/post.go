@@ -14,8 +14,8 @@ import (
 	"github.com/VTGare/boe-tea-go/bot"
 	"github.com/VTGare/boe-tea-go/internal/arikawautils"
 	"github.com/VTGare/boe-tea-go/internal/arikawautils/embeds"
-	"github.com/VTGare/boe-tea-go/internal/arrays"
 	"github.com/VTGare/boe-tea-go/internal/cache"
+	"github.com/VTGare/boe-tea-go/internal/slices"
 	"github.com/VTGare/boe-tea-go/messages"
 	"github.com/VTGare/boe-tea-go/repost"
 	"github.com/VTGare/boe-tea-go/store"
@@ -142,7 +142,7 @@ func (p *Post) Crosspost(userID discord.UserID, group string, channels []string)
 			}
 
 			if guild.Crosspost {
-				if len(guild.ArtChannels) == 0 || arrays.AnyString(guild.ArtChannels, ch.ID.String()) {
+				if len(guild.ArtChannels) == 0 || slices.Any(guild.ArtChannels, ch.ID.String()) {
 					res, err := p.fetch(guild, channelID, true)
 					if err != nil {
 						log.Infof("Couldn't crosspost. Fetch error: %v", err)
@@ -295,27 +295,34 @@ func (p *Post) fetch(guild *store.Guild, channelID discord.ChannelID, crosspost 
 }
 
 func (p *Post) sendReposts(guild *store.Guild, reposts []*repost.Repost, timeout time.Duration) {
-	locale := messages.RepostEmbed()
+	var (
+		eb   = embeds.NewBuilder()
+		data = api.SendMessageData{}
+	)
 
-	eb := embeds.NewBuilder()
-	eb.Title(locale.Title)
 	for ind, rep := range reposts {
 		eb.AddField(
 			fmt.Sprintf("#%v | %v", ind+1, rep.ID),
 			fmt.Sprintf(
-				"**%v %v**\n**URL:** %v\n\n%v",
-				locale.Expires, messages.RelativeTimestamp(rep.ExpiresAt),
+				"**%v %v**\n**URL:** %v",
+				"Expires in", messages.RelativeTimestamp(rep.ExpiresAt),
 				rep.URL,
-				messages.NamedLink(locale.OriginalMessage, fmt.Sprintf("https://discord.com/channels/%v/%v/%v", rep.GuildID, rep.ChannelID, rep.MessageID)),
 			),
 		)
+
+		components := discord.Components(
+			&discord.ButtonComponent{
+				Style: discord.LinkButtonStyle(rep.URL),
+				Label: fmt.Sprintf("#%v | Original message", ind+1),
+			},
+		)
+		data.Components = append(data.Components, components...)
 	}
 
-	msg, _ := p.state.SendEmbeds(p.event.ChannelID, eb.Build())
+	msg, _ := p.state.SendMessageComplex(p.event.ChannelID, data)
 	if msg != nil {
 		go func() {
 			time.Sleep(timeout)
-
 			p.state.DeleteMessage(msg.ChannelID, msg.ID, "")
 		}()
 	}
@@ -414,7 +421,7 @@ func (p *Post) generateMessages(guild *store.Guild, artworks []artworks.Artwork,
 				//Skip first Twitter embed if not a command.
 
 				// TODO: Skip if command.
-				if !crosspost {
+				if !crosspost && !artwork.NSFW {
 					skipFirst = true
 				}
 			case *pixiv.Artwork:

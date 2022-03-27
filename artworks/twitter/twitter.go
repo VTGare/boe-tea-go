@@ -17,6 +17,7 @@ import (
 	"github.com/diamondburned/arikawa/v3/api"
 	"github.com/diamondburned/arikawa/v3/discord"
 	"github.com/diamondburned/arikawa/v3/utils/sendpart"
+	"go.uber.org/atomic"
 )
 
 type MediaType int
@@ -29,6 +30,7 @@ const (
 
 type Twitter struct {
 	nitter []string
+	hits   atomic.Int64
 }
 
 //Artwork is a tweet struct with a media gallery.
@@ -42,6 +44,7 @@ type Artwork struct {
 	Likes     int
 	Comments  int
 	Retweets  int
+	NSFW      bool
 	Gallery   Gallery
 }
 
@@ -104,6 +107,7 @@ func (t Twitter) Find(snowflake string) (artworks.Artwork, error) {
 			continue
 		}
 
+		t.hits.Add(1)
 		return a, nil
 	}
 
@@ -112,6 +116,10 @@ func (t Twitter) Find(snowflake string) (artworks.Artwork, error) {
 
 func (t Twitter) Enabled(g *store.Guild) bool {
 	return g.Twitter
+}
+
+func (t Twitter) Hits() int64 {
+	return t.hits.Load()
 }
 
 func (t Twitter) scrapeTwitter(snowflake, baseURL string) (*Artwork, error) {
