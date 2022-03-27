@@ -2,6 +2,7 @@ package dgoutils
 
 import (
 	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -28,9 +29,19 @@ func MemberHasPermission(s *discordgo.Session, guildID string, userID string, pe
 		if err != nil {
 			return false, err
 		}
+
 		if role.Permissions&permission != 0 {
 			return true, nil
 		}
+	}
+
+	g, err := s.Guild(guildID)
+	if err != nil {
+		return false, fmt.Errorf("failed to get guild: %w", err)
+	}
+
+	if g.OwnerID == userID {
+		return true, nil
 	}
 
 	return false, nil

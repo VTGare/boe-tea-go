@@ -52,7 +52,7 @@ func New(config *config.Config, models *models.Models, logger *zap.SugaredLogger
 		return nil, err
 	}
 
-	mgr.RegisterIntent(discordgo.IntentsAllWithoutPrivileged)
+	mgr.RegisterIntent(discordgo.IntentsAllWithoutPrivileged | discordgo.IntentMessageContent)
 	banned := ttlcache.NewCache()
 	banned.SetTTL(15 * time.Second)
 
