@@ -1,15 +1,6 @@
 package dgoutils
 
-import (
-	"errors"
-	"strconv"
-	"strings"
-	"time"
-
-	"github.com/bwmarrin/discordgo"
-)
-
-var (
+/*var (
 	widgetControls = map[string]bool{"⏮": true, "⏪": true, "◀": true, "⏹": true, "▶": true, "⏩": true, "⏭": true}
 	ErrNotRange    = errors.New("not range")
 	ErrRangeSyntax = errors.New("range low is higher than range high")
@@ -293,4 +284,4 @@ func nextMessageReactionAdd(s *discordgo.Session) chan *discordgo.MessageReactio
 		out <- e
 	})
 	return out
-}
+}*/

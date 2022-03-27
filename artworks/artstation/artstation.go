@@ -74,6 +74,7 @@ type Category struct {
 
 func New() artworks.Provider {
 	r := regexp.MustCompile(`(?i)https:\/\/(?:www\.)?artstation\.com\/artwork\/([\w\-]+)`)
+
 	return &Artstation{
 		regex: r,
 	}

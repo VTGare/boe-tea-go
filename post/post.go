@@ -19,7 +19,6 @@ import (
 	"github.com/VTGare/boe-tea-go/messages"
 	"github.com/VTGare/boe-tea-go/repost"
 	"github.com/VTGare/boe-tea-go/store"
-	"github.com/bwmarrin/discordgo"
 	"github.com/diamondburned/arikawa/v3/api"
 	"github.com/diamondburned/arikawa/v3/discord"
 	"github.com/diamondburned/arikawa/v3/gateway"
@@ -85,7 +84,7 @@ func (p *Post) Send() ([]*cache.MessageInfo, error) {
 				p.state,
 				guildID,
 				p.bot.Me.ID,
-				discordgo.PermissionAdministrator|discordgo.PermissionManageMessages,
+				discord.PermissionAdministrator|discord.PermissionManageMessages,
 			)
 
 			if perm && res.Matched == len(res.Reposts) {

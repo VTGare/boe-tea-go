@@ -18,7 +18,6 @@ import (
 	"github.com/VTGare/boe-tea-go/post"
 	"github.com/VTGare/boe-tea-go/responses"
 	"github.com/VTGare/boe-tea-go/store"
-	"github.com/bwmarrin/discordgo"
 	"github.com/diamondburned/arikawa/v3/api"
 	"github.com/diamondburned/arikawa/v3/discord"
 	"github.com/diamondburned/arikawa/v3/gateway"
@@ -28,7 +27,7 @@ import (
 )
 
 //PrefixResolver returns an array of guild's prefixes and bot mentions.
-func PrefixResolver(b *bot.Bot) func(s *discordgo.Session, m *discordgo.MessageCreate) []string {
+/*func PrefixResolver(b *bot.Bot) func(s *discordgo.Session, m *discordgo.MessageCreate) []string {
 	return func(s *discordgo.Session, m *discordgo.MessageCreate) []string {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
@@ -43,7 +42,7 @@ func PrefixResolver(b *bot.Bot) func(s *discordgo.Session, m *discordgo.MessageC
 
 		return []string{mention, mentionExcl, g.Prefix}
 	}
-}
+}*/
 
 func All(b *bot.Bot, s *state.State) []interface{} {
 	return []interface{}{
