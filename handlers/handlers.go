@@ -54,7 +54,7 @@ func NotCommand(b *bot.Bot) func(*gumi.Ctx) error {
 		}
 
 		allSent := make([]*cache.MessageInfo, 0)
-		if len(guild.ArtChannels) == 0 || arrays.AnyString(guild.ArtChannels, ctx.Event.ChannelID) {
+		if len(guild.ArtChannels) == 0 || arrays.Any(guild.ArtChannels, ctx.Event.ChannelID) {
 			rx := xurls.Strict()
 			urls := rx.FindAllString(ctx.Event.Content, -1)
 

@@ -175,7 +175,7 @@ func (a Artwork) MessageSends(footer string, hasTags bool) ([]*discordgo.Message
 	}
 
 	if hasTags {
-		tags := arrays.MapString(a.Tags, func(s string) string {
+		tags := arrays.Map(a.Tags, func(s string) string {
 			return fmt.Sprintf("[%v](https://pixiv.net/en/tags/%v/artworks)", s, s)
 		})
 

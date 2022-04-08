@@ -336,7 +336,7 @@ func crosspost(b *bot.Bot) func(ctx *gumi.Ctx) error {
 					excludedChannels[id] = struct{}{}
 				}
 
-				filtered := arrays.FilterString(group.Children, func(s string) bool {
+				filtered := arrays.Filter(group.Children, func(s string) bool {
 					_, ok := excludedChannels[s]
 					return !ok
 				})

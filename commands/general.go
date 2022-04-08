@@ -175,7 +175,7 @@ func help(b *bot.Bot) func(ctx *gumi.Ctx) error {
 				group := groups[key]
 
 				eb.AddField(key, fmt.Sprintf(
-					"```\n%v\n```", strings.Join(arrays.MapString(group, func(s string) string {
+					"```\n%v\n```", strings.Join(arrays.Map(group, func(s string) string {
 						return "• " + s
 					}), "\n"),
 				), true)
@@ -451,7 +451,7 @@ func set(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			eb.AddField(
 				msg.ArtChannels,
 				"Use `bt!artchannels` command to list or manage art channels!\n"+strings.Join(
-					arrays.MapString(guild.ArtChannels, func(s string) string {
+					arrays.Map(guild.ArtChannels, func(s string) string {
 						if len(guild.ArtChannels) > 15 {
 							return ""
 						}

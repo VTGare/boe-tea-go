@@ -127,7 +127,7 @@ func (p *Post) Crosspost(userID, group string, channels []string) ([]*cache.Mess
 			}
 
 			if guild.Crosspost {
-				if len(guild.ArtChannels) == 0 || arrays.AnyString(guild.ArtChannels, ch.ID) {
+				if len(guild.ArtChannels) == 0 || arrays.Any(guild.ArtChannels, ch.ID) {
 					res, err := p.fetch(guild, channelID, true)
 					if err != nil {
 						log.Infof("Couldn't crosspost. Fetch error: %v", err)

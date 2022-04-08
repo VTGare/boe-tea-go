@@ -123,7 +123,7 @@ func (a Artwork) MessageSends(footer string, hasTags bool) ([]*discordgo.Message
 		AddField("Favourites", strconv.Itoa(a.Favourites), true)
 
 	if hasTags {
-		tags := arrays.MapString(a.Tags, func(s string) string {
+		tags := arrays.Map(a.Tags, func(s string) string {
 			return messages.NamedLink(
 				s, "https://www.deviantart.com/tag/"+s,
 			)

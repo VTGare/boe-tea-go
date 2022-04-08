@@ -46,7 +46,7 @@ func NSFWCommand(cmd string) string {
 
 func ListChannels(channels []string) string {
 	return strings.Join(
-		arrays.MapString(
+		arrays.Map(
 			channels,
 			func(s string) string {
 				return fmt.Sprintf("<#%v> | `%v`", s, s)

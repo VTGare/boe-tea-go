@@ -14,6 +14,7 @@ require (
 	github.com/getsentry/sentry-go v0.13.0
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/microcosm-cc/bluemonday v1.0.18
+	github.com/n0madic/twitter-scraper v0.0.0-20220317100158-97b84826bab9
 	github.com/servusdei2018/shards v1.2.5
 	github.com/stretchr/testify v1.7.1
 	go.mongodb.org/mongo-driver v1.8.4
@@ -21,8 +22,6 @@ require (
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	mvdan.cc/xurls/v2 v2.4.0
 )
-
-require github.com/n0madic/twitter-scraper v0.0.0-20220317100158-97b84826bab9 // indirect
 
 require (
 	github.com/andybalholm/cascadia v1.3.1 // indirect
@@ -33,7 +32,6 @@ require (
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/go-stack/stack v1.8.1 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
-	github.com/google/go-cmp v0.5.6 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/gorilla/css v1.0.0 // indirect
 	github.com/gorilla/websocket v1.5.0 // indirect

@@ -153,7 +153,7 @@ func groups(b *bot.Bot) func(ctx *gumi.Ctx) error {
 						"<#%v> | `%v`",
 						group.Parent, group.Parent,
 					),
-					locale.Children, strings.Join(arrays.MapString(
+					locale.Children, strings.Join(arrays.Map(
 						group.Children,
 						func(s string) string {
 							return fmt.Sprintf("<#%v> | `%v`", s, s)
@@ -281,7 +281,7 @@ func push(b *bot.Bot) func(ctx *gumi.Ctx) error {
 				continue
 			}
 
-			if arrays.AnyString(group.Children, channelID) {
+			if arrays.Any(group.Children, channelID) {
 				continue
 			}
 
@@ -339,7 +339,7 @@ func remove(b *bot.Bot) func(ctx *gumi.Ctx) error {
 		for _, arg := range ctx.Args.Arguments {
 			channelID := strings.Trim(arg.Raw, "<#>")
 
-			if !arrays.AnyString(group.Children, channelID) {
+			if !arrays.Any(group.Children, channelID) {
 				continue
 			}
 
@@ -397,7 +397,7 @@ func copygroup(b *bot.Bot) func(ctx *gumi.Ctx) error {
 				newGroup := &store.Group{
 					Name:   dest,
 					Parent: parent,
-					Children: arrays.FilterString(group.Children, func(s string) bool {
+					Children: arrays.Filter(group.Children, func(s string) bool {
 						return s != parent
 					}),
 				}
