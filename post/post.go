@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/VTGare/boe-tea-go/artworks"
-	"github.com/VTGare/boe-tea-go/artworks/pixiv"
 	"github.com/VTGare/boe-tea-go/artworks/twitter"
 	"github.com/VTGare/boe-tea-go/bot"
 	"github.com/VTGare/boe-tea-go/internal/arrays"
@@ -217,9 +216,21 @@ func (p *Post) fetch(guild *store.Guild, channelID string, crosspost bool) (*fet
 					// or the function is called from a command
 					// or we're crossposting a twitter artwork.
 					if provider.Enabled(guild) || p.ctx.Command != nil || (crosspost && isTwitter) {
-						artwork, err := provider.Find(id)
-						if err != nil {
-							return err
+						var (
+							artwork artworks.Artwork
+							key     = fmt.Sprintf("%T:%v", provider, id)
+						)
+
+						if i, ok := p.bot.ArtworkCache.Get(key); ok {
+							artwork = i.(artworks.Artwork)
+						} else {
+							var err error
+							artwork, err = provider.Find(id)
+							if err != nil {
+								return err
+							}
+
+							p.bot.ArtworkCache.Set(key, artwork, 0)
 						}
 
 						// Only add reactions to the original message for Twitter links.
@@ -387,19 +398,8 @@ func (p *Post) generateMessages(guild *store.Guild, artworks []artworks.Artwork,
 			switch artwork := artwork.(type) {
 			case *twitter.Artwork:
 				//Skip first Twitter embed if not a command.
-				if p.ctx.Command == nil && !crosspost {
+				if p.ctx.Command == nil && !crosspost && !artwork.NSFW && len(artwork.Videos) == 0 {
 					skipFirst = true
-				}
-			case *pixiv.Artwork:
-				ch, err := p.ctx.Session.Channel(channelID)
-				if err != nil {
-					return nil, err
-				}
-
-				// TODO: send feedback instead
-				// Silently skip NSFW artworks in safe channels
-				if !ch.NSFW && artwork.NSFW {
-					continue
 				}
 			}
 

@@ -14,6 +14,7 @@ import (
 	"github.com/VTGare/gumi"
 	"github.com/VTGare/sengoku"
 	"github.com/bwmarrin/discordgo"
+	goCache "github.com/patrickmn/go-cache"
 	"github.com/servusdei2018/shards"
 	"go.uber.org/zap"
 )
@@ -26,8 +27,9 @@ type Bot struct {
 	Router  *gumi.Router
 
 	// caches
-	BannedUsers *ttlcache.Cache
-	EmbedCache  *cache.EmbedCache
+	BannedUsers  *ttlcache.Cache
+	EmbedCache   *cache.EmbedCache
+	ArtworkCache *goCache.Cache
 
 	// services
 	Sengoku          *sengoku.Sengoku
@@ -60,6 +62,7 @@ func New(config *config.Config, store store.Store, logger *zap.SugaredLogger, rd
 		RepostDetector: rd,
 		BannedUsers:    banned,
 		EmbedCache:     cache.NewEmbedCache(),
+		ArtworkCache:   goCache.New(60*time.Minute, 90*time.Minute),
 		Metrics:        metrics.New(),
 		NHentai:        nhentai.New(),
 		Sengoku:        sg,

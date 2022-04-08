@@ -22,6 +22,8 @@ require (
 	mvdan.cc/xurls/v2 v2.4.0
 )
 
+require github.com/n0madic/twitter-scraper v0.0.0-20220317100158-97b84826bab9 // indirect
+
 require (
 	github.com/andybalholm/cascadia v1.3.1 // indirect
 	github.com/aymerick/douceur v0.2.0 // indirect

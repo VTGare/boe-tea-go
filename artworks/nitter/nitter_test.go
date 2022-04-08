@@ -1,4 +1,4 @@
-package twitter
+package nitter
 
 import (
 	"testing"
@@ -9,84 +9,84 @@ import (
 func TestTwitterMatch(t *testing.T) {
 	tests := []struct {
 		name              string
-		tr                Twitter
+		tr                Nitter
 		url               string
 		expectedBool      bool
 		expectedSnowflake string
 	}{
 		{
 			name:              "Standard Twitter URL",
-			tr:                Twitter{},
+			tr:                Nitter{},
 			url:               "https://twitter.com/watsonameliaEN/status/1371674594675937282",
 			expectedSnowflake: "1371674594675937282",
 			expectedBool:      true,
 		},
 		{
 			name:              "Mobile Twitter URL",
-			tr:                Twitter{},
+			tr:                Nitter{},
 			url:               "https://mobile.twitter.com/watsonameliaEN/status/1371674594675937282",
 			expectedBool:      true,
 			expectedSnowflake: "1371674594675937282",
 		},
 		{
 			name:              "Twitter URL without username",
-			tr:                Twitter{},
+			tr:                Nitter{},
 			url:               "https://twitter.com/i/status/1371674594675937282",
 			expectedBool:      true,
 			expectedSnowflake: "1371674594675937282",
 		},
 		{
 			name:              "Twitter URL i/web",
-			tr:                Twitter{},
+			tr:                Nitter{},
 			url:               "https://twitter.com/i/web/status/1371674594675937282",
 			expectedBool:      true,
 			expectedSnowflake: "1371674594675937282",
 		},
 		{
 			name:              "Invalid snowflake",
-			tr:                Twitter{},
+			tr:                Nitter{},
 			url:               "https://twitter.com/i/web/status/13716745235f",
 			expectedBool:      false,
 			expectedSnowflake: "",
 		},
 		{
 			name:              "With query parameters",
-			tr:                Twitter{},
+			tr:                Nitter{},
 			url:               "https://twitter.com/i/web/status/12345678?width=120",
 			expectedBool:      true,
 			expectedSnowflake: "12345678",
 		},
 		{
 			name:              "With /photo/1 suffix",
-			tr:                Twitter{},
+			tr:                Nitter{},
 			url:               "https://twitter.com/i/web/status/1371674594675937282/photo/1",
 			expectedBool:      true,
 			expectedSnowflake: "1371674594675937282",
 		},
 		{
 			name:              "Profile URL",
-			tr:                Twitter{},
+			tr:                Nitter{},
 			url:               "https://twitter.com/vtgare",
 			expectedBool:      false,
 			expectedSnowflake: "",
 		},
 		{
 			name:              "Not Twitter URL",
-			tr:                Twitter{},
+			tr:                Nitter{},
 			url:               "https://google.com",
 			expectedBool:      false,
 			expectedSnowflake: "",
 		},
 		{
 			name:              "Not URL",
-			tr:                Twitter{},
+			tr:                Nitter{},
 			url:               "google",
 			expectedBool:      false,
 			expectedSnowflake: "",
 		},
 		{
 			name:              "Invalid Twitter URL",
-			tr:                Twitter{},
+			tr:                Nitter{},
 			url:               "https://twitter.com/i/web/",
 			expectedBool:      false,
 			expectedSnowflake: "",

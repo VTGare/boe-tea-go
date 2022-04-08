@@ -9,14 +9,13 @@ import (
 
 //Config is an application configuration struct.
 type Config struct {
-	Discord    *Discord `json:"discord"`
-	Mongo      *Mongo   `json:"mongo"`
-	Repost     *Repost  `json:"repost"`
-	Pixiv      *Pixiv   `json:"pixiv"`
-	SauceNAO   string   `json:"saucenao"`
-	Sentry     string   `json:"sentry"`
-	Encryption string   `json:"encryption"`
-	Quotes     []*Quote `json:"quotes"`
+	Discord  *Discord `json:"discord"`
+	Mongo    *Mongo   `json:"mongo"`
+	Repost   *Repost  `json:"repost"`
+	Pixiv    *Pixiv   `json:"pixiv"`
+	SauceNAO string   `json:"saucenao"`
+	Sentry   string   `json:"sentry"`
+	Quotes   []*Quote `json:"quotes"`
 
 	safeQuotes []*Quote
 }

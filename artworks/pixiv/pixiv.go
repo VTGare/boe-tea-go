@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ReneKroon/ttlcache"
 	"github.com/VTGare/boe-tea-go/artworks"
 	"github.com/VTGare/boe-tea-go/internal/arrays"
 	"github.com/VTGare/boe-tea-go/messages"
@@ -19,7 +18,6 @@ import (
 
 type Pixiv struct {
 	app   *pixiv.AppPixivAPI
-	cache *ttlcache.Cache
 	regex *regexp.Regexp
 }
 
@@ -48,12 +46,8 @@ func New(authToken, refreshToken string) (artworks.Provider, error) {
 		return nil, err
 	}
 
-	cache := ttlcache.NewCache()
-	cache.SetTTL(30 * time.Minute)
-
 	return &Pixiv{
-		app:   pixiv.NewApp(),
-		cache: cache,
+		app: pixiv.NewApp(),
 		regex: regexp.MustCompile(
 			`(?i)http(?:s)?:\/\/(?:www\.)?pixiv\.net\/(?:en\/)?(?:artworks\/|member_illust\.php\?)(?:mode=medium\&)?(?:illust_id=)?([0-9]+)`,
 		),
@@ -70,10 +64,6 @@ func (p Pixiv) Match(s string) (string, bool) {
 }
 
 func (p Pixiv) Find(id string) (artworks.Artwork, error) {
-	if a, ok := p.get(id); ok {
-		return a, nil
-	}
-
 	i, err := strconv.ParseUint(id, 10, 64)
 	if err != nil {
 		return nil, err
@@ -145,25 +135,11 @@ func (p Pixiv) Find(id string) (artworks.Artwork, error) {
 		artwork.Ugoira = &Ugoira{ugoira.UgoiraMetadataUgoiraMetadata}
 	}
 
-	p.set(id, artwork)
 	return artwork, nil
 }
 
 func (p Pixiv) Enabled(g *store.Guild) bool {
 	return g.Pixiv
-}
-
-func (p Pixiv) get(id string) (*Artwork, bool) {
-	a, ok := p.cache.Get(id)
-	if !ok {
-		return nil, ok
-	}
-
-	return a.(*Artwork), ok
-}
-
-func (p Pixiv) set(id string, artwork *Artwork) {
-	p.cache.Set(id, artwork)
 }
 
 func (a Artwork) StoreArtwork() *store.Artwork {

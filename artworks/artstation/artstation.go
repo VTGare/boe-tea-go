@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/ReneKroon/ttlcache"
 	"github.com/VTGare/boe-tea-go/artworks"
 	"github.com/VTGare/boe-tea-go/store"
 	"github.com/VTGare/embeds"
@@ -18,7 +17,6 @@ import (
 
 type Artstation struct {
 	regex *regexp.Regexp
-	cache *ttlcache.Cache
 }
 
 type ArtstationResponse struct {
@@ -74,11 +72,8 @@ type Category struct {
 func New() artworks.Provider {
 	r := regexp.MustCompile(`(?i)https:\/\/(?:www\.)?artstation\.com\/artwork\/([\w\-]+)`)
 
-	cache := ttlcache.NewCache()
-	cache.SetTTL(30 * time.Minute)
 	return &Artstation{
 		regex: r,
-		cache: cache,
 	}
 }
 
@@ -110,7 +105,7 @@ func (as Artstation) Match(url string) (string, bool) {
 }
 
 func (Artstation) Enabled(g *store.Guild) bool {
-	return true
+	return g.Artstation
 }
 
 func (artwork ArtstationResponse) StoreArtwork() *store.Artwork {
