@@ -378,7 +378,11 @@ func (p *Post) send(guild *store.Guild, channelID string, artworks []artworks.Ar
 		for _, messages := range allMessages {
 			for _, message := range messages {
 				if crosspost {
-					message.Content = message.Embed.URL
+					if len(message.Embeds) > 0 {
+						message.Content = message.Embeds[0].URL
+					} else if message.Embed != nil {
+						message.Content = message.Embed.URL
+					}
 				}
 
 				sendMessage(message)
@@ -419,9 +423,16 @@ func (p *Post) generateMessages(guild *store.Guild, artworks []artworks.Artwork,
 
 			if crosspost {
 				for _, msg := range sends {
-					msg.Embed.Author = &discordgo.MessageEmbedAuthor{
-						Name:    messages.CrosspostBy(p.ctx.Event.Author.String()),
-						IconURL: p.ctx.Event.Author.AvatarURL(""),
+					if len(msg.Embeds) > 0 {
+						msg.Embeds[0].Author = &discordgo.MessageEmbedAuthor{
+							Name:    messages.CrosspostBy(p.ctx.Event.Author.String()),
+							IconURL: p.ctx.Event.Author.AvatarURL(""),
+						}
+					} else if msg.Embed != nil {
+						msg.Embed.Author = &discordgo.MessageEmbedAuthor{
+							Name:    messages.CrosspostBy(p.ctx.Event.Author.String()),
+							IconURL: p.ctx.Event.Author.AvatarURL(""),
+						}
 					}
 				}
 			}
