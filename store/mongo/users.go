@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/VTGare/boe-tea-go/artworks"
 	"github.com/VTGare/boe-tea-go/store"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -92,7 +91,7 @@ func (u *userStore) AddFavourite(ctx context.Context, id string, fav *store.Favo
 			options.FindOneAndUpdate().SetReturnDocument(options.After),
 		)
 
-		var artwork artworks.Artwork
+		var artwork *store.Artwork
 		err := res.Decode(&artwork)
 		if err != nil {
 			return nil, fmt.Errorf("failed to decode artwork: %w", err)
@@ -146,7 +145,7 @@ func (u *userStore) DeleteFavourite(ctx context.Context, id string, fav *store.F
 			options.FindOneAndUpdate().SetReturnDocument(options.After),
 		)
 
-		var artwork artworks.Artwork
+		var artwork *store.Artwork
 		err := res.Decode(&artwork)
 		if err != nil {
 			return nil, err
