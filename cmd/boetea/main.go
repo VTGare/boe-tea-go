@@ -1,28 +1,48 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	"github.com/VTGare/boe-tea-go/artworks/artstation"
+	"github.com/VTGare/boe-tea-go/artworks/deviant"
+	"github.com/VTGare/boe-tea-go/artworks/pixiv"
+	"github.com/VTGare/boe-tea-go/artworks/twitter"
+	"github.com/VTGare/boe-tea-go/bot"
+	"github.com/VTGare/boe-tea-go/commands"
+	"github.com/VTGare/boe-tea-go/handlers"
 	"github.com/VTGare/boe-tea-go/internal/config"
-	"github.com/VTGare/boe-tea-go/internal/database/mongodb"
 	"github.com/VTGare/boe-tea-go/internal/logger"
-	"github.com/VTGare/boe-tea-go/pkg/artworks/artstation"
-	"github.com/VTGare/boe-tea-go/pkg/artworks/deviant"
-	"github.com/VTGare/boe-tea-go/pkg/artworks/pixiv"
-	"github.com/VTGare/boe-tea-go/pkg/artworks/twitter"
-	"github.com/VTGare/boe-tea-go/pkg/bot"
-	"github.com/VTGare/boe-tea-go/pkg/commands"
-	"github.com/VTGare/boe-tea-go/pkg/handlers"
-	"github.com/VTGare/boe-tea-go/pkg/models"
-	"github.com/VTGare/boe-tea-go/pkg/repost"
+	"github.com/VTGare/boe-tea-go/repost"
+	"github.com/VTGare/boe-tea-go/store"
+	"github.com/VTGare/boe-tea-go/store/mongo"
 	"github.com/VTGare/gumi"
+
 	"github.com/getsentry/sentry-go"
+	cache "github.com/patrickmn/go-cache"
 	"go.uber.org/zap"
 )
+
+func initStore(mongoURI, database string) (store.Store, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	mongo, err := mongo.New(ctx, mongoURI, database)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := mongo.Init(ctx); err != nil {
+		return nil, err
+	}
+
+	store := store.NewStatefulStore(mongo, cache.New(30*time.Minute, 1*time.Hour))
+	return store, nil
+}
 
 func main() {
 	cfg, err := config.FromFile("config.json")
@@ -50,17 +70,10 @@ func main() {
 
 	log := zapLogger.Sugar()
 
-	db, err := mongodb.New(cfg.Mongo.URI, cfg.Mongo.Database)
+	store, err := initStore(cfg.Mongo.URI, cfg.Mongo.Database)
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	err = db.CreateCollections()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	m := models.New(db, log)
 
 	var repostDetector repost.Detector
 	switch cfg.Repost.Type {
@@ -73,7 +86,7 @@ func main() {
 		repostDetector = repost.NewMemory()
 	}
 
-	b, err := bot.New(cfg, m, log, repostDetector)
+	b, err := bot.New(cfg, store, log, repostDetector)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -110,7 +123,7 @@ func main() {
 	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
 	<-sc
 
-	db.Close()
+	store.Close(context.Background())
 	repostDetector.Close()
 	b.Close()
 }

@@ -1,0 +1,97 @@
+package bot
+
+import (
+	"time"
+
+	"github.com/ReneKroon/ttlcache"
+	"github.com/VTGare/boe-tea-go/artworks"
+	"github.com/VTGare/boe-tea-go/internal/apis/nhentai"
+	"github.com/VTGare/boe-tea-go/internal/cache"
+	"github.com/VTGare/boe-tea-go/internal/config"
+	"github.com/VTGare/boe-tea-go/metrics"
+	"github.com/VTGare/boe-tea-go/repost"
+	"github.com/VTGare/boe-tea-go/store"
+	"github.com/VTGare/gumi"
+	"github.com/VTGare/sengoku"
+	"github.com/bwmarrin/discordgo"
+	"github.com/servusdei2018/shards"
+	"go.uber.org/zap"
+)
+
+type Bot struct {
+	// misc.
+	Log     *zap.SugaredLogger
+	Config  *config.Config
+	Metrics *metrics.Metrics
+	Router  *gumi.Router
+
+	// caches
+	BannedUsers *ttlcache.Cache
+	EmbedCache  *cache.EmbedCache
+
+	// services
+	Sengoku          *sengoku.Sengoku
+	NHentai          *nhentai.API
+	ArtworkProviders []artworks.Provider
+	RepostDetector   repost.Detector
+
+	ShardManager *shards.Manager
+	Store        store.Store
+}
+
+func New(config *config.Config, store store.Store, logger *zap.SugaredLogger, rd repost.Detector) (*Bot, error) {
+	mgr, err := shards.New("Bot " + config.Discord.Token)
+	if err != nil {
+		return nil, err
+	}
+
+	mgr.RegisterIntent(discordgo.IntentsAllWithoutPrivileged | discordgo.IntentMessageContent)
+	banned := ttlcache.NewCache()
+	banned.SetTTL(15 * time.Second)
+
+	sg := sengoku.NewSengoku(config.SauceNAO, sengoku.Config{
+		DB:      999,
+		Results: 10,
+	})
+
+	return &Bot{
+		Log:            logger,
+		Config:         config,
+		RepostDetector: rd,
+		BannedUsers:    banned,
+		EmbedCache:     cache.NewEmbedCache(),
+		Metrics:        metrics.New(),
+		NHentai:        nhentai.New(),
+		Sengoku:        sg,
+		ShardManager:   mgr,
+		Store:          store,
+	}, nil
+}
+
+func (b *Bot) AddRouter(router *gumi.Router) {
+	b.Router = gumi.Create(router)
+}
+
+func (b *Bot) AddProvider(provider artworks.Provider) {
+	b.ArtworkProviders = append(b.ArtworkProviders, provider)
+}
+
+func (b *Bot) AddHandler(handler interface{}) {
+	b.ShardManager.AddHandler(handler)
+}
+
+func (b *Bot) Open() error {
+	b.ShardManager.AddHandler(b.Router.Handler())
+
+	err := b.ShardManager.Start()
+	if err != nil {
+		return err
+	}
+
+	b.Log.Info("Started a bot.")
+	return nil
+}
+
+func (b *Bot) Close() error {
+	return b.ShardManager.Shutdown()
+}
