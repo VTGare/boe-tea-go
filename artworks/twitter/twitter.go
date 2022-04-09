@@ -14,6 +14,7 @@ import (
 	"github.com/VTGare/boe-tea-go/artworks/nitter"
 	"github.com/VTGare/boe-tea-go/store"
 	"github.com/VTGare/embeds"
+
 	"github.com/bwmarrin/discordgo"
 	twitterscraper "github.com/n0madic/twitter-scraper"
 )
@@ -51,7 +52,22 @@ func New() artworks.Provider {
 }
 
 func (t Twitter) Find(id string) (artworks.Artwork, error) {
-	tweet, err := t.scraper.GetTweet(id)
+	var (
+		tweet   *twitterscraper.Tweet
+		retries int
+		err     error
+	)
+
+	for {
+		tweet, err = t.scraper.GetTweet(id)
+		if err == nil || retries == 3 {
+			break
+		}
+
+		time.Sleep(time.Second / 2)
+		retries++
+	}
+
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			return t.fallback.Find(id)

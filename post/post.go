@@ -399,9 +399,9 @@ func (p *Post) generateMessages(guild *store.Guild, artworks []artworks.Artwork,
 		if artwork != nil {
 			skipFirst := false
 
+			// Skip first Twitter embed if not a command.
 			switch artwork := artwork.(type) {
 			case twitter.Artwork:
-				//Skip first Twitter embed if not a command.
 				if p.ctx.Command == nil && !crosspost && !artwork.NSFW && len(artwork.Videos) == 0 {
 					skipFirst = true
 				}
