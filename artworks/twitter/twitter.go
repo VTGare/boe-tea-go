@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/VTGare/boe-tea-go/artworks"
+	"github.com/VTGare/boe-tea-go/artworks/nitter"
 	"github.com/VTGare/boe-tea-go/store"
 	"github.com/VTGare/embeds"
 	"github.com/bwmarrin/discordgo"
@@ -18,7 +19,8 @@ import (
 )
 
 type Twitter struct {
-	scraper *twitterscraper.Scraper
+	scraper  *twitterscraper.Scraper
+	fallback artworks.Provider
 }
 
 type Artwork struct {
@@ -43,13 +45,18 @@ type Category struct {
 
 func New() artworks.Provider {
 	return &Twitter{
-		scraper: twitterscraper.New(),
+		scraper:  twitterscraper.New(),
+		fallback: nitter.New(),
 	}
 }
 
 func (t Twitter) Find(id string) (artworks.Artwork, error) {
 	tweet, err := t.scraper.GetTweet(id)
 	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			return t.fallback.Find(id)
+		}
+
 		return nil, err
 	}
 
