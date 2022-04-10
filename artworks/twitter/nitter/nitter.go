@@ -36,7 +36,7 @@ type Artwork struct {
 	Snowflake string
 	url       string
 	Content   string
-	Timestamp string
+	Timestamp time.Time
 	Likes     int
 	Comments  int
 	Retweets  int
@@ -160,7 +160,7 @@ func (t Nitter) scrapeTwitter(snowflake, baseURL string) (*Artwork, error) {
 
 	date, _ := doc.Find(".main-tweet .tweet-date").Find("a").Attr("title")
 	ts, _ := time.Parse("Jan 2, 2006 · 3:04 PM UTC", date)
-	res.Timestamp = ts.Format(time.RFC3339)
+	res.Timestamp = ts
 
 	username := ""
 	if res.Username == "" {
@@ -205,7 +205,7 @@ func (a Artwork) MessageSends(footer string, _ bool) ([]*discordgo.MessageSend, 
 		eb.Title(fmt.Sprintf("%v (%v)", a.FullName, a.Username))
 	}
 
-	eb.URL(a.url).Description(a.Content).TimestampString(a.Timestamp)
+	eb.URL(a.url).Description(a.Content).Timestamp(a.Timestamp)
 	eb.AddField("Retweets", strconv.Itoa(a.Retweets), true)
 	eb.AddField("Likes", strconv.Itoa(a.Likes), true)
 
@@ -247,7 +247,7 @@ func (a Artwork) MessageSends(footer string, _ bool) ([]*discordgo.MessageSend, 
 			eb := embeds.NewBuilder()
 
 			eb.Title(fmt.Sprintf("%v (%v) | Page %v / %v", a.FullName, a.Username, ind+2, length)).URL(a.url)
-			eb.Image(art.URL).TimestampString(a.Timestamp)
+			eb.Image(art.URL).Timestamp(a.Timestamp)
 
 			if footer != "" {
 				eb.Footer(footer, "")

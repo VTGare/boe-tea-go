@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/VTGare/boe-tea-go/artworks"
-	"github.com/VTGare/boe-tea-go/artworks/nitter"
+	"github.com/VTGare/boe-tea-go/artworks/twitter/nitter"
 	"github.com/VTGare/boe-tea-go/store"
 	"github.com/VTGare/embeds"
 
@@ -52,25 +52,15 @@ func New() artworks.Provider {
 }
 
 func (t Twitter) Find(id string) (artworks.Artwork, error) {
-	var (
-		tweet   *twitterscraper.Tweet
-		retries int
-		err     error
-	)
-
-	for {
-		tweet, err = t.scraper.GetTweet(id)
-		if err == nil || retries == 3 {
-			break
-		}
-
-		time.Sleep(time.Second / 2)
-		retries++
-	}
-
+	tweet, err := t.scraper.GetTweet(id)
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
-			return t.fallback.Find(id)
+			a, err := t.fallback.Find(id)
+			if err != nil {
+				return nil, err
+			}
+
+			return convertNitter(a.(*nitter.Artwork)), nil
 		}
 
 		return nil, err
@@ -239,4 +229,35 @@ func (a Artwork) Len() int {
 	}
 
 	return len(a.Photos)
+}
+
+func convertNitter(a *nitter.Artwork) Artwork {
+	var (
+		videos = make([]twitterscraper.Video, 0)
+		photos = make([]string, 0)
+	)
+
+	for _, media := range a.Gallery {
+		switch media.Type {
+		case nitter.MediaTypeGIF:
+			videos = append(videos, twitterscraper.Video{URL: media.URL})
+		case nitter.MediaTypeImage:
+			photos = append(photos, media.URL)
+		}
+	}
+
+	return Artwork{
+		ID:        a.Snowflake,
+		FullName:  a.FullName,
+		Username:  a.Username,
+		Content:   a.Content,
+		Likes:     a.Likes,
+		Replies:   a.Comments,
+		Retweets:  a.Retweets,
+		Timestamp: a.Timestamp,
+		Videos:    videos,
+		Photos:    photos,
+		NSFW:      true, // It seems that fallback method is only used for NSFW artworks.
+		Permalink: a.URL(),
+	}
 }

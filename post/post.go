@@ -207,7 +207,7 @@ func (p *Post) fetch(guild *store.Guild, channelID string, crosspost bool) (*fet
 						)
 
 						if err != nil {
-							p.bot.Log.Errorf("Error creating a repost: %v", err)
+							p.bot.Log.Errorf("error creating a repost: %v", err)
 						}
 					}
 
@@ -234,10 +234,8 @@ func (p *Post) fetch(guild *store.Guild, channelID string, crosspost bool) (*fet
 						}
 
 						// Only add reactions to the original message for Twitter links.
-						if isTwitter && artwork != nil && artwork.Len() > 0 {
-							if guild.Reactions && p.ctx.Command == nil && isTwitter {
-								p.addReactions(p.ctx.Event.Message)
-							}
+						if guild.Reactions && p.ctx.Command == nil && isTwitter && artwork != nil && artwork.Len() > 0 {
+							p.addReactions(p.ctx.Event.Message)
 						}
 
 						artworksChan <- artwork
@@ -349,8 +347,17 @@ func (p *Post) send(guild *store.Guild, channelID string, artworks []artworks.Ar
 			})
 
 			//If URL doesn't exist then the embed contains an error message, instead of an artwork.
-			if guild.Reactions && send.Embed != nil {
-				if send.Embed.URL != "" {
+			// TODO: make sure artwork providers always use Embeds instead of embed.
+			if guild.Reactions && (send.Embed != nil || len(send.Embeds) > 0) {
+				var ok bool
+				switch {
+				case send.Embed != nil:
+					ok = send.Embed.URL != ""
+				case len(send.Embeds) > 0:
+					ok = send.Embeds[0].URL != ""
+				}
+
+				if ok {
 					p.addReactions(msg)
 				}
 			}
