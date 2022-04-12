@@ -56,4 +56,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect
 )
 
-replace github.com/n0madic/twitter-scraper => github.com/VTGare/twitter-scraper v0.0.2
+replace github.com/n0madic/twitter-scraper => github.com/VTGare/twitter-scraper v0.0.3
