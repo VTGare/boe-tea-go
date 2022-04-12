@@ -87,6 +87,11 @@ func (t Twitter) Find(id string) (artworks.Artwork, error) {
 		Permalink: tweet.PermanentURL,
 	}
 
+	if tweet.QuotedStatus != nil && tweet.QuotedStatus.UserID == tweet.UserID {
+		art.Photos = append(art.Photos, tweet.QuotedStatus.Photos...)
+		art.Videos = append(art.Videos, tweet.QuotedStatus.Videos...)
+	}
+
 	return art, nil
 }
 
