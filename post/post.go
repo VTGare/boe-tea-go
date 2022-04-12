@@ -236,7 +236,7 @@ func (p *Post) fetch(guild *store.Guild, channelID string) (*fetchResult, error)
 						}
 
 						// Only add reactions to the original message for Twitter links.
-						if guild.Reactions && p.ctx.Command == nil && isTwitter && artwork != nil && artwork.Len() > 0 {
+						if guild.Reactions && p.ctx.Command == nil && isTwitter && artwork != nil && artwork.Len() > 0 && !p.crosspost {
 							p.addReactions(p.ctx.Event.Message)
 						}
 
@@ -366,36 +366,25 @@ func (p *Post) send(guild *store.Guild, channelID string, artworks []artworks.Ar
 		}
 	}
 
+	first := allMessages[0][0]
 	if count > guild.Limit {
-		first := allMessages[0][0]
 		first.Content = messages.LimitExceeded(guild.Limit, count)
-		if p.crosspost {
-			first.Content = first.Embed.URL + "\n" + first.Content
+	}
+
+	if p.crosspost {
+		var embed *discordgo.MessageEmbed
+		if first.Embed == nil {
+			embed = first.Embeds[0]
+		} else {
+			embed = first.Embed
 		}
 
-		sendMessage(first)
-		if len(allMessages) > 1 {
-			for _, messages := range allMessages[1:] {
-				if p.crosspost {
-					messages[0].Content = messages[0].Embed.URL
-				}
+		first.Content = embed.URL + "\n" + first.Content
+	}
 
-				sendMessage(messages[0])
-			}
-		}
-	} else {
-		for _, messages := range allMessages {
-			for _, message := range messages {
-				if p.crosspost {
-					if len(message.Embeds) > 0 {
-						message.Content = message.Embeds[0].URL
-					} else if message.Embed != nil {
-						message.Content = message.Embed.URL
-					}
-				}
-
-				sendMessage(message)
-			}
+	for _, messages := range allMessages {
+		for _, message := range messages {
+			sendMessage(message)
 		}
 	}
 
