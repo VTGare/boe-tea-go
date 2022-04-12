@@ -14,6 +14,7 @@ import (
 	"github.com/VTGare/boe-tea-go/artworks/twitter/nitter"
 	"github.com/VTGare/boe-tea-go/store"
 	"github.com/VTGare/embeds"
+	"golang.org/x/net/html"
 
 	"github.com/bwmarrin/discordgo"
 	twitterscraper "github.com/n0madic/twitter-scraper"
@@ -74,8 +75,8 @@ func (t Twitter) Find(id string) (artworks.Artwork, error) {
 	art := Artwork{
 		ID:        id,
 		FullName:  profile.Name,
-		Username:  tweet.Username,
-		Content:   tweet.Text,
+		Username:  "@" + tweet.Username,
+		Content:   html.UnescapeString(tweet.Text),
 		Likes:     tweet.Likes,
 		Replies:   tweet.Replies,
 		Retweets:  tweet.Retweets,
@@ -205,7 +206,7 @@ func (a Artwork) MessageSends(footer string, _ bool) ([]*discordgo.MessageSend, 
 		for ind, photo := range a.Photos[1:] {
 			eb := embeds.NewBuilder()
 
-			eb.Title(fmt.Sprintf("%v (%v) | Page %v / %v", a.FullName, a.Username, ind+2, length)).URL(photo)
+			eb.Title(fmt.Sprintf("%v (%v) | Page %v / %v", a.FullName, a.Username, ind+2, length)).URL(a.Permalink)
 			eb.Image(photo).Timestamp(a.Timestamp)
 
 			if footer != "" {
