@@ -35,11 +35,12 @@ const (
 )
 
 type Post struct {
-	bot      *bot.Bot
-	ctx      *gumi.Ctx
-	urls     []string
-	indices  map[int]struct{}
-	skipMode SkipMode
+	bot       *bot.Bot
+	ctx       *gumi.Ctx
+	urls      []string
+	indices   map[int]struct{}
+	skipMode  SkipMode
+	crosspost bool
 }
 
 type fetchResult struct {
@@ -64,7 +65,7 @@ func (p *Post) Send() ([]*cache.MessageInfo, error) {
 		return nil, err
 	}
 
-	res, err := p.fetch(guild, p.ctx.Event.ChannelID, false)
+	res, err := p.fetch(guild, p.ctx.Event.ChannelID)
 	if err != nil {
 		return nil, err
 	}
@@ -86,7 +87,7 @@ func (p *Post) Send() ([]*cache.MessageInfo, error) {
 		p.sendReposts(guild, res.Reposts, 15*time.Second)
 	}
 
-	return p.send(guild, p.ctx.Event.ChannelID, res.Artworks, false)
+	return p.send(guild, p.ctx.Event.ChannelID, res.Artworks)
 }
 
 func (p *Post) Crosspost(userID, group string, channels []string) ([]*cache.MessageInfo, error) {
@@ -128,13 +129,14 @@ func (p *Post) Crosspost(userID, group string, channels []string) ([]*cache.Mess
 
 			if guild.Crosspost {
 				if len(guild.ArtChannels) == 0 || arrays.Any(guild.ArtChannels, ch.ID) {
-					res, err := p.fetch(guild, channelID, true)
+					p.crosspost = true
+					res, err := p.fetch(guild, channelID)
 					if err != nil {
 						log.Infof("Couldn't crosspost. Fetch error: %v", err)
 						return
 					}
 
-					sent, err := p.send(guild, channelID, res.Artworks, true)
+					sent, err := p.send(guild, channelID, res.Artworks)
 					if err != nil {
 						log.Infof("Couldn't crosspost. Send error: %v", err)
 						return
@@ -163,7 +165,7 @@ func (p *Post) SetSkip(indices map[int]struct{}, mode SkipMode) {
 	p.skipMode = mode
 }
 
-func (p *Post) fetch(guild *store.Guild, channelID string, crosspost bool) (*fetchResult, error) {
+func (p *Post) fetch(guild *store.Guild, channelID string) (*fetchResult, error) {
 	var (
 		wg, _        = errgroup.WithContext(context.Background())
 		matched      int64
@@ -186,7 +188,7 @@ func (p *Post) fetch(guild *store.Guild, channelID string, crosspost bool) (*fet
 							artworksChan <- rep
 
 							//If crosspost don't do anything and move on with your life.
-							if crosspost || guild.Repost == "strict" {
+							if p.crosspost || guild.Repost == "strict" {
 								return nil
 							}
 
@@ -215,7 +217,7 @@ func (p *Post) fetch(guild *store.Guild, channelID string, crosspost bool) (*fet
 					// Only post the picture if the provider is enabled
 					// or the function is called from a command
 					// or we're crossposting a twitter artwork.
-					if provider.Enabled(guild) || p.ctx.Command != nil || (crosspost && isTwitter) {
+					if provider.Enabled(guild) || p.ctx.Command != nil || (p.crosspost && isTwitter) {
 						var (
 							artwork artworks.Artwork
 							key     = fmt.Sprintf("%T:%v", provider, id)
@@ -300,7 +302,7 @@ func (p *Post) sendReposts(guild *store.Guild, reposts []*repost.Repost, timeout
 	}
 }
 
-func (p *Post) send(guild *store.Guild, channelID string, artworks []artworks.Artwork, crosspost bool) ([]*cache.MessageInfo, error) {
+func (p *Post) send(guild *store.Guild, channelID string, artworks []artworks.Artwork) ([]*cache.MessageInfo, error) {
 	if len(artworks) == 0 {
 		return nil, nil
 	}
@@ -308,7 +310,7 @@ func (p *Post) send(guild *store.Guild, channelID string, artworks []artworks.Ar
 	lenArtworks := int64(len(artworks))
 	p.bot.Metrics.IncrementArtwork(lenArtworks)
 
-	allMessages, err := p.generateMessages(guild, artworks, channelID, crosspost)
+	allMessages, err := p.generateMessages(guild, artworks, channelID)
 	if err != nil {
 		return nil, err
 	}
@@ -331,7 +333,7 @@ func (p *Post) send(guild *store.Guild, channelID string, artworks []artworks.Ar
 	sent := make([]*cache.MessageInfo, 0, count)
 	sendMessage := func(send *discordgo.MessageSend) {
 		var s *discordgo.Session
-		if crosspost {
+		if p.crosspost {
 			guildID, _ := strconv.ParseInt(guild.ID, 10, 64)
 			s = p.bot.ShardManager.SessionForGuild(guildID)
 		} else {
@@ -367,14 +369,14 @@ func (p *Post) send(guild *store.Guild, channelID string, artworks []artworks.Ar
 	if count > guild.Limit {
 		first := allMessages[0][0]
 		first.Content = messages.LimitExceeded(guild.Limit, count)
-		if crosspost {
+		if p.crosspost {
 			first.Content = first.Embed.URL + "\n" + first.Content
 		}
 
 		sendMessage(first)
 		if len(allMessages) > 1 {
 			for _, messages := range allMessages[1:] {
-				if crosspost {
+				if p.crosspost {
 					messages[0].Content = messages[0].Embed.URL
 				}
 
@@ -384,7 +386,7 @@ func (p *Post) send(guild *store.Guild, channelID string, artworks []artworks.Ar
 	} else {
 		for _, messages := range allMessages {
 			for _, message := range messages {
-				if crosspost {
+				if p.crosspost {
 					if len(message.Embeds) > 0 {
 						message.Content = message.Embeds[0].URL
 					} else if message.Embed != nil {
@@ -400,20 +402,10 @@ func (p *Post) send(guild *store.Guild, channelID string, artworks []artworks.Ar
 	return sent, nil
 }
 
-func (p *Post) generateMessages(guild *store.Guild, artworks []artworks.Artwork, channelID string, crosspost bool) ([][]*discordgo.MessageSend, error) {
+func (p *Post) generateMessages(guild *store.Guild, artworks []artworks.Artwork, channelID string) ([][]*discordgo.MessageSend, error) {
 	messageSends := make([][]*discordgo.MessageSend, 0, len(artworks))
 	for _, artwork := range artworks {
 		if artwork != nil {
-			skipFirst := false
-
-			// Skip first Twitter embed if not a command.
-			switch artwork := artwork.(type) {
-			case twitter.Artwork:
-				if p.ctx.Command == nil && !crosspost && !artwork.NSFW && len(artwork.Videos) == 0 {
-					skipFirst = true
-				}
-			}
-
 			var quote string
 			if guild.FlavourText {
 				quote = p.bot.Config.RandomQuote(guild.NSFW)
@@ -424,11 +416,11 @@ func (p *Post) generateMessages(guild *store.Guild, artworks []artworks.Artwork,
 				return nil, err
 			}
 
-			if skipFirst {
+			if p.skipFirst(artwork) {
 				sends = sends[1:]
 			}
 
-			if crosspost {
+			if p.crosspost {
 				for _, msg := range sends {
 					if len(msg.Embeds) > 0 {
 						msg.Embeds[0].Author = &discordgo.MessageEmbedAuthor{
@@ -483,4 +475,25 @@ func (p *Post) skipArtworks(embeds []*discordgo.MessageSend) []*discordgo.Messag
 	}
 
 	return filtered
+}
+
+func (p *Post) skipFirst(a artworks.Artwork) bool {
+	if p.ctx.Command != nil {
+		return false
+	}
+
+	tweet, isTwitter := a.(twitter.Artwork)
+	if !isTwitter {
+		return false
+	}
+
+	if a.Len() == 0 {
+		return true
+	}
+
+	if len(tweet.Videos) > 0 || tweet.NSFW || p.crosspost {
+		return false
+	}
+
+	return true
 }
