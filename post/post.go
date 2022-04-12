@@ -384,6 +384,15 @@ func (p *Post) send(guild *store.Guild, channelID string, artworks []artworks.Ar
 
 	for _, messages := range allMessages {
 		for _, message := range messages {
+			if !p.crosspost {
+				message.AllowedMentions = &discordgo.MessageAllowedMentions{} // disable reference ping.
+				message.Reference = &discordgo.MessageReference{
+					GuildID:   p.ctx.Event.GuildID,
+					ChannelID: p.ctx.Event.ChannelID,
+					MessageID: p.ctx.Event.ID,
+				}
+			}
+
 			sendMessage(message)
 		}
 	}
