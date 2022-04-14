@@ -55,12 +55,11 @@ type Gallery []*Media
 //New creates a new Twitter artwork provider.
 func New() artworks.Provider {
 	return &Nitter{nitter: []string{
-		"https://nitter.snopyta.org",
 		"https://nitter.42l.fr",
+		"https://nitter.pussthecat.org",
 		"https://nitter.nixnet.services",
 		"https://nitter.himiko.cloud",
 		"https://nitter.cc",
-		"https://nitter.net",
 	}}
 }
 

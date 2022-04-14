@@ -24,7 +24,11 @@ func NamedLink(name, url string) string {
 	return fmt.Sprintf("[%v](%v)", name, url)
 }
 
-func LimitExceeded(limit, count int) string {
+func LimitExceeded(limit, artworks, count int) string {
+	if artworks == 1 {
+		return fmt.Sprintf("Album size `(%v)` is higher than the server's limit `(%v)`, album size has been cut.", count, limit)
+	}
+
 	return fmt.Sprintf("Album size `(%v)` is higher than the server's limit `(%v)`, only the first image of every artwork has been sent.", count, limit)
 }
 

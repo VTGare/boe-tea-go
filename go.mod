@@ -9,7 +9,6 @@ require (
 	github.com/VTGare/gumi v0.4.3
 	github.com/VTGare/sengoku v0.1.7
 	github.com/bwmarrin/discordgo v0.24.0
-	github.com/ericpauley/go-quantize v0.0.0-20200331213906-ae555eb2afa4
 	github.com/everpcpc/pixiv v0.0.0-20211114161155-a51b0f35e073
 	github.com/getsentry/sentry-go v0.13.0
 	github.com/go-redis/redis/v8 v8.11.5

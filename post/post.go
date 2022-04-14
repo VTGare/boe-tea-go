@@ -325,12 +325,7 @@ func (p *Post) send(guild *store.Guild, channelID string, artworks []artworks.Ar
 		allMessages[0] = p.skipArtworks(allMessages[0])
 	}
 
-	count := 0
-	for _, messages := range allMessages {
-		count += len(messages)
-	}
-
-	sent := make([]*cache.MessageInfo, 0, count)
+	sent := make([]*cache.MessageInfo, 0)
 	sendMessage := func(send *discordgo.MessageSend) {
 		var s *discordgo.Session
 		if p.crosspost {
@@ -366,13 +361,13 @@ func (p *Post) send(guild *store.Guild, channelID string, artworks []artworks.Ar
 		}
 	}
 
-	first := allMessages[0][0]
-	if count > guild.Limit {
-		first.Content = messages.LimitExceeded(guild.Limit, count)
-	}
-
+	allMessages = p.handleLimit(allMessages, guild.Limit)
 	if p.crosspost {
-		var embed *discordgo.MessageEmbed
+		var (
+			embed *discordgo.MessageEmbed
+			first = allMessages[0][0]
+		)
+
 		if first.Embed == nil {
 			embed = first.Embeds[0]
 		} else {
@@ -494,4 +489,30 @@ func (p *Post) skipFirst(a artworks.Artwork) bool {
 	}
 
 	return true
+}
+
+func (p *Post) handleLimit(allMessages [][]*discordgo.MessageSend, limit int) [][]*discordgo.MessageSend {
+	count := 0
+	for _, messages := range allMessages {
+		count += len(messages)
+	}
+
+	if count <= limit {
+		return allMessages
+	}
+
+	allMessages[0][0].Content = messages.LimitExceeded(limit, len(allMessages), count)
+	if len(allMessages) == 1 {
+		allMessages[0] = allMessages[0][:limit]
+		return allMessages
+	}
+
+	filtered := make([][]*discordgo.MessageSend, 0, limit)
+	for _, messages := range allMessages {
+		if len(messages) > 0 {
+			filtered = append(filtered, []*discordgo.MessageSend{messages[0]})
+		}
+	}
+
+	return filtered
 }

@@ -31,7 +31,6 @@ type Artwork struct {
 	Tags   []string
 	Images []*Image
 	NSFW   bool
-	Ugoira *Ugoira
 	url    string
 }
 
@@ -123,16 +122,6 @@ func (p Pixiv) Find(id string) (artworks.Artwork, error) {
 		Type:   illust.Type,
 		Pages:  illust.PageCount,
 		Likes:  illust.TotalBookmarks,
-	}
-
-	if illust.Type == "ugoira" {
-		ugoira, err := p.app.UgoiraMetadata(i)
-
-		if err != nil {
-			return nil, err
-		}
-
-		artwork.Ugoira = &Ugoira{ugoira.UgoiraMetadataUgoiraMetadata}
 	}
 
 	return artwork, nil

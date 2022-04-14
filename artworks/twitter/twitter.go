@@ -3,6 +3,7 @@ package twitter
 import (
 	"bytes"
 	"fmt"
+	"html"
 	"io"
 	"net/http"
 	"net/url"
@@ -14,7 +15,6 @@ import (
 	"github.com/VTGare/boe-tea-go/artworks/twitter/nitter"
 	"github.com/VTGare/boe-tea-go/store"
 	"github.com/VTGare/embeds"
-	"golang.org/x/net/html"
 
 	"github.com/bwmarrin/discordgo"
 	twitterscraper "github.com/n0madic/twitter-scraper"
@@ -87,7 +87,7 @@ func (t Twitter) Find(id string) (artworks.Artwork, error) {
 		Permalink: tweet.PermanentURL,
 	}
 
-	if tweet.QuotedStatus != nil && tweet.QuotedStatus.UserID == tweet.UserID {
+	if tweet.QuotedStatus != nil {
 		art.Photos = append(art.Photos, tweet.QuotedStatus.Photos...)
 		art.Videos = append(art.Videos, tweet.QuotedStatus.Videos...)
 	}
