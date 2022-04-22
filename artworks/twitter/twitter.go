@@ -218,7 +218,7 @@ func (a Artwork) MessageSends(footer string, _ bool) ([]*discordgo.MessageSend, 
 				eb.Footer(footer, "")
 			}
 
-			tweets = append(tweets, &discordgo.MessageSend{Embed: eb.Finalize()})
+			tweets = append(tweets, &discordgo.MessageSend{Embeds: []*discordgo.MessageEmbed{eb.Finalize()}})
 		}
 	}
 

@@ -135,7 +135,7 @@ func (artwork ArtstationResponse) MessageSends(footer string, hasTags bool) ([]*
 		eb.Footer(footer, "")
 
 		return []*discordgo.MessageSend{
-			{Embed: eb.Finalize()},
+			{Embeds: []*discordgo.MessageEmbed{eb.Finalize()}},
 		}, nil
 	}
 
@@ -160,7 +160,7 @@ func (artwork ArtstationResponse) MessageSends(footer string, hasTags bool) ([]*
 	}
 
 	eb.Image(artwork.Assets[0].ImageURL)
-	pages = append(pages, &discordgo.MessageSend{Embed: eb.Finalize()})
+	pages = append(pages, &discordgo.MessageSend{Embeds: []*discordgo.MessageEmbed{eb.Finalize()}})
 	if length > 1 {
 		for ind, image := range artwork.Assets[1:] {
 			eb := embeds.NewBuilder()
@@ -175,7 +175,7 @@ func (artwork ArtstationResponse) MessageSends(footer string, hasTags bool) ([]*
 			}
 
 			eb.AddField("Likes", strconv.Itoa(artwork.LikesCount), true)
-			pages = append(pages, &discordgo.MessageSend{Embed: eb.Finalize()})
+			pages = append(pages, &discordgo.MessageSend{Embeds: []*discordgo.MessageEmbed{eb.Finalize()}})
 		}
 	}
 

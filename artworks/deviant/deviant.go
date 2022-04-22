@@ -137,7 +137,7 @@ func (a Artwork) MessageSends(footer string, hasTags bool) ([]*discordgo.Message
 	}
 
 	return []*discordgo.MessageSend{
-		{Embed: eb.Finalize()},
+		{Embeds: []*discordgo.MessageEmbed{eb.Finalize()}},
 	}, nil
 }
 

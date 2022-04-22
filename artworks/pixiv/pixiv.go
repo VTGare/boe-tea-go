@@ -153,7 +153,7 @@ func (a Artwork) MessageSends(footer string, hasTags bool) ([]*discordgo.Message
 		eb.Footer(footer, "")
 
 		return []*discordgo.MessageSend{
-			{Embed: eb.Finalize()},
+			{Embeds: []*discordgo.MessageEmbed{eb.Finalize()}},
 		}, nil
 	}
 
@@ -171,24 +171,17 @@ func (a Artwork) MessageSends(footer string, hasTags bool) ([]*discordgo.Message
 		eb.Description(fmt.Sprintf("**Tags**\n%v", strings.Join(tags, " • ")))
 	}
 
-	eb.URL(
-		a.url,
-	).AddField(
-		"Likes", strconv.Itoa(a.Likes), true,
-	).AddField(
-		"Original quality",
-		messages.ClickHere(a.Images[0].originalProxy()),
-		true,
-	).Timestamp(
-		time.Now(),
-	)
+	eb.URL(a.url).
+		AddField("Likes", strconv.Itoa(a.Likes), true).
+		AddField("Original quality", messages.ClickHere(a.Images[0].originalProxy()), true).
+		Timestamp(time.Now())
 
 	if footer != "" {
 		eb.Footer(footer, "")
 	}
 
 	eb.Image(a.Images[0].previewProxy())
-	pages = append(pages, &discordgo.MessageSend{Embed: eb.Finalize()})
+	pages = append(pages, &discordgo.MessageSend{Embeds: []*discordgo.MessageEmbed{eb.Finalize()}})
 	if length > 1 {
 		for ind, image := range a.Images[1:] {
 			eb := embeds.NewBuilder()
@@ -204,7 +197,7 @@ func (a Artwork) MessageSends(footer string, hasTags bool) ([]*discordgo.Message
 			eb.AddField("Likes", strconv.Itoa(a.Likes), true)
 			eb.AddField("Original quality", messages.ClickHere(image.originalProxy()), true)
 
-			pages = append(pages, &discordgo.MessageSend{Embed: eb.Finalize()})
+			pages = append(pages, &discordgo.MessageSend{Embeds: []*discordgo.MessageEmbed{eb.Finalize()}})
 		}
 	}
 

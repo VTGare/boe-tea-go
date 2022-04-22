@@ -303,29 +303,23 @@ func (p *Post) sendReposts(guild *store.Guild, reposts []*repost.Repost, timeout
 }
 
 func (p *Post) send(guild *store.Guild, channelID string, artworks []artworks.Artwork) ([]*cache.MessageInfo, error) {
+	sent := make([]*cache.MessageInfo, 0)
 	if len(artworks) == 0 {
-		return nil, nil
+		return sent, nil
 	}
 
-	lenArtworks := int64(len(artworks))
-	p.bot.Metrics.IncrementArtwork(lenArtworks)
-
+	p.bot.Metrics.IncrementArtwork(int64(len(artworks)))
 	allMessages, err := p.generateMessages(guild, artworks, channelID)
 	if err != nil {
 		return nil, err
 	}
 
 	if len(allMessages) == 0 {
-		return nil, nil
+		return sent, nil
 	}
 
-	//If skipMode not equals none, remove certain indices from the embeds array.
-	//It only happens from the command so only one artwork should be affected.
-	if p.skipMode != SkipModeNone {
-		allMessages[0] = p.skipArtworks(allMessages[0])
-	}
-
-	sent := make([]*cache.MessageInfo, 0)
+	// It only happens from commands so only first artwork should be affected.
+	allMessages[0] = p.skipArtworks(allMessages[0])
 	sendMessage := func(send *discordgo.MessageSend) {
 		var s *discordgo.Session
 		if p.crosspost {
@@ -336,25 +330,12 @@ func (p *Post) send(guild *store.Guild, channelID string, artworks []artworks.Ar
 		}
 
 		msg, _ := s.ChannelMessageSendComplex(channelID, send)
-
 		if msg != nil {
-			sent = append(sent, &cache.MessageInfo{
-				MessageID: msg.ID,
-				ChannelID: msg.ChannelID,
-			})
+			sent = append(sent, &cache.MessageInfo{MessageID: msg.ID, ChannelID: msg.ChannelID})
 
-			//If URL doesn't exist then the embed contains an error message, instead of an artwork.
-			// TODO: make sure artwork providers always use Embeds instead of embed.
-			if guild.Reactions && (send.Embed != nil || len(send.Embeds) > 0) {
-				var ok bool
-				switch {
-				case send.Embed != nil:
-					ok = send.Embed.URL != ""
-				case len(send.Embeds) > 0:
-					ok = send.Embeds[0].URL != ""
-				}
-
-				if ok {
+			// If URL doesn't exist then the embed contains an error message, instead of an artwork.
+			if guild.Reactions && len(send.Embeds) > 0 {
+				if send.Embeds[0].URL != "" {
 					p.addReactions(msg)
 				}
 			}
@@ -364,30 +345,14 @@ func (p *Post) send(guild *store.Guild, channelID string, artworks []artworks.Ar
 	allMessages = p.handleLimit(allMessages, guild.Limit)
 	if p.crosspost {
 		var (
-			embed *discordgo.MessageEmbed
 			first = allMessages[0][0]
 		)
 
-		if first.Embed == nil {
-			embed = first.Embeds[0]
-		} else {
-			embed = first.Embed
-		}
-
-		first.Content = embed.URL + "\n" + first.Content
+		first.Content = first.Embeds[0].URL + "\n" + first.Content
 	}
 
 	for _, messages := range allMessages {
 		for _, message := range messages {
-			if !p.crosspost {
-				message.AllowedMentions = &discordgo.MessageAllowedMentions{} // disable reference ping.
-				message.Reference = &discordgo.MessageReference{
-					GuildID:   p.ctx.Event.GuildID,
-					ChannelID: p.ctx.Event.ChannelID,
-					MessageID: p.ctx.Event.ID,
-				}
-			}
-
 			sendMessage(message)
 		}
 	}
@@ -413,18 +378,22 @@ func (p *Post) generateMessages(guild *store.Guild, artworks []artworks.Artwork,
 				sends = sends[1:]
 			}
 
-			if p.crosspost {
-				for _, msg := range sends {
-					if len(msg.Embeds) > 0 {
-						msg.Embeds[0].Author = &discordgo.MessageEmbedAuthor{
-							Name:    messages.CrosspostBy(p.ctx.Event.Author.String()),
-							IconURL: p.ctx.Event.Author.AvatarURL(""),
-						}
-					} else if msg.Embed != nil {
-						msg.Embed.Author = &discordgo.MessageEmbedAuthor{
-							Name:    messages.CrosspostBy(p.ctx.Event.Author.String()),
-							IconURL: p.ctx.Event.Author.AvatarURL(""),
-						}
+			for _, msg := range sends {
+				if len(msg.Embeds) == 0 {
+					continue
+				}
+
+				if p.crosspost {
+					msg.Embeds[0].Author = &discordgo.MessageEmbedAuthor{
+						Name:    messages.CrosspostBy(p.ctx.Event.Author.String()),
+						IconURL: p.ctx.Event.Author.AvatarURL(""),
+					}
+				} else {
+					msg.AllowedMentions = &discordgo.MessageAllowedMentions{} // disable reference ping.
+					msg.Reference = &discordgo.MessageReference{
+						GuildID:   p.ctx.Event.GuildID,
+						ChannelID: p.ctx.Event.ChannelID,
+						MessageID: p.ctx.Event.ID,
 					}
 				}
 			}

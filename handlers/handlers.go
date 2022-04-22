@@ -219,7 +219,7 @@ func OnReactionAdd(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageReacti
 				"user", r.UserID,
 			)
 			name        = r.Emoji.APIName()
-			ctx, cancel = context.WithTimeout(context.Background(), 10*time.Second)
+			ctx, cancel = context.WithTimeout(context.Background(), 30*time.Second)
 		)
 
 		defer cancel()
