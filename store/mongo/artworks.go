@@ -125,10 +125,9 @@ func (a *artworkStore) CreateArtwork(ctx context.Context, artwork *store.Artwork
 }
 
 func findOptions(a store.ArtworkSearchOptions) *options.FindOptions {
-	skip := a.Limit * a.Page
 	sort := bson.M{a.Sort.String(): a.Order}
 
-	return options.Find().SetLimit(a.Limit).SetSkip(skip).SetSort(sort)
+	return options.Find().SetLimit(a.Limit).SetSkip(a.Skip).SetSort(sort)
 }
 
 func filterBSON(f store.ArtworkFilter) bson.D {

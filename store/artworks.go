@@ -46,7 +46,7 @@ func (s ArtworkSort) String() string {
 
 type ArtworkSearchOptions struct {
 	Limit int64
-	Page  int64
+	Skip  int64
 	Order Order
 	Sort  ArtworkSort
 }
@@ -63,7 +63,6 @@ type ArtworkFilter struct {
 func DefaultSearchOptions() ArtworkSearchOptions {
 	return ArtworkSearchOptions{
 		Limit: 100,
-		Page:  0,
 		Order: Descending,
 		Sort:  ByTime,
 	}

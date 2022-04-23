@@ -44,6 +44,15 @@ func (b *bookmarkStore) ListBookmarks(ctx context.Context, userID string) ([]*st
 	return bookmarks, nil
 }
 
+func (b *bookmarkStore) CountBookmarks(ctx context.Context, userID string) (int64, error) {
+	count, err := b.col.CountDocuments(ctx, bson.M{"user_id": userID})
+	if err != nil {
+		return 0, fmt.Errorf("failed to count bookmarks: %w", err)
+	}
+
+	return count, nil
+}
+
 func (b *bookmarkStore) AddBookmark(ctx context.Context, bookmark *store.Bookmark) (bool, error) {
 	wc := writeconcern.New(writeconcern.WMajority())
 	rc := readconcern.Snapshot()

@@ -422,7 +422,7 @@ func copygroup(b *bot.Bot) func(ctx *gumi.Ctx) error {
 
 func favourites(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
-		tctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		tctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 		defer cancel()
 
 		bookmarks, err := b.Store.ListBookmarks(tctx, ctx.Event.Author.ID)
@@ -435,12 +435,12 @@ func favourites(b *bot.Bot) func(ctx *gumi.Ctx) error {
 		}
 
 		var (
-			limit  = int64(len(bookmarks))
-			order  = store.Descending
-			sort   = store.ByTime
-			args   = strings.Fields(ctx.Args.Raw)
-			mode   = flags.SFWFavourites
-			filter = store.ArtworkFilter{}
+			limit  int64 = 50
+			order        = store.Descending
+			sort         = store.ByTime
+			args         = strings.Fields(ctx.Args.Raw)
+			mode         = flags.SFWFavourites
+			filter       = store.ArtworkFilter{}
 		)
 
 		ch, err := ctx.Session.Channel(ctx.Event.ChannelID)
@@ -452,14 +452,7 @@ func favourites(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			mode = flags.AllFavourites
 		}
 
-		flagsMap, err := flags.FromArgs(
-			args,
-			flags.FlagTypeOrder,
-			flags.FlagTypeSort,
-			flags.FlagTypeDuring,
-			flags.FlagTypeMode,
-		)
-
+		flagsMap, err := flags.FromArgs(args, flags.FlagTypeOrder, flags.FlagTypeSort, flags.FlagTypeDuring, flags.FlagTypeMode)
 		if err != nil {
 			return err
 		}
@@ -508,12 +501,24 @@ func favourites(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			return err
 		}
 
-		artworkEmbeds := make([]*discordgo.MessageEmbed, 0, len(artworks))
+		pages := make([]*discordgo.MessageEmbed, len(bookmarks))
 		for ind, artwork := range artworks {
-			artworkEmbeds = append(artworkEmbeds, artworkToEmbed(artwork, artwork.Images[0], ind, len(artworks)))
+			pages[ind] = artworkToEmbed(artwork, artwork.Images[0], ind, len(bookmarks))
 		}
 
-		wg := dgoutils.NewWidget(ctx.Session, ctx.Event.Author.ID, artworkEmbeds)
+		wg := dgoutils.NewWidget(ctx.Session, ctx.Event.Author.ID, pages)
+		wg.WithCallback(func(wa dgoutils.WidgetAction, i int) error {
+			if wg.Pages[i] == nil {
+				artwork, err := b.Store.Artwork(tctx, bookmarks[i].ArtworkID, "")
+				if err != nil {
+					return err
+				}
+
+				wg.Pages[i] = artworkToEmbed(artwork, artwork.Images[0], i, len(bookmarks))
+			}
+
+			return nil
+		})
 		return wg.Start(ctx.Event.ChannelID)
 	}
 }
@@ -522,94 +527,102 @@ func userset(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
 		switch {
 		case ctx.Args.Len() == 0:
-			user, err := b.Store.User(context.Background(), ctx.Event.Author.ID)
-			if err != nil {
-				return err
-			}
-
-			bookmarks, err := b.Store.ListBookmarks(context.Background(), ctx.Event.Author.ID)
-			if err != nil {
-				return err
-			}
-
-			locale := messages.UserProfileEmbed(ctx.Event.Author.Username)
-			eb := embeds.NewBuilder()
-			eb.Title(locale.Title)
-			eb.Thumbnail(ctx.Event.Author.AvatarURL(""))
-
-			eb.AddField(
-				locale.Settings,
-				fmt.Sprintf(
-					"**%v:** %v | **%v:** %v",
-					locale.Crosspost, messages.FormatBool(user.Crosspost),
-					locale.DM, messages.FormatBool(user.DM),
-				),
-			)
-
-			eb.AddField(
-				locale.Stats,
-				fmt.Sprintf(
-					"**%v:** %v | **%v:** %v",
-					locale.Groups, len(user.Groups),
-					locale.Favourites, len(bookmarks),
-				),
-			)
-
-			ctx.ReplyEmbed(eb.Finalize())
-			return nil
+			return showUserProfile(b, ctx)
 		case ctx.Args.Len() >= 2:
-			user, err := b.Store.User(context.Background(), ctx.Event.Author.ID)
-			if err != nil {
-				return err
-			}
-
-			var (
-				settingName     = ctx.Args.Get(0)
-				newSetting      = ctx.Args.Get(1)
-				newSettingEmbed interface{}
-				oldSettingEmbed interface{}
-			)
-
-			switch settingName.Raw {
-			case "dm":
-				new, err := parseBool(newSetting.Raw)
-				if err != nil {
-					return err
-				}
-
-				oldSettingEmbed = user.DM
-				newSettingEmbed = new
-				user.DM = new
-			case "crosspost":
-				new, err := parseBool(newSetting.Raw)
-				if err != nil {
-					return err
-				}
-
-				oldSettingEmbed = user.Crosspost
-				newSettingEmbed = new
-				user.Crosspost = new
-			default:
-				return messages.ErrUnknownUserSetting(settingName.Raw)
-			}
-
-			_, err = b.Store.UpdateUser(context.Background(), user)
-			if err != nil {
-				return err
-			}
-
-			eb := embeds.NewBuilder()
-			eb.InfoTemplate("Successfully changed user setting.")
-			eb.AddField("Setting name", settingName.Raw, true)
-			eb.AddField("Old setting", fmt.Sprintf("%v", oldSettingEmbed), true)
-			eb.AddField("New setting", fmt.Sprintf("%v", newSettingEmbed), true)
-
-			ctx.ReplyEmbed(eb.Finalize())
-			return nil
+			return changeUserSettings(b, ctx)
 		default:
 			return messages.ErrIncorrectCmd(ctx.Command)
 		}
 	}
+}
+
+func showUserProfile(b *bot.Bot, ctx *gumi.Ctx) error {
+	user, err := b.Store.User(context.Background(), ctx.Event.Author.ID)
+	if err != nil {
+		return err
+	}
+
+	bookmarks, err := b.Store.CountBookmarks(context.Background(), ctx.Event.Author.ID)
+	if err != nil {
+		return err
+	}
+
+	locale := messages.UserProfileEmbed(ctx.Event.Author.Username)
+	eb := embeds.NewBuilder()
+	eb.Title(locale.Title)
+	eb.Thumbnail(ctx.Event.Author.AvatarURL(""))
+
+	eb.AddField(
+		locale.Settings,
+		fmt.Sprintf(
+			"**%v:** %v | **%v:** %v",
+			locale.Crosspost, messages.FormatBool(user.Crosspost),
+			locale.DM, messages.FormatBool(user.DM),
+		),
+	)
+
+	eb.AddField(
+		locale.Stats,
+		fmt.Sprintf(
+			"**%v:** %v | **%v:** %v",
+			locale.Groups, len(user.Groups),
+			locale.Favourites, bookmarks,
+		),
+	)
+
+	ctx.ReplyEmbed(eb.Finalize())
+	return nil
+}
+
+func changeUserSettings(b *bot.Bot, ctx *gumi.Ctx) error {
+	user, err := b.Store.User(context.Background(), ctx.Event.Author.ID)
+	if err != nil {
+		return err
+	}
+
+	var (
+		settingName     = ctx.Args.Get(0)
+		newSetting      = ctx.Args.Get(1)
+		newSettingEmbed interface{}
+		oldSettingEmbed interface{}
+	)
+
+	switch settingName.Raw {
+	case "dm":
+		new, err := parseBool(newSetting.Raw)
+		if err != nil {
+			return err
+		}
+
+		oldSettingEmbed = user.DM
+		newSettingEmbed = new
+		user.DM = new
+	case "crosspost":
+		new, err := parseBool(newSetting.Raw)
+		if err != nil {
+			return err
+		}
+
+		oldSettingEmbed = user.Crosspost
+		newSettingEmbed = new
+		user.Crosspost = new
+	default:
+		return messages.ErrUnknownUserSetting(settingName.Raw)
+	}
+
+	_, err = b.Store.UpdateUser(context.Background(), user)
+	if err != nil {
+		return err
+	}
+
+	eb := embeds.NewBuilder()
+	eb.InfoTemplate("Successfully changed user setting.")
+	eb.AddField("Setting name", settingName.Raw, true)
+	eb.AddField("Old setting", fmt.Sprintf("%v", oldSettingEmbed), true)
+	eb.AddField("New setting", fmt.Sprintf("%v", newSettingEmbed), true)
+
+	ctx.ReplyEmbed(eb.Finalize())
+	return nil
 }
 
 func unfav(b *bot.Bot) func(ctx *gumi.Ctx) error {

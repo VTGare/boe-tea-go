@@ -7,6 +7,7 @@ import (
 
 type BookmarkStore interface {
 	ListBookmarks(ctx context.Context, userID string) ([]*Bookmark, error)
+	CountBookmarks(ctx context.Context, userID string) (int64, error)
 	AddBookmark(ctx context.Context, fav *Bookmark) (bool, error)
 	DeleteBookmark(ctx context.Context, fav *Bookmark) (bool, error)
 }

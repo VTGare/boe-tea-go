@@ -631,7 +631,6 @@ func OnError(b *bot.Bot) func(*gumi.Ctx, error) {
 
 			eb.FailureTemplate("An unexpected error occured. Please try again later.\n" +
 				"If error persists, please let the developer know about it with `bt!feedback` command.")
-			eb.ErrorTemplate(err.Error())
 		}
 
 		ctx.ReplyEmbed(eb.Finalize())
