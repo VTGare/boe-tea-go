@@ -396,11 +396,6 @@ func OnReactionAdd(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageReacti
 				return fmt.Errorf("failed to find or create an artwork: %w", err)
 			}
 
-			user, err := b.Store.User(ctx, r.UserID)
-			if err != nil {
-				return fmt.Errorf("failed to find or create a user: %w", err)
-			}
-
 			var (
 				nsfw = name == "🤤"
 				fav  = &store.Bookmark{
@@ -422,7 +417,16 @@ func OnReactionAdd(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageReacti
 				return fmt.Errorf("failed to insert a favourite: %w", err)
 			}
 
-			if !user.DM || !added {
+			if !added {
+				return nil
+			}
+
+			user, err := b.Store.User(ctx, r.UserID)
+			if err != nil {
+				return fmt.Errorf("failed to find or create a user: %w", err)
+			}
+
+			if !user.DM {
 				return nil
 			}
 
