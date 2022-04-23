@@ -624,7 +624,7 @@ func OnError(b *bot.Bot) func(*gumi.Ctx, error) {
 			eb.FailureTemplate(usrErr.Error())
 		default:
 			if ctx.Command != nil {
-				b.Log.Errorf("An error occured. Command: %v. Arguments: [%v]", ctx.Command.Name, ctx.Args.Raw, err)
+				b.Log.Errorf("An error occured. Command: %v. Arguments: [%v]. Error: %v", ctx.Command.Name, ctx.Args.Raw, err)
 			} else {
 				b.Log.Errorf("An error occured. Error: %v", err)
 			}

@@ -513,15 +513,31 @@ func favourites(b *bot.Bot) func(ctx *gumi.Ctx) error {
 
 		wg := dgoutils.NewWidget(ctx.Session, ctx.Event.Author.ID, pages)
 		wg.WithCallback(func(wa dgoutils.WidgetAction, i int) error {
-			if wg.Pages[i] == nil {
-				artwork, err := b.Store.Artwork(tctx, bookmarks[i].ArtworkID, "")
-				if err != nil {
-					return err
-				}
-
-				wg.Pages[i] = artworkToEmbed(artwork, artwork.Images[0], i, len(bookmarks))
+			if wg.Pages[i] != nil {
+				return nil
 			}
 
+			artwork, err := b.Store.Artwork(tctx, bookmarks[i].ArtworkID, "")
+			if errors.Is(err, store.ErrArtworkNotFound) {
+				eb := embeds.NewBuilder()
+				eb.FailureTemplate("Artwork not found.").
+					AddField("ID", strconv.Itoa(bookmarks[i].ArtworkID))
+
+				wg.Pages[i] = eb.Finalize()
+
+				_, err := b.Store.DeleteBookmark(tctx, bookmarks[i])
+				if err != nil {
+					return fmt.Errorf("failed to delete unknown bookmark: %w", err)
+				}
+
+				return nil
+			}
+
+			if err != nil {
+				return err
+			}
+
+			wg.Pages[i] = artworkToEmbed(artwork, artwork.Images[0], i, len(bookmarks))
 			return nil
 		})
 		return wg.Start(ctx.Event.ChannelID)
