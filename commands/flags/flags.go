@@ -19,14 +19,6 @@ const (
 	FlagTypeMode
 )
 
-type FavouritesMode int
-
-const (
-	SFWFavourites FavouritesMode = iota
-	NSFWFavourites
-	AllFavourites
-)
-
 func FromArgs(args []string, flags ...FlagType) (map[FlagType]interface{}, error) {
 	m := make(map[FlagType]interface{})
 
@@ -90,11 +82,11 @@ func FromArgs(args []string, flags ...FlagType) (map[FlagType]interface{}, error
 
 					switch f {
 					case "sfw":
-						m[FlagTypeMode] = SFWFavourites
+						m[FlagTypeMode] = store.BookmarkFilterSafe
 					case "nsfw":
-						m[FlagTypeMode] = NSFWFavourites
+						m[FlagTypeMode] = store.BookmarkFilterUnsafe
 					case "all":
-						m[FlagTypeMode] = AllFavourites
+						m[FlagTypeMode] = store.BookmarkFilterAll
 					}
 				}
 			}

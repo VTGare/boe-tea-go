@@ -30,10 +30,15 @@ func BookmarksStore(client *mongo.Client, database, collection string) store.Boo
 	}
 }
 
-func (b *bookmarkStore) ListBookmarks(ctx context.Context, userID string, order store.Order) ([]*store.Bookmark, error) {
+func (b *bookmarkStore) ListBookmarks(ctx context.Context, userID string, filter store.BookmarkFilter, order store.Order) ([]*store.Bookmark, error) {
+	f := bson.M{"user_id": userID}
+	if filter != store.BookmarkFilterAll {
+		f["nsfw"] = filter == store.BookmarkFilterUnsafe
+	}
+
 	cur, err := b.col.Find(
 		ctx,
-		bson.M{"user_id": userID},
+		f,
 		options.Find().SetSort(bson.M{"created_at": order}),
 	)
 

@@ -430,7 +430,7 @@ func favourites(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			order        = store.Descending
 			sortBy       = store.ByTime
 			args         = strings.Fields(ctx.Args.Raw)
-			mode         = flags.SFWFavourites
+			mode         = store.BookmarkFilterSafe
 			filter       = store.ArtworkFilter{}
 		)
 
@@ -440,7 +440,7 @@ func favourites(b *bot.Bot) func(ctx *gumi.Ctx) error {
 		}
 
 		if ch.NSFW || ch.Type == discordgo.ChannelTypeDM {
-			mode = flags.AllFavourites
+			mode = store.BookmarkFilterAll
 		}
 
 		flagsMap, err := flags.FromArgs(args, flags.FlagTypeOrder, flags.FlagTypeMode)
@@ -453,11 +453,11 @@ func favourites(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			case flags.FlagTypeOrder:
 				order = val.(store.Order)
 			case flags.FlagTypeMode:
-				mode = val.(flags.FavouritesMode)
+				mode = val.(store.BookmarkFilter)
 			}
 		}
 
-		bookmarks, err := b.Store.ListBookmarks(tctx, ctx.Event.Author.ID, order)
+		bookmarks, err := b.Store.ListBookmarks(tctx, ctx.Event.Author.ID, mode, order)
 		if err != nil {
 			return err
 		}
@@ -466,30 +466,15 @@ func favourites(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			return messages.ErrUserNoFavourites(ctx.Event.Author.ID)
 		}
 
-		ids := make([]int, 0)
+		filter.IDs = make([]int, 0, limit)
 		for _, bookmark := range bookmarks {
-			if int64(len(ids)) == limit {
+			if int64(len(filter.IDs)) == limit {
 				break
 			}
 
-			switch mode {
-			case flags.AllFavourites:
-				ids = append(ids, bookmark.ArtworkID)
-
-			case flags.NSFWFavourites:
-				if bookmark.NSFW {
-					ids = append(ids, bookmark.ArtworkID)
-				}
-
-			case flags.SFWFavourites:
-				if !bookmark.NSFW {
-					ids = append(ids, bookmark.ArtworkID)
-				}
-
-			}
+			filter.IDs = append(filter.IDs, bookmark.ArtworkID)
 		}
 
-		filter.IDs = ids
 		opts := store.ArtworkSearchOptions{
 			Limit: limit,
 			Order: order,
@@ -508,7 +493,14 @@ func favourites(b *bot.Bot) func(ctx *gumi.Ctx) error {
 				break
 			}
 
-			pages[ind] = artworkToEmbed(artwork, artwork.Images[0], ind, len(bookmarks))
+			page := artworkToEmbed(artwork, artwork.Images[0], ind, len(bookmarks))
+			page.Fields = append(page.Fields, &discordgo.MessageEmbedField{
+				Name:   "NSFW",
+				Value:  strconv.FormatBool(bookmark.NSFW),
+				Inline: true,
+			})
+
+			pages[ind] = page
 		}
 
 		wg := dgoutils.NewWidget(ctx.Session, ctx.Event.Author.ID, pages)
@@ -537,7 +529,14 @@ func favourites(b *bot.Bot) func(ctx *gumi.Ctx) error {
 				return err
 			}
 
-			wg.Pages[i] = artworkToEmbed(artwork, artwork.Images[0], i, len(bookmarks))
+			page := artworkToEmbed(artwork, artwork.Images[0], i, len(bookmarks))
+			page.Fields = append(page.Fields, &discordgo.MessageEmbedField{
+				Name:   "NSFW",
+				Value:  strconv.FormatBool(bookmarks[i].NSFW),
+				Inline: true,
+			})
+
+			wg.Pages[i] = page
 			return nil
 		})
 		return wg.Start(ctx.Event.ChannelID)
