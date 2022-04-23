@@ -403,7 +403,8 @@ func OnReactionAdd(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageReacti
 
 			var (
 				nsfw = name == "🤤"
-				fav  = &store.Favourite{
+				fav  = &store.Bookmark{
+					UserID:    r.UserID,
 					ArtworkID: artworkDB.ID,
 					NSFW:      nsfw,
 					CreatedAt: time.Now(),
@@ -416,11 +417,12 @@ func OnReactionAdd(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageReacti
 			)
 
 			log.Info("inserting a favourite")
-			if err := b.Store.AddFavourite(ctx, r.UserID, fav); err != nil {
+			added, err := b.Store.AddBookmark(ctx, fav)
+			if err != nil {
 				return fmt.Errorf("failed to insert a favourite: %w", err)
 			}
 
-			if !user.DM {
+			if !user.DM || !added {
 				return nil
 			}
 
@@ -549,23 +551,20 @@ func OnReactionRemove(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageRea
 			return
 		}
 
+		log.With("user", r.UserID, "artwork", artworkDB.ID).Info("removing a favourite")
+		deleted, err := b.Store.DeleteBookmark(ctx, &store.Bookmark{UserID: r.UserID, ArtworkID: artworkDB.ID})
+		if err != nil {
+			log.With("error", err).Error("failed to remove a favourite")
+			return
+		}
+
+		if !deleted {
+			return
+		}
+
 		user, err := b.Store.User(ctx, r.UserID)
 		if err != nil {
-			if !errors.Is(err, mongo.ErrNoDocuments) {
-				log.With("error", err).Error("failed to find a user")
-			}
-
-			return
-		}
-
-		fav, ok := user.FindFavourite(artworkDB.ID)
-		if !ok {
-			return
-		}
-
-		log.With("user", r.UserID, "artwork", artworkDB.ID).Info("removing a favourite")
-		if err := b.Store.DeleteFavourite(ctx, user.ID, fav); err != nil {
-			log.With("error", err).Error("failed to remove a favourite")
+			log.With("error", err).Error("failed to find or create a user")
 			return
 		}
 
@@ -584,8 +583,7 @@ func OnReactionRemove(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageRea
 		eb.Title("💔 Successfully removed an artwork from favourites").
 			Description("If you dislike direct messages disable them by running `bt!userset dm off` command").
 			AddField("ID", strconv.Itoa(artworkDB.ID), true).
-			AddField("URL", messages.ClickHere(artworkDB.URL), true).
-			AddField("NSFW", strconv.FormatBool(fav.NSFW), true)
+			AddField("URL", messages.ClickHere(artworkDB.URL), true)
 
 		if len(artworkDB.Images) > 0 {
 			eb.Thumbnail(artworkDB.Images[0])

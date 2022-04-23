@@ -18,7 +18,6 @@ type Artwork struct {
 	URL        string    `json:"url" bson:"url"`
 	Images     []string  `json:"images" bson:"images"`
 	Favourites int       `json:"favourites" bson:"favourites"`
-	NSFW       int       `json:"nsfw" bson:"nsfw"`
 	CreatedAt  time.Time `json:"created_at" bson:"created_at"`
 	UpdatedAt  time.Time `json:"updated_at" bson:"updated_at"`
 }

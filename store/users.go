@@ -10,9 +10,6 @@ type UserStore interface {
 	UpdateUser(ctx context.Context, user *User) (*User, error)
 	User(ctx context.Context, userID string) (*User, error)
 
-	AddFavourite(ctx context.Context, userID string, fav *Favourite) error
-	DeleteFavourite(ctx context.Context, userID string, fav *Favourite) error
-
 	CreateCrosspostGroup(ctx context.Context, userID string, group *Group) (*User, error)
 	DeleteCrosspostGroup(ctx context.Context, userID string, group string) (*User, error)
 	AddCrosspostChannel(ctx context.Context, userID string, group string, child string) (*User, error)
@@ -20,19 +17,12 @@ type UserStore interface {
 }
 
 type User struct {
-	ID         string       `json:"id" bson:"user_id"`
-	DM         bool         `json:"dm" bson:"dm"`
-	Crosspost  bool         `json:"crosspost" bson:"crosspost"`
-	Favourites []*Favourite `json:"favourites" bson:"new_favourites"`
-	Groups     []*Group     `json:"groups" bson:"channel_groups"`
-	CreatedAt  time.Time    `json:"created_at" bson:"created_at"`
-	UpdatedAt  time.Time    `json:"updated_at" bson:"updated_at"`
-}
-
-type Favourite struct {
-	ArtworkID int       `json:"artwork_id" bson:"artwork_id"`
-	NSFW      bool      `json:"nsfw" bson:"nsfw"`
+	ID        string    `json:"id" bson:"user_id"`
+	DM        bool      `json:"dm" bson:"dm"`
+	Crosspost bool      `json:"crosspost" bson:"crosspost"`
+	Groups    []*Group  `json:"groups" bson:"channel_groups"`
 	CreatedAt time.Time `json:"created_at" bson:"created_at"`
+	UpdatedAt time.Time `json:"updated_at" bson:"updated_at"`
 }
 
 type Group struct {
@@ -43,13 +33,12 @@ type Group struct {
 
 func DefaultUser(id string) *User {
 	return &User{
-		ID:         id,
-		DM:         true,
-		Crosspost:  true,
-		Favourites: make([]*Favourite, 0),
-		Groups:     make([]*Group, 0),
-		CreatedAt:  time.Now(),
-		UpdatedAt:  time.Now(),
+		ID:        id,
+		DM:        true,
+		Crosspost: true,
+		Groups:    make([]*Group, 0),
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
 	}
 }
 
@@ -67,16 +56,6 @@ func (u *User) FindGroupByName(name string) (*Group, bool) {
 	for _, group := range u.Groups {
 		if group.Name == name {
 			return group, true
-		}
-	}
-
-	return nil, false
-}
-
-func (u *User) FindFavourite(artworkID int) (*Favourite, bool) {
-	for _, fav := range u.Favourites {
-		if fav.ArtworkID == artworkID {
-			return fav, true
 		}
 	}
 

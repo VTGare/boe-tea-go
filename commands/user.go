@@ -422,17 +422,20 @@ func copygroup(b *bot.Bot) func(ctx *gumi.Ctx) error {
 
 func favourites(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
-		user, err := b.Store.User(context.Background(), ctx.Event.Author.ID)
+		tctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		bookmarks, err := b.Store.ListBookmarks(tctx, ctx.Event.Author.ID)
 		if err != nil {
 			return err
 		}
 
-		if len(user.Favourites) == 0 {
+		if len(bookmarks) == 0 {
 			return messages.ErrUserNoFavourites(ctx.Event.Author.ID)
 		}
 
 		var (
-			limit  = int64(len(user.Favourites))
+			limit  = int64(len(bookmarks))
 			order  = store.Descending
 			sort   = store.ByTime
 			args   = strings.Fields(ctx.Args.Raw)
@@ -474,35 +477,33 @@ func favourites(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			}
 		}
 
-		ids := make([]int, 0, len(user.Favourites))
-		switch mode {
-		case flags.AllFavourites:
-			for _, fav := range user.Favourites {
-				ids = append(ids, fav.ArtworkID)
-			}
-		case flags.NSFWFavourites:
-			for _, fav := range user.Favourites {
-				if fav.NSFW {
-					ids = append(ids, fav.ArtworkID)
+		ids := make([]int, 0)
+		for _, bookmark := range bookmarks {
+			switch mode {
+			case flags.AllFavourites:
+				ids = append(ids, bookmark.ArtworkID)
+
+			case flags.NSFWFavourites:
+				if bookmark.NSFW {
+					ids = append(ids, bookmark.ArtworkID)
 				}
-			}
-		case flags.SFWFavourites:
-			for _, fav := range user.Favourites {
-				if !fav.NSFW {
-					ids = append(ids, fav.ArtworkID)
+
+			case flags.SFWFavourites:
+				if !bookmark.NSFW {
+					ids = append(ids, bookmark.ArtworkID)
 				}
+
 			}
 		}
 
 		filter.IDs = ids
-
 		opts := store.ArtworkSearchOptions{
 			Limit: limit,
 			Order: order,
 			Sort:  sort,
 		}
 
-		artworks, err := b.Store.SearchArtworks(context.Background(), filter, opts)
+		artworks, err := b.Store.SearchArtworks(tctx, filter, opts)
 		if err != nil {
 			return err
 		}
@@ -526,6 +527,11 @@ func userset(b *bot.Bot) func(ctx *gumi.Ctx) error {
 				return err
 			}
 
+			bookmarks, err := b.Store.ListBookmarks(context.Background(), ctx.Event.Author.ID)
+			if err != nil {
+				return err
+			}
+
 			locale := messages.UserProfileEmbed(ctx.Event.Author.Username)
 			eb := embeds.NewBuilder()
 			eb.Title(locale.Title)
@@ -545,7 +551,7 @@ func userset(b *bot.Bot) func(ctx *gumi.Ctx) error {
 				fmt.Sprintf(
 					"**%v:** %v | **%v:** %v",
 					locale.Groups, len(user.Groups),
-					locale.Favourites, len(user.Favourites),
+					locale.Favourites, len(bookmarks),
 				),
 			)
 
@@ -612,18 +618,10 @@ func unfav(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			return messages.ErrIncorrectCmd(ctx.Command)
 		}
 
-		user, err := b.Store.User(context.Background(), ctx.Event.Author.ID)
-		if err != nil {
-			return err
-		}
-
-		if len(user.Favourites) == 0 {
-			return messages.ErrUserNoFavourites(ctx.Event.Author.ID)
-		}
-
 		var (
 			id    int
 			url   string
+			err   error
 			query = ctx.Args.Get(0).Raw
 		)
 
@@ -642,37 +640,22 @@ func unfav(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			id = artwork.ID
 		}
 
-		fav, ok := user.FindFavourite(id)
-		if !ok {
-			return messages.ErrArtworkNotFound(strconv.Itoa(id))
+		deleted, err := b.Store.DeleteBookmark(context.Background(), &store.Bookmark{UserID: ctx.Event.Author.ID, ArtworkID: id})
+		if err != nil {
+			return messages.ErrUserUnfavouriteFail(query, err)
 		}
 
-		if err := b.Store.DeleteFavourite(context.Background(), user.ID, fav); err != nil {
-			return messages.ErrUserUnfavouriteFail(query, err)
+		if !deleted {
+			return messages.ErrArtworkNotFound(query)
 		}
 
 		eb := embeds.NewBuilder()
 		locale := messages.FavouriteRemovedEmbed()
 
-		eb.Title(
-			locale.Title,
-		).Description(
-			locale.Description,
-		)
-
-		eb.AddField(
-			"ID",
-			strconv.Itoa(artwork.ID),
-			true,
-		).AddField(
-			"URL",
-			messages.ClickHere(artwork.URL),
-			true,
-		).AddField(
-			"NSFW",
-			strconv.FormatBool(fav.NSFW),
-			true,
-		)
+		eb.Title(locale.Title).
+			Description(locale.Description).
+			AddField("ID", strconv.Itoa(artwork.ID), true).
+			AddField("URL", messages.ClickHere(artwork.URL), true)
 
 		if len(artwork.Images) > 0 {
 			eb.Thumbnail(artwork.Images[0])
@@ -683,11 +666,7 @@ func unfav(b *bot.Bot) func(ctx *gumi.Ctx) error {
 }
 
 func artworkToEmbed(artwork *store.Artwork, image string, ind, length int) *discordgo.MessageEmbed {
-	var (
-		title   = ""
-		percent = (float64(artwork.NSFW) / float64(artwork.Favourites)) * 100.0
-	)
-
+	title := ""
 	if length > 1 {
 		if artwork.Title == "" {
 			title = fmt.Sprintf("[%v/%v] %v", ind+1, length, artwork.Author)
@@ -707,24 +686,12 @@ func artworkToEmbed(artwork *store.Artwork, image string, ind, length int) *disc
 	if len(artwork.Images) > 0 {
 		eb.Image(image)
 	}
-	eb.AddField("ID",
-		strconv.Itoa(artwork.ID),
-		true,
-	).AddField(
-		"Author",
-		artwork.Author,
-		true,
-	).AddField(
-		"Favourites",
-		strconv.Itoa(artwork.Favourites),
-		true,
-	).AddField(
-		"URL",
-		messages.ClickHere(artwork.URL),
-	).AddField(
-		"Lewdmeter",
-		fmt.Sprintf("%.2f%s", percent, "%"),
-	).Timestamp(artwork.CreatedAt)
+
+	eb.AddField("ID", strconv.Itoa(artwork.ID), true).
+		AddField("Author", artwork.Author, true).
+		AddField("Favourites", strconv.Itoa(artwork.Favourites), true).
+		AddField("URL", messages.ClickHere(artwork.URL)).
+		Timestamp(artwork.CreatedAt)
 
 	return eb.Finalize()
 }
