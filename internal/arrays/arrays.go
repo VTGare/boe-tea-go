@@ -45,3 +45,18 @@ func Map[T any](slice []T, f func(T) T) []T {
 
 	return mapped
 }
+
+func Find[T any](slice []T, f func(T) bool) T {
+	var n T
+	if len(slice) == 0 {
+		return n
+	}
+
+	for _, val := range slice {
+		if f(val) {
+			return val
+		}
+	}
+
+	return n
+}

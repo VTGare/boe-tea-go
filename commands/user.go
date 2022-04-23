@@ -425,19 +425,10 @@ func favourites(b *bot.Bot) func(ctx *gumi.Ctx) error {
 		tctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 		defer cancel()
 
-		bookmarks, err := b.Store.ListBookmarks(tctx, ctx.Event.Author.ID)
-		if err != nil {
-			return err
-		}
-
-		if len(bookmarks) == 0 {
-			return messages.ErrUserNoFavourites(ctx.Event.Author.ID)
-		}
-
 		var (
-			limit  int64 = 50
+			limit  int64 = 1
 			order        = store.Descending
-			sort         = store.ByTime
+			sortBy       = store.ByTime
 			args         = strings.Fields(ctx.Args.Raw)
 			mode         = flags.SFWFavourites
 			filter       = store.ArtworkFilter{}
@@ -452,7 +443,7 @@ func favourites(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			mode = flags.AllFavourites
 		}
 
-		flagsMap, err := flags.FromArgs(args, flags.FlagTypeOrder, flags.FlagTypeSort, flags.FlagTypeDuring, flags.FlagTypeMode)
+		flagsMap, err := flags.FromArgs(args, flags.FlagTypeOrder, flags.FlagTypeMode)
 		if err != nil {
 			return err
 		}
@@ -461,17 +452,26 @@ func favourites(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			switch key {
 			case flags.FlagTypeOrder:
 				order = val.(store.Order)
-			case flags.FlagTypeSort:
-				sort = val.(store.ArtworkSort)
-			case flags.FlagTypeDuring:
-				filter.Time = val.(time.Duration)
 			case flags.FlagTypeMode:
 				mode = val.(flags.FavouritesMode)
 			}
 		}
 
+		bookmarks, err := b.Store.ListBookmarks(tctx, ctx.Event.Author.ID, order)
+		if err != nil {
+			return err
+		}
+
+		if len(bookmarks) == 0 {
+			return messages.ErrUserNoFavourites(ctx.Event.Author.ID)
+		}
+
 		ids := make([]int, 0)
 		for _, bookmark := range bookmarks {
+			if int64(len(ids)) == limit {
+				break
+			}
+
 			switch mode {
 			case flags.AllFavourites:
 				ids = append(ids, bookmark.ArtworkID)
@@ -493,7 +493,7 @@ func favourites(b *bot.Bot) func(ctx *gumi.Ctx) error {
 		opts := store.ArtworkSearchOptions{
 			Limit: limit,
 			Order: order,
-			Sort:  sort,
+			Sort:  sortBy,
 		}
 
 		artworks, err := b.Store.SearchArtworks(tctx, filter, opts)
@@ -502,7 +502,12 @@ func favourites(b *bot.Bot) func(ctx *gumi.Ctx) error {
 		}
 
 		pages := make([]*discordgo.MessageEmbed, len(bookmarks))
-		for ind, artwork := range artworks {
+		for ind, bookmark := range bookmarks {
+			artwork := arrays.Find(artworks, func(a *store.Artwork) bool { return a.ID == bookmark.ArtworkID })
+			if artwork == nil {
+				break
+			}
+
 			pages[ind] = artworkToEmbed(artwork, artwork.Images[0], ind, len(bookmarks))
 		}
 
