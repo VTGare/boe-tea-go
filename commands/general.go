@@ -84,8 +84,8 @@ func generalGroup(b *bot.Bot) {
 	b.Router.RegisterCmd(&gumi.Command{
 		Name:        "stats",
 		Group:       group,
-		Description: "Shows bot's runtime stats.",
-		Usage:       "bt!stats",
+		Description: "Shows bot's runtime stats. First argument is 'general' by default.",
+		Usage:       "bt!stats [general/artworks/commands]",
 		Example:     "bt!stats",
 		RateLimiter: gumi.NewRateLimiter(5 * time.Second),
 		Exec:        stats(b),
@@ -330,40 +330,86 @@ func feedback(b *bot.Bot) func(ctx *gumi.Ctx) error {
 
 func stats(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
-		var (
-			s   = ctx.Session
-			mem runtime.MemStats
-		)
-		runtime.ReadMemStats(&mem)
-
-		guilds := b.ShardManager.GuildCount()
-		shards := b.ShardManager.ShardCount
-
-		b.ShardManager.RLock()
-		defer b.ShardManager.RUnlock()
-
-		var channels int
-		for _, shard := range b.ShardManager.Shards {
-			for _, guild := range shard.Session.State.Guilds {
-				channels += len(guild.Channels)
-			}
+		if ctx.Args.Len() == 0 {
+			return generalStats(b, ctx)
 		}
 
-		latency := s.HeartbeatLatency().Round(1 * time.Millisecond)
-
-		eb := embeds.NewBuilder()
-		eb.Title("Bot stats")
-		eb.AddField("Guilds", strconv.Itoa(guilds), true).
-			AddField("Channels", strconv.Itoa(channels), true).
-			AddField("Shards", strconv.Itoa(shards), true).
-			AddField("Commands executed", strconv.FormatInt(b.Metrics.CommandsExecuted, 10), true).
-			AddField("Artworks sent", strconv.FormatInt(b.Metrics.ArtworksSent, 10), true).
-			AddField("Latency", latency.String(), true).
-			AddField("Uptime", messages.FormatDuration(b.Metrics.Uptime), true).
-			AddField("RAM used", fmt.Sprintf("%v MB", mem.Alloc/1024/1024), true)
-
-		return ctx.ReplyEmbed(eb.Finalize())
+		arg := ctx.Args.Get(0).Raw
+		switch arg {
+		case "commands":
+			return commandStats(b, ctx)
+		case "artworks":
+			return artworkStats(b, ctx)
+		case "general":
+			return generalStats(b, ctx)
+		default:
+			return messages.ErrIncorrectCmd(ctx.Command)
+		}
 	}
+}
+
+func generalStats(b *bot.Bot, ctx *gumi.Ctx) error {
+	var (
+		s   = ctx.Session
+		mem runtime.MemStats
+	)
+	runtime.ReadMemStats(&mem)
+
+	guilds := b.ShardManager.GuildCount()
+	shards := b.ShardManager.ShardCount
+
+	b.ShardManager.RLock()
+	defer b.ShardManager.RUnlock()
+
+	var channels int
+	for _, shard := range b.ShardManager.Shards {
+		for _, guild := range shard.Session.State.Guilds {
+			channels += len(guild.Channels)
+		}
+	}
+
+	latency := s.HeartbeatLatency().Round(1 * time.Millisecond)
+	uptime := time.Since(b.StartTime).Round(1 * time.Second)
+
+	_, totalArtworks := b.Stats.ArtworkStats()
+	_, totalCommands := b.Stats.CommandStats()
+
+	eb := embeds.NewBuilder()
+	eb.Title("Bot stats")
+	eb.AddField("Guilds", strconv.Itoa(guilds), true).
+		AddField("Channels", strconv.Itoa(channels), true).
+		AddField("Shards", strconv.Itoa(shards), true).
+		AddField("Commands executed", strconv.FormatInt(totalCommands, 10), true).
+		AddField("Artworks sent", strconv.FormatInt(totalArtworks, 10), true).
+		AddField("Latency", latency.String(), true).
+		AddField("Uptime", messages.FormatDuration(uptime), true).
+		AddField("RAM used", fmt.Sprintf("%v MB", mem.Alloc/1024/1024), true)
+
+	return ctx.ReplyEmbed(eb.Finalize())
+}
+
+func artworkStats(b *bot.Bot, ctx *gumi.Ctx) error {
+	eb := embeds.NewBuilder()
+	eb.Title("Artwork stats")
+
+	stats, _ := b.Stats.ArtworkStats()
+	for _, item := range stats {
+		eb.AddField(item.Name, strconv.FormatInt(item.Count, 10))
+	}
+
+	return ctx.ReplyEmbed(eb.Finalize())
+}
+
+func commandStats(b *bot.Bot, ctx *gumi.Ctx) error {
+	eb := embeds.NewBuilder()
+	eb.Title("Command stats")
+
+	stats, _ := b.Stats.CommandStats()
+	for _, item := range stats {
+		eb.AddField(item.Name, strconv.FormatInt(item.Count, 10), true)
+	}
+
+	return ctx.ReplyEmbed(eb.Finalize())
 }
 
 func set(b *bot.Bot) func(ctx *gumi.Ctx) error {

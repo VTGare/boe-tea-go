@@ -258,6 +258,10 @@ func (p *Post) fetch(guild *store.Guild, channelID string) (*fetchResult, error)
 							p.addReactions(p.ctx.Event.Message)
 						}
 
+						go func() {
+							p.bot.Stats.IncrementArtwork(provider)
+						}()
+
 						artworksChan <- artwork
 					}
 
@@ -326,7 +330,6 @@ func (p *Post) send(guild *store.Guild, channelID string, artworks []artworks.Ar
 		return sent, nil
 	}
 
-	p.bot.Metrics.IncrementArtwork(int64(len(artworks)))
 	allMessages, err := p.generateMessages(guild, artworks, channelID)
 	if err != nil {
 		return nil, err

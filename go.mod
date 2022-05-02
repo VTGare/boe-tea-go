@@ -18,6 +18,7 @@ require (
 	github.com/onsi/gomega v1.19.0
 	github.com/servusdei2018/shards v1.2.5
 	go.mongodb.org/mongo-driver v1.8.4
+	go.uber.org/atomic v1.9.0
 	go.uber.org/zap v1.21.0
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	mvdan.cc/xurls/v2 v2.4.0
@@ -44,14 +45,12 @@ require (
 	github.com/xdg-go/stringprep v1.0.3 // indirect
 	github.com/youmark/pkcs8 v0.0.0-20201027041543-1326539a0a0a // indirect
 	github.com/zekroTJA/timedmap v1.4.0 // indirect
-	go.uber.org/atomic v1.9.0 // indirect
 	go.uber.org/multierr v1.8.0 // indirect
 	golang.org/x/crypto v0.0.0-20220321153916-2c7772ba3064 // indirect
 	golang.org/x/net v0.0.0-20220325170049-de3da57026de // indirect
 	golang.org/x/sys v0.0.0-20220325203850-36772127a21f // indirect
 	golang.org/x/text v0.3.7 // indirect
+	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
-
-require gopkg.in/yaml.v2 v2.4.0 // indirect
 
 replace github.com/n0madic/twitter-scraper => github.com/VTGare/twitter-scraper v0.0.3

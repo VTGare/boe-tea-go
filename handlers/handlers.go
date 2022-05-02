@@ -678,7 +678,7 @@ func OnExecute(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
 		b.Log.Infof("Executing command [%v]. Arguments: [%v]. Guild ID: %v, channel ID: %v", ctx.Command.Name, ctx.Args.Raw, ctx.Event.GuildID, ctx.Event.ChannelID)
 
-		b.Metrics.IncrementCommand()
+		b.Stats.IncrementCommand(ctx.Command.Name)
 		return nil
 	}
 }

@@ -8,8 +8,8 @@ import (
 	"github.com/VTGare/boe-tea-go/internal/apis/nhentai"
 	"github.com/VTGare/boe-tea-go/internal/cache"
 	"github.com/VTGare/boe-tea-go/internal/config"
-	"github.com/VTGare/boe-tea-go/metrics"
 	"github.com/VTGare/boe-tea-go/repost"
+	"github.com/VTGare/boe-tea-go/stats"
 	"github.com/VTGare/boe-tea-go/store"
 	"github.com/VTGare/gumi"
 	"github.com/VTGare/sengoku"
@@ -21,10 +21,11 @@ import (
 
 type Bot struct {
 	// misc.
-	Log     *zap.SugaredLogger
-	Config  *config.Config
-	Metrics *metrics.Metrics
-	Router  *gumi.Router
+	Log       *zap.SugaredLogger
+	Config    *config.Config
+	Stats     *stats.Stats
+	StartTime time.Time
+	Router    *gumi.Router
 
 	// caches
 	BannedUsers  *ttlcache.Cache
@@ -55,7 +56,6 @@ func New(config *config.Config, store store.Store, logger *zap.SugaredLogger, rd
 		DB:      999,
 		Results: 10,
 	})
-
 	return &Bot{
 		Log:            logger,
 		Config:         config,
@@ -63,7 +63,6 @@ func New(config *config.Config, store store.Store, logger *zap.SugaredLogger, rd
 		BannedUsers:    banned,
 		EmbedCache:     cache.NewEmbedCache(),
 		ArtworkCache:   goCache.New(60*time.Minute, 90*time.Minute),
-		Metrics:        metrics.New(),
 		NHentai:        nhentai.New(),
 		Sengoku:        sg,
 		ShardManager:   mgr,
@@ -86,12 +85,15 @@ func (b *Bot) AddHandler(handler interface{}) {
 func (b *Bot) Open() error {
 	b.ShardManager.AddHandler(b.Router.Handler())
 
-	err := b.ShardManager.Start()
-	if err != nil {
+	b.StartTime = time.Now()
+	b.Stats = stats.New(b.Router, b.ArtworkProviders)
+
+	if err := b.ShardManager.Start(); err != nil {
 		return err
 	}
 
 	b.Log.Info("Started a bot.")
+
 	return nil
 }
 
