@@ -29,8 +29,8 @@ func New(router *gumi.Router, providers []artworks.Provider) *Stats {
 		Artworks: map[string]*atomic.Int64{},
 	}
 
-	for command := range router.Commands {
-		stats.Commands[command] = atomic.NewInt64(0)
+	for _, cmd := range router.Commands {
+		stats.Commands[cmd.Name] = atomic.NewInt64(0)
 	}
 
 	for _, provider := range providers {
