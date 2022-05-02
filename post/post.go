@@ -65,6 +65,15 @@ func (p *Post) Send() ([]*cache.MessageInfo, error) {
 		return nil, err
 	}
 
+	user, err := p.bot.Store.User(context.Background(), p.ctx.Event.Author.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	if user.Ignore && p.ctx.Command == nil {
+		return []*cache.MessageInfo{}, nil
+	}
+
 	res, err := p.fetch(guild, p.ctx.Event.ChannelID)
 	if err != nil {
 		return nil, err
@@ -91,6 +100,15 @@ func (p *Post) Send() ([]*cache.MessageInfo, error) {
 }
 
 func (p *Post) Crosspost(userID, group string, channels []string) ([]*cache.MessageInfo, error) {
+	user, err := p.bot.Store.User(context.Background(), userID)
+	if err != nil {
+		return nil, err
+	}
+
+	if user.Ignore && p.ctx.Command == nil {
+		return []*cache.MessageInfo{}, nil
+	}
+
 	var (
 		wg      = sync.WaitGroup{}
 		msgChan = make(chan []*cache.MessageInfo, len(channels))

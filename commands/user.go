@@ -626,6 +626,16 @@ func changeUserSettings(b *bot.Bot, ctx *gumi.Ctx) error {
 		oldSettingEmbed = user.Crosspost
 		newSettingEmbed = new
 		user.Crosspost = new
+	case "ignore":
+		new, err := parseBool(newSetting.Raw)
+		if err != nil {
+			return err
+		}
+
+		oldSettingEmbed = user.Ignore
+		newSettingEmbed = new
+		user.Ignore = new
+
 	default:
 		return messages.ErrUnknownUserSetting(settingName.Raw)
 	}

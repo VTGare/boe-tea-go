@@ -20,6 +20,7 @@ type User struct {
 	ID        string    `json:"id" bson:"user_id"`
 	DM        bool      `json:"dm" bson:"dm"`
 	Crosspost bool      `json:"crosspost" bson:"crosspost"`
+	Ignore    bool      `json:"ignore" bson:"ignore"`
 	Groups    []*Group  `json:"groups" bson:"channel_groups"`
 	CreatedAt time.Time `json:"created_at" bson:"created_at"`
 	UpdatedAt time.Time `json:"updated_at" bson:"updated_at"`
