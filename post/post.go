@@ -474,7 +474,7 @@ func (p *Post) skipFirst(a artworks.Artwork) bool {
 		return true
 	}
 
-	if len(tweet.Videos) > 0 || tweet.NSFW || p.crosspost {
+	if len(tweet.Videos) > 0 || p.crosspost {
 		return false
 	}
 

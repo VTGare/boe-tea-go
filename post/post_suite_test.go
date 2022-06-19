@@ -53,9 +53,9 @@ var _ = Describe("Skip First Tests", func() {
 		Expect(post.skipFirst(twitterArtwork)).To(BeTrue())
 	})
 
-	It("shouldn't skip first if tweet is NSFW", func() {
+	It("should skip first if tweet is NSFW", func() {
 		twitterArtwork.NSFW = true
-		Expect(post.skipFirst(twitterArtwork)).To(BeFalse())
+		Expect(post.skipFirst(twitterArtwork)).To(BeTrue())
 	})
 
 	It("shouldn't skip first if tweet has video", func() {
