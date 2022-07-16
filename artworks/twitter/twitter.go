@@ -101,7 +101,7 @@ func (t Twitter) Match(s string) (string, bool) {
 		return "", false
 	}
 
-	if !strings.Contains(u.Host, "twitter.com") {
+	if u.Host != "twitter.com" && u.Host != "mobile.twitter.com" {
 		return "", false
 	}
 
