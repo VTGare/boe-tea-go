@@ -842,13 +842,11 @@ func artchannels(b *bot.Bot) func(ctx *gumi.Ctx) error {
 					return messages.ErrForeignChannel(ch.ID)
 				}
 
-				switch ch.Type {
-				case discordgo.ChannelTypeGuildText:
-					if err := filter(guild, ch.ID); err != nil {
-						return err
-					}
+				if ch.Type == discordgo.ChannelTypeGuildVoice {
+					continue
+				}
 
-					channels = append(channels, ch.ID)
+				switch ch.Type {
 				case discordgo.ChannelTypeGuildCategory:
 					gcs, err := ctx.Session.GuildChannels(guild.ID)
 					if err != nil {
@@ -856,7 +854,7 @@ func artchannels(b *bot.Bot) func(ctx *gumi.Ctx) error {
 					}
 
 					for _, gc := range gcs {
-						if gc.Type != discordgo.ChannelTypeGuildText {
+						if ch.Type == discordgo.ChannelTypeGuildVoice {
 							continue
 						}
 
@@ -869,7 +867,11 @@ func artchannels(b *bot.Bot) func(ctx *gumi.Ctx) error {
 						}
 					}
 				default:
-					return nil
+					if err := filter(guild, ch.ID); err != nil {
+						return err
+					}
+
+					channels = append(channels, ch.ID)
 				}
 			}
 
