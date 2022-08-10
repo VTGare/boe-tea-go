@@ -2,6 +2,7 @@ package twitter
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"html"
 	"io"
@@ -61,7 +62,12 @@ func (t Twitter) Find(id string) (artworks.Artwork, error) {
 				return nil, err
 			}
 
-			return convertNitter(a.(*nitter.Artwork)), nil
+			nitter, ok := a.(*nitter.Artwork)
+			if !ok {
+				return nil, errors.New("twitter API is down. Please contact the developer is the problem persists.")
+			}
+
+			return convertNitter(nitter), nil
 		}
 
 		return nil, err

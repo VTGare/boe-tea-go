@@ -95,16 +95,18 @@ func (t Nitter) Match(s string) (string, bool) {
 }
 
 func (t Nitter) Find(snowflake string) (artworks.Artwork, error) {
+	var lastError error
 	for _, nitter := range t.nitter {
 		a, err := t.scrapeTwitter(snowflake, nitter)
 		if err != nil {
+			lastError = err
 			continue
 		}
 
 		return a, nil
 	}
 
-	return nil, nil
+	return nil, lastError
 }
 
 func (t Nitter) Enabled(g *store.Guild) bool {
