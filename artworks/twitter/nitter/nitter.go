@@ -57,9 +57,8 @@ func New() artworks.Provider {
 	return &Nitter{nitter: []string{
 		"https://nitter.42l.fr",
 		"https://nitter.pussthecat.org",
-		"https://nitter.nixnet.services",
-		"https://nitter.himiko.cloud",
-		"https://nitter.cc",
+		"https://nitter.fdn.fr",
+		"https://nitter.namazso.eu",
 	}}
 }
 
@@ -119,6 +118,12 @@ func (t Nitter) scrapeTwitter(snowflake, baseURL string) (*Artwork, error) {
 		return nil, err
 	}
 	defer resp.Body.Close()
+
+	// TODO: handle error 429.
+	// switch resp.StatusCode {
+	// case http.StatusTooManyRequests:
+	// 	retryAfter := resp.Header.Get("Retry-After")
+	// }
 
 	if resp.StatusCode != 200 {
 		return nil, fmt.Errorf("unexpected status code: %v", resp.Status)
