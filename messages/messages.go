@@ -17,7 +17,7 @@ func FormatBool(b bool) string {
 }
 
 func ClickHere(url string) string {
-	return fmt.Sprintf("[Click here](%v)", url)
+	return NamedLink("Click here", url)
 }
 
 func NamedLink(name, url string) string {
@@ -33,7 +33,12 @@ func LimitExceeded(limit, artworks, count int) string {
 }
 
 func CrosspostBy(author string) string {
-	return fmt.Sprintf("Crosspost requested by %v", author)
+	switch author {
+	case "":
+		return "Crosspost requested by anonymous"
+	default:
+		return fmt.Sprintf("Crosspost requested by %v", author)
+	}
 }
 
 func RateLimit(duration time.Duration) string {
@@ -60,6 +65,8 @@ func ListChannels(channels []string) string {
 	)
 }
 
+// Formats the duration as a combination of human readable time counters
+// E.g. `10 * time.Second` will return `10 seconds`
 func FormatDuration(d time.Duration) string {
 	d = d.Round(1 * time.Second)
 
@@ -84,6 +91,7 @@ func FormatDuration(d time.Duration) string {
 	return sb.String()
 }
 
+// Returns a Discord relative timestamp
 func RelativeTimestamp(t time.Time) string {
 	return fmt.Sprintf("<t:%v:R>", t.Unix())
 }
