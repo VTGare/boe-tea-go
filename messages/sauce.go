@@ -48,6 +48,12 @@ func SauceError(err error) error {
 
 func DoujinNotFound(id string) error {
 	return newUserError(
-		fmt.Sprintf("Couldn't find a doujin with `%v` ID. It doesn't exist or the server is not responding.", id),
+		fmt.Sprintf("Couldn't find a doujin with the following ID: `%v`.", id),
+	)
+}
+
+func CloudflareError() error {
+	return newUserError(
+		fmt.Sprintf("Failed to bypass Cloudflare protection."),
 	)
 }

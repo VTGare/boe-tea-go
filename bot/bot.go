@@ -1,6 +1,7 @@
 package bot
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ReneKroon/ttlcache"
@@ -45,7 +46,7 @@ type Bot struct {
 func New(config *config.Config, store store.Store, logger *zap.SugaredLogger, rd repost.Detector) (*Bot, error) {
 	mgr, err := shards.New("Bot " + config.Discord.Token)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to init a shard manager: %w", err)
 	}
 
 	mgr.RegisterIntent(discordgo.IntentsAllWithoutPrivileged | discordgo.IntentMessageContent)
@@ -56,6 +57,12 @@ func New(config *config.Config, store store.Store, logger *zap.SugaredLogger, rd
 		DB:      999,
 		Results: 10,
 	})
+
+	nh, err := nhentai.New()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create nhentai api client: %w", err)
+	}
+
 	return &Bot{
 		Log:            logger,
 		Config:         config,
@@ -63,7 +70,7 @@ func New(config *config.Config, store store.Store, logger *zap.SugaredLogger, rd
 		BannedUsers:    banned,
 		EmbedCache:     cache.NewEmbedCache(),
 		ArtworkCache:   goCache.New(60*time.Minute, 90*time.Minute),
-		NHentai:        nhentai.New(),
+		NHentai:        nh,
 		Sengoku:        sg,
 		ShardManager:   mgr,
 		Store:          store,

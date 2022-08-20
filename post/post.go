@@ -465,7 +465,7 @@ func (p *Post) skipFirst(a artworks.Artwork) bool {
 		return false
 	}
 
-	tweet, isTwitter := a.(twitter.Artwork)
+	tweet, isTwitter := a.(*twitter.Artwork)
 	if !isTwitter {
 		return false
 	}

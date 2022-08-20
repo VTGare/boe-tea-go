@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/VTGare/boe-tea-go/bot"
-	nhAPI "github.com/VTGare/boe-tea-go/internal/apis/nhentai"
+	nh "github.com/VTGare/boe-tea-go/internal/apis/nhentai"
 	"github.com/VTGare/boe-tea-go/internal/dgoutils"
 	"github.com/VTGare/boe-tea-go/messages"
 	"github.com/VTGare/embeds"
@@ -61,7 +61,14 @@ func nhentai(b *bot.Bot) func(ctx *gumi.Ctx) error {
 		id := ctx.Args.Get(0).Raw
 		hentai, err := b.NHentai.FindHentai(id)
 		if err != nil {
-			return messages.DoujinNotFound(id)
+			switch {
+			case errors.Is(err, nh.ErrNotFound):
+				return messages.DoujinNotFound(id)
+			case errors.Is(err, nh.ErrCloudflareProtection):
+				return messages.CloudflareError()
+			}
+
+			return err
 		}
 
 		eb := embeds.NewBuilder()
@@ -76,7 +83,7 @@ func nhentai(b *bot.Bot) func(ctx *gumi.Ctx) error {
 		eb.Image(hentai.Cover)
 		eb.Timestamp(hentai.UploadedAt)
 
-		tagsToString := func(tags []*nhAPI.Tag) string {
+		tagsToString := func(tags []*nh.Tag) string {
 			ss := make([]string, 0, len(tags))
 			for _, tag := range tags {
 				ss = append(ss, tag.Name)
@@ -85,7 +92,7 @@ func nhentai(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			return strings.Join(ss, " • ")
 		}
 
-		tagsToNamedLinks := func(tags []*nhAPI.Tag) string {
+		tagsToNamedLinks := func(tags []*nh.Tag) string {
 			ss := make([]string, 0, len(tags))
 			for _, tag := range tags {
 				ss = append(ss, messages.NamedLink(tag.Name, tag.URL))

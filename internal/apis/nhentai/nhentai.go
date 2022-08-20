@@ -2,13 +2,16 @@ package nhentai
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
 	"time"
 )
 
-type API struct{}
+type API struct {
+	client *http.Client
+}
 
 type nhentaiResult struct {
 	ID         interface{} `json:"id,omitempty"`
@@ -62,8 +65,16 @@ const (
 	ParodyTag
 )
 
-func New() *API {
-	return &API{}
+var (
+	ErrNotFound             = errors.New("doujin not found")
+	ErrCloudflareProtection = errors.New("failed to bypass cloudflare")
+)
+
+func New() (*API, error) {
+	client := &http.Client{}
+	return &API{
+		client: client,
+	}, nil
 }
 
 func (n *API) FindHentai(id string) (*Hentai, error) {
@@ -170,19 +181,34 @@ func (t *Tag) String() string {
 }
 
 func (n *API) get(id string) (*nhentaiResult, error) {
-	resp, err := http.Get("https://nhentai.net/api/gallery/" + id)
+	req, err := http.NewRequest("GET", "https://nhentai.net/api/gallery/"+id, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create a request to nhentai: %w", err)
+	}
+
+	resp, err := n.client.Do(req)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
 
-	var res nhentaiResult
-	err = json.NewDecoder(resp.Body).Decode(&res)
-	if err != nil {
-		return nil, err
+	switch resp.StatusCode {
+	case 200:
+		var res nhentaiResult
+		err = json.NewDecoder(resp.Body).Decode(&res)
+		if err != nil {
+			return nil, err
+		}
+
+		return &res, nil
+
+	case 503:
+		return nil, ErrCloudflareProtection
+	case 404:
+		return nil, ErrNotFound
 	}
 
-	return &res, nil
+	return nil, fmt.Errorf("unexpected api response: %v", resp.Status)
 }
 
 func interfaceToInt(i interface{}) int {

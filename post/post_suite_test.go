@@ -30,13 +30,13 @@ var _ = Describe("Generate Messages Tests", func() {
 var _ = Describe("Skip First Tests", func() {
 	var (
 		post           Post
-		twitterArtwork twitter.Artwork
-		pixivArtwork   = pixiv.Artwork{}
+		twitterArtwork *twitter.Artwork
+		pixivArtwork   = &pixiv.Artwork{}
 	)
 
 	BeforeEach(func() {
 		post = Post{ctx: &gumi.Ctx{}}
-		twitterArtwork = twitter.Artwork{Photos: []string{"https://test.com/1.png"}}
+		twitterArtwork = &twitter.Artwork{Photos: []string{"https://test.com/1.png"}}
 	})
 
 	It("should skip first if Twitter", func() {
