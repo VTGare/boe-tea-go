@@ -62,7 +62,7 @@ func New() artworks.Provider {
 	}}
 }
 
-func (t Nitter) Match(s string) (string, bool) {
+func (t *Nitter) Match(s string) (string, bool) {
 	u, err := url.ParseRequestURI(s)
 	if err != nil {
 		return "", false
@@ -93,7 +93,7 @@ func (t Nitter) Match(s string) (string, bool) {
 	return snowflake, true
 }
 
-func (t Nitter) Find(snowflake string) (artworks.Artwork, error) {
+func (t *Nitter) Find(snowflake string) (artworks.Artwork, error) {
 	var lastError error
 	for _, nitter := range t.nitter {
 		a, err := t.scrapeTwitter(snowflake, nitter)
@@ -108,11 +108,11 @@ func (t Nitter) Find(snowflake string) (artworks.Artwork, error) {
 	return nil, lastError
 }
 
-func (t Nitter) Enabled(g *store.Guild) bool {
+func (t *Nitter) Enabled(g *store.Guild) bool {
 	return g.Twitter
 }
 
-func (t Nitter) scrapeTwitter(snowflake, baseURL string) (*Artwork, error) {
+func (t *Nitter) scrapeTwitter(snowflake, baseURL string) (*Artwork, error) {
 	resp, err := http.Get(baseURL + "/i/status/" + snowflake)
 	if err != nil {
 		return nil, err
@@ -187,7 +187,7 @@ func parseCount(s string) int {
 }
 
 //StoreArtwork transforms an artwork to an insertable to database artwork model.
-func (a Artwork) StoreArtwork() *store.Artwork {
+func (a *Artwork) StoreArtwork() *store.Artwork {
 	return &store.Artwork{
 		Title:  "",
 		Author: a.Username,
@@ -197,7 +197,7 @@ func (a Artwork) StoreArtwork() *store.Artwork {
 }
 
 //Embeds transforms an artwork to DiscordGo embeds.
-func (a Artwork) MessageSends(footer string, _ bool) ([]*discordgo.MessageSend, error) {
+func (a *Artwork) MessageSends(footer string, _ bool) ([]*discordgo.MessageSend, error) {
 	var (
 		eb     = embeds.NewBuilder()
 		length = a.Gallery.Len()
@@ -266,11 +266,11 @@ func (a Artwork) MessageSends(footer string, _ bool) ([]*discordgo.MessageSend, 
 	return tweets, nil
 }
 
-func (a Artwork) URL() string {
+func (a *Artwork) URL() string {
 	return a.url
 }
 
-func (a Artwork) Len() int {
+func (a *Artwork) Len() int {
 	return a.Gallery.Len()
 }
 

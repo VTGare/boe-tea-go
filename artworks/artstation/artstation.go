@@ -77,7 +77,7 @@ func New() artworks.Provider {
 	}
 }
 
-func (as Artstation) Find(id string) (artworks.Artwork, error) {
+func (as *Artstation) Find(id string) (artworks.Artwork, error) {
 	reqURL := fmt.Sprintf("https://www.artstation.com/projects/%v.json", id)
 	resp, err := http.Get(reqURL)
 	if err != nil {
@@ -86,8 +86,8 @@ func (as Artstation) Find(id string) (artworks.Artwork, error) {
 
 	defer resp.Body.Close()
 
-	var res ArtstationResponse
-	err = json.NewDecoder(resp.Body).Decode(&res)
+	res := &ArtstationResponse{}
+	err = json.NewDecoder(resp.Body).Decode(res)
 	if err != nil {
 		return nil, err
 	}
@@ -95,7 +95,7 @@ func (as Artstation) Find(id string) (artworks.Artwork, error) {
 	return res, nil
 }
 
-func (as Artstation) Match(url string) (string, bool) {
+func (as *Artstation) Match(url string) (string, bool) {
 	res := as.regex.FindStringSubmatch(url)
 	if res == nil {
 		return "", false
@@ -104,11 +104,11 @@ func (as Artstation) Match(url string) (string, bool) {
 	return res[1], true
 }
 
-func (Artstation) Enabled(g *store.Guild) bool {
+func (*Artstation) Enabled(g *store.Guild) bool {
 	return g.Artstation
 }
 
-func (artwork ArtstationResponse) StoreArtwork() *store.Artwork {
+func (artwork *ArtstationResponse) StoreArtwork() *store.Artwork {
 	images := make([]string, 0, len(artwork.Assets))
 	for _, asset := range artwork.Assets {
 		images = append(images, asset.ImageURL)
@@ -122,7 +122,7 @@ func (artwork ArtstationResponse) StoreArtwork() *store.Artwork {
 	}
 }
 
-func (artwork ArtstationResponse) MessageSends(footer string, hasTags bool) ([]*discordgo.MessageSend, error) {
+func (artwork *ArtstationResponse) MessageSends(footer string, hasTags bool) ([]*discordgo.MessageSend, error) {
 	var (
 		length = len(artwork.Assets)
 		pages  = make([]*discordgo.MessageSend, 0, length)
@@ -182,10 +182,10 @@ func (artwork ArtstationResponse) MessageSends(footer string, hasTags bool) ([]*
 	return pages, nil
 }
 
-func (artwork ArtstationResponse) URL() string {
+func (artwork *ArtstationResponse) URL() string {
 	return artwork.Permalink
 }
 
-func (artwork ArtstationResponse) Len() int {
+func (artwork *ArtstationResponse) Len() int {
 	return len(artwork.Assets)
 }

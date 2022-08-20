@@ -53,7 +53,7 @@ func New() artworks.Provider {
 	}
 }
 
-func (t Twitter) Find(id string) (artworks.Artwork, error) {
+func (t *Twitter) Find(id string) (artworks.Artwork, error) {
 	tweet, err := t.scraper.GetTweet(id)
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
@@ -78,7 +78,7 @@ func (t Twitter) Find(id string) (artworks.Artwork, error) {
 		return nil, err
 	}
 
-	art := Artwork{
+	art := &Artwork{
 		ID:        id,
 		FullName:  profile.Name,
 		Username:  "@" + tweet.Username,
@@ -101,7 +101,7 @@ func (t Twitter) Find(id string) (artworks.Artwork, error) {
 	return art, nil
 }
 
-func (t Twitter) Match(s string) (string, bool) {
+func (t *Twitter) Match(s string) (string, bool) {
 	u, err := url.ParseRequestURI(s)
 	if err != nil {
 		return "", false
@@ -136,7 +136,7 @@ func (Twitter) Enabled(g *store.Guild) bool {
 	return g.Twitter
 }
 
-func (artwork Artwork) StoreArtwork() *store.Artwork {
+func (artwork *Artwork) StoreArtwork() *store.Artwork {
 	media := make([]string, 0, len(artwork.Photos)+len(artwork.Videos))
 
 	media = append(media, artwork.Photos...)
@@ -152,7 +152,7 @@ func (artwork Artwork) StoreArtwork() *store.Artwork {
 }
 
 //Embeds transforms an artwork to DiscordGo embeds.
-func (a Artwork) MessageSends(footer string, _ bool) ([]*discordgo.MessageSend, error) {
+func (a *Artwork) MessageSends(footer string, _ bool) ([]*discordgo.MessageSend, error) {
 	eb := embeds.NewBuilder()
 	eb.URL(a.Permalink).Description(a.Content).Timestamp(a.Timestamp)
 	eb.AddField("Retweets", strconv.Itoa(a.Retweets), true)
@@ -231,11 +231,11 @@ func (a Artwork) MessageSends(footer string, _ bool) ([]*discordgo.MessageSend, 
 	return tweets, nil
 }
 
-func (a Artwork) URL() string {
+func (a *Artwork) URL() string {
 	return a.Permalink
 }
 
-func (a Artwork) Len() int {
+func (a *Artwork) Len() int {
 	if len(a.Videos) != 0 {
 		return 1
 	}
@@ -243,7 +243,7 @@ func (a Artwork) Len() int {
 	return len(a.Photos)
 }
 
-func convertNitter(a *nitter.Artwork) Artwork {
+func convertNitter(a *nitter.Artwork) *Artwork {
 	var (
 		videos = make([]twitterscraper.Video, 0)
 		photos = make([]string, 0)
@@ -258,7 +258,7 @@ func convertNitter(a *nitter.Artwork) Artwork {
 		}
 	}
 
-	return Artwork{
+	return &Artwork{
 		ID:        a.Snowflake,
 		FullName:  a.FullName,
 		Username:  a.Username,
@@ -269,7 +269,7 @@ func convertNitter(a *nitter.Artwork) Artwork {
 		Timestamp: a.Timestamp,
 		Videos:    videos,
 		Photos:    photos,
-		NSFW:      true, // It seems that fallback method is only used for NSFW artworks.
+		NSFW:      true, // Fallback method is only used for NSFW artworks.
 		Permalink: a.URL(),
 	}
 }

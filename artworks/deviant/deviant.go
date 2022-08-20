@@ -68,7 +68,7 @@ func New() artworks.Provider {
 	}
 }
 
-func (d DeviantArt) Find(id string) (artworks.Artwork, error) {
+func (d *DeviantArt) Find(id string) (artworks.Artwork, error) {
 	reqURL := "https://backend.deviantart.com/oembed?url=" + url.QueryEscape("deviantart.com/art/"+id)
 	resp, err := http.Get(reqURL)
 	if err != nil {
@@ -99,7 +99,7 @@ func (d DeviantArt) Find(id string) (artworks.Artwork, error) {
 	}, nil
 }
 
-func (d DeviantArt) Match(s string) (string, bool) {
+func (d *DeviantArt) Match(s string) (string, bool) {
 	res := d.regex.FindStringSubmatch(s)
 	if res == nil {
 		return "", false
@@ -108,11 +108,11 @@ func (d DeviantArt) Match(s string) (string, bool) {
 	return res[1], true
 }
 
-func (d DeviantArt) Enabled(g *store.Guild) bool {
+func (d *DeviantArt) Enabled(g *store.Guild) bool {
 	return g.Deviant
 }
 
-func (a Artwork) MessageSends(footer string, hasTags bool) ([]*discordgo.MessageSend, error) {
+func (a *Artwork) MessageSends(footer string, hasTags bool) ([]*discordgo.MessageSend, error) {
 	eb := embeds.NewBuilder()
 
 	eb.Title(fmt.Sprintf("%v by %v", a.Title, a.Author.Name)).
@@ -141,7 +141,7 @@ func (a Artwork) MessageSends(footer string, hasTags bool) ([]*discordgo.Message
 	}, nil
 }
 
-func (a Artwork) StoreArtwork() *store.Artwork {
+func (a *Artwork) StoreArtwork() *store.Artwork {
 	return &store.Artwork{
 		Title:  a.Title,
 		Author: a.Author.Name,
@@ -150,10 +150,10 @@ func (a Artwork) StoreArtwork() *store.Artwork {
 	}
 }
 
-func (a Artwork) URL() string {
+func (a *Artwork) URL() string {
 	return a.url
 }
 
-func (a Artwork) Len() int {
+func (a *Artwork) Len() int {
 	return 1
 }

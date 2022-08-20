@@ -53,7 +53,7 @@ func New(authToken, refreshToken string) (artworks.Provider, error) {
 	return &Pixiv{app: pixiv.NewApp()}, nil
 }
 
-func (p Pixiv) Match(s string) (string, bool) {
+func (p *Pixiv) Match(s string) (string, bool) {
 	res := regex.FindStringSubmatch(s)
 	if res == nil {
 		return "", false
@@ -62,7 +62,7 @@ func (p Pixiv) Match(s string) (string, bool) {
 	return res[1], true
 }
 
-func (p Pixiv) Find(id string) (artworks.Artwork, error) {
+func (p *Pixiv) Find(id string) (artworks.Artwork, error) {
 	i, err := strconv.ParseUint(id, 10, 64)
 	if err != nil {
 		return nil, err
@@ -127,11 +127,11 @@ func (p Pixiv) Find(id string) (artworks.Artwork, error) {
 	return artwork, nil
 }
 
-func (p Pixiv) Enabled(g *store.Guild) bool {
+func (p *Pixiv) Enabled(g *store.Guild) bool {
 	return g.Pixiv
 }
 
-func (a Artwork) StoreArtwork() *store.Artwork {
+func (a *Artwork) StoreArtwork() *store.Artwork {
 	return &store.Artwork{
 		Title:  a.Title,
 		Author: a.Author,
@@ -140,7 +140,7 @@ func (a Artwork) StoreArtwork() *store.Artwork {
 	}
 }
 
-func (a Artwork) MessageSends(footer string, hasTags bool) ([]*discordgo.MessageSend, error) {
+func (a *Artwork) MessageSends(footer string, hasTags bool) ([]*discordgo.MessageSend, error) {
 	var (
 		length = len(a.Images)
 		pages  = make([]*discordgo.MessageSend, 0, length)
@@ -204,15 +204,15 @@ func (a Artwork) MessageSends(footer string, hasTags bool) ([]*discordgo.Message
 	return pages, nil
 }
 
-func (a Artwork) URL() string {
+func (a *Artwork) URL() string {
 	return a.url
 }
 
-func (a Artwork) Len() int {
+func (a *Artwork) Len() int {
 	return a.Pages
 }
 
-func (a Artwork) imageURLs() []string {
+func (a *Artwork) imageURLs() []string {
 	urls := make([]string, 0, len(a.Images))
 
 	for _, img := range a.Images {
