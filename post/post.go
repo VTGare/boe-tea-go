@@ -2,6 +2,7 @@ package post
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
 	"strconv"
@@ -62,12 +63,12 @@ func New(bot *bot.Bot, ctx *gumi.Ctx, urls ...string) *Post {
 func (p *Post) Send() ([]*cache.MessageInfo, error) {
 	guild, err := p.bot.Store.Guild(context.Background(), p.ctx.Event.GuildID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get a guild: %w", err)
 	}
 
 	user, err := p.bot.Store.User(context.Background(), p.ctx.Event.Author.ID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get a user: %w", err)
 	}
 
 	if user.Ignore && p.ctx.Command == nil {
@@ -76,24 +77,47 @@ func (p *Post) Send() ([]*cache.MessageInfo, error) {
 
 	res, err := p.fetch(guild, p.ctx.Event.ChannelID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to fetch artworks: %w", err)
 	}
+
+	log := p.bot.Log.With(
+		"guild_id", guild.ID,
+		"user_id", user.ID,
+	)
 
 	if len(res.Reposts) > 0 {
 		if guild.Repost == "strict" {
-			perm, _ := dgoutils.MemberHasPermission(
+			perm, err := dgoutils.MemberHasPermission(
 				p.ctx.Session,
 				guild.ID,
 				p.ctx.Session.State.User.ID,
 				discordgo.PermissionAdministrator|discordgo.PermissionManageMessages,
 			)
 
+			if err != nil {
+				log.With("error", err).Warn("failed to check if boe tea has permissions")
+			}
+
 			if perm && res.Matched == len(res.Reposts) {
-				p.ctx.Session.ChannelMessageDelete(p.ctx.Event.ChannelID, p.ctx.Event.ID)
+				var (
+					channelID = p.ctx.Event.ChannelID
+					messageID = p.ctx.Event.ID
+				)
+
+				err := p.ctx.Session.ChannelMessageDelete(channelID, messageID)
+				if err != nil {
+					log.With(
+						"channel_id", channelID,
+						"message_id", messageID,
+					).Warn("failed to delete a message")
+				}
 			}
 		}
 
-		p.sendReposts(guild, res.Reposts, 15*time.Second)
+		err := p.sendReposts(guild, res.Reposts, 15*time.Second)
+		if err != nil {
+			log.Warn("failed to send reposts")
+		}
 	}
 
 	return p.send(guild, p.ctx.Event.ChannelID, res.Artworks)
@@ -117,9 +141,9 @@ func (p *Post) Crosspost(userID, group string, channels []string) ([]*cache.Mess
 	wg.Add(len(channels))
 	for _, channelID := range channels {
 		log := p.bot.Log.With(
-			"userID", userID,
+			"user_id", userID,
 			"group", group,
-			"channelID", channelID,
+			"channel_id", channelID,
 		)
 
 		go func(channelID string) {
@@ -185,88 +209,106 @@ func (p *Post) SetSkip(indices map[int]struct{}, mode SkipMode) {
 
 func (p *Post) fetch(guild *store.Guild, channelID string) (*fetchResult, error) {
 	var (
+		log = p.bot.Log.With(
+			"guild_id", guild.ID,
+			"channel_id", channelID,
+		)
+
 		wg, _        = errgroup.WithContext(context.Background())
 		matched      int64
 		artworksChan = make(chan interface{}, len(p.urls)*2)
 	)
 
 	for _, url := range p.urls {
-		url := url //shadowing loop variables to pass them to wg.Go. It's required otherwise variables will stay the same every loop.
+		url := url //shadowing loop variables.
 
 		wg.Go(func() error {
 			for _, provider := range p.bot.ArtworkProviders {
-				if id, ok := provider.Match(url); ok {
-					p.bot.Log.Infof("Matched a URL: %v. Provider: %v", url, reflect.TypeOf(provider))
-					atomic.AddInt64(&matched, 1)
-
-					var isRepost bool
-					if guild.Repost != "disabled" {
-						rep, _ := p.bot.RepostDetector.Find(channelID, id)
-						if rep != nil {
-							artworksChan <- rep
-
-							//If crosspost don't do anything and move on with your life.
-							if p.crosspost || guild.Repost == "strict" {
-								return nil
-							}
-
-							isRepost = true
-						}
-					}
-
-					if guild.Repost != "disabled" && !isRepost {
-						err := p.bot.RepostDetector.Create(
-							&repost.Repost{
-								ID:        id,
-								URL:       url,
-								GuildID:   guild.ID,
-								ChannelID: channelID,
-								MessageID: p.ctx.Event.ID,
-							},
-							guild.RepostExpiration,
-						)
-
-						if err != nil {
-							p.bot.Log.Errorf("error creating a repost: %v", err)
-						}
-					}
-
-					_, isTwitter := provider.(*twitter.Twitter)
-					// Only post the picture if the provider is enabled
-					// or the function is called from a command
-					// or we're crossposting a twitter artwork.
-					if provider.Enabled(guild) || p.ctx.Command != nil || (p.crosspost && isTwitter) {
-						var (
-							artwork artworks.Artwork
-							key     = fmt.Sprintf("%T:%v", provider, id)
-						)
-
-						if i, ok := p.bot.ArtworkCache.Get(key); ok {
-							artwork = i.(artworks.Artwork)
-						} else {
-							var err error
-							artwork, err = provider.Find(id)
-							if err != nil {
-								return err
-							}
-
-							p.bot.ArtworkCache.Set(key, artwork, 0)
-						}
-
-						// Only add reactions to the original message for Twitter links.
-						if guild.Reactions && p.ctx.Command == nil && isTwitter && artwork != nil && artwork.Len() > 0 && !p.crosspost {
-							p.addReactions(p.ctx.Event.Message)
-						}
-
-						go func() {
-							p.bot.Stats.IncrementArtwork(provider)
-						}()
-
-						artworksChan <- artwork
-					}
-
-					break
+				id, ok := provider.Match(url)
+				if !ok {
+					continue
 				}
+
+				atomic.AddInt64(&matched, 1)
+				log := log.With(
+					"provider", reflect.TypeOf(provider),
+					"url", url,
+				)
+				log.Debug("matched a url")
+
+				var isRepost bool
+				if guild.Repost != "disabled" {
+					rep, err := p.bot.RepostDetector.Find(channelID, id)
+					if err != nil && !errors.Is(err, repost.ErrNotFound) {
+						log.Error("failed to find a repost")
+					}
+
+					if rep != nil {
+						artworksChan <- rep
+						if p.crosspost || guild.Repost == "strict" {
+							return nil
+						}
+
+						isRepost = true
+					}
+				}
+
+				if guild.Repost != "disabled" && !isRepost {
+					err := p.bot.RepostDetector.Create(
+						&repost.Repost{
+							ID:        id,
+							URL:       url,
+							GuildID:   guild.ID,
+							ChannelID: channelID,
+							MessageID: p.ctx.Event.ID,
+						},
+						guild.RepostExpiration,
+					)
+
+					if err != nil {
+						log.With("error", err).Error("error creating a repost")
+					}
+				}
+
+				_, isTwitter := provider.(*twitter.Twitter)
+				// Only post the artwork any of the following is true:
+				// - The provider is enabled in guild settings.
+				// - The function is called from a command
+				// - Crossposting a Twitter artwork. Bypasses Guild settings by design.
+				if provider.Enabled(guild) || p.ctx.Command != nil || (p.crosspost && isTwitter) {
+					var (
+						artwork artworks.Artwork
+						key     = fmt.Sprintf("%T:%v", provider, id)
+					)
+
+					if i, ok := p.bot.ArtworkCache.Get(key); ok {
+						artwork = i.(artworks.Artwork)
+					} else {
+						var err error
+						artwork, err = provider.Find(id)
+						if err != nil {
+							return err
+						}
+
+						p.bot.ArtworkCache.Set(key, artwork, 0)
+					}
+
+					// Only add reactions to the original message for Twitter links.
+					if guild.Reactions && p.ctx.Command == nil && isTwitter && artwork != nil && artwork.Len() > 0 && !p.crosspost {
+						err := p.addBookmarkReactions(p.ctx.Event.Message)
+						if err != nil {
+							log.With("error", err).Warn("failed to add bookmark reactions")
+						}
+					}
+
+					go func() {
+						p.bot.Stats.IncrementArtwork(provider)
+					}()
+
+					artworksChan <- artwork
+				}
+
+				break
 			}
 
 			return nil
@@ -297,7 +339,7 @@ func (p *Post) fetch(guild *store.Guild, channelID string) (*fetchResult, error)
 	return res, nil
 }
 
-func (p *Post) sendReposts(guild *store.Guild, reposts []*repost.Repost, timeout time.Duration) {
+func (p *Post) sendReposts(guild *store.Guild, reposts []*repost.Repost, timeout time.Duration) error {
 	locale := messages.RepostEmbed()
 
 	eb := embeds.NewBuilder()
@@ -309,25 +351,42 @@ func (p *Post) sendReposts(guild *store.Guild, reposts []*repost.Repost, timeout
 				"**%v %v**\n**URL:** %v\n\n%v",
 				locale.Expires, messages.RelativeTimestamp(rep.ExpiresAt),
 				rep.URL,
-				messages.NamedLink(locale.OriginalMessage, fmt.Sprintf("https://discord.com/channels/%v/%v/%v", rep.GuildID, rep.ChannelID, rep.MessageID)),
+				messages.NamedLink(
+					locale.OriginalMessage,
+					fmt.Sprintf("https://discord.com/channels/%v/%v/%v", rep.GuildID, rep.ChannelID, rep.MessageID),
+				),
 			),
 		)
 	}
 
-	msg, _ := p.ctx.Session.ChannelMessageSendEmbed(p.ctx.Event.ChannelID, eb.Finalize())
-	if msg != nil {
-		go func() {
-			time.Sleep(timeout)
-
-			p.ctx.Session.ChannelMessageDelete(msg.ChannelID, msg.ID)
-		}()
+	msg, err := p.ctx.Session.ChannelMessageSendEmbed(p.ctx.Event.ChannelID, eb.Finalize())
+	if err != nil {
+		return fmt.Errorf("failed to send message to discord: %w", err)
 	}
+
+	go func() {
+		time.Sleep(timeout)
+		err := p.ctx.Session.ChannelMessageDelete(msg.ChannelID, msg.ID)
+		if err != nil {
+			log := p.bot.Log.With(
+				"guild_id", guild.ID,
+				"channel_id", msg.ChannelID,
+				"message_id", msg.ID,
+				"error", err,
+			)
+
+			log.Warn("failed to delete a detected repost message")
+		}
+	}()
+
+	return nil
 }
 
+// TODO: for the love of God rewrite this entire thing
 func (p *Post) send(guild *store.Guild, channelID string, artworks []artworks.Artwork) ([]*cache.MessageInfo, error) {
-	sent := make([]*cache.MessageInfo, 0)
+	sentMessages := make([]*cache.MessageInfo, 0)
 	if len(artworks) == 0 {
-		return sent, nil
+		return sentMessages, nil
 	}
 
 	allMessages, err := p.generateMessages(guild, artworks, channelID)
@@ -336,31 +395,43 @@ func (p *Post) send(guild *store.Guild, channelID string, artworks []artworks.Ar
 	}
 
 	if len(allMessages) == 0 {
-		return sent, nil
+		return sentMessages, nil
+	}
+
+	mediaCount := 0
+	for _, artwork := range artworks {
+		mediaCount += artwork.Len()
 	}
 
 	// It only happens from commands so only first artwork should be affected.
 	allMessages[0] = p.skipArtworks(allMessages[0])
-	sendMessage := func(send *discordgo.MessageSend) {
-		var s *discordgo.Session
+	sendMessage := func(send *discordgo.MessageSend) error {
+		s := p.ctx.Session
 		if p.crosspost {
-			guildID, _ := strconv.ParseInt(guild.ID, 10, 64)
+			guildID, err := strconv.ParseInt(guild.ID, 10, 64)
+			if err != nil {
+				return fmt.Errorf("failed to parse guild id: %w", err)
+			}
+
 			s = p.bot.ShardManager.SessionForGuild(guildID)
-		} else {
-			s = p.ctx.Session
 		}
 
-		msg, _ := s.ChannelMessageSendComplex(channelID, send)
-		if msg != nil {
-			sent = append(sent, &cache.MessageInfo{MessageID: msg.ID, ChannelID: msg.ChannelID})
+		msg, err := s.ChannelMessageSendComplex(channelID, send)
+		if err != nil {
+			return fmt.Errorf("failed to send message: %w", err)
+		}
 
-			// If URL doesn't exist then the embed contains an error message, instead of an artwork.
-			if guild.Reactions && len(send.Embeds) > 0 {
-				if send.Embeds[0].URL != "" {
-					p.addReactions(msg)
-				}
+		sentMessages = append(sentMessages, &cache.MessageInfo{MessageID: msg.ID, ChannelID: msg.ChannelID})
+
+		// If URL isn't set then it's an error embed.
+		// If media count equals 0, it's most likely a Tweet without images and it can't be bookmarked.
+		if guild.Reactions && len(send.Embeds) > 0 && send.Embeds[0].URL != "" && mediaCount != 0 {
+			if err := p.addBookmarkReactions(msg); err != nil {
+				return fmt.Errorf("failed to add reactions: %w", err)
 			}
 		}
+
+		return nil
 	}
 
 	allMessages = p.handleLimit(allMessages, guild.Limit)
@@ -372,13 +443,22 @@ func (p *Post) send(guild *store.Guild, channelID string, artworks []artworks.Ar
 		first.Content = first.Embeds[0].URL + "\n" + first.Content
 	}
 
+	log := p.bot.Log.With(
+		"guild_id", guild.ID,
+		"channel_id", channelID,
+		"crosspost", p.crosspost,
+	)
+
 	for _, messages := range allMessages {
 		for _, message := range messages {
-			sendMessage(message)
+			err := sendMessage(message)
+			if err != nil {
+				log.With(err).Warn("failed to send artwork message")
+			}
 		}
 	}
 
-	return sent, nil
+	return sentMessages, nil
 }
 
 func (p *Post) generateMessages(guild *store.Guild, artworks []artworks.Artwork, channelID string) ([][]*discordgo.MessageSend, error) {
@@ -428,14 +508,16 @@ func (p *Post) generateMessages(guild *store.Guild, artworks []artworks.Artwork,
 	return messageSends, nil
 }
 
-func (p *Post) addReactions(msg *discordgo.Message) {
-	p.ctx.Session.MessageReactionAdd(
-		msg.ChannelID, msg.ID, "💖",
-	)
+func (p *Post) addBookmarkReactions(msg *discordgo.Message) error {
+	reactions := []string{"💖", "🤤"}
+	for _, reaction := range reactions {
+		err := p.ctx.Session.MessageReactionAdd(msg.ChannelID, msg.ID, reaction)
+		if err != nil {
+			return err
+		}
+	}
 
-	p.ctx.Session.MessageReactionAdd(
-		msg.ChannelID, msg.ID, "🤤",
-	)
+	return nil
 }
 
 func (p *Post) skipArtworks(embeds []*discordgo.MessageSend) []*discordgo.MessageSend {
