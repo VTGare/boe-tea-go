@@ -25,10 +25,10 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-//SkipMode is an enum that configures what indices are skipped from the send function
+// SkipMode is an enum that configures what indices are skipped from the send function
 type SkipMode int
 
-//SkipMode enum
+// SkipMode enum
 const (
 	SkipModeNone SkipMode = iota
 	SkipModeInclude
@@ -297,7 +297,7 @@ func (p *Post) fetch(guild *store.Guild, channelID string) (*fetchResult, error)
 					if guild.Reactions && p.ctx.Command == nil && isTwitter && artwork != nil && artwork.Len() > 0 && !p.crosspost {
 						err := p.addBookmarkReactions(p.ctx.Event.Message)
 						if err != nil {
-							log.With("error", err).Warn("failed to add bookmark reactions")
+							log.With("error", err).Debug("failed to add bookmark reactions")
 						}
 					}
 
