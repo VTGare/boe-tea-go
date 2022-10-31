@@ -86,7 +86,7 @@ func (p *Post) Send() ([]*cache.MessageInfo, error) {
 	)
 
 	if len(res.Reposts) > 0 {
-		if guild.Repost == "strict" {
+		if guild.Repost == store.GuildRepostStrict {
 			perm, err := dgoutils.MemberHasPermission(
 				p.ctx.Session,
 				guild.ID,
@@ -237,7 +237,7 @@ func (p *Post) fetch(guild *store.Guild, channelID string) (*fetchResult, error)
 				log.Debug("matched a url")
 
 				var isRepost bool
-				if guild.Repost != "disabled" {
+				if guild.Repost != store.GuildRepostDisabled {
 					rep, err := p.bot.RepostDetector.Find(channelID, id)
 					if err != nil && !errors.Is(err, repost.ErrNotFound) {
 						log.Error("failed to find a repost")
@@ -245,7 +245,7 @@ func (p *Post) fetch(guild *store.Guild, channelID string) (*fetchResult, error)
 
 					if rep != nil {
 						artworksChan <- rep
-						if p.crosspost || guild.Repost == "strict" {
+						if p.crosspost || guild.Repost == store.GuildRepostStrict {
 							return nil
 						}
 
@@ -253,7 +253,7 @@ func (p *Post) fetch(guild *store.Guild, channelID string) (*fetchResult, error)
 					}
 				}
 
-				if guild.Repost != "disabled" && !isRepost {
+				if guild.Repost != store.GuildRepostDisabled && !isRepost {
 					err := p.bot.RepostDetector.Create(
 						&repost.Repost{
 							ID:        id,

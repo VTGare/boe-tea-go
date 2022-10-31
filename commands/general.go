@@ -562,13 +562,15 @@ func set(b *bot.Bot) func(ctx *gumi.Ctx) error {
 				newSettingEmbed = limit
 				guild.Limit = limit
 			case "repost":
-				if newSetting.Raw != "enabled" && newSetting.Raw != "disabled" && newSetting.Raw != "strict" {
+				if newSetting.Raw != string(store.GuildRepostEnabled) &&
+					newSetting.Raw != string(store.GuildRepostDisabled) &&
+					newSetting.Raw != string(store.GuildRepostStrict) {
 					return messages.ErrUnknownRepostOption(newSetting.Raw)
 				}
 
 				oldSettingEmbed = guild.Repost
 				newSettingEmbed = newSetting.Raw
-				guild.Repost = newSetting.Raw
+				guild.Repost = store.GuildRepost(newSetting.Raw)
 			case "repost.expiration":
 				dur, err := time.ParseDuration(newSetting.Raw)
 				if err != nil {
