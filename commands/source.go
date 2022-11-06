@@ -9,6 +9,9 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
+
 	"github.com/VTGare/boe-tea-go/bot"
 	nh "github.com/VTGare/boe-tea-go/internal/apis/nhentai"
 	"github.com/VTGare/boe-tea-go/internal/dgoutils"
@@ -134,7 +137,7 @@ func nhentai(b *bot.Bot) func(ctx *gumi.Ctx) error {
 		if lang, ok := hentai.Language(); ok {
 			eb.AddField(
 				"Language",
-				strings.Title(lang.String()),
+				cases.Title(language.English).String(lang.String()),
 				true,
 			)
 		}
