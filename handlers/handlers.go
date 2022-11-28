@@ -21,7 +21,7 @@ import (
 	"mvdan.cc/xurls/v2"
 )
 
-//PrefixResolver returns an array of guild's prefixes and bot mentions.
+// PrefixResolver returns an array of guild's prefixes and bot mentions.
 func PrefixResolver(b *bot.Bot) func(s *discordgo.Session, m *discordgo.MessageCreate) []string {
 	return func(s *discordgo.Session, m *discordgo.MessageCreate) []string {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -45,7 +45,7 @@ func OnPanic(b *bot.Bot) func(*gumi.Ctx, interface{}) {
 	}
 }
 
-//NotCommand is executed on every message that isn't a command.
+// NotCommand is executed on every message that isn't a command.
 func NotCommand(b *bot.Bot) func(*gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
 		guild, err := b.Store.Guild(context.Background(), ctx.Event.GuildID)
@@ -119,40 +119,44 @@ func RegisterHandlers(b *bot.Bot) {
 	b.AddHandler(OnMessageRemove(b))
 }
 
-//OnReady logs that bot's up.
+// OnReady logs that bot's up.
 func OnReady(b *bot.Bot) func(*discordgo.Session, *discordgo.Ready) {
 	return func(s *discordgo.Session, r *discordgo.Ready) {
-		b.Log.Infof("%v is online. Session ID: %v. Guilds: %v", r.User.String(), r.SessionID, len(r.Guilds))
+		b.Log.With("user", r.User.String(), "session_id", r.SessionID, "guilds", len(r.Guilds)).Info("user is online")
 	}
 }
 
-//OnGuildCreate loads server configuration on launch and creates new database entries when joining a new server.
+// OnGuildCreate loads server configuration on launch and creates new database entries when joining a new server.
 func OnGuildCreate(b *bot.Bot) func(*discordgo.Session, *discordgo.GuildCreate) {
 	return func(s *discordgo.Session, g *discordgo.GuildCreate) {
 		_, err := b.Store.Guild(context.Background(), g.ID)
 		if errors.Is(err, mongo.ErrNoDocuments) {
-			b.Log.Infof("Joined a guild. Name: %v. ID: %v", g.Name, g.ID)
+			b.Log.With("guild", g.Name, "guild_id", g.ID).Info("joined a guild")
 			_, err := b.Store.CreateGuild(context.Background(), g.ID)
 			if err != nil {
-				b.Log.Errorf("Error while inserting guild %v: %v", g.ID, err)
+				b.Log.With("error", err, "guild_id", g.ID).Error("failed to insert guild")
 			}
 		}
 	}
 }
 
-//OnGuildDelete logs guild outages and guilds that kicked the bot out.
+// OnGuildDelete logs guild outages and guilds that kicked the bot out.
 func OnGuildDelete(b *bot.Bot) func(*discordgo.Session, *discordgo.GuildDelete) {
 	return func(s *discordgo.Session, g *discordgo.GuildDelete) {
+		var log = b.Log.With(
+			"guild_id", g.ID,
+		)
+
 		if g.Unavailable {
-			b.Log.Infof("Guild outage. ID: %v", g.ID)
+			log.Info("guild outage")
 		} else {
-			b.Log.Infof("Kicked/banned from guild: %v", g.ID)
+			log.Info("bot kicked/banned from guild")
 		}
 	}
 }
 
-//OnGuildBanAdd adds a banned server member to temporary banned users cache to prevent them from losing all their favourites
-//on that server due to Discord removing all reactions of banned users.
+// OnGuildBanAdd adds a banned server member to temporary banned users cache to prevent them from losing all their favourites
+// on that server due to Discord removing all reactions of banned users.
 func OnGuildBanAdd(b *bot.Bot) func(*discordgo.Session, *discordgo.GuildBanAdd) {
 	return func(s *discordgo.Session, gb *discordgo.GuildBanAdd) {
 		b.BannedUsers.Set(gb.User.ID, struct{}{})
@@ -161,6 +165,7 @@ func OnGuildBanAdd(b *bot.Bot) func(*discordgo.Session, *discordgo.GuildBanAdd) 
 
 func OnMessageRemove(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageDelete) {
 	return func(s *discordgo.Session, m *discordgo.MessageDelete) {
+		var log = b.Log.With("channel_id", m.ChannelID, "parent_id", m.ID)
 		msg, ok := b.EmbedCache.Get(
 			m.ChannelID,
 			m.ID,
@@ -175,21 +180,10 @@ func OnMessageRemove(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageDele
 		)
 
 		if msg.Parent {
-			b.Log.Infof(
-				"Removing children messages. Channel ID: %v. Parent ID: %v. User ID: %v.",
-				m.ChannelID,
-				m.ID,
-				msg.AuthorID,
-			)
+			log.With("user_id", msg.AuthorID).Info("removing children messages")
 
 			for _, child := range msg.Children {
-				b.Log.Infof(
-					"Removing a child message. Parent ID: %v. Channel ID: %v. Message ID: %v. User ID: %v.",
-					m.ID,
-					child.ChannelID,
-					child.MessageID,
-					msg.AuthorID,
-				)
+				log.With("user_id", msg.AuthorID, "message_id", child.MessageID).Info("removing a child message")
 
 				b.EmbedCache.Remove(
 					child.ChannelID, child.MessageID,
@@ -197,7 +191,7 @@ func OnMessageRemove(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageDele
 
 				err := s.ChannelMessageDelete(child.ChannelID, child.MessageID)
 				if err != nil {
-					b.Log.Warn("OnMessageRemove -> s.ChannelMessageDelete: ", err)
+					log.With("error", err, "message_id", child.MessageID).Warn("failed to delete child message")
 				}
 			}
 		}
@@ -213,10 +207,10 @@ func OnReactionAdd(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageReacti
 
 		var (
 			log = b.Log.With(
-				"guild", r.GuildID,
-				"channel", r.ChannelID,
-				"message", r.MessageID,
-				"user", r.UserID,
+				"guild_id", r.GuildID,
+				"channel_id", r.ChannelID,
+				"message_id", r.MessageID,
+				"user_id", r.UserID,
 			)
 			name        = r.Emoji.APIName()
 			ctx, cancel = context.WithTimeout(context.Background(), 30*time.Second)
@@ -250,10 +244,10 @@ func OnReactionAdd(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageReacti
 			childrenIDs := make(map[string][]string)
 			for _, child := range msg.Children {
 				log.With(
-					"parent", r.MessageID,
-					"channel", child.ChannelID,
-					"message", child.MessageID,
-					"user", r.UserID,
+					"parent_id", r.MessageID,
+					"channel_id", child.ChannelID,
+					"message_id", child.MessageID,
+					"user_id", r.UserID,
 				).Infof("removing a child message")
 
 				b.EmbedCache.Remove(child.ChannelID, child.MessageID)
@@ -405,7 +399,7 @@ func OnReactionAdd(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageReacti
 					CreatedAt: time.Now(),
 				}
 				log = log.With(
-					"user", r.UserID,
+					"user_id", r.UserID,
 					"artwork_id", artworkDB.ID,
 					"nsfw", nsfw,
 				)
@@ -477,10 +471,10 @@ func OnReactionRemove(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageRea
 		}
 
 		log := b.Log.With(
-			"guild", r.GuildID,
-			"channel", r.ChannelID,
-			"message", r.MessageID,
-			"user", r.UserID,
+			"guild_id", r.GuildID,
+			"channel_id", r.ChannelID,
+			"message_id", r.MessageID,
+			"user_id", r.UserID,
 		)
 
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -529,7 +523,7 @@ func OnReactionRemove(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageRea
 				if id, ok := provider.Match(url); ok {
 					artwork, err = provider.Find(id)
 					if err != nil {
-						log.With("error", err).Error("failed to find an artwork")
+						log.With("error", err, "artwork_id", id).Error("failed to find an artwork")
 						return
 					}
 
@@ -555,7 +549,7 @@ func OnReactionRemove(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageRea
 			return
 		}
 
-		log.With("user", r.UserID, "artwork", artworkDB.ID).Info("removing a favourite")
+		log.With("user_id", r.UserID, "artwork_id", artworkDB.ID).Info("removing a favourite artwork")
 		deleted, err := b.Store.DeleteBookmark(ctx, &store.Bookmark{UserID: r.UserID, ArtworkID: artworkDB.ID})
 		if err != nil {
 			log.With("error", err).Error("failed to remove a favourite")
@@ -568,7 +562,7 @@ func OnReactionRemove(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageRea
 
 		user, err := b.Store.User(ctx, r.UserID)
 		if err != nil {
-			log.With("error", err).Error("failed to find or create a user")
+			log.With("error", err, "user_id", r.UserID).Error("failed to find or create a user")
 			return
 		}
 
@@ -579,7 +573,7 @@ func OnReactionRemove(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageRea
 		dmSession := b.ShardManager.SessionForDM()
 		ch, err := dmSession.UserChannelCreate(user.ID)
 		if err != nil {
-			log.With("error", err).Error("failed to create private channel")
+			log.With("error", err, "user_id", user.ID).Error("failed to create private channel")
 			return
 		}
 
@@ -597,7 +591,7 @@ func OnReactionRemove(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageRea
 	}
 }
 
-//OnError creates an error response, logs them and sends the response on Discord.
+// OnError creates an error response, logs them and sends the response on Discord.
 func OnError(b *bot.Bot) func(*gumi.Ctx, error) {
 	return func(ctx *gumi.Ctx, err error) {
 		eb := embeds.NewBuilder()
@@ -609,24 +603,32 @@ func OnError(b *bot.Bot) func(*gumi.Ctx, error) {
 
 		switch {
 		case errors.As(err, &cmdErr):
+			if ctx.Command != nil {
+				b.Log.With("error", err, "command", ctx.Command.Name, "arguments", ctx.Args.Raw).Error("failed to execute command due to a command error")
+
+			} else {
+				b.Log.With("error", err).Error("a command error occured")
+			}
+
 			eb.FailureTemplate(cmdErr.Error() + "\n" + cmdErr.Description)
 			eb.AddField(cmdErr.Embed.Usage, fmt.Sprintf("`%v`", cmdErr.Usage))
 			eb.AddField(cmdErr.Embed.Example, fmt.Sprintf("`%v`", cmdErr.Example))
 		case errors.As(err, &usrErr):
 			if err := usrErr.Unwrap(); err != nil {
 				if ctx.Command != nil {
-					b.Log.Infof("A user error occured. Command: %v. Arguments: [%v]. Error: %v", ctx.Command.Name, ctx.Args.Raw, err)
+					b.Log.With("error", err, "command", ctx.Command.Name, "arguments", ctx.Args.Raw).Info("failed to execute command due to an user error")
 				} else {
-					b.Log.Infof("A user error occured. Error: %v", err)
+					b.Log.With("error", err).Info("an user error occured")
 				}
 			}
 
 			eb.FailureTemplate(usrErr.Error())
 		default:
 			if ctx.Command != nil {
-				b.Log.Errorf("An error occured. Command: %v. Arguments: [%v]. Error: %v", ctx.Command.Name, ctx.Args.Raw, err)
+				b.Log.With("error", err, "command", ctx.Command.Name, "arguments", ctx.Args.Raw).Error("failed to execute command due to an unexpected error")
+
 			} else {
-				b.Log.Errorf("An error occured. Error: %v", err)
+				b.Log.With("error", err).Error("an unexpected error occured")
 			}
 
 			eb.FailureTemplate("An unexpected error occured. Please try again later.\n" +
@@ -637,7 +639,7 @@ func OnError(b *bot.Bot) func(*gumi.Ctx, error) {
 	}
 }
 
-//OnRateLimit creates a response for users who use bot's command too frequently
+// OnRateLimit creates a response for users who use bot's command too frequently
 func OnRateLimit(b *bot.Bot) func(*gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
 		duration, err := ctx.Command.RateLimiter.Expires(ctx.Event.Author.ID)
@@ -652,7 +654,7 @@ func OnRateLimit(b *bot.Bot) func(*gumi.Ctx) error {
 	}
 }
 
-//OnNoPerms creates a response for users who used a command without required permissions.
+// OnNoPerms creates a response for users who used a command without required permissions.
 func OnNoPerms(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
 		eb := embeds.NewBuilder()
@@ -662,7 +664,7 @@ func OnNoPerms(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	}
 }
 
-//OnNSFW creates a response for users who used a NSFW command in a SFW channel
+// OnNSFW creates a response for users who used a NSFW command in a SFW channel
 func OnNSFW(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
 		eb := embeds.NewBuilder()
@@ -673,10 +675,10 @@ func OnNSFW(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	}
 }
 
-//OnExecute logs every executed command.
+// OnExecute logs every executed command.
 func OnExecute(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
-		b.Log.Infof("Executing command [%v]. Arguments: [%v]. Guild ID: %v, channel ID: %v", ctx.Command.Name, ctx.Args.Raw, ctx.Event.GuildID, ctx.Event.ChannelID)
+		b.Log.With("command", ctx.Command.Name, "arguments", ctx.Args.Raw, "guild_id", ctx.Event.GuildID, "channel_id", ctx.Event.ChannelID).Info("executing command")
 
 		b.Stats.IncrementCommand(ctx.Command.Name)
 		return nil
