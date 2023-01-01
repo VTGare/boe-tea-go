@@ -21,10 +21,10 @@ import (
 	"mvdan.cc/xurls/v2"
 )
 
-//PrefixResolver returns an array of guild's prefixes and bot mentions.
+// PrefixResolver returns an array of guild's prefixes and bot mentions.
 func PrefixResolver(b *bot.Bot) func(s *discordgo.Session, m *discordgo.MessageCreate) []string {
 	return func(s *discordgo.Session, m *discordgo.MessageCreate) []string {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 		defer cancel()
 
 		mention := fmt.Sprintf("<@%v> ", s.State.User.ID)
@@ -45,7 +45,7 @@ func OnPanic(b *bot.Bot) func(*gumi.Ctx, interface{}) {
 	}
 }
 
-//NotCommand is executed on every message that isn't a command.
+// NotCommand is executed on every message that isn't a command.
 func NotCommand(b *bot.Bot) func(*gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
 		guild, err := b.Store.Guild(context.Background(), ctx.Event.GuildID)
@@ -119,14 +119,14 @@ func RegisterHandlers(b *bot.Bot) {
 	b.AddHandler(OnMessageRemove(b))
 }
 
-//OnReady logs that bot's up.
+// OnReady logs that bot's up.
 func OnReady(b *bot.Bot) func(*discordgo.Session, *discordgo.Ready) {
 	return func(s *discordgo.Session, r *discordgo.Ready) {
 		b.Log.Infof("%v is online. Session ID: %v. Guilds: %v", r.User.String(), r.SessionID, len(r.Guilds))
 	}
 }
 
-//OnGuildCreate loads server configuration on launch and creates new database entries when joining a new server.
+// OnGuildCreate loads server configuration on launch and creates new database entries when joining a new server.
 func OnGuildCreate(b *bot.Bot) func(*discordgo.Session, *discordgo.GuildCreate) {
 	return func(s *discordgo.Session, g *discordgo.GuildCreate) {
 		_, err := b.Store.Guild(context.Background(), g.ID)
@@ -140,7 +140,7 @@ func OnGuildCreate(b *bot.Bot) func(*discordgo.Session, *discordgo.GuildCreate) 
 	}
 }
 
-//OnGuildDelete logs guild outages and guilds that kicked the bot out.
+// OnGuildDelete logs guild outages and guilds that kicked the bot out.
 func OnGuildDelete(b *bot.Bot) func(*discordgo.Session, *discordgo.GuildDelete) {
 	return func(s *discordgo.Session, g *discordgo.GuildDelete) {
 		if g.Unavailable {
@@ -151,8 +151,8 @@ func OnGuildDelete(b *bot.Bot) func(*discordgo.Session, *discordgo.GuildDelete) 
 	}
 }
 
-//OnGuildBanAdd adds a banned server member to temporary banned users cache to prevent them from losing all their favourites
-//on that server due to Discord removing all reactions of banned users.
+// OnGuildBanAdd adds a banned server member to temporary banned users cache to prevent them from losing all their favourites
+// on that server due to Discord removing all reactions of banned users.
 func OnGuildBanAdd(b *bot.Bot) func(*discordgo.Session, *discordgo.GuildBanAdd) {
 	return func(s *discordgo.Session, gb *discordgo.GuildBanAdd) {
 		b.BannedUsers.Set(gb.User.ID, struct{}{})
@@ -219,7 +219,7 @@ func OnReactionAdd(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageReacti
 				"user", r.UserID,
 			)
 			name        = r.Emoji.APIName()
-			ctx, cancel = context.WithTimeout(context.Background(), 30*time.Second)
+			ctx, cancel = context.WithTimeout(context.Background(), 2*time.Minute)
 		)
 
 		defer cancel()
@@ -483,7 +483,7 @@ func OnReactionRemove(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageRea
 			"user", r.UserID,
 		)
 
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 		defer cancel()
 
 		//Do nothing if user was banned recently. Discord removes all reactions
@@ -597,7 +597,7 @@ func OnReactionRemove(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageRea
 	}
 }
 
-//OnError creates an error response, logs them and sends the response on Discord.
+// OnError creates an error response, logs them and sends the response on Discord.
 func OnError(b *bot.Bot) func(*gumi.Ctx, error) {
 	return func(ctx *gumi.Ctx, err error) {
 		eb := embeds.NewBuilder()
@@ -637,7 +637,7 @@ func OnError(b *bot.Bot) func(*gumi.Ctx, error) {
 	}
 }
 
-//OnRateLimit creates a response for users who use bot's command too frequently
+// OnRateLimit creates a response for users who use bot's command too frequently
 func OnRateLimit(b *bot.Bot) func(*gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
 		duration, err := ctx.Command.RateLimiter.Expires(ctx.Event.Author.ID)
@@ -652,7 +652,7 @@ func OnRateLimit(b *bot.Bot) func(*gumi.Ctx) error {
 	}
 }
 
-//OnNoPerms creates a response for users who used a command without required permissions.
+// OnNoPerms creates a response for users who used a command without required permissions.
 func OnNoPerms(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
 		eb := embeds.NewBuilder()
@@ -662,7 +662,7 @@ func OnNoPerms(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	}
 }
 
-//OnNSFW creates a response for users who used a NSFW command in a SFW channel
+// OnNSFW creates a response for users who used a NSFW command in a SFW channel
 func OnNSFW(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
 		eb := embeds.NewBuilder()
@@ -673,7 +673,7 @@ func OnNSFW(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	}
 }
 
-//OnExecute logs every executed command.
+// OnExecute logs every executed command.
 func OnExecute(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
 		b.Log.Infof("Executing command [%v]. Arguments: [%v]. Guild ID: %v, channel ID: %v", ctx.Command.Name, ctx.Args.Raw, ctx.Event.GuildID, ctx.Event.ChannelID)

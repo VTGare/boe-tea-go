@@ -422,7 +422,7 @@ func copygroup(b *bot.Bot) func(ctx *gumi.Ctx) error {
 
 func favourites(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
-		tctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+		tctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 		defer cancel()
 
 		var (
