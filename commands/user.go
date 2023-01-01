@@ -88,27 +88,27 @@ func userGroup(b *bot.Bot) {
 	})
 
 	b.Router.RegisterCmd(&gumi.Command{
-		Name:        "favourites",
+		Name:        "bookmarks",
 		Group:       group,
-		Aliases:     []string{"favorites", "favs"},
-		Description: "Shows your favourites. Use help command to learn more about filtering and sorting.",
-		Usage:       "bt!favourites [flags]",
-		Example:     "bt!favourites during:month sort:time order:asc",
+		Aliases:     []string{"favorites", "favourites", "favs"},
+		Description: "Shows your bookmarks. Use help command to learn more about filtering and sorting.",
+		Usage:       "bt!bookmarks [flags]",
+		Example:     "bt!bookmarks during:month sort:time order:asc",
 		Flags: map[string]string{
-			"sort":   "**Options:** `[time, favourites]`. **Default:** time. Changes sort type.",
+			"sort":   "**Options:** `[time, popularity]`. **Default:** time. Changes sort type.",
 			"order":  "**Options:** `[asc, desc]`. **Default:** desc. Changes order of sorted artworks.",
 			"mode":   "**Options:** `[all, sfw, nsfw]`. **Default:** all in nsfw channels and DMs, sfw otherwise.",
 			"during": "**Options:** `[day, week, month]`. **Default:** none. Filters artworks by time.",
 		},
 		RateLimiter: gumi.NewRateLimiter(10 * time.Second),
-		Exec:        favourites(b),
+		Exec:        bookmarks(b),
 	})
 
 	b.Router.RegisterCmd(&gumi.Command{
-		Name:        "unfav",
+		Name:        "unbookmark",
 		Group:       group,
-		Aliases:     []string{"unfavourite", "unfavorite"},
-		Description: "Remove a favourite by its ID or URL",
+		Aliases:     []string{"unfav", "unfavourite", "unfavorite"},
+		Description: "Remove a bookmark by its ID or URL",
 		Usage:       "bt!unfav <artwork ID or URL>",
 		Example:     "bt!unfav 69",
 		RateLimiter: gumi.NewRateLimiter(15 * time.Second),
@@ -420,7 +420,7 @@ func copygroup(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	}
 }
 
-func favourites(b *bot.Bot) func(ctx *gumi.Ctx) error {
+func bookmarks(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
 		tctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 		defer cancel()
@@ -463,7 +463,7 @@ func favourites(b *bot.Bot) func(ctx *gumi.Ctx) error {
 		}
 
 		if len(bookmarks) == 0 {
-			return messages.ErrUserNoFavourites(ctx.Event.Author.ID)
+			return messages.ErrUserNoBookmarks(ctx.Event.Author.ID)
 		}
 
 		filter.IDs = make([]int, 0, limit)
@@ -586,7 +586,7 @@ func showUserProfile(b *bot.Bot, ctx *gumi.Ctx) error {
 		fmt.Sprintf(
 			"**%v:** %v | **%v:** %v",
 			locale.Groups, len(user.Groups),
-			locale.Favourites, bookmarks,
+			locale.Bookmarks, bookmarks,
 		),
 	)
 
@@ -685,7 +685,7 @@ func unfav(b *bot.Bot) func(ctx *gumi.Ctx) error {
 
 		deleted, err := b.Store.DeleteBookmark(context.Background(), &store.Bookmark{UserID: ctx.Event.Author.ID, ArtworkID: id})
 		if err != nil {
-			return messages.ErrUserUnfavouriteFail(query, err)
+			return messages.ErrUserUnbookmarkFail(query, err)
 		}
 
 		if !deleted {
@@ -693,7 +693,7 @@ func unfav(b *bot.Bot) func(ctx *gumi.Ctx) error {
 		}
 
 		eb := embeds.NewBuilder()
-		locale := messages.FavouriteRemovedEmbed()
+		locale := messages.BookmarkRemovedEmbed()
 
 		eb.Title(locale.Title).
 			Description(locale.Description).
@@ -732,7 +732,7 @@ func artworkToEmbed(artwork *store.Artwork, image string, ind, length int) *disc
 
 	eb.AddField("ID", strconv.Itoa(artwork.ID), true).
 		AddField("Author", artwork.Author, true).
-		AddField("Favourites", strconv.Itoa(artwork.Favourites), true).
+		AddField("Bookmarks", strconv.Itoa(artwork.Favorites), true).
 		AddField("URL", messages.ClickHere(artwork.URL)).
 		Timestamp(artwork.CreatedAt)
 

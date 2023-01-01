@@ -107,7 +107,7 @@ func nhentai(b *bot.Bot) func(ctx *gumi.Ctx) error {
 		eb.AddField(
 			"Pages", strconv.Itoa(hentai.Pages), true,
 		).AddField(
-			"Favourites", strconv.Itoa(hentai.Favourites), true,
+			"Favorites", strconv.Itoa(hentai.Favorites), true,
 		)
 
 		if artists := hentai.Artists(); len(artists) > 0 {

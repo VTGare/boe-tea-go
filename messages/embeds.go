@@ -10,8 +10,8 @@ const (
 	about
 	sauce
 	set
-	favAdded
-	favRemoved
+	bookmarkAdded
+	bookmarkRemoved
 )
 
 type Language int
@@ -92,13 +92,13 @@ type Features struct {
 }
 
 type UserProfile struct {
-	Title      string
-	Settings   string
-	DM         string
-	Crosspost  string
-	Stats      string
-	Groups     string
-	Favourites string
+	Title     string
+	Settings  string
+	DM        string
+	Crosspost string
+	Stats     string
+	Groups    string
+	Bookmarks string
 }
 
 type UserGroups struct {
@@ -181,13 +181,13 @@ var embeds = map[Language]map[EmbedType]interface{}{
 			},
 		},
 
-		favAdded: &BaseEmbed{
-			Title:       "💖 Successfully added an artwork to favourites",
+		bookmarkAdded: &BaseEmbed{
+			Title:       "💖 Successfully bookmarked an artwork",
 			Description: "If you dislike direct messages disable them by running `bt!userset dm off` command",
 		},
 
-		favRemoved: &BaseEmbed{
-			Title:       "💔 Successfully removed an artwork from favourites",
+		bookmarkRemoved: &BaseEmbed{
+			Title:       "💔 Successfully removed a bookmark",
 			Description: "If you dislike direct messages disable them by running `bt!userset dm off` command",
 		},
 	},
@@ -214,9 +214,9 @@ func SetEmbed() *SetCommand {
 }
 
 func FavouriteAddedEmbed() *BaseEmbed {
-	return embeds[English][favAdded].(*BaseEmbed)
+	return embeds[English][bookmarkAdded].(*BaseEmbed)
 }
 
-func FavouriteRemovedEmbed() *BaseEmbed {
-	return embeds[English][favRemoved].(*BaseEmbed)
+func BookmarkRemovedEmbed() *BaseEmbed {
+	return embeds[English][bookmarkRemoved].(*BaseEmbed)
 }

@@ -16,13 +16,13 @@ func UserGroupsEmbed(username string) *UserGroups {
 
 func UserProfileEmbed(username string) *UserProfile {
 	return &UserProfile{
-		Title:      fmt.Sprintf("%v's profile", username),
-		Settings:   "Settings",
-		DM:         "DM",
-		Crosspost:  "Crosspost",
-		Stats:      "Stats",
-		Groups:     "Groups",
-		Favourites: "Favourites",
+		Title:     fmt.Sprintf("%v's profile", username),
+		Settings:  "Settings",
+		DM:        "DM",
+		Crosspost: "Crosspost",
+		Stats:     "Stats",
+		Groups:    "Groups",
+		Bookmarks: "Bookmarks",
 	}
 }
 
@@ -82,9 +82,9 @@ func ErrUserCopyGroupFail(src, dest string) error {
 	))
 }
 
-func ErrUserNoFavourites(id string) error {
+func ErrUserNoBookmarks(id string) error {
 	return newUserError(fmt.Sprintf(
-		"User <@%v> doesn't have any favourites", id,
+		"User <@%v> doesn't have any bookmarks.", id,
 	))
 }
 
@@ -94,9 +94,9 @@ func ErrUnknownUserSetting(setting string) error {
 	)
 }
 
-func ErrUserUnfavouriteFail(query interface{}, err error) error {
+func ErrUserUnbookmarkFail(query interface{}, err error) error {
 	return newUserError(
-		fmt.Sprintf("Failed to remove a favourite `[%v]`. Unexpected error occured: %v.", query, err),
+		fmt.Sprintf("Failed to remove a bookmark `[%v]`. Unexpected error occured: %v.", query, err),
 		err,
 	)
 }

@@ -12,14 +12,14 @@ type ArtworkStore interface {
 }
 
 type Artwork struct {
-	ID         int       `json:"id" bson:"artwork_id"`
-	Title      string    `json:"title" bson:"title"`
-	Author     string    `json:"author" bson:"author"`
-	URL        string    `json:"url" bson:"url"`
-	Images     []string  `json:"images" bson:"images"`
-	Favourites int       `json:"favourites" bson:"favourites"`
-	CreatedAt  time.Time `json:"created_at" bson:"created_at"`
-	UpdatedAt  time.Time `json:"updated_at" bson:"updated_at"`
+	ID        int       `json:"id" bson:"artwork_id"`
+	Title     string    `json:"title" bson:"title"`
+	Author    string    `json:"author" bson:"author"`
+	URL       string    `json:"url" bson:"url"`
+	Images    []string  `json:"images" bson:"images"`
+	Favorites int       `json:"favourites" bson:"favourites"`
+	CreatedAt time.Time `json:"created_at" bson:"created_at"`
+	UpdatedAt time.Time `json:"updated_at" bson:"updated_at"`
 }
 
 type Order int
@@ -34,13 +34,13 @@ type ArtworkSort int
 
 const (
 	ByTime ArtworkSort = iota
-	ByFavourites
+	ByPopularity
 )
 
 func (s ArtworkSort) String() string {
 	return map[ArtworkSort]string{
 		ByTime:       "created_at",
-		ByFavourites: "favourites",
+		ByPopularity: "favourites",
 	}[s]
 }
 
