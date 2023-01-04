@@ -113,7 +113,7 @@ func (p *Pixiv) Find(id string) (artworks.Artwork, error) {
 
 	artwork := &Artwork{
 		ID:     id,
-		url:    "https://pixiv.net/en/artworks/" + id,
+		url:    "https://www.pixiv.net/en/artworks/" + id,
 		Title:  illust.Title,
 		Author: author,
 		Tags:   tags,
