@@ -213,7 +213,7 @@ func SetEmbed() *SetCommand {
 	return embeds[English][set].(*SetCommand)
 }
 
-func FavouriteAddedEmbed() *BaseEmbed {
+func BookmarkAddedEmbed() *BaseEmbed {
 	return embeds[English][bookmarkAdded].(*BaseEmbed)
 }
 
