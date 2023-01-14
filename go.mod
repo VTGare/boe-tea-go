@@ -9,7 +9,7 @@ require (
 	github.com/VTGare/gumi v0.4.3
 	github.com/VTGare/sengoku v0.1.7
 	github.com/bwmarrin/discordgo v0.26.1
-	github.com/everpcpc/pixiv v0.0.0-20220529081517-3fe20718a035
+	github.com/everpcpc/pixiv v0.1.1
 	github.com/getsentry/sentry-go v0.14.0
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/microcosm-cc/bluemonday v1.0.21
@@ -21,8 +21,8 @@ require (
 	go.uber.org/atomic v1.10.0
 	go.uber.org/zap v1.23.0
 	golang.org/x/sync v0.0.0-20220929204114-8fcdb60fdcc0
-	mvdan.cc/xurls/v2 v2.4.0
 	golang.org/x/text v0.4.0
+	mvdan.cc/xurls/v2 v2.4.0
 )
 
 require (
