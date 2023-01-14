@@ -59,8 +59,8 @@ func TestLimitExceeded(t *testing.T) {
 		args args
 		want string
 	}{
-		{"with a single artwork", args{10, 1, 5}, "Album size `(5)` is higher than the server's limit `(10)`, album has been cut."},
-		{"with multiple artworks", args{10, 3, 5}, "Album size `(5)` is higher than the server's limit `(10)`, only the first image of every artwork has been sent."},
+		{"with a single artwork", args{10, 1, 5}, "Album size `(5)` exceeds the server's limit `(10)`, album has been cut."},
+		{"with multiple artworks", args{10, 3, 5}, "Album size `(5)` exceeds the server's limit `(10)`, only the first image of every artwork has been sent."},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -101,9 +101,9 @@ func TestRateLimit(t *testing.T) {
 		args args
 		want string
 	}{
-		{"with limit of 0", args{time.Second * 0}, "Hold your horses! You're getting rate limited. Try again in **0s**"},
-		{"with limit of 1 second", args{time.Second}, "Hold your horses! You're getting rate limited. Try again in **1s**"},
-		{"with limit of 1 minute", args{time.Minute}, "Hold your horses! You're getting rate limited. Try again in **1m0s**"},
+		{"with limit of 0", args{time.Second * 0}, "Calm down, you're getting rate limited. Try again in **0s**"},
+		{"with limit of 1 second", args{time.Second}, "Calm down, you're getting rate limited. Try again in **1s**"},
+		{"with limit of 1 minute", args{time.Minute}, "Calm down, you're getting rate limited. Try again in **1m0s**"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
