@@ -38,20 +38,15 @@ func reply(b *bot.Bot) func(ctx *gumi.Ctx) error {
 		}
 
 		eb := embeds.NewBuilder()
+		reply := strings.TrimPrefix(strings.TrimSpace(ctx.Args.Raw), ctx.Args.Get(0).Raw)
 
-		eb.Author(
-			"Feedback reply",
-			"",
-			ctx.Session.State.User.AvatarURL(""),
-		).Description(
-			strings.TrimPrefix(
-				strings.TrimSpace(ctx.Args.Raw),
-				ctx.Args.Get(0).Raw,
-			),
-		)
+		eb.Author("Feedback reply", "", ctx.Session.State.User.AvatarURL("")).
+			Description(reply)
 
 		if attachments := ctx.Event.Attachments; len(attachments) >= 1 {
-			if strings.HasSuffix(attachments[0].Filename, "png") || strings.HasSuffix(attachments[0].Filename, "jpg") || strings.HasSuffix(attachments[0].Filename, "gif") {
+			if strings.HasSuffix(attachments[0].Filename, "png") ||
+				strings.HasSuffix(attachments[0].Filename, "jpg") ||
+				strings.HasSuffix(attachments[0].Filename, "gif") {
 				eb.Image(attachments[0].URL)
 			}
 		}
@@ -62,7 +57,6 @@ func reply(b *bot.Bot) func(ctx *gumi.Ctx) error {
 		}
 
 		eb.Clear()
-		ctx.ReplyEmbed(eb.SuccessTemplate("Reply has been sent.").Finalize())
-		return nil
+		return ctx.ReplyEmbed(eb.SuccessTemplate("Reply has been sent.").Finalize())
 	}
 }

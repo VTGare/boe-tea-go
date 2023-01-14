@@ -125,22 +125,14 @@ var embeds = map[Language]map[EmbedType]interface{}{
 		about: &About{
 			Title: "ℹ About",
 			Description: fmt.Sprintf(
-				"Boe Tea is an ultimate artwork bot for all your artwork related needs. %v\n***%v:***\n%v\nYou guys are epic!",
+				"Boe Tea is an artwork bot for all your artwork related needs. %v\n***%v:***\n%v\nYou guys are epic!",
 				"If you want to copy the invite link, simply right-click it and press Copy Link.",
-				"Many thanks to our patrons",
+				"Many thanks to my early patrons",
 				"• Nom\n• Danyo\n• tuba\n• Jeffrey\n• ... and other anonymous supporters!",
 			),
 			SupportServer: "Support server",
 			InviteLink:    "Invite link",
 			Patreon:       "Patreon",
-		},
-
-		sauce: &Sauce{
-			Author:      "Author",
-			Similarity:  "Similarity",
-			OtherURLs:   "Other URLs",
-			ExternalURL: "External URL",
-			NoTitle:     "No title",
 		},
 
 		set: &SetCommand{
@@ -153,42 +145,42 @@ var embeds = map[Language]map[EmbedType]interface{}{
 			},
 			TwitterSettings: &ProviderSettings{
 				Title:   "Twitter settings",
-				Enabled: "Status __(twitter)__",
+				Enabled: "Status (twitter)",
 			},
 			DeviantSettings: &ProviderSettings{
 				Title:   "DeviantArt settings",
-				Enabled: "Status __(deviant)__",
+				Enabled: "Status (deviant)",
 			},
 			ArtstationSettings: &ProviderSettings{
 				Title:   "ArtStation settings",
-				Enabled: "Status __(artstation)__",
+				Enabled: "Status (artstation)",
 			},
 			PixivSettings: &PixivSettings{
 				ProviderSettings: ProviderSettings{
 					Title:   "Pixiv settings",
-					Enabled: "Status __(pixiv)__",
+					Enabled: "Status (pixiv)",
 				},
 				Limit: "Limit",
 			},
 			Features: &Features{
 				Title:            "Features",
 				Repost:           "Repost",
-				RepostExpiration: "Expiration __(repost.expiration)__",
+				RepostExpiration: "Expiration (repost.expiration)",
 				Crosspost:        "Crosspost",
 				Reactions:        "Reactions",
 				Tags:             "Tags",
-				FlavourText:      "Footer quotes __(footer)__",
+				FlavourText:      "Footer quotes (footer)",
 			},
 		},
 
 		bookmarkAdded: &BaseEmbed{
 			Title:       "💖 Successfully bookmarked an artwork",
-			Description: "If you dislike direct messages disable them by running `bt!userset dm off` command",
+			Description: "If you dislike direct messages, disable them by running `bt!userset dm off` command",
 		},
 
 		bookmarkRemoved: &BaseEmbed{
 			Title:       "💔 Successfully removed a bookmark",
-			Description: "If you dislike direct messages disable them by running `bt!userset dm off` command",
+			Description: "If you dislike direct messages, disable them by running `bt!userset dm off` command",
 		},
 	},
 }
@@ -203,10 +195,6 @@ func AboutEmbed() *About {
 
 func RepostEmbed() *Repost {
 	return embeds[English][repost].(*Repost)
-}
-
-func SauceEmbed() *Sauce {
-	return embeds[English][sauce].(*Sauce)
 }
 
 func SetEmbed() *SetCommand {

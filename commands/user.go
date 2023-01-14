@@ -163,8 +163,7 @@ func groups(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			)
 		}
 
-		ctx.ReplyEmbed(eb.Finalize())
-		return nil
+		return ctx.ReplyEmbed(eb.Finalize())
 	}
 }
 
@@ -202,12 +201,10 @@ func newgroup(b *bot.Bot) func(ctx *gumi.Ctx) error {
 
 		eb := embeds.NewBuilder()
 
-		eb.SuccessTemplate(fmt.Sprintf(
-			"Created a group `%v` with parent channel <#%v> | `%v`", name, parent, parent,
-		))
+		msg := fmt.Sprintf("Created a group `%v` with parent channel <#%v> | `%v`", name, parent, parent)
+		eb.SuccessTemplate(msg)
 
-		ctx.ReplyEmbed(eb.Finalize())
-		return nil
+		return ctx.ReplyEmbed(eb.Finalize())
 	}
 }
 
@@ -236,12 +233,10 @@ func delgroup(b *bot.Bot) func(ctx *gumi.Ctx) error {
 
 		eb := embeds.NewBuilder()
 
-		eb.SuccessTemplate(fmt.Sprintf(
-			"Removed a group named `%v`", name,
-		))
+		msg := fmt.Sprintf("Removed a group named `%v`", name)
+		eb.SuccessTemplate(msg)
 
-		ctx.ReplyEmbed(eb.Finalize())
-		return nil
+		return ctx.ReplyEmbed(eb.Finalize())
 	}
 }
 
@@ -304,15 +299,13 @@ func push(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			inserted = append(inserted, channelID)
 		}
 
-		if len(inserted) > 0 {
-			eb := embeds.NewBuilder()
-			eb.SuccessTemplate(messages.UserPushSuccess(name, inserted))
-			ctx.ReplyEmbed(eb.Finalize())
-		} else {
+		if len(inserted) == 0 {
 			return messages.ErrUserPushFail(name)
 		}
 
-		return nil
+		eb := embeds.NewBuilder()
+		eb.SuccessTemplate(messages.UserPushSuccess(name, inserted))
+		return ctx.ReplyEmbed(eb.Finalize())
 	}
 }
 
@@ -362,15 +355,13 @@ func remove(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			removed = append(removed, channelID)
 		}
 
-		if len(removed) > 0 {
-			eb := embeds.NewBuilder()
-			eb.SuccessTemplate(messages.UserRemoveSuccess(name, removed))
-			ctx.ReplyEmbed(eb.Finalize())
-		} else {
+		if len(removed) == 0 {
 			return messages.ErrUserRemoveFail(name)
 		}
 
-		return nil
+		eb := embeds.NewBuilder()
+		eb.SuccessTemplate(messages.UserRemoveSuccess(name, removed))
+		return ctx.ReplyEmbed(eb.Finalize())
 	}
 }
 
@@ -590,8 +581,7 @@ func showUserProfile(b *bot.Bot, ctx *gumi.Ctx) error {
 		),
 	)
 
-	ctx.ReplyEmbed(eb.Finalize())
-	return nil
+	return ctx.ReplyEmbed(eb.Finalize())
 }
 
 func changeUserSettings(b *bot.Bot, ctx *gumi.Ctx) error {
@@ -651,8 +641,7 @@ func changeUserSettings(b *bot.Bot, ctx *gumi.Ctx) error {
 	eb.AddField("Old setting", fmt.Sprintf("%v", oldSettingEmbed), true)
 	eb.AddField("New setting", fmt.Sprintf("%v", newSettingEmbed), true)
 
-	ctx.ReplyEmbed(eb.Finalize())
-	return nil
+	return ctx.ReplyEmbed(eb.Finalize())
 }
 
 func unfav(b *bot.Bot) func(ctx *gumi.Ctx) error {

@@ -269,8 +269,7 @@ func about(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			true,
 		)
 
-		ctx.ReplyEmbed(eb.Finalize())
-		return nil
+		return ctx.ReplyEmbed(eb.Finalize())
 	}
 }
 
@@ -323,8 +322,9 @@ func feedback(b *bot.Bot) func(ctx *gumi.Ctx) error {
 		}
 
 		eb.Clear()
-		ctx.ReplyEmbed(eb.SuccessTemplate("Feedback message has been sent.").Finalize())
-		return nil
+
+		reply := eb.SuccessTemplate("Feedback message has been sent.").Finalize()
+		return ctx.ReplyEmbed(reply)
 	}
 }
 
@@ -507,8 +507,7 @@ func set(b *bot.Bot) func(ctx *gumi.Ctx) error {
 				),
 			)
 
-			ctx.ReplyEmbed(eb.Finalize())
-			return nil
+			return ctx.ReplyEmbed(eb.Finalize())
 		}
 
 		changeSetting := func() error {
@@ -680,8 +679,7 @@ func set(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			eb.AddField("Old setting", fmt.Sprintf("%v", oldSettingEmbed), true)
 			eb.AddField("New setting", fmt.Sprintf("%v", newSettingEmbed), true)
 
-			ctx.ReplyEmbed(eb.Finalize())
-			return nil
+			return ctx.ReplyEmbed(eb.Finalize())
 		}
 
 		switch {

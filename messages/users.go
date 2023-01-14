@@ -27,11 +27,7 @@ func UserProfileEmbed(username string) *UserProfile {
 }
 
 func UserPushSuccess(name string, channels []string) string {
-	return fmt.Sprintf(
-		"Added following channels to group `%v`:\n%v",
-		name,
-		ListChannels(channels),
-	)
+	return fmt.Sprintf("Added the following channels to `%v`:\n%v", name, ListChannels(channels))
 }
 
 func ErrUserPushFail(name string) error {
@@ -45,30 +41,22 @@ func ErrUserPushFail(name string) error {
 }
 
 func UserRemoveSuccess(name string, channels []string) string {
-	return fmt.Sprintf(
-		"Removed following channels from group `%v`:\n%v",
-		name,
-		ListChannels(channels),
-	)
+	return fmt.Sprintf("Removed the following channels from group `%v`:\n%v", name, ListChannels(channels))
 }
 
 func ErrUserRemoveFail(name string) error {
-	return newUserError(fmt.Sprintf(
-		"No channels were removed from group `%v`. None of the channel were part of the group or group doesn't exist.",
-		name,
-	))
+	msg := fmt.Sprintf("No channels were removed from `%v`. None of the channels were part of the group or group doesn't exist.", name)
+	return newUserError(msg)
 }
 
 func ErrUserChannelAlreadyParent(id string) error {
-	return newUserError(fmt.Sprintf(
-		"Channel <#%v> | `%v` is already a parent",
-		id, id,
-	))
+	msg := fmt.Sprintf("Channel <#%v> | `%v` is already a parent", id, id)
+	return newUserError(msg)
 }
 
 func UserCopyGroupSuccess(src, dest string, channels []string) string {
 	return fmt.Sprintf(
-		"Copied group `%v` to `%v`. Children channels:\n%v",
+		"Copied group `%v` to `%v`. Inherited children channels:\n%v",
 		src, dest, ListChannels(channels),
 	)
 }
@@ -83,14 +71,12 @@ func ErrUserCopyGroupFail(src, dest string) error {
 }
 
 func ErrUserNoBookmarks(id string) error {
-	return newUserError(fmt.Sprintf(
-		"User <@%v> doesn't have any bookmarks.", id,
-	))
+	return newUserError(fmt.Sprintf("User <@%v> doesn't have any bookmarks.", id))
 }
 
 func ErrUnknownUserSetting(setting string) error {
 	return newUserError(
-		fmt.Sprintf("Setting `%v` doesn't exist. Please use `bt!profile` to see existing settings.", setting),
+		fmt.Sprintf("Unknown setting: `%v`. Please use `bt!profile` to see existing settings.", setting),
 	)
 }
 
