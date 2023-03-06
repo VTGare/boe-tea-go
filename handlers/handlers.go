@@ -122,7 +122,7 @@ func RegisterHandlers(b *bot.Bot) {
 // OnReady logs that bot's up.
 func OnReady(b *bot.Bot) func(*discordgo.Session, *discordgo.Ready) {
 	return func(s *discordgo.Session, r *discordgo.Ready) {
-		b.Log.With("user", r.User.String(), "session_id", r.SessionID, "guilds", len(r.Guilds)).Info("user is online")
+		b.Log.With("user", r.User.String(), "session_id", r.SessionID, "guilds", len(r.Guilds)).Info("shard is connected")
 	}
 }
 
