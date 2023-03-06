@@ -25,8 +25,8 @@ type nhentaiResult struct {
 		URL   string `json:"url,omitempty"`
 		Count int    `json:"count,omitempty"`
 	} `json:"tags,omitempty"`
-	Pages      interface{} `json:"num_pages,omitempty"`
-	Favourites interface{} `json:"num_favorites,omitempty"`
+	Pages     interface{} `json:"num_pages,omitempty"`
+	Favorites interface{} `json:"num_favorites,omitempty"`
 }
 
 type Hentai struct {
@@ -37,7 +37,7 @@ type Hentai struct {
 	Titles     *Titles
 	Tags       []*Tag
 	Pages      int
-	Favourites int
+	Favorites  int
 	UploadedAt time.Time
 }
 
@@ -117,7 +117,7 @@ func (n *API) FindHentai(id string) (*Hentai, error) {
 		Cover:      fmt.Sprintf("https://t.nhentai.net/galleries/%v/cover.jpg", res.MediaID),
 		ID:         interfaceToInt(res.ID),
 		Pages:      interfaceToInt(res.Pages),
-		Favourites: interfaceToInt(res.Favourites),
+		Favorites:  interfaceToInt(res.Favorites),
 		UploadedAt: time.Unix(res.UploadDate, 0),
 	}, nil
 }

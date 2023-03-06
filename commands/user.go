@@ -88,27 +88,27 @@ func userGroup(b *bot.Bot) {
 	})
 
 	b.Router.RegisterCmd(&gumi.Command{
-		Name:        "favourites",
+		Name:        "bookmarks",
 		Group:       group,
-		Aliases:     []string{"favorites", "favs"},
-		Description: "Shows your favourites. Use help command to learn more about filtering and sorting.",
-		Usage:       "bt!favourites [flags]",
-		Example:     "bt!favourites during:month sort:time order:asc",
+		Aliases:     []string{"favorites", "favourites", "favs"},
+		Description: "Shows your bookmarks. Use help command to learn more about filtering and sorting.",
+		Usage:       "bt!bookmarks [flags]",
+		Example:     "bt!bookmarks during:month sort:time order:asc",
 		Flags: map[string]string{
-			"sort":   "**Options:** `[time, favourites]`. **Default:** time. Changes sort type.",
+			"sort":   "**Options:** `[time, popularity]`. **Default:** time. Changes sort type.",
 			"order":  "**Options:** `[asc, desc]`. **Default:** desc. Changes order of sorted artworks.",
 			"mode":   "**Options:** `[all, sfw, nsfw]`. **Default:** all in nsfw channels and DMs, sfw otherwise.",
 			"during": "**Options:** `[day, week, month]`. **Default:** none. Filters artworks by time.",
 		},
 		RateLimiter: gumi.NewRateLimiter(10 * time.Second),
-		Exec:        favourites(b),
+		Exec:        bookmarks(b),
 	})
 
 	b.Router.RegisterCmd(&gumi.Command{
-		Name:        "unfav",
+		Name:        "unbookmark",
 		Group:       group,
-		Aliases:     []string{"unfavourite", "unfavorite"},
-		Description: "Remove a favourite by its ID or URL",
+		Aliases:     []string{"unfav", "unfavourite", "unfavorite"},
+		Description: "Remove a bookmark by its ID or URL",
 		Usage:       "bt!unfav <artwork ID or URL>",
 		Example:     "bt!unfav 69",
 		RateLimiter: gumi.NewRateLimiter(15 * time.Second),
@@ -163,8 +163,7 @@ func groups(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			)
 		}
 
-		ctx.ReplyEmbed(eb.Finalize())
-		return nil
+		return ctx.ReplyEmbed(eb.Finalize())
 	}
 }
 
@@ -202,12 +201,10 @@ func newgroup(b *bot.Bot) func(ctx *gumi.Ctx) error {
 
 		eb := embeds.NewBuilder()
 
-		eb.SuccessTemplate(fmt.Sprintf(
-			"Created a group `%v` with parent channel <#%v> | `%v`", name, parent, parent,
-		))
+		msg := fmt.Sprintf("Created a group `%v` with parent channel <#%v> | `%v`", name, parent, parent)
+		eb.SuccessTemplate(msg)
 
-		ctx.ReplyEmbed(eb.Finalize())
-		return nil
+		return ctx.ReplyEmbed(eb.Finalize())
 	}
 }
 
@@ -236,12 +233,10 @@ func delgroup(b *bot.Bot) func(ctx *gumi.Ctx) error {
 
 		eb := embeds.NewBuilder()
 
-		eb.SuccessTemplate(fmt.Sprintf(
-			"Removed a group named `%v`", name,
-		))
+		msg := fmt.Sprintf("Removed a group named `%v`", name)
+		eb.SuccessTemplate(msg)
 
-		ctx.ReplyEmbed(eb.Finalize())
-		return nil
+		return ctx.ReplyEmbed(eb.Finalize())
 	}
 }
 
@@ -304,15 +299,13 @@ func push(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			inserted = append(inserted, channelID)
 		}
 
-		if len(inserted) > 0 {
-			eb := embeds.NewBuilder()
-			eb.SuccessTemplate(messages.UserPushSuccess(name, inserted))
-			ctx.ReplyEmbed(eb.Finalize())
-		} else {
+		if len(inserted) == 0 {
 			return messages.ErrUserPushFail(name)
 		}
 
-		return nil
+		eb := embeds.NewBuilder()
+		eb.SuccessTemplate(messages.UserPushSuccess(name, inserted))
+		return ctx.ReplyEmbed(eb.Finalize())
 	}
 }
 
@@ -362,15 +355,13 @@ func remove(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			removed = append(removed, channelID)
 		}
 
-		if len(removed) > 0 {
-			eb := embeds.NewBuilder()
-			eb.SuccessTemplate(messages.UserRemoveSuccess(name, removed))
-			ctx.ReplyEmbed(eb.Finalize())
-		} else {
+		if len(removed) == 0 {
 			return messages.ErrUserRemoveFail(name)
 		}
 
-		return nil
+		eb := embeds.NewBuilder()
+		eb.SuccessTemplate(messages.UserRemoveSuccess(name, removed))
+		return ctx.ReplyEmbed(eb.Finalize())
 	}
 }
 
@@ -420,9 +411,9 @@ func copygroup(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	}
 }
 
-func favourites(b *bot.Bot) func(ctx *gumi.Ctx) error {
+func bookmarks(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
-		tctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+		tctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 		defer cancel()
 
 		var (
@@ -463,7 +454,7 @@ func favourites(b *bot.Bot) func(ctx *gumi.Ctx) error {
 		}
 
 		if len(bookmarks) == 0 {
-			return messages.ErrUserNoFavourites(ctx.Event.Author.ID)
+			return messages.ErrUserNoBookmarks(ctx.Event.Author.ID)
 		}
 
 		filter.IDs = make([]int, 0, limit)
@@ -586,12 +577,11 @@ func showUserProfile(b *bot.Bot, ctx *gumi.Ctx) error {
 		fmt.Sprintf(
 			"**%v:** %v | **%v:** %v",
 			locale.Groups, len(user.Groups),
-			locale.Favourites, bookmarks,
+			locale.Bookmarks, bookmarks,
 		),
 	)
 
-	ctx.ReplyEmbed(eb.Finalize())
-	return nil
+	return ctx.ReplyEmbed(eb.Finalize())
 }
 
 func changeUserSettings(b *bot.Bot, ctx *gumi.Ctx) error {
@@ -651,8 +641,7 @@ func changeUserSettings(b *bot.Bot, ctx *gumi.Ctx) error {
 	eb.AddField("Old setting", fmt.Sprintf("%v", oldSettingEmbed), true)
 	eb.AddField("New setting", fmt.Sprintf("%v", newSettingEmbed), true)
 
-	ctx.ReplyEmbed(eb.Finalize())
-	return nil
+	return ctx.ReplyEmbed(eb.Finalize())
 }
 
 func unfav(b *bot.Bot) func(ctx *gumi.Ctx) error {
@@ -685,7 +674,7 @@ func unfav(b *bot.Bot) func(ctx *gumi.Ctx) error {
 
 		deleted, err := b.Store.DeleteBookmark(context.Background(), &store.Bookmark{UserID: ctx.Event.Author.ID, ArtworkID: id})
 		if err != nil {
-			return messages.ErrUserUnfavouriteFail(query, err)
+			return messages.ErrUserUnbookmarkFail(query, err)
 		}
 
 		if !deleted {
@@ -693,7 +682,7 @@ func unfav(b *bot.Bot) func(ctx *gumi.Ctx) error {
 		}
 
 		eb := embeds.NewBuilder()
-		locale := messages.FavouriteRemovedEmbed()
+		locale := messages.BookmarkRemovedEmbed()
 
 		eb.Title(locale.Title).
 			Description(locale.Description).
@@ -732,7 +721,7 @@ func artworkToEmbed(artwork *store.Artwork, image string, ind, length int) *disc
 
 	eb.AddField("ID", strconv.Itoa(artwork.ID), true).
 		AddField("Author", artwork.Author, true).
-		AddField("Favourites", strconv.Itoa(artwork.Favourites), true).
+		AddField("Bookmarks", strconv.Itoa(artwork.Favorites), true).
 		AddField("URL", messages.ClickHere(artwork.URL)).
 		Timestamp(artwork.CreatedAt)
 

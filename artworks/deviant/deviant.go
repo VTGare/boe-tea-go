@@ -29,7 +29,7 @@ type Artwork struct {
 	ThumbnailURL string
 	Tags         []string
 	Views        int
-	Favourites   int
+	Favorites    int
 	Comments     int
 	CreatedAt    time.Time
 	url          string
@@ -92,7 +92,7 @@ func (d *DeviantArt) Find(id string) (artworks.Artwork, error) {
 		ThumbnailURL: res.ThumbnailURL,
 		Tags:         strings.Split(res.Tags, ", "),
 		Views:        res.Community.Statistics.Attributes.Views,
-		Favourites:   res.Community.Statistics.Attributes.Favorites,
+		Favorites:    res.Community.Statistics.Attributes.Favorites,
 		Comments:     res.Community.Statistics.Attributes.Comments,
 		CreatedAt:    res.Pubdate,
 		url:          res.AuthorURL + "/art/" + id,
@@ -120,7 +120,7 @@ func (a *Artwork) MessageSends(footer string, hasTags bool) ([]*discordgo.Messag
 		URL(a.url).
 		Timestamp(a.CreatedAt).
 		AddField("Views", strconv.Itoa(a.Views), true).
-		AddField("Favourites", strconv.Itoa(a.Favourites), true)
+		AddField("Favorites", strconv.Itoa(a.Favorites), true)
 
 	if hasTags {
 		tags := arrays.Map(a.Tags, func(s string) string {

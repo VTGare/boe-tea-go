@@ -142,12 +142,12 @@ func (s *StatefulStore) SearchArtworks(ctx context.Context, filter ArtworkFilter
 	}
 
 	switch opt.Sort {
-	case ByFavourites:
+	case ByPopularity:
 		sort.Slice(artworks, func(i, j int) bool {
 			if opt.Order == Ascending {
-				return artworks[i].Favourites < artworks[j].Favourites
+				return artworks[i].Favorites < artworks[j].Favorites
 			} else {
-				return artworks[i].Favourites > artworks[j].Favourites
+				return artworks[i].Favorites > artworks[j].Favorites
 			}
 		})
 	case ByTime:

@@ -7,7 +7,7 @@ func ErrPrefixTooLong(prefix string) error {
 }
 
 func ErrUnknownSetting(setting string) error {
-	return newUserError(fmt.Sprintf("Setting `%v` doesn't exist. Please use `bt!set` to view existing settings", setting))
+	return newUserError(fmt.Sprintf("Unknown setting: `%v`. Please use `bt!set` to view existing settings", setting))
 }
 
 func ErrParseBool(value string) error {
@@ -28,49 +28,48 @@ func ErrParseDuration(value string) error {
 }
 
 func ErrExpirationOutOfRange(value string) error {
-	return newUserError(
-		fmt.Sprintf("Duration `%v` is too short or too long. Minimum expiration is one minute `1m`, maximum expiration is `168h`.", value),
-	)
+	msg := fmt.Sprintf("Expiration duration `%v` is out of range. Minimum is `1m`, and maximum is `168h`.", value)
+	return newUserError(msg)
 }
 
 func ErrUnknownRepostOption(option string) error {
-	return newUserError(fmt.Sprintf("Repost option `%v` doesn't exist. Available options are `[enabled, disabled, strict]`", option))
+	return newUserError(fmt.Sprintf("Unknown option: `%v`. Use one of the following options: `[enabled, disabled, strict]`", option))
 }
 
 func ErrForeignChannel(id string) error {
 	return newUserError(
-		fmt.Sprintf("Cannot get channel <#%v>. It's from a foreign server.", id),
+		fmt.Sprintf("Couldn't get <#%v>. Please use channels from this server.", id),
 	)
 }
 
 func ErrAlreadyArtChannel(id string) error {
 	return newUserError(
-		fmt.Sprintf("Cannot add channel <#%v> to art channels. It's already an art channel.", id),
+		fmt.Sprintf("Couldn't add <#%v> to art channels. It's already an art channel.", id),
 	)
 }
 
 func ErrNotArtChannel(id string) error {
 	return newUserError(
-		fmt.Sprintf("Cannot remove channel <#%v> from art channels. It's not an art channel.", id),
+		fmt.Sprintf("Couldn't remove <#%v> from art channels. It's not an art channel.", id),
 	)
 }
 
 func ErrWrongChannelType(id string) error {
 	return newUserError(
-		fmt.Sprintf("Cannot add channel <#%v> to art channels. It's not a text channel or a category.", id),
+		fmt.Sprintf("Couldn't add <#%v> to art channels. Unsupported channel type.", id),
 	)
 }
 
 func AddArtChannelSuccess(channels []string) string {
 	return fmt.Sprintf(
-		"Successfully added following channels to server's art channels:\n%v",
+		"Successfully added the following to art channels:\n%v",
 		ListChannels(channels),
 	)
 }
 
 func RemoveArtChannelSuccess(channels []string) string {
 	return fmt.Sprintf(
-		"Successfully removed following channels from server's art channels:\n%v",
+		"Successfully removed the following from art channels:\n%v",
 		ListChannels(channels),
 	)
 }
@@ -78,9 +77,8 @@ func RemoveArtChannelSuccess(channels []string) string {
 func RemoveArtChannelFail(channels []string) error {
 	return newUserError(
 		fmt.Sprintf(
-			"Failed to remove following channels from art channels:\n%v\n%v",
+			"Failed to remove the following channels from art channels:\n%v",
 			ListChannels(channels),
-			"All channels passed to the command should be art channels.",
 		),
 	)
 }

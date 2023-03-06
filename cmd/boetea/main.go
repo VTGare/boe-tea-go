@@ -28,7 +28,7 @@ import (
 )
 
 func initStore(mongoURI, database string) (store.Store, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
 	mongo, err := mongo.New(ctx, mongoURI, database)

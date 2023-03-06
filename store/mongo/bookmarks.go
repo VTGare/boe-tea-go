@@ -96,7 +96,7 @@ func (b *bookmarkStore) AddBookmark(ctx context.Context, bookmark *store.Bookmar
 		)
 
 		if err != nil {
-			return false, fmt.Errorf("failed to increment artwork favourite count: %w", err)
+			return false, fmt.Errorf("failed to increment artwork favorite count: %w", err)
 		}
 
 		return true, nil
@@ -133,7 +133,7 @@ func (b *bookmarkStore) DeleteBookmark(ctx context.Context, bookmark *store.Book
 		}
 
 		if err != nil {
-			return false, fmt.Errorf("failed to update artwork favourite count: %w", err)
+			return false, fmt.Errorf("failed to update artwork favorite count: %w", err)
 		}
 
 		_, err = b.artworks().UpdateOne(
@@ -143,7 +143,7 @@ func (b *bookmarkStore) DeleteBookmark(ctx context.Context, bookmark *store.Book
 		)
 
 		if err != nil {
-			return false, fmt.Errorf("failed to increment artwork favourite count: %w", err)
+			return false, fmt.Errorf("failed to increment artwork favorite count: %w", err)
 		}
 
 		return true, nil

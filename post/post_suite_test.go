@@ -88,7 +88,7 @@ var _ = Describe("Limit Handler Tests", func() {
 		result := post.handleLimit([][]*discordgo.MessageSend{artwork}, 2)
 		Expect(result[0]).To(HaveLen(2))
 		Expect(result[0][0].Content).To(
-			Equal("Album size `(4)` is higher than the server's limit `(2)`, album has been cut."),
+			Equal("Album size `(4)` exceeds the server's limit `(2)`, album has been cut."),
 		)
 	})
 
@@ -96,7 +96,7 @@ var _ = Describe("Limit Handler Tests", func() {
 		result := post.handleLimit([][]*discordgo.MessageSend{artwork, artwork}, 2)
 		Expect(result).Should(HaveEach(HaveLen(1)))
 		Expect(result[0][0].Content).To(
-			Equal("Album size `(8)` is higher than the server's limit `(2)`, only the first image of every artwork has been sent."),
+			Equal("Album size `(8)` exceeds the server's limit `(2)`, only the first image of every artwork has been sent."),
 		)
 	})
 
@@ -107,7 +107,7 @@ var _ = Describe("Limit Handler Tests", func() {
 			HaveLen(3),
 		))
 		Expect(result[0][0].Content).To(
-			Equal("Album size `(12)` is higher than the server's limit `(2)`, only the first image of every artwork has been sent."),
+			Equal("Album size `(12)` exceeds the server's limit `(2)`, only the first image of every artwork has been sent."),
 		)
 	})
 })

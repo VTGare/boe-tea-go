@@ -27,16 +27,19 @@ type Pixiv struct {
 }
 
 type Artwork struct {
-	ID     string
-	Type   string
-	Author string
-	Title  string
-	Likes  int
-	Pages  int
-	Tags   []string
-	Images []*Image
-	NSFW   bool
-	url    string
+	ID          string
+	Type        string
+	Author      string
+	Title       string
+	Likes       int
+	Pages       int
+	Tags        []string
+	Images      []*Image
+	NSFW        bool
+	AIGenerated bool
+	CreatedAt   time.Time
+
+	url string
 }
 
 type Image struct {
@@ -87,7 +90,11 @@ func (p *Pixiv) Find(id string) (artworks.Artwork, error) {
 			nsfw = true
 		}
 
-		tags = append(tags, tag.Name)
+		if tag.TranslatedName != "" {
+			tags = append(tags, tag.TranslatedName)
+		} else {
+			tags = append(tags, tag.Name)
+		}
 	}
 
 	images := make([]*Image, 0, illust.PageCount)
@@ -112,16 +119,21 @@ func (p *Pixiv) Find(id string) (artworks.Artwork, error) {
 	}
 
 	artwork := &Artwork{
-		ID:     id,
-		url:    "https://pixiv.net/en/artworks/" + id,
-		Title:  illust.Title,
-		Author: author,
-		Tags:   tags,
-		Images: images,
-		NSFW:   nsfw,
-		Type:   illust.Type,
-		Pages:  illust.PageCount,
-		Likes:  illust.TotalBookmarks,
+		ID:        id,
+		url:       "https://www.pixiv.net/en/artworks/" + id,
+		Title:     illust.Title,
+		Author:    author,
+		Tags:      tags,
+		Images:    images,
+		NSFW:      nsfw,
+		Type:      illust.Type,
+		Pages:     illust.PageCount,
+		Likes:     illust.TotalBookmarks,
+		CreatedAt: illust.CreateDate,
+	}
+
+	if illust.IllustAIType == pixiv.IllustAITypeAIGenerated {
+		artwork.AIGenerated = true
 	}
 
 	return artwork, nil
@@ -174,10 +186,14 @@ func (a *Artwork) MessageSends(footer string, hasTags bool) ([]*discordgo.Messag
 	eb.URL(a.url).
 		AddField("Likes", strconv.Itoa(a.Likes), true).
 		AddField("Original quality", messages.ClickHere(a.Images[0].originalProxy()), true).
-		Timestamp(time.Now())
+		Timestamp(a.CreatedAt)
 
 	if footer != "" {
 		eb.Footer(footer, "")
+	}
+
+	if a.AIGenerated {
+		eb.AddField("⚠️ Disclaimer", "This artwork is AI-generated.")
 	}
 
 	eb.Image(a.Images[0].previewProxy())
@@ -188,7 +204,7 @@ func (a *Artwork) MessageSends(footer string, hasTags bool) ([]*discordgo.Messag
 
 			eb.Title(fmt.Sprintf("%v by %v | Page %v / %v", a.Title, a.Author, ind+2, length))
 			eb.Image(image.previewProxy())
-			eb.URL(a.url).Timestamp(time.Now())
+			eb.URL(a.url).Timestamp(a.CreatedAt)
 
 			if footer != "" {
 				eb.Footer(footer, "")

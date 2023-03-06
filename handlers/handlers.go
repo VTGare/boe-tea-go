@@ -24,7 +24,7 @@ import (
 // PrefixResolver returns an array of guild's prefixes and bot mentions.
 func PrefixResolver(b *bot.Bot) func(s *discordgo.Session, m *discordgo.MessageCreate) []string {
 	return func(s *discordgo.Session, m *discordgo.MessageCreate) []string {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 		defer cancel()
 
 		mention := fmt.Sprintf("<@%v> ", s.State.User.ID)
@@ -155,7 +155,8 @@ func OnGuildDelete(b *bot.Bot) func(*discordgo.Session, *discordgo.GuildDelete) 
 	}
 }
 
-// OnGuildBanAdd adds a banned server member to temporary banned users cache to prevent them from losing all their favourites
+
+// OnGuildBanAdd adds a banned server member to temporary banned users cache to prevent them from losing all their bookmarks
 // on that server due to Discord removing all reactions of banned users.
 func OnGuildBanAdd(b *bot.Bot) func(*discordgo.Session, *discordgo.GuildBanAdd) {
 	return func(s *discordgo.Session, gb *discordgo.GuildBanAdd) {
@@ -213,7 +214,7 @@ func OnReactionAdd(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageReacti
 				"user_id", r.UserID,
 			)
 			name        = r.Emoji.APIName()
-			ctx, cancel = context.WithTimeout(context.Background(), 30*time.Second)
+			ctx, cancel = context.WithTimeout(context.Background(), 2*time.Minute)
 		)
 
 		defer cancel()
@@ -329,7 +330,7 @@ func OnReactionAdd(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageReacti
 			return nil
 		}
 
-		addFavourite := func() error {
+		addBookmark := func() error {
 			msg, err := s.ChannelMessage(r.ChannelID, r.MessageID)
 			if err != nil {
 				return fmt.Errorf("failed to get a discord message: %w", err)
@@ -405,10 +406,10 @@ func OnReactionAdd(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageReacti
 				)
 			)
 
-			log.Info("inserting a favourite")
+			log.Info("inserting a bookmark")
 			added, err := b.Store.AddBookmark(ctx, fav)
 			if err != nil {
-				return fmt.Errorf("failed to insert a favourite: %w", err)
+				return fmt.Errorf("failed to insert a bookmark: %w", err)
 			}
 
 			if !added {
@@ -435,7 +436,7 @@ func OnReactionAdd(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageReacti
 				eb.Thumbnail(artworkDB.Images[0])
 			}
 
-			eb.Title("💖 Successfully added an artwork to favourites").
+			eb.Title("💖 Successfully bookmarked an artwork").
 				Description("If you dislike direct messages disable them by running `bt!userset dm off` command").
 				AddField("ID", strconv.Itoa(artworkDB.ID), true).
 				AddField("URL", messages.ClickHere(artworkDB.URL), true).
@@ -451,8 +452,8 @@ func OnReactionAdd(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageReacti
 				log.With("error", err).Error("failed to delete an embed on reaction")
 			}
 		case name == "💖" || name == "🤤":
-			if err := addFavourite(); err != nil {
-				log.With("error", err).Error("failed to add favourite")
+			if err := addBookmark(); err != nil {
+				log.With("error", err).Error("failed to add a bookmark")
 			}
 
 		case name == "📫" || name == "📩":
@@ -477,11 +478,11 @@ func OnReactionRemove(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageRea
 			"user_id", r.UserID,
 		)
 
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 		defer cancel()
 
 		//Do nothing if user was banned recently. Discord removes all reactions
-		//of banned users on the server which in turn removes all favourites.
+		//of banned users on the server which in turn removes all bookmarks.
 		if _, ok := b.BannedUsers.Get(r.UserID); ok {
 			return
 		}
@@ -549,10 +550,11 @@ func OnReactionRemove(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageRea
 			return
 		}
 
-		log.With("user_id", r.UserID, "artwork_id", artworkDB.ID).Info("removing a favourite artwork")
+
+		log.With("user_id", r.UserID, "artwork_id", artworkDB.ID).Info("removing a bookmark")
 		deleted, err := b.Store.DeleteBookmark(ctx, &store.Bookmark{UserID: r.UserID, ArtworkID: artworkDB.ID})
 		if err != nil {
-			log.With("error", err).Error("failed to remove a favourite")
+			log.With("error", err).Error("failed to remove a bookmark")
 			return
 		}
 
@@ -578,7 +580,7 @@ func OnReactionRemove(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageRea
 		}
 
 		eb := embeds.NewBuilder()
-		eb.Title("💔 Successfully removed an artwork from favourites").
+		eb.Title("💔 Successfully removed a bookmark.").
 			Description("If you dislike direct messages disable them by running `bt!userset dm off` command").
 			AddField("ID", strconv.Itoa(artworkDB.ID), true).
 			AddField("URL", messages.ClickHere(artworkDB.URL), true)

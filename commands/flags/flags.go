@@ -65,13 +65,11 @@ func FromArgs(args []string, flags ...FlagType) (map[FlagType]interface{}, error
 				if strings.HasPrefix(arg, "sort:") {
 					f := strings.TrimPrefix(arg, "sort:")
 
-					if f == "favs" ||
-						f == "favorites" ||
-						f == "favourites" {
-						m[FlagTypeSort] = store.ByFavourites
+					if f == "popularity" {
+						m[FlagTypeSort] = store.ByPopularity
 					}
 
-					if f == "time" || f == "date" {
+					if f == "time" {
 						m[FlagTypeSort] = store.ByTime
 					}
 

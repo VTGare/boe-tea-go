@@ -27,7 +27,7 @@ func NewRedis(addr string) (Detector, error) {
 }
 
 func (rd redisDetector) Find(channelID, artworkID string) (*Repost, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
 	var (
@@ -68,7 +68,7 @@ func (rd redisDetector) Find(channelID, artworkID string) (*Repost, error) {
 }
 
 func (rd redisDetector) Create(repost *Repost, duration time.Duration) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
 	key := fmt.Sprintf("channel:%v:artwork:%v", repost.ChannelID, repost.ID)

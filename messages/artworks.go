@@ -23,7 +23,7 @@ func ErrSearchArtworksNoResults(query string) error {
 func ErrLimitTooHigh(limit int64) error {
 	return newUserError(
 		fmt.Sprintf(
-			"Limit `%v` is too high. Please provide a number up to 100.",
+			"Limit `%v` is too high. Please provide an integer number equal or lower than 100.",
 			limit,
 		),
 	)

@@ -61,9 +61,9 @@ func artworksGroup(b *bot.Bot) {
 		Aliases:     []string{},
 		Description: "Search artworks in Boe Tea's database.",
 		Usage:       "bt!search <query> [flags]",
-		Example:     "bt!search hews limit:10 sort:favourites",
+		Example:     "bt!search hews limit:10 sort:popularity",
 		Flags: map[string]string{
-			"sort":   "**Options:** `[time, favourites]`. **Default:** time. Changes sort type.",
+			"sort":   "**Options:** `[time, popularity]`. **Default:** time. Changes sort type.",
 			"order":  "**Options:** `[asc, desc]`. **Default:** desc. Changes order of sorted artworks.",
 			"limit":  "**Options:** `any integer number up to 100`. **Default:** 100. Limits the size of a leaderboard.",
 			"during": "**Options:** `[day, week, month]`. **Default:** all time. Filters artworks by time.",
@@ -410,7 +410,7 @@ func leaderboard(b *bot.Bot) func(ctx *gumi.Ctx) error {
 		opts := store.ArtworkSearchOptions{
 			Limit: limit,
 			Order: store.Descending,
-			Sort:  store.ByFavourites,
+			Sort:  store.ByPopularity,
 		}
 
 		artworks, err := b.Store.SearchArtworks(context.Background(), filter, opts)

@@ -9,6 +9,9 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
+
 	"github.com/VTGare/boe-tea-go/bot"
 	nh "github.com/VTGare/boe-tea-go/internal/apis/nhentai"
 	"github.com/VTGare/boe-tea-go/internal/dgoutils"
@@ -20,7 +23,7 @@ import (
 )
 
 var (
-	imageRegex      = regexp.MustCompile(`(?i)^https?://(?:[a-z0-9\-]+\.)+[a-z]{2,6}(?:/[^/#?]+)+\.(?:jpe?g|gif|png)`)
+	imageRegex      = regexp.MustCompile(`(?i)^https?://(?:[a-z0-9\-]+\.)+[a-z]{2,6}(?:/[^/#?]+)+\.(?:jpe?g|gif|png|webp)`)
 	messageRefRegex = regexp.MustCompile(`(?i)http(?:s)?:\/\/(?:www\.)?discord(?:app)?.com\/channels\/\d+\/(\d+)\/(\d+)`)
 )
 
@@ -76,7 +79,7 @@ func nhentai(b *bot.Bot) func(ctx *gumi.Ctx) error {
 		if hentai.Titles != nil {
 			eb.Title(hentai.Titles.Pretty)
 		} else {
-			eb.Title("Unable to fetch the title")
+			eb.Title("No title")
 		}
 
 		eb.URL(hentai.URL)
@@ -101,49 +104,27 @@ func nhentai(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			return strings.Join(ss, " • ")
 		}
 
-		eb.AddField(
-			"Pages", strconv.Itoa(hentai.Pages), true,
-		).AddField(
-			"Favourites", strconv.Itoa(hentai.Favourites), true,
-		)
+		eb.AddField("Pages", strconv.Itoa(hentai.Pages), true).
+			AddField("Favorites", strconv.Itoa(hentai.Favorites), true)
 
 		if artists := hentai.Artists(); len(artists) > 0 {
-			eb.AddField(
-				"Artists",
-				tagsToNamedLinks(artists),
-				true,
-			)
+			eb.AddField("Artists", tagsToNamedLinks(artists), true)
 		}
 
 		if characters := hentai.Characters(); len(characters) > 0 {
-			eb.AddField(
-				"Characters",
-				tagsToNamedLinks(characters),
-				true,
-			)
+			eb.AddField("Characters", tagsToNamedLinks(characters), true)
 		}
 
 		if padories := hentai.Parodies(); len(padories) > 0 {
-			eb.AddField(
-				"Parodies",
-				tagsToNamedLinks(padories),
-				true,
-			)
+			eb.AddField("Parodies", tagsToNamedLinks(padories), true)
 		}
 
 		if lang, ok := hentai.Language(); ok {
-			eb.AddField(
-				"Language",
-				strings.Title(lang.String()),
-				true,
-			)
+			eb.AddField("Language", cases.Title(language.English).String(lang.String()), true)
 		}
 
 		if genres := hentai.Genres(); len(genres) > 0 {
-			eb.AddField(
-				"Tags",
-				tagsToString(genres),
-			)
+			eb.AddField("Tags", tagsToString(genres))
 		}
 
 		return ctx.ReplyEmbed(eb.Finalize())
@@ -191,83 +172,32 @@ func sauce(b *bot.Bot) func(ctx *gumi.Ctx) error {
 
 func sauceNAOEmbeds(sauces []*sengoku.Sauce) []*discordgo.MessageEmbed {
 	sauceEmbeds := make([]*discordgo.MessageEmbed, 0, len(sauces))
-	locale := messages.SauceEmbed()
 
-	toEmbed := func(sauce *sengoku.Sauce, index, l int) *discordgo.MessageEmbed {
+	toEmbed := func(source *sengoku.Sauce, index, l int) *discordgo.MessageEmbed {
 		eb := embeds.NewBuilder()
 
 		titleBuilder := strings.Builder{}
 		if l > 1 {
-			titleBuilder.WriteString(
-				fmt.Sprintf("[%v/%v] ", index+1, l),
-			)
+			titleBuilder.WriteString(fmt.Sprintf("[%v/%v] ", index+1, l))
 		}
 
-		if sauce.Title == "" {
-			titleBuilder.WriteString(locale.NoTitle)
+		if source.Title == "" {
+			titleBuilder.WriteString("No title")
 		} else {
-			titleBuilder.WriteString(sauce.Title)
+			titleBuilder.WriteString(source.Title)
 		}
 
 		eb.Title(titleBuilder.String())
-		if sauce.Author != nil {
-			eb.AddField(
-				locale.Author,
-				messages.NamedLink(sauce.Author.Name, sauce.Author.URL),
-			)
+		if source.Author != nil {
+			eb.AddField("Artist", messages.NamedLink(source.Author.Name, source.Author.URL))
 		}
 
-		if sauce.URLs != nil {
-			if uri, err := url.ParseRequestURI(sauce.URLs.Source); err == nil {
-				eb.URL(uri.String())
-				eb.AddField(
-					"URL",
-					uri.String(),
-				)
-			}
-
-			if l := len(sauce.URLs.ExternalURLs); l != 0 {
-				var sb strings.Builder
-				uri := sauce.URLs.ExternalURLs[0]
-				switch {
-				case strings.Contains(uri, "twitter"):
-					sb.WriteString(messages.NamedLink("Twitter", uri))
-				case strings.Contains(uri, "danbooru"):
-					sb.WriteString(messages.NamedLink("Danbooru", uri))
-				case strings.Contains(uri, "gelbooru"):
-					sb.WriteString(messages.NamedLink("Gelbooru", uri))
-				default:
-					sb.WriteString(messages.NamedLink(locale.ExternalURL+" 1", uri))
-				}
-
-				if l > 1 {
-					for index, uri := range sauce.URLs.ExternalURLs[1:] {
-						switch {
-						case strings.Contains(uri, "twitter"):
-							sb.WriteString(messages.NamedLink(" • Twitter", uri))
-						case strings.Contains(uri, "danbooru"):
-							sb.WriteString(messages.NamedLink(" • Danbooru", uri))
-						case strings.Contains(uri, "gelbooru"):
-							sb.WriteString(messages.NamedLink(" • Gelbooru", uri))
-						default:
-							sb.WriteString(messages.NamedLink(
-								" • "+locale.ExternalURL+" "+strconv.Itoa(index+2),
-								uri,
-							))
-						}
-					}
-				}
-
-				eb.AddField(locale.OtherURLs, sb.String())
-			}
+		if source.URLs != nil {
+			handleURLs(source, eb)
 		}
 
-		eb.AddField(
-			locale.Similarity,
-			strconv.FormatFloat(sauce.Similarity, 'f', 2, 64),
-		)
-
-		eb.Thumbnail(sauce.Thumbnail)
+		eb.AddField("Similarity", strconv.FormatFloat(source.Similarity, 'f', 2, 64))
+		eb.Thumbnail(source.Thumbnail)
 
 		return eb.Finalize()
 	}
@@ -278,6 +208,50 @@ func sauceNAOEmbeds(sauces []*sengoku.Sauce) []*discordgo.MessageEmbed {
 	}
 
 	return sauceEmbeds
+}
+
+func handleURLs(source *sengoku.Sauce, eb *embeds.Builder) {
+	if uri, err := url.ParseRequestURI(source.URLs.Source); err == nil {
+		eb.URL(uri.String())
+		eb.AddField("URL", uri.String())
+	}
+
+	if len(source.URLs.ExternalURLs) == 0 {
+		return
+	}
+
+	var sb strings.Builder
+	uri := source.URLs.ExternalURLs[0]
+
+	switch {
+	case strings.Contains(uri, "twitter"):
+		sb.WriteString(messages.NamedLink("Twitter", uri))
+	case strings.Contains(uri, "danbooru"):
+		sb.WriteString(messages.NamedLink("Danbooru", uri))
+	case strings.Contains(uri, "gelbooru"):
+		sb.WriteString(messages.NamedLink("Gelbooru", uri))
+	default:
+		sb.WriteString(messages.NamedLink("URL 1", uri))
+	}
+
+	if len(source.URLs.ExternalURLs) <= 1 {
+		return
+	}
+
+	for index, uri := range source.URLs.ExternalURLs[1:] {
+		switch {
+		case strings.Contains(uri, "twitter"):
+			sb.WriteString(messages.NamedLink(" • Twitter", uri))
+		case strings.Contains(uri, "danbooru"):
+			sb.WriteString(messages.NamedLink(" • Danbooru", uri))
+		case strings.Contains(uri, "gelbooru"):
+			sb.WriteString(messages.NamedLink(" • Gelbooru", uri))
+		default:
+			sb.WriteString(messages.NamedLink(" • URL"+" "+strconv.Itoa(index+2), uri))
+		}
+	}
+
+	eb.AddField("External links", sb.String())
 }
 
 func findImage(s *discordgo.Session, m *discordgo.MessageCreate, args []string) (string, bool) {

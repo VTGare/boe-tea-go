@@ -22,7 +22,7 @@ func (g guildStore) Guild(ctx context.Context, id string) (*store.Guild, error) 
 		return store.UserGuild(), nil
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
 
 	res := g.col.FindOne(ctx, bson.M{"guild_id": id})

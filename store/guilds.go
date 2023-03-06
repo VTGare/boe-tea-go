@@ -28,7 +28,7 @@ type Guild struct {
 	Reactions   bool `json:"reactions" bson:"reactions"`
 	Limit       int  `json:"limit" bson:"limit" validate:"required"`
 
-	Repost           string        `json:"repost" bson:"repost" validate:"required"`
+	Repost           GuildRepost   `json:"repost" bson:"repost" validate:"required"`
 	RepostExpiration time.Duration `json:"repost_expiration" bson:"repost_expiration"`
 
 	ArtChannels []string `json:"art_channels" bson:"art_channels" validate:"required"`
@@ -37,6 +37,14 @@ type Guild struct {
 	CreatedAt time.Time `json:"created_at" bson:"created_at" validate:"required"`
 	UpdatedAt time.Time `json:"updated_at" bson:"updated_at"`
 }
+
+type GuildRepost string
+
+const (
+	GuildRepostEnabled  GuildRepost = "enabled"
+	GuildRepostDisabled GuildRepost = "disabled"
+	GuildRepostStrict   GuildRepost = "strict"
+)
 
 func DefaultGuild(id string) *Guild {
 	return &Guild{
@@ -49,10 +57,10 @@ func DefaultGuild(id string) *Guild {
 		Deviant:          true,
 		Tags:             true,
 		FlavourText:      true,
-		Repost:           "enabled",
+		Repost:           GuildRepostEnabled,
 		RepostExpiration: 24 * time.Hour,
 		Crosspost:        true,
-		Reactions:        true,
+		Reactions:        false,
 		ArtChannels:      make([]string, 0),
 		CreatedAt:        time.Now(),
 		UpdatedAt:        time.Now(),
@@ -70,9 +78,9 @@ func UserGuild() *Guild {
 		Deviant:          true,
 		Tags:             true,
 		FlavourText:      true,
-		Repost:           "disabled",
-		RepostExpiration: 24 * time.Hour,
-		Crosspost:        true,
+		Repost:           GuildRepostDisabled,
+		RepostExpiration: 0,
+		Crosspost:        false,
 		Reactions:        true,
 	}
 }
