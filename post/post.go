@@ -466,7 +466,7 @@ func (p *Post) generateMessages(guild *store.Guild, artworks []artworks.Artwork,
 	for _, artwork := range artworks {
 		if artwork != nil {
 			var quote string
-			if guild.FlavourText {
+			if guild.FlavorText {
 				quote = p.bot.Config.RandomQuote(guild.NSFW)
 			}
 

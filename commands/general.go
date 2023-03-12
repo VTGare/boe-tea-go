@@ -457,7 +457,7 @@ func set(b *bot.Bot) func(ctx *gumi.Ctx) error {
 					msg.Features.Crosspost, messages.FormatBool(guild.Crosspost),
 					msg.Features.Reactions, messages.FormatBool(guild.Reactions),
 					msg.Features.Tags, messages.FormatBool(guild.Tags),
-					msg.Features.FlavourText, messages.FormatBool(guild.FlavourText),
+					msg.Features.FlavourText, messages.FormatBool(guild.FlavorText),
 				),
 			)
 
@@ -661,9 +661,9 @@ func set(b *bot.Bot) func(ctx *gumi.Ctx) error {
 					return err
 				}
 
-				oldSettingEmbed = guild.FlavourText
+				oldSettingEmbed = guild.FlavorText
 				newSettingEmbed = new
-				guild.FlavourText = new
+				guild.FlavorText = new
 			default:
 				return messages.ErrUnknownSetting(settingName.Raw)
 			}
