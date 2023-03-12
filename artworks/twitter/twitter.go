@@ -56,21 +56,17 @@ func New() artworks.Provider {
 func (t *Twitter) Find(id string) (artworks.Artwork, error) {
 	tweet, err := t.scraper.GetTweet(id)
 	if err != nil {
-		if strings.Contains(err.Error(), "not found") {
-			a, err := t.fallback.Find(id)
-			if err != nil {
-				return nil, err
-			}
-
-			nitter, ok := a.(*nitter.Artwork)
-			if !ok {
-				return nil, errors.New("twitter API is down. Please contact the developer is the problem persists.")
-			}
-
-			return convertNitter(nitter), nil
+		a, err := t.fallback.Find(id)
+		if err != nil {
+			return nil, err
 		}
 
-		return nil, err
+		nitter, ok := a.(*nitter.Artwork)
+		if !ok {
+			return nil, errors.New("Twitter API is down. Please use `bt!feedback` command to contact the developer.")
+		}
+
+		return convertNitter(nitter), nil
 	}
 
 	profile, err := t.scraper.GetProfile(tweet.Username)
@@ -151,7 +147,7 @@ func (artwork *Artwork) StoreArtwork() *store.Artwork {
 	}
 }
 
-//Embeds transforms an artwork to DiscordGo embeds.
+// Embeds transforms an artwork to DiscordGo embeds.
 func (a *Artwork) MessageSends(footer string, _ bool) ([]*discordgo.MessageSend, error) {
 	eb := embeds.NewBuilder()
 	eb.URL(a.Permalink).Description(a.Content).Timestamp(a.Timestamp)
