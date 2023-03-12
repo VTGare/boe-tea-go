@@ -26,6 +26,7 @@ type Guild struct {
 	FlavorText bool `json:"flavour_text" bson:"flavour_text"`
 	Crosspost  bool `json:"crosspost" bson:"crosspost"`
 	Reactions  bool `json:"reactions" bson:"reactions"`
+	SkipFirst  bool `json:"skip_first" bson:"skip_first"`
 	Limit      int  `json:"limit" bson:"limit" validate:"required"`
 
 	Repost           GuildRepost   `json:"repost" bson:"repost" validate:"required"`
@@ -61,6 +62,7 @@ func DefaultGuild(id string) *Guild {
 		RepostExpiration: 24 * time.Hour,
 		Crosspost:        true,
 		Reactions:        false,
+		SkipFirst:        true,
 		ArtChannels:      make([]string, 0),
 		CreatedAt:        time.Now(),
 		UpdatedAt:        time.Now(),
@@ -78,6 +80,7 @@ func UserGuild() *Guild {
 		Deviant:          true,
 		Tags:             true,
 		FlavorText:       true,
+		SkipFirst:        true,
 		Repost:           GuildRepostDisabled,
 		RepostExpiration: 0,
 		Crosspost:        false,
