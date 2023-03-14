@@ -430,76 +430,73 @@ func set(b *bot.Bot) func(ctx *gumi.Ctx) error {
 				}
 			}
 
-			var (
-				eb  = embeds.NewBuilder()
-				msg = messages.SetEmbed()
-			)
-
-			eb.Title(msg.CurrentSettings).Description(fmt.Sprintf("**%v**", gd.Name))
+			eb := embeds.NewBuilder()
+			eb.Title("Current settings").Description(fmt.Sprintf("**%v**", gd.Name))
 			eb.Thumbnail(gd.IconURL())
-			eb.Footer("Ebin message.", "")
+			eb.Footer("To change a setting use either its name or the name in parethesis", "")
 
 			eb.AddField(
-				msg.General.Title,
+				"General",
 				fmt.Sprintf(
 					"**%v**: %v | **%v**: %v",
-					msg.General.Prefix, guild.Prefix,
-					msg.General.NSFW, messages.FormatBool(guild.NSFW),
+					"Prefix", guild.Prefix,
+					"NSFW", messages.FormatBool(guild.NSFW),
 				),
 			)
 
 			eb.AddField(
-				msg.Features.Title,
+				"Features",
 				fmt.Sprintf(
 					"**%v**: %v | **%v**: %v\n**%v**: %v | **%v**: %v\n**%v**: %v | **%v**: %v",
-					msg.Features.Repost, guild.Repost,
-					msg.Features.RepostExpiration, guild.RepostExpiration,
-					msg.Features.Crosspost, messages.FormatBool(guild.Crosspost),
-					msg.Features.Reactions, messages.FormatBool(guild.Reactions),
-					msg.Features.Tags, messages.FormatBool(guild.Tags),
-					msg.Features.FlavourText, messages.FormatBool(guild.FlavourText),
+					"Repost", guild.Repost,
+					"Expiration (repost.expiration)", guild.RepostExpiration,
+					"Crosspost", messages.FormatBool(guild.Crosspost),
+					"Reactions", messages.FormatBool(guild.Reactions),
+					"Tags", messages.FormatBool(guild.Tags),
+					"Footer messages (footer)", messages.FormatBool(guild.FlavorText),
 				),
 			)
 
 			eb.AddField(
-				msg.PixivSettings.Title,
+				"Pixiv settings",
 				fmt.Sprintf(
 					"**%v**: %v | **%v**: %v",
-					msg.PixivSettings.Enabled, messages.FormatBool(guild.Pixiv),
-					msg.PixivSettings.Limit, strconv.Itoa(guild.Limit),
+					"Status (pixiv)", messages.FormatBool(guild.Pixiv),
+					"Limit", strconv.Itoa(guild.Limit),
 				),
 			)
 
 			eb.AddField(
-				msg.TwitterSettings.Title,
+				"Twitter settings",
+				fmt.Sprintf(
+					"**%v**: %v | **%v**: %v",
+					"Status (twitter)", messages.FormatBool(guild.Twitter),
+					"Skip First (twitter.skip)", messages.FormatBool(guild.SkipFirst),
+				),
+			)
+
+			eb.AddField(
+				"DeviantArt settings",
 				fmt.Sprintf(
 					"**%v**: %v",
-					msg.TwitterSettings.Enabled, messages.FormatBool(guild.Twitter),
+					"Status (deviant)", messages.FormatBool(guild.Deviant),
 				),
 			)
 
 			eb.AddField(
-				msg.DeviantSettings.Title,
+				"ArtStation settings",
 				fmt.Sprintf(
 					"**%v**: %v",
-					msg.DeviantSettings.Enabled, messages.FormatBool(guild.Deviant),
+					"Status (artstation)", messages.FormatBool(guild.Artstation),
 				),
 			)
 
 			eb.AddField(
-				msg.ArtstationSettings.Title,
-				fmt.Sprintf(
-					"**%v**: %v",
-					msg.ArtstationSettings.Enabled, messages.FormatBool(guild.Artstation),
-				),
-			)
-
-			eb.AddField(
-				msg.ArtChannels,
-				"Use `bt!artchannels` command to list or manage art channels!\n"+strings.Join(
+				"Art channels",
+				"Use `bt!artchannels` command to list or manage art channels!\n\n"+strings.Join(
 					arrays.Map(guild.ArtChannels, func(s string) string {
-						if len(guild.ArtChannels) > 15 {
-							return ""
+						if len(guild.ArtChannels) > 10 {
+							return "There are more than 10 art channels, use `bt!artchannels` command to see them."
 						}
 
 						return fmt.Sprintf("<#%v> | `%v`", s, s)
@@ -661,9 +658,18 @@ func set(b *bot.Bot) func(ctx *gumi.Ctx) error {
 					return err
 				}
 
-				oldSettingEmbed = guild.FlavourText
+				oldSettingEmbed = guild.FlavorText
 				newSettingEmbed = new
-				guild.FlavourText = new
+				guild.FlavorText = new
+			case "twitter.skip":
+				new, err := parseBool(newSetting.Raw)
+				if err != nil {
+					return err
+				}
+
+				oldSettingEmbed = guild.SkipFirst
+				newSettingEmbed = new
+				guild.SkipFirst = new
 			default:
 				return messages.ErrUnknownSetting(settingName.Raw)
 			}
