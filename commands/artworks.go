@@ -157,7 +157,7 @@ func parseArtworkArgument(arg string) (int, string, bool) {
 	return 0, "", false
 }
 
-func share(b *bot.Bot, s) func(ctx *gumi.Ctx) error {
+func share(b *bot.Bot, s post.SkipMode) func(ctx *gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
 		if ctx.Args.Len() < 1 {
 			return messages.ErrIncorrectCmd(ctx.Command)
