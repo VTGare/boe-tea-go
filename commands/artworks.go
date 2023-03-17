@@ -75,25 +75,25 @@ func artworksGroup(b *bot.Bot) {
 	b.Router.RegisterCmd(&gumi.Command{
 		Name:        "share",
 		Group:       group,
-		Aliases:     []string{"pixiv", "twitter", "exclude"},
-		Description: "Shares an artwork from a URL, optionally excludes images.",
-		Usage:       "bt!share <artwork url> [indices to exclude]",
+		Aliases:     []string{"pixiv", "twitter", "include", "shareinclude", "si"},
+		Description: "Shares an artwork from a URL, optionally includes some images.",
+		Usage:       "bt!share <artwork url> [indices to include]",
 		Example:     "bt!share https://pixiv.net/artworks/86341538 1-3 5",
 		GuildOnly:   true,
 		RateLimiter: gumi.NewRateLimiter(5 * time.Second),
-		Exec:        share(b),
+		Exec:        share(b, post.SkipModeInclude),
 	})
 
 	b.Router.RegisterCmd(&gumi.Command{
-		Name:        "shareinclude",
+		Name:        "shareexclude",
 		Group:       group,
-		Aliases:     []string{"si", "include"},
-		Description: "Shares an artwork from a URL, optionally include only some images.",
-		Usage:       "bt!si <artwork url> [indices to include]",
-		Example:     "bt!si https://pixiv.net/artworks/86341538 1",
+		Aliases:     []string{"exclude", "ex"},
+		Description: "Shares an artwork from a URL, optionally excludes some images.",
+		Usage:       "bt!ex <artwork url> [indices to exclude]",
+		Example:     "bt!ex https://pixiv.net/artworks/86341538 1",
 		GuildOnly:   true,
 		RateLimiter: gumi.NewRateLimiter(5 * time.Second),
-		Exec:        shareInclude(b),
+		Exec:        share(b, post.SkipModeExclude),
 	})
 
 	b.Router.RegisterCmd(&gumi.Command{
@@ -157,7 +157,7 @@ func parseArtworkArgument(arg string) (int, string, bool) {
 	return 0, "", false
 }
 
-func share(b *bot.Bot) func(ctx *gumi.Ctx) error {
+func share(b *bot.Bot, s) func(ctx *gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
 		if ctx.Args.Len() < 1 {
 			return messages.ErrIncorrectCmd(ctx.Command)
@@ -186,82 +186,7 @@ func share(b *bot.Bot) func(ctx *gumi.Ctx) error {
 
 		p := post.New(b, ctx, url)
 		if len(indices) > 0 {
-			p.SetSkip(indices, post.SkipModeExclude)
-		}
-
-		allSent := make([]*cache.MessageInfo, 0)
-		sent, err := p.Send()
-		if err != nil {
-			return err
-		}
-
-		allSent = append(allSent, sent...)
-
-		user, _ := b.Store.User(context.Background(), ctx.Event.Author.ID)
-		if user != nil {
-			if group, ok := user.FindGroup(ctx.Event.ChannelID); ok {
-				sent, err := p.Crosspost(user.ID, group.Name, group.Children)
-				if err != nil {
-					return err
-				}
-
-				allSent = append(allSent, sent...)
-			}
-		}
-
-		if len(allSent) > 0 {
-			b.EmbedCache.Set(
-				ctx.Event.Author.ID,
-				ctx.Event.ChannelID,
-				ctx.Event.ID,
-				true,
-				allSent...,
-			)
-
-			for _, msg := range allSent {
-				b.EmbedCache.Set(
-					ctx.Event.Author.ID,
-					msg.ChannelID,
-					msg.MessageID,
-					false,
-				)
-			}
-		}
-
-		return nil
-	}
-}
-
-func shareInclude(b *bot.Bot) func(ctx *gumi.Ctx) error {
-	return func(ctx *gumi.Ctx) error {
-		if ctx.Args.Len() < 1 {
-			return messages.ErrIncorrectCmd(ctx.Command)
-		}
-
-		//Trim <> in case someone wraps the link in it.
-		url := strings.Trim(ctx.Args.Get(0).Raw, "<>")
-		ctx.Args.Remove(0)
-
-		indices := make(map[int]struct{})
-		for _, arg := range strings.Fields(ctx.Args.Raw) {
-			index, err := strconv.Atoi(arg)
-			if err != nil {
-				ran, err := dgoutils.NewRange(arg)
-				if err != nil {
-					return messages.ErrSkipIndexSyntax(arg)
-				}
-
-				for _, index := range ran.Array() {
-					indices[index] = struct{}{}
-				}
-			} else {
-				indices[index] = struct{}{}
-			}
-		}
-
-		p := post.New(b, ctx, url)
-		if len(indices) > 0 {
-			p.SetSkip(indices, post.SkipModeInclude)
+			p.SetSkip(indices, s)
 		}
 
 		allSent := make([]*cache.MessageInfo, 0)

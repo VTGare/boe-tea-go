@@ -133,41 +133,38 @@ func nhentai(b *bot.Bot) func(ctx *gumi.Ctx) error {
 
 func sauce(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
-		images := findImage(
+		url, ok := findImage(
 			ctx.Session,
 			ctx.Event,
 			strings.Fields(ctx.Args.Raw),
 		)
 
-		if len(images) == 0 {
+		if !ok {
 			return messages.SauceNoImage()
-		} else if len(images) == 1 {
-            sauces, err := b.Sengoku.Search(images[0])
-            if err != nil {
-                switch {
-                case errors.Is(err, sengoku.ErrRateLimitReached):
-                    return messages.SauceRateLimit()
-                default:
-                    return messages.SauceError(err)
-                }
-            }
-
-            filtered := make([]*sengoku.Sauce, 0)
-            for _, sauce := range sauces {
-                if sauce.Similarity > 70.0 && sauce.Pretty {
-                    filtered = append(filtered, sauce)
-                }
-            }
-
-            if len(filtered) == 0 {
-                return messages.SauceNotFound(url)
-            }
-
-            sauceEmbeds := sauceNAOEmbeds(filtered)
-		} else {
-		    sauceEmbeds := sauceNAOMultipleEmbed(images)
 		}
 
+		sauces, err := b.Sengoku.Search(url)
+		if err != nil {
+			switch {
+			case errors.Is(err, sengoku.ErrRateLimitReached):
+				return messages.SauceRateLimit()
+			default:
+				return messages.SauceError(err)
+			}
+		}
+
+		filtered := make([]*sengoku.Sauce, 0)
+		for _, sauce := range sauces {
+			if sauce.Similarity > 70.0 && sauce.Pretty {
+				filtered = append(filtered, sauce)
+			}
+		}
+
+		if len(filtered) == 0 {
+			return messages.SauceNotFound(url)
+		}
+
+		sauceEmbeds := sauceNAOEmbeds(filtered)
 		widget := dgoutils.NewWidget(ctx.Session, ctx.Event.Author.ID, sauceEmbeds)
 		return widget.Start(ctx.Event.ChannelID)
 	}
@@ -211,24 +208,6 @@ func sauceNAOEmbeds(sauces []*sengoku.Sauce) []*discordgo.MessageEmbed {
 	}
 
 	return sauceEmbeds
-}
-
-func sauceNAOMultipleEmbed(images []string) []*discordgo.MessageEmbed {
-    sauceEmbed := *discordgo.MessageEmbed
-
-    toEmbed := func(images []string) *discordgo.MessageEmbed {
-        eb := embeds.NewBuilder()
-        eb.Author("SauceNAO Image Results:", _, "https://saucenao.com/favicon.ico")
-
-        for index, url := range images {
-            sauceNAOLink := fmt.Sprintf("https://saucenao.com/search.php?url=%v", url)
-            eb.AddField(_, messages.NamedLink(fmt.Sprintf("Image Results %v", index+1), sauceNAOLink, true))
-        }
-
-        return eb.Finalize()
-    }
-
-    return toEmbed(images)
 }
 
 func handleURLs(source *sengoku.Sauce, eb *embeds.Builder) {
@@ -275,34 +254,26 @@ func handleURLs(source *sengoku.Sauce, eb *embeds.Builder) {
 	eb.AddField("External links", sb.String())
 }
 
-func findImage(s *discordgo.Session, m *discordgo.MessageCreate, args []string) ([]string) {
+func findImage(s *discordgo.Session, m *discordgo.MessageCreate, args []string) (string, bool) {
 	if len(args) > 0 {
 		if imageRegex.MatchString(args[0]) {
-			return append(urls, args[0])
+			return args[0], true
 		} else if url, err := findImageMessageReference(s, args[0]); err == nil && url != "" {
-		    return append(urls, url)
+			return url, true
 		}
 	}
 
 	if len(m.Attachments) > 0 {
-	    urls := make([]string, 0)
-	    for index, attach := range m.Attachments {
-		    url := attach.URL
-
-            if imageRegex.MatchString(url) {
-                urls = append(urls, url)
-            }
-        }
-
-        if len(urls) > 0 {
-            return urls
-        }
+		url := m.Attachments[0].URL
+		if imageRegex.MatchString(url) {
+			return url, true
+		}
 	}
 
 	if ref := m.MessageReference; ref != nil {
 		url, err := findImageMessageReference(s, fmt.Sprintf("https://discord.com/channels/%s/%s/%s", ref.GuildID, ref.ChannelID, ref.MessageID))
 		if err == nil && url != "" {
-			return append(urls, url)
+			return url, true
 		}
 	}
 
@@ -310,20 +281,20 @@ func findImage(s *discordgo.Session, m *discordgo.MessageCreate, args []string) 
 		if m.Embeds[0].Image != nil {
 			url := m.Embeds[0].Image.URL
 			if imageRegex.MatchString(url) {
-				return append(urls, url)
+				return url, true
 			}
 		}
 	}
 
 	messages, err := s.ChannelMessages(m.ChannelID, 5, m.ID, "", "")
 	if err != nil {
-		return append(urls, "")
+		return "", false
 	}
 	if recent := findImageMessages(messages); recent != "" {
-		return append(urls, recent)
+		return recent, true
 	}
 
-	return append(urls, "")
+	return "", false
 }
 
 func findImageMessages(messages []*discordgo.Message) string {
