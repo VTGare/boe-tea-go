@@ -466,7 +466,7 @@ func (p *Post) generateMessages(guild *store.Guild, artworks []artworks.Artwork,
 	for _, artwork := range artworks {
 		if artwork != nil {
 			var quote string
-			if guild.FlavourText {
+			if guild.FlavorText {
 				quote = p.bot.Config.RandomQuote(guild.NSFW)
 			}
 
@@ -475,7 +475,7 @@ func (p *Post) generateMessages(guild *store.Guild, artworks []artworks.Artwork,
 				return nil, err
 			}
 
-			if p.skipFirst(artwork) {
+			if p.skipFirst(guild, artwork) {
 				sends = sends[1:]
 			}
 
@@ -542,7 +542,11 @@ func (p *Post) skipArtworks(embeds []*discordgo.MessageSend) []*discordgo.Messag
 	return filtered
 }
 
-func (p *Post) skipFirst(a artworks.Artwork) bool {
+func (p *Post) skipFirst(guild *store.Guild, a artworks.Artwork) bool {
+	if !guild.SkipFirst {
+		return false
+	}
+
 	if p.ctx.Command != nil {
 		return false
 	}

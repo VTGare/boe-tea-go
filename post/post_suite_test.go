@@ -5,6 +5,7 @@ import (
 
 	"github.com/VTGare/boe-tea-go/artworks/pixiv"
 	"github.com/VTGare/boe-tea-go/artworks/twitter"
+	"github.com/VTGare/boe-tea-go/store"
 	"github.com/VTGare/gumi"
 	"github.com/bwmarrin/discordgo"
 	twitterscraper "github.com/n0madic/twitter-scraper"
@@ -32,44 +33,51 @@ var _ = Describe("Skip First Tests", func() {
 		post           Post
 		twitterArtwork *twitter.Artwork
 		pixivArtwork   = &pixiv.Artwork{}
+		guild          = &store.Guild{SkipFirst: true}
 	)
 
 	BeforeEach(func() {
 		post = Post{ctx: &gumi.Ctx{}}
+		guild = &store.Guild{SkipFirst: true}
 		twitterArtwork = &twitter.Artwork{Photos: []string{"https://test.com/1.png"}}
 	})
 
 	It("should skip first if Twitter", func() {
-		Expect(post.skipFirst(twitterArtwork)).To(BeTrue())
+		Expect(post.skipFirst(guild, twitterArtwork)).To(BeTrue())
 	})
 
 	It("shouldn't skip first if Twitter and command", func() {
 		post.ctx.Command = &gumi.Command{}
-		Expect(post.skipFirst(twitterArtwork)).To(BeFalse())
+		Expect(post.skipFirst(guild, twitterArtwork)).To(BeFalse())
 	})
 
 	It("should skip first if tweet has no images or videos", func() {
 		twitterArtwork.Photos = []string{}
-		Expect(post.skipFirst(twitterArtwork)).To(BeTrue())
+		Expect(post.skipFirst(guild, twitterArtwork)).To(BeTrue())
 	})
 
 	It("should skip first if tweet is NSFW", func() {
 		twitterArtwork.NSFW = true
-		Expect(post.skipFirst(twitterArtwork)).To(BeTrue())
+		Expect(post.skipFirst(guild, twitterArtwork)).To(BeTrue())
+	})
+
+	It("shouldn't skip first if skipFirst setting is false", func() {
+		guild.SkipFirst = false
+		Expect(post.skipFirst(guild, twitterArtwork)).To(BeFalse())
 	})
 
 	It("shouldn't skip first if tweet has video", func() {
 		twitterArtwork.Videos = []twitterscraper.Video{{}}
-		Expect(post.skipFirst(twitterArtwork)).To(BeFalse())
+		Expect(post.skipFirst(guild, twitterArtwork)).To(BeFalse())
 	})
 
 	It("shouldn't skip first if Twitter and crosspost", func() {
 		post.crosspost = true
-		Expect(post.skipFirst(twitterArtwork)).To(BeFalse())
+		Expect(post.skipFirst(guild, twitterArtwork)).To(BeFalse())
 	})
 
 	It("shouldn't skip first if not Twitter", func() {
-		Expect(post.skipFirst(pixivArtwork)).To(BeFalse())
+		Expect(post.skipFirst(guild, pixivArtwork)).To(BeFalse())
 	})
 })
 
