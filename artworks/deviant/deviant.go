@@ -19,10 +19,11 @@ import (
 )
 
 type DeviantArt struct {
-	regex *regexp.Regexp
+    artworks.ProvBase
 }
 
 type Artwork struct {
+    artworks.ArtBase
 	Title        string
 	Author       *Author
 	ImageURL     string
@@ -63,9 +64,9 @@ type deviantEmbed struct {
 }
 
 func New() artworks.Provider {
-	return &DeviantArt{
-		regex: regexp.MustCompile(`(?i)https:\/\/(?:www\.)?deviantart\.com\/[\w]+\/art\/([\w\-]+)`),
-	}
+    prov := artworks.ProvBase{}
+    prov.Regex = regexp.MustCompile(`(?i)https:\/\/(?:www\.)?deviantart\.com\/[\w]+\/art\/([\w\-]+)`)
+	return &DeviantArt{prov}
 }
 
 func (d *DeviantArt) Find(id string) (artworks.Artwork, error) {
@@ -97,15 +98,6 @@ func (d *DeviantArt) Find(id string) (artworks.Artwork, error) {
 		CreatedAt:    res.Pubdate,
 		url:          res.AuthorURL + "/art/" + id,
 	}, nil
-}
-
-func (d *DeviantArt) Match(s string) (string, bool) {
-	res := d.regex.FindStringSubmatch(s)
-	if res == nil {
-		return "", false
-	}
-
-	return res[1], true
 }
 
 func (d *DeviantArt) Enabled(g *store.Guild) bool {
@@ -141,19 +133,8 @@ func (a *Artwork) MessageSends(footer string, hasTags bool) ([]*discordgo.Messag
 	}, nil
 }
 
-func (a *Artwork) StoreArtwork() *store.Artwork {
-	return &store.Artwork{
-		Title:  a.Title,
-		Author: a.Author.Name,
-		URL:    a.url,
-		Images: []string{a.ImageURL},
-	}
-}
-
-func (a *Artwork) URL() string {
-	return a.url
-}
-
-func (a *Artwork) Len() int {
-	return 1
-}
+func (a *Artwork) GetTitle() string { return a.Title }
+func (a *Artwork) GetAuthor() string { return a.Author.Name }
+func (a *Artwork) GetURL() string { return a.url }
+func (a *Artwork) GetImages() []string { return []string{a.ImageURL} }
+func (a *Artwork) Len() int { return 1 }

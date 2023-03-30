@@ -16,10 +16,11 @@ import (
 )
 
 type Artstation struct {
-	regex *regexp.Regexp
+    artworks.ProvBase
 }
 
 type ArtstationResponse struct {
+    artworks.ArtBase
 	Title       string   `json:"title,omitempty"`
 	Description string   `json:"description,omitempty"`
 	Permalink   string   `json:"permalink,omitempty"`
@@ -70,11 +71,9 @@ type Category struct {
 }
 
 func New() artworks.Provider {
-	r := regexp.MustCompile(`(?i)https:\/\/(?:www\.)?artstation\.com\/artwork\/([\w\-]+)`)
-
-	return &Artstation{
-		regex: r,
-	}
+    prov := artworks.ProvBase{}
+    prov.Regex = regexp.MustCompile(`(?i)https:\/\/(?:www\.)?artstation\.com\/artwork\/([\w\-]+)`)
+	return &Artstation{prov}
 }
 
 func (as *Artstation) Find(id string) (artworks.Artwork, error) {
@@ -95,31 +94,8 @@ func (as *Artstation) Find(id string) (artworks.Artwork, error) {
 	return res, nil
 }
 
-func (as *Artstation) Match(url string) (string, bool) {
-	res := as.regex.FindStringSubmatch(url)
-	if res == nil {
-		return "", false
-	}
-
-	return res[1], true
-}
-
 func (*Artstation) Enabled(g *store.Guild) bool {
 	return g.Artstation
-}
-
-func (artwork *ArtstationResponse) StoreArtwork() *store.Artwork {
-	images := make([]string, 0, len(artwork.Assets))
-	for _, asset := range artwork.Assets {
-		images = append(images, asset.ImageURL)
-	}
-
-	return &store.Artwork{
-		Title:  artwork.Title,
-		Author: artwork.User.Name,
-		URL:    artwork.Permalink,
-		Images: images,
-	}
 }
 
 func (artwork *ArtstationResponse) MessageSends(footer string, hasTags bool) ([]*discordgo.MessageSend, error) {
@@ -150,7 +126,7 @@ func (artwork *ArtstationResponse) MessageSends(footer string, hasTags bool) ([]
 		eb.Description(desc)
 	}
 
-	eb.URL(artwork.URL()).
+	eb.URL(artwork.GetURL()).
 		AddField("Likes", strconv.Itoa(artwork.LikesCount), true).
 		AddField("Views", strconv.Itoa(artwork.ViewsCount), true).
 		Timestamp(artwork.CreatedAt)
@@ -165,9 +141,9 @@ func (artwork *ArtstationResponse) MessageSends(footer string, hasTags bool) ([]
 		for ind, image := range artwork.Assets[1:] {
 			eb := embeds.NewBuilder()
 
-			eb.Title(fmt.Sprintf("%v by %v | Page %v / %v", artwork.Title, artwork.User.Name, ind+2, length)).
+			eb.Title(fmt.Sprintf("%v by %v | Page %v / %v", artwork.GetTitle, artwork.GetAuthor, ind+2, length)).
 				Image(image.ImageURL).
-				URL(artwork.URL()).
+				URL(artwork.GetURL()).
 				Timestamp(artwork.CreatedAt)
 
 			if footer != "" {
@@ -182,10 +158,16 @@ func (artwork *ArtstationResponse) MessageSends(footer string, hasTags bool) ([]
 	return pages, nil
 }
 
-func (artwork *ArtstationResponse) URL() string {
-	return artwork.Permalink
+func (artwork *ArtstationResponse) GetTitle() string { return artwork.Title }
+func (artwork *ArtstationResponse) GetAuthor() string { return artwork.User.Name }
+func (artwork *ArtstationResponse) GetURL() string { return artwork.Permalink }
+
+func (artwork *ArtstationResponse) GetImages() []string {
+    images := make([]string, 0, len(artwork.Assets))
+	for _, asset := range artwork.Assets {
+		images = append(images, asset.ImageURL)
+	}
+	return images
 }
 
-func (artwork *ArtstationResponse) Len() int {
-	return len(artwork.Assets)
-}
+func (artwork *ArtstationResponse) Len() int { return len(artwork.Assets) }

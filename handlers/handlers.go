@@ -382,9 +382,11 @@ func OnReactionAdd(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageReacti
 				return nil
 			}
 
-			artworkDB, err := b.Store.Artwork(ctx, 0, artwork.URL())
+			artworkDB, err := b.Store.Artwork(ctx, 0, artwork.GetURL())
 			if errors.Is(err, store.ErrArtworkNotFound) {
-				artworkDB, err = b.Store.CreateArtwork(ctx, artwork.StoreArtwork())
+				artworkDB, err = b.Store.CreateArtwork(ctx, artwork.StoreArtwork(
+				    artwork.GetTitle(), artwork.GetAuthor(), artwork.GetURL(), artwork.GetImages(),
+				))
 			}
 
 			if err != nil {
@@ -541,7 +543,7 @@ func OnReactionRemove(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageRea
 			return
 		}
 
-		artworkDB, err := b.Store.Artwork(ctx, 0, artwork.URL())
+		artworkDB, err := b.Store.Artwork(ctx, 0, artwork.GetURL())
 		if err != nil {
 			if !errors.Is(err, mongo.ErrNoDocuments) {
 				log.With("error", err).Error("failed to find an artwork")

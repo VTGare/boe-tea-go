@@ -16,17 +16,13 @@ import (
 	"github.com/everpcpc/pixiv"
 )
 
-var (
-	regex = regexp.MustCompile(
-		`(?i)http(?:s)?:\/\/(?:www\.)?pixiv\.net\/(?:en\/)?(?:artworks\/|member_illust\.php\?)(?:mode=medium\&)?(?:illust_id=)?([0-9]+)`,
-	)
-)
-
 type Pixiv struct {
+    artworks.ProvBase
 	app *pixiv.AppPixivAPI
 }
 
 type Artwork struct {
+    artworks.ArtBase
 	ID          string
 	Type        string
 	Author      string
@@ -53,16 +49,9 @@ func New(authToken, refreshToken string) (artworks.Provider, error) {
 		return nil, err
 	}
 
-	return &Pixiv{app: pixiv.NewApp()}, nil
-}
-
-func (p *Pixiv) Match(s string) (string, bool) {
-	res := regex.FindStringSubmatch(s)
-	if res == nil {
-		return "", false
-	}
-
-	return res[1], true
+    prov := artworks.ProvBase{}
+	prov.Regex = regexp.MustCompile(`(?i)http(?:s)?:\/\/(?:www\.)?pixiv\.net\/(?:en\/)?(?:artworks\/|member_illust\.php\?)(?:mode=medium\&)?(?:illust_id=)?([0-9]+)`)
+    return &Pixiv{prov, pixiv.NewApp()}, nil
 }
 
 func (p *Pixiv) Find(id string) (artworks.Artwork, error) {
@@ -143,15 +132,6 @@ func (p *Pixiv) Enabled(g *store.Guild) bool {
 	return g.Pixiv
 }
 
-func (a *Artwork) StoreArtwork() *store.Artwork {
-	return &store.Artwork{
-		Title:  a.Title,
-		Author: a.Author,
-		URL:    a.url,
-		Images: a.imageURLs(),
-	}
-}
-
 func (a *Artwork) MessageSends(footer string, hasTags bool) ([]*discordgo.MessageSend, error) {
 	var (
 		length = len(a.Images)
@@ -220,21 +200,17 @@ func (a *Artwork) MessageSends(footer string, hasTags bool) ([]*discordgo.Messag
 	return pages, nil
 }
 
-func (a *Artwork) URL() string {
-	return a.url
-}
+func (a *Artwork) GetTitle() string { return a.Title }
+func (a *Artwork) GetAuthor() string { return a.Author }
+func (a *Artwork) GetURL() string { return a.url }
+func (a *Artwork) Len() int { return a.Pages }
 
-func (a *Artwork) Len() int {
-	return a.Pages
-}
-
-func (a *Artwork) imageURLs() []string {
+func (a *Artwork) GetImages() []string {
 	urls := make([]string, 0, len(a.Images))
 
 	for _, img := range a.Images {
 		urls = append(urls, img.originalProxy())
 	}
-
 	return urls
 }
 

@@ -22,11 +22,13 @@ import (
 )
 
 type Twitter struct {
+    artworks.TwitBase
 	scraper  *twitterscraper.Scraper
 	fallback artworks.Provider
 }
 
 type Artwork struct {
+    artworks.ArtBase
 	Videos    []twitterscraper.Video
 	Photos    []string
 	ID        string
@@ -97,54 +99,8 @@ func (t *Twitter) Find(id string) (artworks.Artwork, error) {
 	return art, nil
 }
 
-func (t *Twitter) Match(s string) (string, bool) {
-	u, err := url.ParseRequestURI(s)
-	if err != nil {
-		return "", false
-	}
-
-	if u.Host != "twitter.com" && u.Host != "mobile.twitter.com" {
-		return "", false
-	}
-
-	parts := strings.FieldsFunc(u.Path, func(r rune) bool {
-		return r == '/'
-	})
-
-	if len(parts) < 3 {
-		return "", false
-	}
-
-	parts = parts[2:]
-	if parts[0] == "status" {
-		parts = parts[1:]
-	}
-
-	snowflake := parts[0]
-	if _, err := strconv.ParseUint(snowflake, 10, 64); err != nil {
-		return "", false
-	}
-
-	return snowflake, true
-}
-
 func (Twitter) Enabled(g *store.Guild) bool {
 	return g.Twitter
-}
-
-func (artwork *Artwork) StoreArtwork() *store.Artwork {
-	media := make([]string, 0, len(artwork.Photos)+len(artwork.Videos))
-
-	media = append(media, artwork.Photos...)
-	for _, video := range artwork.Videos {
-		media = append(media, video.Preview)
-	}
-
-	return &store.Artwork{
-		Author: artwork.Username,
-		URL:    artwork.Permalink,
-		Images: media,
-	}
 }
 
 // Embeds transforms an artwork to DiscordGo embeds.
@@ -227,15 +183,22 @@ func (a *Artwork) MessageSends(footer string, _ bool) ([]*discordgo.MessageSend,
 	return tweets, nil
 }
 
-func (a *Artwork) URL() string {
-	return a.Permalink
+func (a *Artwork) GetAuthor() string { return a.Username }
+func (a *Artwork) GetURL() string { return a.Permalink }
+
+func (a *Artwork) GetImages() []string {
+    media := make([]string, 0, len(a.Photos)+len(a.Videos))
+	media = append(media, a.Photos...)
+	for _, video := range a.Videos {
+		media = append(media, video.Preview)
+	}
+    return media
 }
 
 func (a *Artwork) Len() int {
 	if len(a.Videos) != 0 {
 		return 1
 	}
-
 	return len(a.Photos)
 }
 
@@ -266,6 +229,6 @@ func convertNitter(a *nitter.Artwork) *Artwork {
 		Videos:    videos,
 		Photos:    photos,
 		NSFW:      true, // Fallback method is only used for NSFW artworks.
-		Permalink: a.URL(),
+		Permalink: a.GetURL(),
 	}
 }

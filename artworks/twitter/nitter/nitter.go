@@ -26,11 +26,13 @@ const (
 )
 
 type Nitter struct {
+    artworks.TwitBase
 	nitter []string
 }
 
 //Artwork is a tweet struct with a media gallery.
 type Artwork struct {
+    artworks.ArtBase
 	FullName  string
 	Username  string
 	Snowflake string
@@ -60,37 +62,6 @@ func New() artworks.Provider {
 		"https://nitter.fdn.fr",
 		"https://nitter.namazso.eu",
 	}}
-}
-
-func (t *Nitter) Match(s string) (string, bool) {
-	u, err := url.ParseRequestURI(s)
-	if err != nil {
-		return "", false
-	}
-
-	if u.Host != "twitter.com" && u.Host != "mobile.twitter.com" {
-		return "", false
-	}
-
-	parts := strings.FieldsFunc(u.Path, func(r rune) bool {
-		return r == '/'
-	})
-
-	if len(parts) < 3 {
-		return "", false
-	}
-
-	parts = parts[2:]
-	if parts[0] == "status" {
-		parts = parts[1:]
-	}
-
-	snowflake := parts[0]
-	if _, err := strconv.ParseUint(snowflake, 10, 64); err != nil {
-		return "", false
-	}
-
-	return snowflake, true
 }
 
 func (t *Nitter) Find(snowflake string) (artworks.Artwork, error) {
@@ -186,21 +157,11 @@ func parseCount(s string) int {
 	return num
 }
 
-//StoreArtwork transforms an artwork to an insertable to database artwork model.
-func (a *Artwork) StoreArtwork() *store.Artwork {
-	return &store.Artwork{
-		Title:  "",
-		Author: a.Username,
-		URL:    a.url,
-		Images: a.Gallery.Strings(),
-	}
-}
-
 //Embeds transforms an artwork to DiscordGo embeds.
 func (a *Artwork) MessageSends(footer string, _ bool) ([]*discordgo.MessageSend, error) {
 	var (
 		eb     = embeds.NewBuilder()
-		length = a.Gallery.Len()
+		length = a.Len()
 	)
 
 	tweets := make([]*discordgo.MessageSend, 0, length)
@@ -266,24 +227,16 @@ func (a *Artwork) MessageSends(footer string, _ bool) ([]*discordgo.MessageSend,
 	return tweets, nil
 }
 
-func (a *Artwork) URL() string {
-	return a.url
-}
+func (a *Artwork) GetAuthor() string { return a.Username }
+func (a *Artwork) GetURL() string { return a.url }
+func (a *Artwork) Len() int { return len(a.Gallery) } //Len returns the length of Tweets gallery.
 
-func (a *Artwork) Len() int {
-	return a.Gallery.Len()
-}
+//GetImages returns an array of strings with tweet's media URLs.
+func (a *Artwork) GetImages() []string {
+	urls := make([]string, 0, a.Len())
 
-//Len returns the length of Tweets gallery.
-func (g Gallery) Len() int { return len(g) }
-
-//Strings returns an array of strings with tweet's media URLs.
-func (g Gallery) Strings() []string {
-	ss := make([]string, 0, g.Len())
-
-	for _, media := range g {
-		ss = append(ss, media.URL)
+	for _, media := range a.Gallery {
+		urls = append(urls, media.URL)
 	}
-
-	return ss
+	return urls
 }
