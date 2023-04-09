@@ -29,7 +29,7 @@ type Nitter struct {
 	nitter []string
 }
 
-//Artwork is a tweet struct with a media gallery.
+// Artwork is a tweet struct with a media gallery.
 type Artwork struct {
 	FullName  string
 	Username  string
@@ -43,22 +43,22 @@ type Artwork struct {
 	Gallery   Gallery
 }
 
-//Media is tweet's media file which can be an image, a GIF, or a video. M3U8 is only present with video tweets.
+// Media is tweet's media file which can be an image, a GIF, or a video. M3U8 is only present with video tweets.
 type Media struct {
 	URL  string
 	Type MediaType
 }
 
-//Gallery is an array of tweet's media files: images, GIFs, or videos.
+// Gallery is an array of tweet's media files: images, GIFs, or videos.
 type Gallery []*Media
 
-//New creates a new Twitter artwork provider.
+// New creates a new Twitter artwork provider.
 func New() artworks.Provider {
 	return &Nitter{nitter: []string{
-		"https://nitter.42l.fr",
-		"https://nitter.pussthecat.org",
-		"https://nitter.fdn.fr",
-		"https://nitter.namazso.eu",
+		"https://nittereu.moomoo.me",
+		"https://nitter.fly.dev",
+		"https://nitter.1d4.us",
+		"https://notabird.site",
 	}}
 }
 
@@ -186,7 +186,7 @@ func parseCount(s string) int {
 	return num
 }
 
-//StoreArtwork transforms an artwork to an insertable to database artwork model.
+// StoreArtwork transforms an artwork to an insertable to database artwork model.
 func (a *Artwork) StoreArtwork() *store.Artwork {
 	return &store.Artwork{
 		Title:  "",
@@ -196,7 +196,7 @@ func (a *Artwork) StoreArtwork() *store.Artwork {
 	}
 }
 
-//Embeds transforms an artwork to DiscordGo embeds.
+// Embeds transforms an artwork to DiscordGo embeds.
 func (a *Artwork) MessageSends(footer string, _ bool) ([]*discordgo.MessageSend, error) {
 	var (
 		eb     = embeds.NewBuilder()
@@ -274,10 +274,10 @@ func (a *Artwork) Len() int {
 	return a.Gallery.Len()
 }
 
-//Len returns the length of Tweets gallery.
+// Len returns the length of Tweets gallery.
 func (g Gallery) Len() int { return len(g) }
 
-//Strings returns an array of strings with tweet's media URLs.
+// Strings returns an array of strings with tweet's media URLs.
 func (g Gallery) Strings() []string {
 	ss := make([]string, 0, g.Len())
 

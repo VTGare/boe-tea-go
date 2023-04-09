@@ -55,7 +55,7 @@ func New() artworks.Provider {
 
 func (t *Twitter) Find(id string) (artworks.Artwork, error) {
 	tweet, err := t.scraper.GetTweet(id)
-	if err != nil {
+	if err != nil || tweet.Username == "" {
 		a, err := t.fallback.Find(id)
 		if err != nil {
 			return nil, err
@@ -147,9 +147,19 @@ func (artwork *Artwork) StoreArtwork() *store.Artwork {
 	}
 }
 
-// Embeds transforms an artwork to DiscordGo embeds.
+// MessageSends transforms an artwork to discordgo embeds.
 func (a *Artwork) MessageSends(footer string, _ bool) ([]*discordgo.MessageSend, error) {
 	eb := embeds.NewBuilder()
+	if a.Username == "" && a.Len() == 0 {
+		eb.Title("❎ Tweet doesn't exist.")
+		eb.Description("Twitter API doesn't respond or the tweet has been deleted.\n\nLately unsafe tweets may appear as deleted, I'm looking for a workaround!")
+		eb.Footer(footer, "")
+
+		return []*discordgo.MessageSend{
+			{Embeds: []*discordgo.MessageEmbed{eb.Finalize()}},
+		}, nil
+	}
+
 	eb.URL(a.Permalink).Description(a.Content).Timestamp(a.Timestamp)
 	eb.AddField("Retweets", strconv.Itoa(a.Retweets), true)
 	eb.AddField("Likes", strconv.Itoa(a.Likes), true)
