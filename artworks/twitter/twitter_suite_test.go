@@ -32,5 +32,5 @@ var _ = DescribeTable(
 	Entry("ID with letters", "https://twitter.com/i/web/status/1371674594675937282f", "", false),
 	Entry("Different domain", "https://google.com/i/status/123456", "", false),
 	Entry("Invalid URL", "efe", "", false),
-	Entry("vxtwitter link", "https://vxtwitter.com/i/status/1234", "", false),
+	Entry("vxtwitter link", "https://vxtwitter.com/i/status/1234", "1234", true),
 )

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -426,7 +427,8 @@ func (p *Post) send(guild *store.Guild, channelID string, artworks []artworks.Ar
 		// If URL isn't set then it's an error embed.
 		// If media count equals 0, it's most likely a Tweet without images and it can't be bookmarked.
 		if guild.Reactions && len(send.Embeds) > 0 && send.Embeds[0].URL != "" && mediaCount != 0 {
-			if err := p.addBookmarkReactions(msg); err != nil {
+			err := p.addBookmarkReactions(msg)
+			if err != nil && !strings.Contains(err.Error(), "403") {
 				return fmt.Errorf("failed to add reactions: %w", err)
 			}
 		}

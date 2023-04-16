@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"html"
 	"io"
 	"net/http"
 	"net/url"
@@ -13,21 +12,19 @@ import (
 	"time"
 
 	"github.com/VTGare/boe-tea-go/artworks"
-	"github.com/VTGare/boe-tea-go/artworks/twitter/nitter"
 	"github.com/VTGare/boe-tea-go/store"
 	"github.com/VTGare/embeds"
 
 	"github.com/bwmarrin/discordgo"
-	twitterscraper "github.com/n0madic/twitter-scraper"
 )
 
 type Twitter struct {
-	scraper  *twitterscraper.Scraper
-	fallback artworks.Provider
+	twitterMatcher
+	providers []artworks.Provider
 }
 
 type Artwork struct {
-	Videos    []twitterscraper.Video
+	Videos    []Video
 	Photos    []string
 	ID        string
 	FullName  string
@@ -41,95 +38,40 @@ type Artwork struct {
 	NSFW      bool
 }
 
-type Category struct {
-	ID   int
-	Name string
+type Video struct {
+	URL     string
+	Preview string
 }
 
 func New() artworks.Provider {
 	return &Twitter{
-		scraper:  twitterscraper.New(),
-		fallback: nitter.New(),
+		providers: []artworks.Provider{newScraper(), newFxTwitter(), newNitter()},
 	}
 }
 
 func (t *Twitter) Find(id string) (artworks.Artwork, error) {
-	tweet, err := t.scraper.GetTweet(id)
-	if err != nil || tweet.Username == "" {
-		a, err := t.fallback.Find(id)
+	var (
+		artwork artworks.Artwork
+		errs    []error
+	)
+
+	for _, provider := range t.providers {
+		var err error
+		artwork, err = provider.Find(id)
 		if err != nil {
-			return nil, err
+			errs = append(errs, err)
+			continue
 		}
 
-		nitter, ok := a.(*nitter.Artwork)
-		if !ok {
-			return nil, errors.New("Twitter API is down. Please use `bt!feedback` command to contact the developer.")
+		tweet := artwork.(*Artwork)
+		if tweet.Username == "" {
+			continue
 		}
 
-		return convertNitter(nitter), nil
+		return artwork, nil
 	}
 
-	profile, err := t.scraper.GetProfile(tweet.Username)
-	if err != nil {
-		return nil, err
-	}
-
-	art := &Artwork{
-		ID:        id,
-		FullName:  profile.Name,
-		Username:  "@" + tweet.Username,
-		Content:   html.UnescapeString(tweet.Text),
-		Likes:     tweet.Likes,
-		Replies:   tweet.Replies,
-		Retweets:  tweet.Retweets,
-		Timestamp: tweet.TimeParsed,
-		Photos:    tweet.Photos,
-		Videos:    tweet.Videos,
-		NSFW:      tweet.SensitiveContent,
-		Permalink: tweet.PermanentURL,
-	}
-
-	if tweet.QuotedStatus != nil {
-		art.Photos = append(art.Photos, tweet.QuotedStatus.Photos...)
-		art.Videos = append(art.Videos, tweet.QuotedStatus.Videos...)
-	}
-
-	return art, nil
-}
-
-func (t *Twitter) Match(s string) (string, bool) {
-	u, err := url.ParseRequestURI(s)
-	if err != nil {
-		return "", false
-	}
-
-	if u.Host != "twitter.com" && u.Host != "mobile.twitter.com" {
-		return "", false
-	}
-
-	parts := strings.FieldsFunc(u.Path, func(r rune) bool {
-		return r == '/'
-	})
-
-	if len(parts) < 3 {
-		return "", false
-	}
-
-	parts = parts[2:]
-	if parts[0] == "status" {
-		parts = parts[1:]
-	}
-
-	snowflake := parts[0]
-	if _, err := strconv.ParseUint(snowflake, 10, 64); err != nil {
-		return "", false
-	}
-
-	return snowflake, true
-}
-
-func (Twitter) Enabled(g *store.Guild) bool {
-	return g.Twitter
+	return &Artwork{}, errors.Join(errs...)
 }
 
 func (artwork *Artwork) StoreArtwork() *store.Artwork {
@@ -247,35 +189,4 @@ func (a *Artwork) Len() int {
 	}
 
 	return len(a.Photos)
-}
-
-func convertNitter(a *nitter.Artwork) *Artwork {
-	var (
-		videos = make([]twitterscraper.Video, 0)
-		photos = make([]string, 0)
-	)
-
-	for _, media := range a.Gallery {
-		switch media.Type {
-		case nitter.MediaTypeGIF:
-			videos = append(videos, twitterscraper.Video{URL: media.URL})
-		case nitter.MediaTypeImage:
-			photos = append(photos, media.URL)
-		}
-	}
-
-	return &Artwork{
-		ID:        a.Snowflake,
-		FullName:  a.FullName,
-		Username:  a.Username,
-		Content:   a.Content,
-		Likes:     a.Likes,
-		Replies:   a.Comments,
-		Retweets:  a.Retweets,
-		Timestamp: a.Timestamp,
-		Videos:    videos,
-		Photos:    photos,
-		NSFW:      true, // Fallback method is only used for NSFW artworks.
-		Permalink: a.URL(),
-	}
 }

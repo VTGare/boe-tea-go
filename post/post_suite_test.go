@@ -8,7 +8,6 @@ import (
 	"github.com/VTGare/boe-tea-go/store"
 	"github.com/VTGare/gumi"
 	"github.com/bwmarrin/discordgo"
-	twitterscraper "github.com/n0madic/twitter-scraper"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -67,7 +66,7 @@ var _ = Describe("Skip First Tests", func() {
 	})
 
 	It("shouldn't skip first if tweet has video", func() {
-		twitterArtwork.Videos = []twitterscraper.Video{{}}
+		twitterArtwork.Videos = []twitter.Video{{}}
 		Expect(post.skipFirst(guild, twitterArtwork)).To(BeFalse())
 	})
 
