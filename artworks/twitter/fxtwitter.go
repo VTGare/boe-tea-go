@@ -88,5 +88,6 @@ func (fxt *fxTwitter) Find(id string) (artworks.Artwork, error) {
 		Likes:     fxArtwork.Tweet.Likes,
 		Replies:   fxArtwork.Tweet.Replies,
 		Retweets:  fxArtwork.Tweet.Retweets,
+		NSFW:      true,
 	}, nil
 }
