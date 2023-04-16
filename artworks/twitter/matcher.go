@@ -10,7 +10,7 @@ import (
 
 type twitterMatcher struct{}
 
-func (t *twitterMatcher) Match(s string) (string, bool) {
+func (twitterMatcher) Match(s string) (string, bool) {
 	u, err := url.ParseRequestURI(s)
 	if err != nil {
 		return "", false
