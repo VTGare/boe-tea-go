@@ -58,6 +58,10 @@ func (fxt *fxTwitter) Find(id string) (artworks.Artwork, error) {
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode != http.StatusOK {
+		return &Artwork{}, nil
+	}
+
 	fxArtwork := &fxTwitterResponse{}
 	if err := json.NewDecoder(resp.Body).Decode(fxArtwork); err != nil {
 		return nil, fmt.Errorf("decode: %w", err)
@@ -76,12 +80,17 @@ func (fxt *fxTwitter) Find(id string) (artworks.Artwork, error) {
 		photos = append(photos, p.URL)
 	}
 
+	var username string
+	if fxArtwork.Tweet.Author.Name != "" {
+		username = "@" + fxArtwork.Tweet.Author.Name
+	}
+
 	return &Artwork{
 		Videos:    videos,
 		Photos:    photos,
 		ID:        fxArtwork.Tweet.ID,
 		FullName:  fxArtwork.Tweet.Author.ScreenName,
-		Username:  "@" + fxArtwork.Tweet.Author.Name,
+		Username:  username,
 		Content:   fxArtwork.Tweet.Text,
 		Permalink: fxArtwork.Tweet.URL,
 		Timestamp: time.Unix(fxArtwork.Tweet.CreatedTimestamp, 0),
