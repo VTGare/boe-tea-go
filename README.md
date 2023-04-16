@@ -62,7 +62,7 @@ Please use `bt!help` command for documentation. Complete documentation is coming
 
 ### Requirements
 
-- Go (1.18+). Download Golang from <https://golang.org> or by using a package manager (e.g. Chocolatey on Windows, homebrew on Mac or pacman on ArchLinux).
+- Go (1.20+). Download Golang from <https://golang.org> or by using a package manager (e.g. Chocolatey on Windows, homebrew on Mac or pacman on ArchLinux).
 
 ### Locally
 
