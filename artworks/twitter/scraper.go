@@ -10,8 +10,8 @@ import (
 
 type twitterScraper struct {
 	twitterMatcher
-
-	scraper *twitterscraper.Scraper
+	aitagger artworks.AITagger
+	scraper  *twitterscraper.Scraper
 }
 
 func newScraper() artworks.Provider {
@@ -58,6 +58,8 @@ func (ts *twitterScraper) Find(id string) (artworks.Artwork, error) {
 	if tweet.QuotedStatus != nil {
 		art.Photos = append(art.Photos, tweet.QuotedStatus.Photos...)
 	}
+
+	art.AIGenerated = ts.aitagger.AITag([]string{art.Content})
 
 	return art, nil
 }

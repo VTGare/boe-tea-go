@@ -16,7 +16,8 @@ import (
 )
 
 type Artstation struct {
-	regex *regexp.Regexp
+	aitagger artworks.AITagger
+	regex    *regexp.Regexp
 }
 
 type ArtstationResponse struct {
@@ -40,7 +41,8 @@ type ArtstationResponse struct {
 	HideAsAdult         bool `json:"hide_as_adult,omitempty"`
 	VisibleOnArtstation bool `json:"visible_on_artstation,omitempty"`
 
-	CreatedAt time.Time `json:"created_at,omitempty"`
+	AIGenerated bool
+	CreatedAt   time.Time `json:"created_at,omitempty"`
 }
 
 type Asset struct {
@@ -91,6 +93,8 @@ func (as *Artstation) Find(id string) (artworks.Artwork, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	res.AIGenerated = as.aitagger.AITag(res.Tags)
 
 	return res, nil
 }
@@ -157,6 +161,10 @@ func (artwork *ArtstationResponse) MessageSends(footer string, hasTags bool) ([]
 
 	if footer != "" {
 		eb.Footer(footer, "")
+	}
+
+	if artwork.AIGenerated {
+		eb.AddField("⚠️ Disclaimer", "This artwork is AI-generated.")
 	}
 
 	eb.Image(artwork.Assets[0].ImageURL)
