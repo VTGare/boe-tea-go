@@ -31,6 +31,7 @@ type Artwork struct {
 	Views        int
 	Favorites    int
 	Comments     int
+	AIGenerated  bool
 	CreatedAt    time.Time
 	url          string
 }
@@ -82,7 +83,7 @@ func (d *DeviantArt) Find(id string) (artworks.Artwork, error) {
 		return nil, err
 	}
 
-	return &Artwork{
+	artwork := &Artwork{
 		Title: res.Title,
 		Author: &Author{
 			Name: res.AuthorName,
@@ -96,7 +97,11 @@ func (d *DeviantArt) Find(id string) (artworks.Artwork, error) {
 		Comments:     res.Community.Statistics.Attributes.Comments,
 		CreatedAt:    res.Pubdate,
 		url:          res.AuthorURL + "/art/" + id,
-	}, nil
+	}
+
+	artwork.AIGenerated = artworks.IsAIGenerated(artwork.Tags...)
+
+	return artwork, nil
 }
 
 func (d *DeviantArt) Match(s string) (string, bool) {
@@ -134,6 +139,10 @@ func (a *Artwork) MessageSends(footer string, hasTags bool) ([]*discordgo.Messag
 
 	if footer != "" {
 		eb.Footer(footer, "")
+	}
+
+	if a.AIGenerated {
+		eb.AddField("⚠️ Disclaimer", "This artwork is AI-generated.")
 	}
 
 	return []*discordgo.MessageSend{

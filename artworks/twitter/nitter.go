@@ -110,6 +110,7 @@ func (t *nitter) scrapeTwitter(snowflake, baseURL string) (*Artwork, error) {
 	}
 
 	res.Permalink = fmt.Sprintf("https://twitter.com/%v/status/%v", username, res.ID)
+	res.AIGenerated = artworks.IsAIGenerated(res.Content)
 	return res, nil
 }
 

@@ -85,7 +85,7 @@ func (fxt *fxTwitter) Find(id string) (artworks.Artwork, error) {
 		username = "@" + fxArtwork.Tweet.Author.Name
 	}
 
-	return &Artwork{
+	artwork := &Artwork{
 		Videos:    videos,
 		Photos:    photos,
 		ID:        fxArtwork.Tweet.ID,
@@ -98,5 +98,9 @@ func (fxt *fxTwitter) Find(id string) (artworks.Artwork, error) {
 		Replies:   fxArtwork.Tweet.Replies,
 		Retweets:  fxArtwork.Tweet.Retweets,
 		NSFW:      true,
-	}, nil
+	}
+
+	artwork.AIGenerated = artworks.IsAIGenerated(artwork.Content)
+
+	return artwork, nil
 }

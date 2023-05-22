@@ -24,18 +24,19 @@ type Twitter struct {
 }
 
 type Artwork struct {
-	Videos    []Video
-	Photos    []string
-	ID        string
-	FullName  string
-	Username  string
-	Content   string
-	Permalink string
-	Timestamp time.Time
-	Likes     int
-	Replies   int
-	Retweets  int
-	NSFW      bool
+	Videos      []Video
+	Photos      []string
+	ID          string
+	FullName    string
+	Username    string
+	Content     string
+	Permalink   string
+	Timestamp   time.Time
+	Likes       int
+	Replies     int
+	Retweets    int
+	NSFW        bool
+	AIGenerated bool
 }
 
 type Video struct {
@@ -108,6 +109,10 @@ func (a *Artwork) MessageSends(footer string, _ bool) ([]*discordgo.MessageSend,
 
 	if footer != "" {
 		eb.Footer(footer, "")
+	}
+
+	if a.AIGenerated {
+		eb.AddField("⚠️ Disclaimer", "This artwork is AI-generated.")
 	}
 
 	if len(a.Videos) > 0 {

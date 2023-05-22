@@ -1,6 +1,8 @@
 package artworks
 
 import (
+	"strings"
+
 	"github.com/VTGare/boe-tea-go/store"
 	"github.com/bwmarrin/discordgo"
 )
@@ -16,4 +18,25 @@ type Artwork interface {
 	MessageSends(footer string, tags bool) ([]*discordgo.MessageSend, error)
 	URL() string
 	Len() int
+}
+
+func IsAIGenerated(contents ...string) bool {
+	aiTags := []string{
+		"aiart",
+		"aigenerated",
+		"aiイラスト",
+		"createdwithai",
+		"dall-e",
+		"midjourney",
+		"stablediffusion",
+	}
+
+	for _, tag := range contents {
+		for _, test := range aiTags {
+			if strings.Contains(strings.ToLower(tag), test) {
+				return true
+			}
+		}
+	}
+	return false
 }
