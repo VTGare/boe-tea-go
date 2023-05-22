@@ -14,7 +14,6 @@ import (
 
 type nitter struct {
 	twitterMatcher
-	aitagger  artworks.AITagger
 	instances []string
 }
 
@@ -111,7 +110,7 @@ func (t *nitter) scrapeTwitter(snowflake, baseURL string) (*Artwork, error) {
 	}
 
 	res.Permalink = fmt.Sprintf("https://twitter.com/%v/status/%v", username, res.ID)
-	res.AIGenerated = t.aitagger.AITag([]string{res.Content})
+	res.AIGenerated = artworks.IsAIGenerated(res.Content)
 	return res, nil
 }
 

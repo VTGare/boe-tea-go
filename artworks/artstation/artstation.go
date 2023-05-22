@@ -16,8 +16,7 @@ import (
 )
 
 type Artstation struct {
-	aitagger artworks.AITagger
-	regex    *regexp.Regexp
+	regex *regexp.Regexp
 }
 
 type ArtstationResponse struct {
@@ -94,7 +93,7 @@ func (as *Artstation) Find(id string) (artworks.Artwork, error) {
 		return nil, err
 	}
 
-	res.AIGenerated = as.aitagger.AITag(res.Tags)
+	res.AIGenerated = artworks.IsAIGenerated(res.Tags...)
 
 	return res, nil
 }

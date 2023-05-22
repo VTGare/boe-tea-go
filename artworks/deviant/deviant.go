@@ -19,8 +19,7 @@ import (
 )
 
 type DeviantArt struct {
-	aitagger artworks.AITagger
-	regex    *regexp.Regexp
+	regex *regexp.Regexp
 }
 
 type Artwork struct {
@@ -100,7 +99,7 @@ func (d *DeviantArt) Find(id string) (artworks.Artwork, error) {
 		url:          res.AuthorURL + "/art/" + id,
 	}
 
-	artwork.AIGenerated = d.aitagger.AITag(artwork.Tags)
+	artwork.AIGenerated = artworks.IsAIGenerated(artwork.Tags...)
 
 	return artwork, nil
 }

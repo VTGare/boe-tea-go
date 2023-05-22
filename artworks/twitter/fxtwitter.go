@@ -11,8 +11,7 @@ import (
 
 type fxTwitter struct {
 	twitterMatcher
-	aitagger artworks.AITagger
-	client   *http.Client
+	client *http.Client
 }
 
 type fxTwitterResponse struct {
@@ -101,7 +100,7 @@ func (fxt *fxTwitter) Find(id string) (artworks.Artwork, error) {
 		NSFW:      true,
 	}
 
-	artwork.AIGenerated = fxt.aitagger.AITag([]string{artwork.Content})
+	artwork.AIGenerated = artworks.IsAIGenerated(artwork.Content)
 
 	return artwork, nil
 }
