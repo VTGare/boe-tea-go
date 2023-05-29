@@ -84,7 +84,8 @@ Please use `bt!help` command for documentation. Complete documentation is coming
     },
     "pixiv": {
         "auth_token": "Pixiv auth token. Refer to https://gist.github.com/upbit/6edda27cb1644e94183291109b8a5fde to acquire.",
-        "refresh_token": "Pixiv refresh token. Refer to https://gist.github.com/upbit/6edda27cb1644e94183291109b8a5fde to acquire."
+        "refresh_token": "Pixiv refresh token. Refer to https://gist.github.com/upbit/6edda27cb1644e94183291109b8a5fde to acquire.",
+        "proxy_host": "Pixiv reverse proxy host, defaults to https://boetea.dev"
     },
     "repost": {
         "type": "Two options are supported: redis and memory.",

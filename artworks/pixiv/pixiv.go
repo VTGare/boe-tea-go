@@ -23,7 +23,8 @@ var (
 )
 
 type Pixiv struct {
-	app *pixiv.AppPixivAPI
+	app       *pixiv.AppPixivAPI
+	proxyHost string
 }
 
 type Artwork struct {
@@ -39,7 +40,8 @@ type Artwork struct {
 	AIGenerated bool
 	CreatedAt   time.Time
 
-	url string
+	url   string
+	proxy string
 }
 
 type Image struct {
@@ -47,13 +49,20 @@ type Image struct {
 	Original string
 }
 
-func New(authToken, refreshToken string) (artworks.Provider, error) {
+func New(proxyHost, authToken, refreshToken string) (artworks.Provider, error) {
 	_, err := pixiv.LoadAuth(authToken, refreshToken, time.Now())
 	if err != nil {
 		return nil, err
 	}
 
-	return &Pixiv{app: pixiv.NewApp()}, nil
+	if proxyHost == "" {
+		proxyHost = "https://boetea.dev"
+	}
+
+	return &Pixiv{
+		app:       pixiv.NewApp(),
+		proxyHost: proxyHost,
+	}, nil
 }
 
 func (p *Pixiv) Match(s string) (string, bool) {
@@ -130,6 +139,8 @@ func (p *Pixiv) Find(id string) (artworks.Artwork, error) {
 		Pages:     illust.PageCount,
 		Likes:     illust.TotalBookmarks,
 		CreatedAt: illust.CreateDate,
+
+		proxy: p.proxyHost,
 	}
 
 	if illust.IllustAIType == pixiv.IllustAITypeAIGenerated {
@@ -185,7 +196,7 @@ func (a *Artwork) MessageSends(footer string, hasTags bool) ([]*discordgo.Messag
 
 	eb.URL(a.url).
 		AddField("Likes", strconv.Itoa(a.Likes), true).
-		AddField("Original quality", messages.ClickHere(a.Images[0].originalProxy()), true).
+		AddField("Original quality", messages.ClickHere(a.Images[0].originalProxy(a.proxy)), true).
 		Timestamp(a.CreatedAt)
 
 	if footer != "" {
@@ -196,14 +207,14 @@ func (a *Artwork) MessageSends(footer string, hasTags bool) ([]*discordgo.Messag
 		eb.AddField("⚠️ Disclaimer", "This artwork is AI-generated.")
 	}
 
-	eb.Image(a.Images[0].previewProxy())
+	eb.Image(a.Images[0].previewProxy(a.proxy))
 	pages = append(pages, &discordgo.MessageSend{Embeds: []*discordgo.MessageEmbed{eb.Finalize()}})
 	if length > 1 {
 		for ind, image := range a.Images[1:] {
 			eb := embeds.NewBuilder()
 
 			eb.Title(fmt.Sprintf("%v by %v | Page %v / %v", a.Title, a.Author, ind+2, length))
-			eb.Image(image.previewProxy())
+			eb.Image(image.previewProxy(a.proxy))
 			eb.URL(a.url).Timestamp(a.CreatedAt)
 
 			if footer != "" {
@@ -211,7 +222,7 @@ func (a *Artwork) MessageSends(footer string, hasTags bool) ([]*discordgo.Messag
 			}
 
 			eb.AddField("Likes", strconv.Itoa(a.Likes), true)
-			eb.AddField("Original quality", messages.ClickHere(image.originalProxy()), true)
+			eb.AddField("Original quality", messages.ClickHere(image.originalProxy(a.proxy)), true)
 
 			pages = append(pages, &discordgo.MessageSend{Embeds: []*discordgo.MessageEmbed{eb.Finalize()}})
 		}
@@ -232,16 +243,16 @@ func (a *Artwork) imageURLs() []string {
 	urls := make([]string, 0, len(a.Images))
 
 	for _, img := range a.Images {
-		urls = append(urls, img.originalProxy())
+		urls = append(urls, img.originalProxy(a.proxy))
 	}
 
 	return urls
 }
 
-func (i Image) originalProxy() string {
-	return strings.Replace(i.Original, "https://i.pximg.net", "https://boe-tea-pximg.herokuapp.com", 1)
+func (i Image) originalProxy(host string) string {
+	return strings.Replace(i.Original, "https://i.pximg.net", host, 1)
 }
 
-func (i Image) previewProxy() string {
-	return strings.Replace(i.Preview, "https://i.pximg.net", "https://boe-tea-pximg.herokuapp.com", 1)
+func (i Image) previewProxy(host string) string {
+	return strings.Replace(i.Preview, "https://i.pximg.net", host, 1)
 }

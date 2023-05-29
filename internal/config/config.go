@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-//Config is an application configuration struct.
+// Config is an application configuration struct.
 type Config struct {
 	Discord  *Discord `json:"discord"`
 	Mongo    *Mongo   `json:"mongo"`
@@ -20,32 +20,33 @@ type Config struct {
 	safeQuotes []*Quote
 }
 
-//Discord stores Discord bot configuration. Acquire bot token on Discord's Developer Portal. Prefixes must be below 5 characters each.
-//AuthorID is required to enable developer commands. Empty AuthorID may lead to undefined behavior.
+// Discord stores Discord bot configuration. Acquire bot token on Discord's Developer Portal. Prefixes must be below 5 characters each.
+// AuthorID is required to enable developer commands. Empty AuthorID may lead to undefined behavior.
 type Discord struct {
 	Token    string `json:"token"`
 	AuthorID string `json:"author_id"`
 }
 
-//Pixiv stores Pixiv login information. Guide how to acquire auth and refresh tokens: https://gist.github.com/upbit/6edda27cb1644e94183291109b8a5fde
+// Pixiv stores Pixiv login information. Guide how to acquire auth and refresh tokens: https://gist.github.com/upbit/6edda27cb1644e94183291109b8a5fde
 type Pixiv struct {
 	AuthToken    string `json:"auth_token"`
 	RefreshToken string `json:"refresh_token"`
+	ProxyHost    string `json:"proxy_host"`
 }
 
-//Mongo stores Mongo connection configuration. Required.
+// Mongo stores Mongo connection configuration. Required.
 type Mongo struct {
 	URI      string `json:"uri"`
 	Database string `json:"default_db"`
 }
 
-//Repost stores repost detector configuration. Supported types: "memory", "redis". RedisURI is not required for in-memory storage.
+// Repost stores repost detector configuration. Supported types: "memory", "redis". RedisURI is not required for in-memory storage.
 type Repost struct {
 	Type     string `json:"type"`
 	RedisURI string `json:"redis_uri"`
 }
 
-//Quote is a message shown in Boe Tea's embeds, selected randomly. If empty, footer will always be empty.
+// Quote is a message shown in Boe Tea's embeds, selected randomly. If empty, footer will always be empty.
 type Quote struct {
 	Content string `json:"content"`
 	NSFW    bool   `json:"nsfw"`

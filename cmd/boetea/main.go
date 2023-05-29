@@ -94,7 +94,7 @@ func main() {
 	b.AddProvider(twitter.New())
 	b.AddProvider(deviant.New())
 	b.AddProvider(artstation.New())
-	if pixiv, err := pixiv.New(cfg.Pixiv.AuthToken, cfg.Pixiv.RefreshToken); err == nil {
+	if pixiv, err := pixiv.New(cfg.Pixiv.ProxyHost, cfg.Pixiv.AuthToken, cfg.Pixiv.RefreshToken); err == nil {
 		log.Info("Successfully logged into Pixiv.")
 		b.AddProvider(pixiv)
 	}
