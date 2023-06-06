@@ -21,6 +21,10 @@ func ClickHere(url string) string {
 }
 
 func NamedLink(name, url string) string {
+	if url == "" {
+		return name
+	}
+
 	return fmt.Sprintf("[%v](%v)", name, url)
 }
 
