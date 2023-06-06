@@ -163,7 +163,7 @@ func (a *Artwork) StoreArtwork() *store.Artwork {
 	}
 }
 
-func (a *Artwork) MessageSends(footer string, hasTags bool) ([]*discordgo.MessageSend, error) {
+func (a *Artwork) MessageSends(footer string, tagsEnabled bool) ([]*discordgo.MessageSend, error) {
 	var (
 		length = len(a.Images)
 		pages  = make([]*discordgo.MessageSend, 0, length)
@@ -186,7 +186,7 @@ func (a *Artwork) MessageSends(footer string, hasTags bool) ([]*discordgo.Messag
 		eb.Title(fmt.Sprintf("%v by %v", a.Title, a.Author))
 	}
 
-	if hasTags {
+	if tagsEnabled && len(a.Tags) > 0 {
 		tags := arrays.Map(a.Tags, func(s string) string {
 			return fmt.Sprintf("[%v](https://pixiv.net/en/tags/%v/artworks)", s, s)
 		})

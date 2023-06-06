@@ -117,7 +117,7 @@ func (d *DeviantArt) Enabled(g *store.Guild) bool {
 	return g.Deviant
 }
 
-func (a *Artwork) MessageSends(footer string, hasTags bool) ([]*discordgo.MessageSend, error) {
+func (a *Artwork) MessageSends(footer string, tagsEnabled bool) ([]*discordgo.MessageSend, error) {
 	eb := embeds.NewBuilder()
 
 	eb.Title(fmt.Sprintf("%v by %v", a.Title, a.Author.Name)).
@@ -127,7 +127,7 @@ func (a *Artwork) MessageSends(footer string, hasTags bool) ([]*discordgo.Messag
 		AddField("Views", strconv.Itoa(a.Views), true).
 		AddField("Favorites", strconv.Itoa(a.Favorites), true)
 
-	if hasTags {
+	if tagsEnabled && len(a.Tags) > 0 {
 		tags := arrays.Map(a.Tags, func(s string) string {
 			return messages.NamedLink(
 				s, "https://www.deviantart.com/tag/"+s,

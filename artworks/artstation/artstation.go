@@ -125,7 +125,7 @@ func (artwork *ArtstationResponse) StoreArtwork() *store.Artwork {
 	}
 }
 
-func (artwork *ArtstationResponse) MessageSends(footer string, hasTags bool) ([]*discordgo.MessageSend, error) {
+func (artwork *ArtstationResponse) MessageSends(footer string, tagsEnabled bool) ([]*discordgo.MessageSend, error) {
 	var (
 		length = len(artwork.Assets)
 		pages  = make([]*discordgo.MessageSend, 0, length)
@@ -148,7 +148,7 @@ func (artwork *ArtstationResponse) MessageSends(footer string, hasTags bool) ([]
 		eb.Title(fmt.Sprintf("%v by %v", artwork.Title, artwork.User.Name))
 	}
 
-	if hasTags {
+	if tagsEnabled {
 		desc := bluemonday.StrictPolicy().Sanitize(artwork.Description)
 		eb.Description(desc)
 	}
