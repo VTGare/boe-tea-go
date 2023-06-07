@@ -77,9 +77,9 @@ func NotCommand(b *bot.Bot) func(*gumi.Ctx) error {
 				}
 			} else {
 				if user.Crosspost {
-					group, ok := user.FindGroup(ctx.Event.ChannelID)
+					group, channels, ok := user.FindGroupByPair(ctx.Event.ChannelID)
 					if ok {
-						sent, _ := p.Crosspost(ctx.Event.Author.ID, group.Name, group.Children)
+						sent, _ := p.Crosspost(ctx.Event.Author.ID, group.Name, channels)
 						allSent = append(allSent, sent...)
 					}
 				}
@@ -154,7 +154,6 @@ func OnGuildDelete(b *bot.Bot) func(*discordgo.Session, *discordgo.GuildDelete) 
 		}
 	}
 }
-
 
 // OnGuildBanAdd adds a banned server member to temporary banned users cache to prevent them from losing all their bookmarks
 // on that server due to Discord removing all reactions of banned users.
@@ -312,8 +311,8 @@ func OnReactionAdd(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageReacti
 			sent := make([]*cache.MessageInfo, 0)
 			user, _ := b.Store.User(ctx, r.UserID)
 			if user != nil {
-				if group, ok := user.FindGroup(r.ChannelID); ok {
-					sent, err = p.Crosspost(user.ID, group.Name, group.Children)
+				if group, channels, ok := user.FindGroupByPair(r.ChannelID); ok {
+					sent, err = p.Crosspost(user.ID, group.Name, channels)
 					if err != nil {
 						return err
 					}
@@ -549,7 +548,6 @@ func OnReactionRemove(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageRea
 
 			return
 		}
-
 
 		log.With("user_id", r.UserID, "artwork_id", artworkDB.ID).Info("removing a bookmark")
 		deleted, err := b.Store.DeleteBookmark(ctx, &store.Bookmark{UserID: r.UserID, ArtworkID: artworkDB.ID})

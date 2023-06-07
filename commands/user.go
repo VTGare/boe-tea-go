@@ -20,8 +20,12 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
+// userGroup registers user group commands.
 func userGroup(b *bot.Bot) {
+	// Assigns type user for command group.
 	group := "user"
+
+	// Registers groups command.
 	b.Router.RegisterCmd(&gumi.Command{
 		Name:        "groups",
 		Group:       group,
@@ -33,6 +37,7 @@ func userGroup(b *bot.Bot) {
 		Exec:        groups(b),
 	})
 
+	// Registers newgroup command.
 	b.Router.RegisterCmd(&gumi.Command{
 		Name:        "newgroup",
 		Group:       group,
@@ -41,9 +46,22 @@ func userGroup(b *bot.Bot) {
 		Usage:       "bt!newgroup <group name> <parent channel>",
 		Example:     "bt!newgroup lewds #nsfw",
 		RateLimiter: gumi.NewRateLimiter(10 * time.Second),
-		Exec:        newgroup(b),
+		Exec:        newgroup(b, false),
 	})
 
+	// Registers newpair command.
+	b.Router.RegisterCmd(&gumi.Command{
+		Name:        "newpair",
+		Group:       group,
+		Aliases:     []string{"addpair"},
+		Description: "Creates a new crosspost pair.",
+		Usage:       "bt!newpair <pair name> <first channel> <second channel>",
+		Example:     "bt!newpair lewds #nsfw #nsfw-pics",
+		RateLimiter: gumi.NewRateLimiter(10 * time.Second),
+		Exec:        newgroup(b, true),
+	})
+
+	// Registers delgroup command.
 	b.Router.RegisterCmd(&gumi.Command{
 		Name:        "delgroup",
 		Group:       group,
@@ -54,10 +72,10 @@ func userGroup(b *bot.Bot) {
 		Exec:        delgroup(b),
 	})
 
+	// Registers push command.
 	b.Router.RegisterCmd(&gumi.Command{
 		Name:        "push",
 		Group:       group,
-		Aliases:     []string{},
 		Description: "Adds channels to a crosspost group.",
 		Usage:       "bt!push <group name> [channel ids]",
 		Example:     "bt!push myCoolGroup #coolchannel #coolerchannel",
@@ -65,6 +83,7 @@ func userGroup(b *bot.Bot) {
 		Exec:        push(b),
 	})
 
+	// Registers remove command.
 	b.Router.RegisterCmd(&gumi.Command{
 		Name:        "remove",
 		Group:       group,
@@ -76,10 +95,21 @@ func userGroup(b *bot.Bot) {
 		Exec:        remove(b),
 	})
 
+	// Registers rename command.
+	b.Router.RegisterCmd(&gumi.Command{
+		Name:        "rename",
+		Group:       group,
+		Description: "Renames a crosspost group",
+		Usage:       "bt!rename <from> <to>",
+		Example:     "bt!rename cuteAnimeGirls AnimeGirls",
+		RateLimiter: gumi.NewRateLimiter(10 * time.Second),
+		Exec:        rename(b),
+	})
+
+	// Registers copygroup command.
 	b.Router.RegisterCmd(&gumi.Command{
 		Name:        "copygroup",
 		Group:       group,
-		Aliases:     []string{},
 		Description: "Copies a crosspost group with a different parent channel",
 		Usage:       "bt!copygroup <from> <to> <parent channel id>",
 		Example:     "bt!copygroup sfw1 sfw2 #za-warudo",
@@ -87,6 +117,7 @@ func userGroup(b *bot.Bot) {
 		Exec:        copygroup(b),
 	})
 
+	// Registers bookmarks command.
 	b.Router.RegisterCmd(&gumi.Command{
 		Name:        "bookmarks",
 		Group:       group,
@@ -104,6 +135,7 @@ func userGroup(b *bot.Bot) {
 		Exec:        bookmarks(b),
 	})
 
+	// Registers unbookmark command.
 	b.Router.RegisterCmd(&gumi.Command{
 		Name:        "unbookmark",
 		Group:       group,
@@ -115,6 +147,7 @@ func userGroup(b *bot.Bot) {
 		Exec:        unfav(b),
 	})
 
+	// Registers userset command.
 	b.Router.RegisterCmd(&gumi.Command{
 		Name:        "userset",
 		Aliases:     []string{"profile"},
@@ -131,155 +164,249 @@ func userGroup(b *bot.Bot) {
 	})
 }
 
+// groups shows the full list of crosspost groups.
 func groups(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
+		// Assigns current discord user.
+		// Returns error if no user is found.
 		user, err := b.Store.User(context.Background(), ctx.Event.Author.ID)
 		if err != nil {
 			return err
 		}
 
+		// Prepares new embed builder to list crosspost groups.
 		locale := messages.UserGroupsEmbed(ctx.Event.Author.Username)
 		eb := embeds.NewBuilder()
 
+		// Builds embed title and description.
 		eb.Title(locale.Title)
 		eb.Description(locale.Description)
 
+		// Iterates and constructs crosspost groups into groupList.
+		var groupList [2][][2]string
 		for _, group := range user.Groups {
-			eb.AddField(
-				locale.Group+" "+group.Name,
-				fmt.Sprintf(
-					"**%v:** %v\n **%v:**\n%v",
-					locale.Parent, fmt.Sprintf(
-						"<#%v> | `%v`",
-						group.Parent, group.Parent,
-					),
-					locale.Children, strings.Join(arrays.Map(
-						group.Children,
-						func(s string) string {
-							return fmt.Sprintf("<#%v> | `%v`", s, s)
-						},
-					), "\n"),
-				),
+			var category, parent, children string
+			var list int8
+
+			// Assigns crosspost group and pair variables
+			if group.IsPair {
+				category = locale.Pair
+			} else {
+				category = locale.Group
+				parent = fmt.Sprintf("**%v: **", locale.Parent)
+				children = fmt.Sprintf("**%v: **", locale.Children)
+				list = 1
+			}
+
+			// Assigns field name and description.
+			name := fmt.Sprintf("%v «%v»", category, group.Name)
+			desc := fmt.Sprintf("%v%v\n%v%v",
+				parent,
+				fmt.Sprintf("<#%v> | `%v`", group.Parent, group.Parent),
+				children,
+				strings.Join(arrays.Map(group.Children, func(s string) string {
+					return fmt.Sprintf("<#%v> | `%v`", s, s)
+				}), "\n"),
 			)
+
+			// Appends to groupList.
+			groupList[list] = append(groupList[list], [2]string{name, desc})
 		}
 
+		// Builds crosspost groups into respective fields.
+		for _, list := range groupList {
+			for _, group := range list {
+				eb.AddField(group[0], group[1])
+			}
+		}
+
+		// Returns embed list of crosspost groups.
 		return ctx.ReplyEmbed(eb.Finalize())
 	}
 }
 
-func newgroup(b *bot.Bot) func(ctx *gumi.Ctx) error {
+// newgroup creates a new crosspost group or pair.
+// A crosspost group is given a name and parent channel.
+// A crosspost pair is also given a crosspost channel.
+func newgroup(b *bot.Bot, ispair bool) func(ctx *gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
-		if ctx.Args.Len() < 2 {
+		// Checks if Boe Tea command is correct.
+		//
+		// Crosspost group command suffices with two (2) arguments.
+		// Crosspost pair command suffices with three (3) arguments.
+		if (ispair && ctx.Args.Len() != 3) || ctx.Args.Len() < 2 {
 			return messages.ErrIncorrectCmd(ctx.Command)
 		}
 
+		// Assigns current discord user.
+		// Returns error if no user is found.
 		user, err := b.Store.User(context.Background(), ctx.Event.Author.ID)
 		if err != nil {
 			return err
 		}
 
+		// Assigns name of crosspost group or pair.
 		name := ctx.Args.Get(0).Raw
+		// Assigns name of parent channel.
+		// Returns error if no channel exists.
 		parent := strings.Trim(ctx.Args.Get(1).Raw, "<#>")
 		if _, err := ctx.Session.Channel(parent); err != nil {
 			return messages.ErrChannelNotFound(err, parent)
 		}
 
+		// Assigns a crosspost channel when crosspost group is a pair.
+		// If group is not a pair leave empty.
+		children := []string{}
+		if ispair {
+			// Assigns channelID of crosspost channel.
+			child := strings.Trim(ctx.Args.Get(2).Raw, "<#>")
+
+			// Returns discord channel from channelID.
+			// If no discord channel is found return error.
+			ch, err := ctx.Session.Channel(child)
+			if err != nil {
+				return messages.ErrChannelNotFound(err, child)
+			}
+
+			// Checks if discord channel is a text channel.
+			if ch.Type != discordgo.ChannelTypeGuildText {
+				return messages.ErrIncorrectCmd(ctx.Command)
+			}
+
+			// Checks if crosspost channel is not parent channel.
+			if parent == child {
+				return messages.ErrIncorrectCmd(ctx.Command)
+			}
+
+			// Checks if crosspost channel is not parent of an existing group.
+			if _, ok := user.FindGroupByParent(child); ok {
+				return messages.ErrInsertGroup(name, child)
+			}
+
+			// Appends crosspost channel to children.
+			children = append(children, child)
+		}
+
+		// Creates crosspost group when checks suffice.
 		_, err = b.Store.CreateCrosspostGroup(context.Background(), user.ID, &store.Group{
 			Name:     name,
 			Parent:   parent,
-			Children: []string{},
+			Children: children,
+			IsPair:   ispair,
 		})
 
+		// Returns error if any mongoDB error is raised.
 		if err != nil {
-			switch {
-			case errors.Is(err, mongo.ErrNoDocuments):
-				return messages.ErrInsertGroup(name, parent)
-			default:
+			if err = errMongoDB(err, messages.ErrInsertGroup(name, parent)); err != nil {
 				return err
 			}
 		}
 
-		eb := embeds.NewBuilder()
+		// Assign success message for crosspost group or pair.
+		var msg string
+		if ispair {
+			msg = messages.UserCreatePairSuccess(name, parent, children[0])
+		} else {
+			msg = messages.UserCreateGroupSuccess(name, parent)
+		}
 
-		msg := fmt.Sprintf("Created a group `%v` with parent channel <#%v> | `%v`", name, parent, parent)
-		eb.SuccessTemplate(msg)
-
-		return ctx.ReplyEmbed(eb.Finalize())
+		// Returns success message embed.
+		return successMessage(ctx, msg)
 	}
 }
 
+// delgroup deletes a crosspost group.
 func delgroup(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
+		// Checks if Boe Tea command is correct.
 		if ctx.Args.Len() < 1 {
 			return messages.ErrIncorrectCmd(ctx.Command)
 		}
 
+		// Assigns current discord user.
+		// Returns error if no user is found.
 		user, err := b.Store.User(context.Background(), ctx.Event.Author.ID)
 		if err != nil {
 			return err
 		}
 
+		// Assigns name of crosspost group.
 		name := ctx.Args.Get(0).Raw
+
+		// Deletes crosspost group when checks suffice.
 		_, err = b.Store.DeleteCrosspostGroup(context.Background(), user.ID, name)
 
+		// Returns error if any mongoDB error is raised.
 		if err != nil {
-			switch {
-			case errors.Is(err, mongo.ErrNoDocuments):
-				return messages.ErrDeleteGroup(name)
-			default:
+			if err = errMongoDB(err, messages.ErrDeleteGroup(name)); err != nil {
 				return err
 			}
 		}
 
-		eb := embeds.NewBuilder()
-
-		msg := fmt.Sprintf("Removed a group named `%v`", name)
-		eb.SuccessTemplate(msg)
-
-		return ctx.ReplyEmbed(eb.Finalize())
+		// Returns success message embed.
+		return successMessage(ctx, fmt.Sprintf("Removed a group named `%v`", name))
 	}
 }
 
+// push adds one or more crosspost channels to a group.
 func push(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
+		// Checks if Boe Tea command is correct.
 		if ctx.Args.Len() < 2 {
 			return messages.ErrIncorrectCmd(ctx.Command)
 		}
 
+		// Assigns current discord user.
+		// Returns error if no user is found.
 		user, err := b.Store.User(context.Background(), ctx.Event.Author.ID)
 		if err != nil {
 			return err
 		}
 
+		// Assigns name of crosspost group.
 		name := ctx.Args.Get(0).Raw
 		ctx.Args.Remove(0)
 
+		// Assigns and checks if crosspost group exists.
 		group, ok := user.FindGroupByName(name)
 		if !ok {
 			return messages.ErrUserPushFail(name)
 		}
 
+		// Checks if group is not a pair.
+		if group.IsPair {
+			return messages.ErrUserPairFail(name)
+		}
+
+		// Iterates crosspost channels to be inserted into group.
 		inserted := make([]string, 0, ctx.Args.Len())
 		for _, arg := range ctx.Args.Arguments {
+			// Assigns channelID of crosspost channel.
 			channelID := strings.Trim(arg.Raw, "<#>")
 
+			// Returns discord channel from channelID.
+			// Returns error if no discord channel found.
 			ch, err := ctx.Session.Channel(channelID)
 			if err != nil {
 				return messages.ErrChannelNotFound(err, channelID)
 			}
 
+			// Checks if discord channel is a text channel.
 			if ch.Type != discordgo.ChannelTypeGuildText {
 				continue
 			}
 
+			// Checks if crosspost channel is not a parent channel of group.
 			if group.Parent == channelID {
 				continue
 			}
 
+			// Checks if crosspost channel is already a channel of this group.
 			if arrays.Any(group.Children, channelID) {
 				continue
 			}
 
+			// Adds crosspost channel to group when checks suffice.
 			_, err = b.Store.AddCrosspostChannel(
 				context.Background(),
 				user.ID,
@@ -287,55 +414,72 @@ func push(b *bot.Bot) func(ctx *gumi.Ctx) error {
 				channelID,
 			)
 
+			// Returns error if any mongoDB error is raised.
 			if err != nil {
-				switch {
-				case errors.Is(err, mongo.ErrNoDocuments):
-					continue
-				default:
+				if err = errMongoDB(err); err != nil {
 					return err
+				} else {
+					continue
 				}
 			}
 
+			// Assigns crosspost channel as being inserted.
 			inserted = append(inserted, channelID)
 		}
 
+		// Checks if any crosspost channel has been inserted into group.
+		// Returns error message if no channel has been inserted.
 		if len(inserted) == 0 {
 			return messages.ErrUserPushFail(name)
 		}
 
-		eb := embeds.NewBuilder()
-		eb.SuccessTemplate(messages.UserPushSuccess(name, inserted))
-		return ctx.ReplyEmbed(eb.Finalize())
+		// Returns success message embed.
+		return successMessage(ctx, messages.UserPushSuccess(name, inserted))
 	}
 }
 
+// remove removes one or more crosspost channels from a group.
 func remove(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
+		// Checks if Boe Tea command is correct.
 		if ctx.Args.Len() < 2 {
 			return messages.ErrIncorrectCmd(ctx.Command)
 		}
 
+		// Assigns current discord user.
+		// Returns error if no user is found.
 		user, err := b.Store.User(context.Background(), ctx.Event.Author.ID)
 		if err != nil {
 			return err
 		}
 
+		// Assigns name of crosspost group or pair.
 		name := ctx.Args.Get(0).Raw
 		ctx.Args.Remove(0)
 
+		// Assigns and checks if crosspost group exists.
 		group, ok := user.FindGroupByName(name)
 		if !ok {
 			return messages.ErrUserRemoveFail(name)
 		}
 
+		// Checks if crosspost group is not a pair.
+		if group.IsPair {
+			return messages.ErrUserPairFail(name)
+		}
+
+		// Iterates crosspost channels to be removed from group.
 		removed := make([]string, 0, ctx.Args.Len())
 		for _, arg := range ctx.Args.Arguments {
+			// Assigns channelID of crosspost channel.
 			channelID := strings.Trim(arg.Raw, "<#>")
 
+			// Checks if crosspost channel exists in group.
 			if !arrays.Any(group.Children, channelID) {
 				continue
 			}
 
+			// Removes crosspost channel from group when checks suffice.
 			_, err = b.Store.DeleteCrosspostChannel(
 				context.Background(),
 				user.ID,
@@ -343,71 +487,122 @@ func remove(b *bot.Bot) func(ctx *gumi.Ctx) error {
 				channelID,
 			)
 
+			// Returns error if any mongoDB error is raised.
 			if err != nil {
-				switch {
-				case errors.Is(err, mongo.ErrNoDocuments):
-					continue
-				default:
+				if err = errMongoDB(err); err != nil {
 					return err
+				} else {
+					continue
 				}
 			}
 
+			// Assigns crosspost channel as removed.
 			removed = append(removed, channelID)
 		}
 
+		// Checks if any crosspost channel has been removed.
+		// Returns error message if no channel has been removed.
 		if len(removed) == 0 {
 			return messages.ErrUserRemoveFail(name)
 		}
 
-		eb := embeds.NewBuilder()
-		eb.SuccessTemplate(messages.UserRemoveSuccess(name, removed))
-		return ctx.ReplyEmbed(eb.Finalize())
+		// Returns success message embed.
+		return successMessage(ctx, messages.UserRemoveSuccess(name, removed))
 	}
 }
 
+// rename changes the name of a crosspost group.
+func rename(b *bot.Bot) func(ctx *gumi.Ctx) error {
+	return func(ctx *gumi.Ctx) error {
+		// Checks if Boe Tea command is correct.
+		if ctx.Args.Len() < 2 {
+			return messages.ErrIncorrectCmd(ctx.Command)
+		}
+
+		// Assigns current discord user.
+		// Returns error if no user is found.
+		user, err := b.Store.User(context.Background(), ctx.Event.Author.ID)
+		if err != nil {
+			return err
+		}
+
+		// Assigns group name and new name.
+		cmd := "rename"
+		src := ctx.Args.Get(0).Raw
+		dest := ctx.Args.Get(1).Raw
+
+		// Checks if crosspost group exists.
+		_, ok := user.FindGroupByName(src)
+		if !ok {
+			return messages.ErrUserGroupNameFail(cmd, src, dest)
+		}
+
+		// Renames crosspost group when checks suffice.
+		_, err = b.Store.RenameCrosspostGroup(context.Background(), user.ID, src, dest)
+		if err != nil {
+			return messages.ErrUserGroupNameFail(cmd, src, dest)
+		}
+
+		// Returns success message embed.
+		return successMessage(ctx, messages.UserRenameSuccess(src, dest))
+	}
+}
+
+// copygroup copies a crosspost group with a new name and parent channel.
 func copygroup(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
 		if ctx.Args.Len() < 3 {
 			return messages.ErrIncorrectCmd(ctx.Command)
 		}
 
+		// Assigns current discord user.
+		// Returns error if no user is found.
 		user, err := b.Store.User(context.Background(), ctx.Event.Author.ID)
 		if err != nil {
 			return err
 		}
 
+		// Assigns crosspost group name and new name of copy.
+		cmd := "copy"
 		src := ctx.Args.Get(0).Raw
 		dest := ctx.Args.Get(1).Raw
+
+		// Assigns and checks if crosspost group exists.
+		group, ok := user.FindGroupByName(src)
+		if !ok {
+			return messages.ErrUserGroupNameFail(cmd, src, dest)
+		}
+
+		// Checks if crosspost group is not a pair
+		if group.IsPair {
+			return messages.ErrUserPairFail(src)
+		}
+
+		// Checks if parent channel is already a parent of another group.
 		parent := strings.Trim(ctx.Args.Get(2).Raw, "<#>")
-		if _, ok := user.FindGroup(parent); ok {
+		if _, ok := user.FindGroupByParent(parent); ok {
 			return messages.ErrUserChannelAlreadyParent(parent)
 		}
 
-		for _, group := range user.Groups {
-			if group.Name == src {
-				newGroup := &store.Group{
-					Name:   dest,
-					Parent: parent,
-					Children: arrays.Filter(group.Children, func(s string) bool {
-						return s != parent
-					}),
-				}
-
-				_, err := b.Store.CreateCrosspostGroup(context.Background(), user.ID, newGroup)
-				if err != nil {
-					return messages.ErrUserCopyGroupFail(src, dest)
-				}
-
-				eb := embeds.NewBuilder()
-				eb.SuccessTemplate(
-					messages.UserCopyGroupSuccess(src, dest, newGroup.Children),
-				)
-
-				return ctx.ReplyEmbed(eb.Finalize())
-			}
+		// Assigns new crosspost group copy with new name and parent.
+		newGroup := &store.Group{
+			Name:   dest,
+			Parent: parent,
+			Children: arrays.Filter(group.Children, func(s string) bool {
+				return s != parent
+			}),
 		}
 
-		return messages.ErrUserCopyGroupFail(src, dest)
+		// Copies crosspost group when checks suffice.
+		_, err = b.Store.CreateCrosspostGroup(context.Background(), user.ID, newGroup)
+		if err != nil {
+			return messages.ErrUserGroupNameFail(cmd, src, dest)
+		}
+
+		// Returns success message embed.
+		return successMessage(ctx,
+			messages.UserCopyGroupSuccess(src, dest, newGroup.Children),
+		)
 	}
 }
 
@@ -726,4 +921,26 @@ func artworkToEmbed(artwork *store.Artwork, image string, ind, length int) *disc
 		Timestamp(artwork.CreatedAt)
 
 	return eb.Finalize()
+}
+
+// errMongoDB returns an error if any mongoDB error is raised.
+// If no error message is provided, errMongoDB will return the provided error or as nil.
+func errMongoDB(err error, message ...error) error {
+	switch {
+	case errors.Is(err, mongo.ErrNoDocuments):
+		if message != nil {
+			return message[0]
+		} else {
+			return nil
+		}
+	default:
+		return err
+	}
+}
+
+// successMessage builds and returns success message embed.
+func successMessage(ctx *gumi.Ctx, message string) error {
+	eb := embeds.NewBuilder()
+	eb.SuccessTemplate(message)
+	return ctx.ReplyEmbed(eb.Finalize())
 }

@@ -199,8 +199,8 @@ func share(b *bot.Bot, s post.SkipMode) func(ctx *gumi.Ctx) error {
 
 		user, _ := b.Store.User(context.Background(), ctx.Event.Author.ID)
 		if user != nil {
-			if group, ok := user.FindGroup(ctx.Event.ChannelID); ok {
-				sent, err := p.Crosspost(user.ID, group.Name, group.Children)
+			if group, channels, ok := user.FindGroupByPair(ctx.Event.ChannelID); ok {
+				sent, err := p.Crosspost(user.ID, group.Name, channels)
 				if err != nil {
 					return err
 				}
@@ -238,7 +238,7 @@ func crosspost(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			return messages.ErrIncorrectCmd(ctx.Command)
 		}
 
-		//Trim <> in case someone wraps the link in it.
+		// Trim <> in case someone wraps the link in it.
 		url := strings.Trim(ctx.Args.Get(0).Raw, "<>")
 		ctx.Args.Remove(0)
 
@@ -254,14 +254,14 @@ func crosspost(b *bot.Bot) func(ctx *gumi.Ctx) error {
 
 		user, _ := b.Store.User(context.Background(), ctx.Event.Author.ID)
 		if user != nil {
-			if group, ok := user.FindGroup(ctx.Event.ChannelID); ok {
+			if group, channels, ok := user.FindGroupByPair(ctx.Event.ChannelID); ok {
 				excludedChannels := make(map[string]struct{})
 				for _, arg := range strings.Fields(ctx.Args.Raw) {
 					id := strings.Trim(arg, "<#>")
 					excludedChannels[id] = struct{}{}
 				}
 
-				filtered := arrays.Filter(group.Children, func(s string) bool {
+				filtered := arrays.Filter(channels, func(s string) bool {
 					_, ok := excludedChannels[s]
 					return !ok
 				})

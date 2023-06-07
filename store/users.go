@@ -12,6 +12,7 @@ type UserStore interface {
 
 	CreateCrosspostGroup(ctx context.Context, userID string, group *Group) (*User, error)
 	DeleteCrosspostGroup(ctx context.Context, userID string, group string) (*User, error)
+	RenameCrosspostGroup(ctx context.Context, userID string, name string, newName string) (*User, error)
 	AddCrosspostChannel(ctx context.Context, userID string, group string, child string) (*User, error)
 	DeleteCrosspostChannel(ctx context.Context, userID string, group string, child string) (*User, error)
 }
@@ -30,6 +31,7 @@ type Group struct {
 	Name     string   `json:"name" bson:"name"`
 	Parent   string   `json:"parent" bson:"parent"`
 	Children []string `json:"children" bson:"children"`
+	IsPair   bool     `json:"ispair" bson:"ispair"`
 }
 
 func DefaultUser(id string) *User {
@@ -43,7 +45,7 @@ func DefaultUser(id string) *User {
 	}
 }
 
-func (u *User) FindGroup(parentID string) (*Group, bool) {
+func (u *User) FindGroupByParent(parentID string) (*Group, bool) {
 	for _, group := range u.Groups {
 		if group.Parent == parentID {
 			return group, true
@@ -61,4 +63,16 @@ func (u *User) FindGroupByName(name string) (*Group, bool) {
 	}
 
 	return nil, false
+}
+
+func (u *User) FindGroupByPair(channelID string) (*Group, []string, bool) {
+	for _, group := range u.Groups {
+		if group.Parent == channelID {
+			return group, group.Children, true
+		} else if group.IsPair && group.Children[0] == channelID {
+			return group, []string{group.Parent}, true
+		}
+	}
+
+	return nil, nil, false
 }
