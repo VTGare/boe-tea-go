@@ -234,7 +234,7 @@ func newgroup(b *bot.Bot, ispair bool) func(ctx *gumi.Ctx) error {
 		//
 		// Crosspost group command suffices with two (2) arguments.
 		// Crosspost pair command suffices with three (3) arguments.
-		if (ispair && ctx.Args.Len() != 3) || ctx.Args.Len() < 2 {
+		if (ispair && ctx.Args.Len() < 3) || ctx.Args.Len() < 2 {
 			return messages.ErrIncorrectCmd(ctx.Command)
 		}
 
