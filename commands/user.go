@@ -228,13 +228,13 @@ func groups(b *bot.Bot) func(ctx *gumi.Ctx) error {
 // newgroup creates a new crosspost group or pair.
 // A crosspost group is given a name and parent channel.
 // A crosspost pair is also given a crosspost channel.
-func newgroup(b *bot.Bot, ispair bool) func(ctx *gumi.Ctx) error {
+func newgroup(b *bot.Bot, isPair bool) func(ctx *gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
 		// Checks if Boe Tea command is correct.
 		//
 		// Crosspost group command suffices with two (2) arguments.
 		// Crosspost pair command suffices with three (3) arguments.
-		if (ispair && ctx.Args.Len() < 3) || ctx.Args.Len() < 2 {
+		if (isPair && ctx.Args.Len() < 3) || ctx.Args.Len() < 2 {
 			return messages.ErrIncorrectCmd(ctx.Command)
 		}
 
@@ -257,7 +257,7 @@ func newgroup(b *bot.Bot, ispair bool) func(ctx *gumi.Ctx) error {
 		// Assigns a crosspost channel when crosspost group is a pair.
 		// If group is not a pair leave empty.
 		children := []string{}
-		if ispair {
+		if isPair {
 			// Assigns channelID of crosspost channel.
 			child := strings.Trim(ctx.Args.Get(2).Raw, "<#>")
 
@@ -292,7 +292,7 @@ func newgroup(b *bot.Bot, ispair bool) func(ctx *gumi.Ctx) error {
 			Name:     name,
 			Parent:   parent,
 			Children: children,
-			IsPair:   ispair,
+			IsPair:   isPair,
 		})
 
 		// Returns error if any mongoDB error is raised.
@@ -304,7 +304,7 @@ func newgroup(b *bot.Bot, ispair bool) func(ctx *gumi.Ctx) error {
 
 		// Assign success message for crosspost group or pair.
 		var msg string
-		if ispair {
+		if isPair {
 			msg = messages.UserCreatePairSuccess(name, parent, children[0])
 		} else {
 			msg = messages.UserCreateGroupSuccess(name, parent)
