@@ -254,6 +254,11 @@ func newgroup(b *bot.Bot, isPair bool) func(ctx *gumi.Ctx) error {
 			return messages.ErrChannelNotFound(err, parent)
 		}
 
+		// Checks if parent is not a parent of an existing pair.
+		if _, _, ok := user.FindGroupByPair(parent); ok {
+			return messages.ErrInsertGroup(name, parent)
+		}
+
 		// Assigns a crosspost channel when crosspost group is a pair.
 		// If group is not a pair leave empty.
 		children := []string{}
