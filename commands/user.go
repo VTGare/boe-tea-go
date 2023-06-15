@@ -279,7 +279,7 @@ func newgroup(b *bot.Bot, isPair bool) func(ctx *gumi.Ctx) error {
 			}
 
 			// Checks if crosspost channel is not parent of an existing group.
-			if _, ok := user.FindGroupByParent(child); ok {
+			if _, _, ok := user.FindGroupByParent(child); ok {
 				return messages.ErrInsertGroup(name, child)
 			}
 
@@ -398,6 +398,11 @@ func push(b *bot.Bot) func(ctx *gumi.Ctx) error {
 
 			// Checks if crosspost channel is not a parent channel of group.
 			if group.Parent == channelID {
+				continue
+			}
+
+			// Checks if channel is not part of a pair.
+			if _, _, ok := user.FindGroupByPair(channelID); ok {
 				continue
 			}
 
@@ -580,7 +585,7 @@ func copygroup(b *bot.Bot) func(ctx *gumi.Ctx) error {
 
 		// Checks if parent channel is already a parent of another group.
 		parent := strings.Trim(ctx.Args.Get(2).Raw, "<#>")
-		if _, ok := user.FindGroupByParent(parent); ok {
+		if _, _, ok := user.FindGroupByParent(parent); ok {
 			return messages.ErrUserChannelAlreadyParent(parent)
 		}
 

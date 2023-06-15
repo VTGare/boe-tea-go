@@ -78,7 +78,7 @@ func (u *userStore) DeleteCrosspostGroup(ctx context.Context, userID, group stri
 func (u *userStore) RenameCrosspostGroup(ctx context.Context, userID, group, rename string) (*store.User, error) {
 	res := u.col.FindOneAndUpdate(
 		ctx,
-		bson.M{"user_id": userID, "channel_groups.name": group},
+		bson.M{"user_id": userID, "channel_groups.name": bson.M{"$ne": rename, "$eq": group}},
 		bson.M{"$set": bson.M{"channel_groups.$.name": rename}},
 		options.FindOneAndUpdate().SetReturnDocument(options.After),
 	)

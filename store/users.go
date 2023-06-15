@@ -45,14 +45,16 @@ func DefaultUser(id string) *User {
 	}
 }
 
-func (u *User) FindGroupByParent(parentID string) (*Group, bool) {
+func (u *User) FindGroupByParent(channelID string) ([]string, *Group, bool) {
 	for _, group := range u.Groups {
-		if group.Parent == parentID {
-			return group, true
+		if group.Parent == channelID {
+			return group.Children, group, true
+		} else if group.IsPair && group.Children[0] == channelID {
+			return []string{group.Parent}, group, true
 		}
 	}
 
-	return nil, false
+	return nil, nil, false
 }
 
 func (u *User) FindGroupByName(name string) (*Group, bool) {
@@ -65,12 +67,14 @@ func (u *User) FindGroupByName(name string) (*Group, bool) {
 	return nil, false
 }
 
-func (u *User) FindGroupByPair(channelID string) (*Group, []string, bool) {
+func (u *User) FindGroupByPair(channelID string) ([]string, *Group, bool) {
 	for _, group := range u.Groups {
-		if group.Parent == channelID {
-			return group, group.Children, true
-		} else if group.IsPair && group.Children[0] == channelID {
-			return group, []string{group.Parent}, true
+		if group.IsPair {
+			if group.Parent == channelID {
+				return group.Children, group, true
+			} else if group.Children[0] == channelID {
+				return []string{group.Parent}, group, true
+			}
 		}
 	}
 

@@ -199,7 +199,7 @@ func share(b *bot.Bot, s post.SkipMode) func(ctx *gumi.Ctx) error {
 
 		user, _ := b.Store.User(context.Background(), ctx.Event.Author.ID)
 		if user != nil {
-			if group, channels, ok := user.FindGroupByPair(ctx.Event.ChannelID); ok {
+			if channels, group, ok := user.FindGroupByParent(ctx.Event.ChannelID); ok {
 				sent, err := p.Crosspost(user.ID, group.Name, channels)
 				if err != nil {
 					return err
@@ -254,7 +254,7 @@ func crosspost(b *bot.Bot) func(ctx *gumi.Ctx) error {
 
 		user, _ := b.Store.User(context.Background(), ctx.Event.Author.ID)
 		if user != nil {
-			if group, channels, ok := user.FindGroupByPair(ctx.Event.ChannelID); ok {
+			if channels, group, ok := user.FindGroupByParent(ctx.Event.ChannelID); ok {
 				excludedChannels := make(map[string]struct{})
 				for _, arg := range strings.Fields(ctx.Args.Raw) {
 					id := strings.Trim(arg, "<#>")
