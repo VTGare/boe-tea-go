@@ -200,7 +200,7 @@ func groups(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			if group.IsPair {
 				groupList.Pairs = append(groupList.Pairs, groupData{name, desc})
 			} else {
-				groupList.Groups = append(groupList.Pairs, groupData{name, desc})
+				groupList.Groups = append(groupList.Groups, groupData{name, desc})
 			}
 		}
 
