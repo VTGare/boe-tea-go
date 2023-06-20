@@ -64,6 +64,17 @@ func (u *userStore) CreateCrosspostGroup(ctx context.Context, userID string, gro
 	return resDecoder(res)
 }
 
+func (u *userStore) CreateCrosspostPair(ctx context.Context, userID string, pair *store.Group) (*store.User, error) {
+	res := u.col.FindOneAndUpdate(
+		ctx,
+		bson.M{"user_id": userID, "channel_groups.name": bson.M{"$ne": pair.Name}, "channel_groups.parent": bson.M{"$nin": pair.Children}},
+		bson.M{"$push": bson.M{"channel_groups": pair}},
+		options.FindOneAndUpdate().SetReturnDocument(options.After),
+	)
+
+	return resDecoder(res)
+}
+
 func (u *userStore) DeleteCrosspostGroup(ctx context.Context, userID, group string) (*store.User, error) {
 	res := u.col.FindOneAndUpdate(
 		ctx,

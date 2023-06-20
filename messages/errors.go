@@ -58,9 +58,19 @@ func newUserError(msg string, errs ...error) *UserErr {
 
 func ErrInsertGroup(group, channel string) error {
 	return newUserError(fmt.Sprintf(
-		"Couldn't create a new group. One of the following is true:\n%v\n%v",
+		"Couldn't create a new group. One of the following is true:\n%v\n%v\n%v",
 		"• Group named `"+group+"` already exist;",
-		"• Channel `"+channel+"` is a parent of another group.",
+		"• Channel `"+channel+"` is a parent of another group;",
+		"• Channel `"+channel+"` is part of a pair.",
+	))
+}
+
+func ErrInsertPair(group string, channels []string) error {
+	return newUserError(fmt.Sprintf(
+		"Couldn't create a new pair. One of the following is true:\n%v\n%v\n%v",
+		"• Group named `"+group+"` already exist;",
+		"• Channel `"+channels[0]+"` is a parent of another group;",
+		"• Channel `"+channels[1]+"` is a parent of another group.",
 	))
 }
 

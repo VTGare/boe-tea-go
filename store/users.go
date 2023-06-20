@@ -11,6 +11,7 @@ type UserStore interface {
 	User(ctx context.Context, userID string) (*User, error)
 
 	CreateCrosspostGroup(ctx context.Context, userID string, group *Group) (*User, error)
+	CreateCrosspostPair(ctx context.Context, userID string, pair *Group) (*User, error)
 	DeleteCrosspostGroup(ctx context.Context, userID string, group string) (*User, error)
 	RenameCrosspostGroup(ctx context.Context, userID string, name string, newName string) (*User, error)
 	AddCrosspostChannel(ctx context.Context, userID string, group string, child string) (*User, error)
@@ -45,16 +46,20 @@ func DefaultUser(id string) *User {
 	}
 }
 
-func (u *User) FindGroupByParent(channelID string) ([]string, *Group, bool) {
+func (u *User) FindGroup(channelID string, onlyPairs bool) (*Group, bool) {
 	for _, group := range u.Groups {
-		if group.Parent == channelID {
-			return group.Children, group, true
-		} else if group.IsPair && group.Children[0] == channelID {
-			return []string{group.Parent}, group, true
+		if !onlyPairs && group.Parent == channelID {
+			return group, true
+		} else if group.IsPair {
+			for _, child := range group.Children {
+				if child == channelID {
+					return group, true
+				}
+			}
 		}
 	}
 
-	return nil, nil, false
+	return nil, false
 }
 
 func (u *User) FindGroupByName(name string) (*Group, bool) {
@@ -65,18 +70,4 @@ func (u *User) FindGroupByName(name string) (*Group, bool) {
 	}
 
 	return nil, false
-}
-
-func (u *User) FindGroupByPair(channelID string) ([]string, *Group, bool) {
-	for _, group := range u.Groups {
-		if group.IsPair {
-			if group.Parent == channelID {
-				return group.Children, group, true
-			} else if group.Children[0] == channelID {
-				return []string{group.Parent}, group, true
-			}
-		}
-	}
-
-	return nil, nil, false
 }

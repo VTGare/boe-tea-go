@@ -77,9 +77,9 @@ func NotCommand(b *bot.Bot) func(*gumi.Ctx) error {
 				}
 			} else {
 				if user.Crosspost {
-					channels, group, ok := user.FindGroupByParent(ctx.Event.ChannelID)
+					group, ok := user.FindGroup(ctx.Event.ChannelID, false)
 					if ok {
-						sent, _ := p.Crosspost(ctx.Event.Author.ID, group.Name, channels)
+						sent, _ := p.Crosspost(ctx.Event.Author.ID, group.Name, group.Children)
 						allSent = append(allSent, sent...)
 					}
 				}
@@ -311,8 +311,8 @@ func OnReactionAdd(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageReacti
 			sent := make([]*cache.MessageInfo, 0)
 			user, _ := b.Store.User(ctx, r.UserID)
 			if user != nil {
-				if channels, group, ok := user.FindGroupByParent(r.ChannelID); ok {
-					sent, err = p.Crosspost(user.ID, group.Name, channels)
+				if group, ok := user.FindGroup(r.ChannelID, false); ok {
+					sent, err = p.Crosspost(user.ID, group.Name, group.Children)
 					if err != nil {
 						return err
 					}

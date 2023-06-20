@@ -34,10 +34,10 @@ func UserCreateGroupSuccess(name, parent string) string {
 	)
 }
 
-func UserCreatePairSuccess(name, parent, child string) string {
+func UserCreatePairSuccess(name string, channels []string) string {
 	return fmt.Sprintf(
 		"Created a pair `%v` with channels <#%v> | `%v` and <#%v> | `%v`",
-		name, parent, parent, child, child,
+		name, channels[0], channels[0], channels[1], channels[1],
 	)
 }
 
@@ -57,11 +57,12 @@ func UserPushSuccess(name string, channels []string) string {
 
 func ErrUserPushFail(name string) error {
 	return newUserError(fmt.Sprintf(
-		"No channels were added to group `%v`. One of the following is true:\n%v\n%v\n%v",
+		"No channels were added to group `%v`. One of the following is true:\n%v\n%v\n%v\n%v",
 		name,
 		"• Group "+name+" doesn't exist;",
 		"• All channels are already part of the group;",
 		"• A channel is also a parent of this group.",
+		"• A channel is part of a pair.",
 	))
 }
 
@@ -96,7 +97,7 @@ func UserCopyGroupSuccess(src, dest string, channels []string) string {
 	)
 }
 
-func ErrUserGroupNameFail(cmd, src, dest string) error {
+func ErrUserEditGroupFail(cmd, src, dest string) error {
 	return newUserError(fmt.Sprintf(
 		"Couldn't "+cmd+" group `%v` to `%v`. One of the following is true:\n%v\n%v",
 		src, dest,
