@@ -154,6 +154,16 @@ func userGroup(b *bot.Bot) {
 
 // groups shows the full list of crosspost groups.
 func groups(b *bot.Bot) func(ctx *gumi.Ctx) error {
+	type groupData struct {
+		Name        string
+		Description string
+	}
+
+	type groupList struct {
+		Pairs  []groupData
+		Groups []groupData
+	}
+
 	return func(ctx *gumi.Ctx) error {
 		user, err := b.Store.User(context.Background(), ctx.Event.Author.ID)
 		if err != nil {
@@ -166,23 +176,17 @@ func groups(b *bot.Bot) func(ctx *gumi.Ctx) error {
 		eb.Title(locale.Title)
 		eb.Description(locale.Description)
 
-		// Iterates and constructs crosspost groups into groupList.
-		var groupList [2][][2]string
+		var groupList groupList
 		for _, group := range user.Groups {
 			var category, parent, children string
-			var list int8
-
-			// Assigns crosspost group and pair variables
 			if group.IsPair {
 				category = locale.Pair
 			} else {
 				category = locale.Group
 				parent = fmt.Sprintf("**%v: **", locale.Parent)
 				children = fmt.Sprintf("**%v: **", locale.Children)
-				list = 1
 			}
 
-			// Assigns field name and description.
 			name := fmt.Sprintf("%v «%v»", category, group.Name)
 			desc := fmt.Sprintf("%v%v\n%v%v",
 				parent,
@@ -193,15 +197,19 @@ func groups(b *bot.Bot) func(ctx *gumi.Ctx) error {
 				}), "\n"),
 			)
 
-			// Appends to groupList.
-			groupList[list] = append(groupList[list], [2]string{name, desc})
+			if group.IsPair {
+				groupList.Pairs = append(groupList.Pairs, groupData{name, desc})
+			} else {
+				groupList.Groups = append(groupList.Pairs, groupData{name, desc})
+			}
 		}
 
-		// Builds crosspost groups into respective fields.
-		for _, list := range groupList {
-			for _, group := range list {
-				eb.AddField(group[0], group[1])
-			}
+		for _, group := range groupList.Groups {
+			eb.AddField(group.Name, group.Description)
+		}
+
+		for _, pair := range groupList.Pairs {
+			eb.AddField(pair.Name, pair.Description)
 		}
 
 		return ctx.ReplyEmbed(eb.Finalize())
@@ -232,8 +240,8 @@ func newgroup(b *bot.Bot, isPair bool) func(ctx *gumi.Ctx) error {
 			return messages.ErrChannelNotFound(err, parent)
 		}
 
-		// Checks if parent already a parent
-		if _, _, ok := user.FindGroupByPair(parent); ok {
+		// Checks if parent is already used.
+		if _, _, ok := user.FindGroupByParent(parent); ok {
 			return messages.ErrInsertGroup(name, parent)
 		}
 
@@ -241,7 +249,6 @@ func newgroup(b *bot.Bot, isPair bool) func(ctx *gumi.Ctx) error {
 		// If group is not a pair leave empty.
 		children := []string{}
 		if isPair {
-			// Assigns channelID of crosspost channel.
 			child := strings.Trim(ctx.Args.Get(2).Raw, "<#>")
 
 			ch, err := ctx.Session.Channel(child)
@@ -271,10 +278,8 @@ func newgroup(b *bot.Bot, isPair bool) func(ctx *gumi.Ctx) error {
 			IsPair:   isPair,
 		})
 
-		if err != nil {
-			if err = errMongoDB(err, messages.ErrInsertGroup(name, parent)); err != nil {
-				return err
-			}
+		if err := handleStoreError(err, messages.ErrInsertGroup(name, parent)); err != nil {
+			return err
 		}
 
 		var msg string
@@ -304,10 +309,8 @@ func delgroup(b *bot.Bot) func(ctx *gumi.Ctx) error {
 		name := ctx.Args.Get(0).Raw
 
 		_, err = b.Store.DeleteCrosspostGroup(context.Background(), user.ID, name)
-		if err != nil {
-			if err = errMongoDB(err, messages.ErrDeleteGroup(name)); err != nil {
-				return err
-			}
+		if err := handleStoreError(err, messages.ErrDeleteGroup(name)); err != nil {
+			return err
 		}
 
 		return successMessage(ctx, fmt.Sprintf("Removed a group named `%v`", name))
@@ -372,12 +375,8 @@ func push(b *bot.Bot) func(ctx *gumi.Ctx) error {
 				channelID,
 			)
 
-			if err != nil {
-				if err = errMongoDB(err); err != nil {
-					return err
-				} else {
-					continue
-				}
+			if err := handleStoreError(err); err != nil {
+				return err
 			}
 
 			inserted = append(inserted, channelID)
@@ -430,12 +429,8 @@ func remove(b *bot.Bot) func(ctx *gumi.Ctx) error {
 				channelID,
 			)
 
-			if err != nil {
-				if err = errMongoDB(err); err != nil {
-					return err
-				} else {
-					continue
-				}
+			if err := handleStoreError(err); err != nil {
+				return err
 			}
 
 			removed = append(removed, channelID)
@@ -850,9 +845,13 @@ func artworkToEmbed(artwork *store.Artwork, image string, ind, length int) *disc
 	return eb.Finalize()
 }
 
-// errMongoDB returns an error if any mongoDB error is raised.
-// If no error message is provided, errMongoDB will return the provided error or as nil.
-func errMongoDB(err error, message ...error) error {
+// handleStoreError returns an error if any store error is raised.
+// If no error message is provided, handleStoreError will return the provided error or as nil.
+func handleStoreError(err error, message ...error) error {
+	if err == nil {
+		return nil
+	}
+
 	switch {
 	case errors.Is(err, mongo.ErrNoDocuments):
 		if message != nil {
