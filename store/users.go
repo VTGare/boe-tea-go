@@ -32,7 +32,7 @@ type Group struct {
 	Name     string   `json:"name" bson:"name"`
 	Parent   string   `json:"parent" bson:"parent"`
 	Children []string `json:"children" bson:"children"`
-	IsPair   bool     `json:"ispair" bson:"ispair"`
+	IsPair   bool     `json:"is_pair" bson:"is_pair"`
 }
 
 func DefaultUser(id string) *User {
