@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -183,11 +184,11 @@ func groups(b *bot.Bot) func(ctx *gumi.Ctx) error {
 				category = locale.Pair
 			} else {
 				category = locale.Group
-				parent = fmt.Sprintf("**%v: %v\n**",
+				parent = fmt.Sprintf("**%v:** %v\n",
 					locale.Parent,
 					fmt.Sprintf("<#%v> | `%v`", group.Parent, group.Parent),
 				)
-				children = fmt.Sprintf("**%v: **", locale.Children)
+				children = fmt.Sprintf("**%v:** ", locale.Children)
 			}
 
 			name := fmt.Sprintf("%v «%v»", category, group.Name)
@@ -206,12 +207,12 @@ func groups(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			}
 		}
 
-		for _, group := range groupList.Groups {
-			eb.AddField(group.Name, group.Description)
-		}
-
 		for _, pair := range groupList.Pairs {
 			eb.AddField(pair.Name, pair.Description)
+		}
+
+		for _, group := range groupList.Groups {
+			eb.AddField(group.Name, group.Description)
 		}
 
 		return ctx.ReplyEmbed(eb.Finalize())
@@ -227,8 +228,8 @@ func newgroup(b *bot.Bot) func(ctx *gumi.Ctx) error {
 		}
 
 		// Name of crosspost group.
-		name := argTrim(ctx, 0)
-		parent := argTrim(ctx, 1)
+		name := ctx.Args.Get(0).Raw
+		parent := dgoutils.TrimChannel(ctx, 1)
 		if _, err := ctx.Session.Channel(parent); err != nil {
 			return messages.ErrChannelNotFound(err, parent)
 		}
@@ -262,11 +263,11 @@ func newpair(b *bot.Bot) func(ctx *gumi.Ctx) error {
 		}
 
 		// Name of crosspost pair.
-		name := argTrim(ctx, 0)
+		name := ctx.Args.Get(0).Raw
 		var children []string
 		children = append(children,
-			argTrim(ctx, 1),
-			argTrim(ctx, 2),
+			dgoutils.TrimChannel(ctx, 1),
+			dgoutils.TrimChannel(ctx, 2),
 		)
 
 		// Checks if crosspost channel is not parent channel.
@@ -289,6 +290,7 @@ func newpair(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			}
 		}
 
+		sort.Strings(children)
 		_, err = b.Store.CreateCrosspostPair(context.Background(), user.ID, &store.Group{
 			Name:     name,
 			Children: children,
@@ -312,7 +314,7 @@ func delgroup(b *bot.Bot) func(ctx *gumi.Ctx) error {
 		}
 
 		// Name of crosspost group.
-		name := argTrim(ctx, 0)
+		name := ctx.Args.Get(0).Raw
 
 		_, err = b.Store.DeleteCrosspostGroup(context.Background(), user.ID, name)
 		if err := handleStoreError(err, messages.ErrDeleteGroup(name)); err != nil {
@@ -332,7 +334,7 @@ func push(b *bot.Bot) func(ctx *gumi.Ctx) error {
 		}
 
 		// Name of crosspost group.
-		name := argTrim(ctx, 0)
+		name := ctx.Args.Get(0).Raw
 		ctx.Args.Remove(0)
 
 		group, ok := user.FindGroupByName(name)
@@ -345,14 +347,13 @@ func push(b *bot.Bot) func(ctx *gumi.Ctx) error {
 		}
 
 		inserted := make([]string, 0, ctx.Args.Len())
-		for _, arg := range ctx.Args.Arguments {
-			channelID := argTrim(ctx, arg.Raw)
+		for arg := range ctx.Args.Arguments {
+			channelID := dgoutils.TrimChannel(ctx, arg)
 			ch, err := ctx.Session.Channel(channelID)
 			if err != nil {
 				return messages.ErrChannelNotFound(err, channelID)
 			}
 
-			// Only accept guild text channels.
 			// Only accept guild text channels.
 			if ch.Type != discordgo.ChannelTypeGuildText {
 				continue
@@ -400,7 +401,7 @@ func remove(b *bot.Bot) func(ctx *gumi.Ctx) error {
 		}
 
 		// Name of crosspost group or pair.
-		name := argTrim(ctx, 0)
+		name := ctx.Args.Get(0).Raw
 		ctx.Args.Remove(0)
 
 		group, ok := user.FindGroupByName(name)
@@ -413,8 +414,8 @@ func remove(b *bot.Bot) func(ctx *gumi.Ctx) error {
 		}
 
 		removed := make([]string, 0, ctx.Args.Len())
-		for _, arg := range ctx.Args.Arguments {
-			channelID := argTrim(ctx, arg.Raw)
+		for arg := range ctx.Args.Arguments {
+			channelID := dgoutils.TrimChannel(ctx, arg)
 
 			if !arrays.Any(group.Children, channelID) {
 				continue
@@ -452,8 +453,8 @@ func rename(b *bot.Bot) func(ctx *gumi.Ctx) error {
 		// Group name (0) and new name (1)
 		var (
 			cmd  = "rename"
-			src  = argTrim(ctx, 0)
-			dest = argTrim(ctx, 1)
+			src  = ctx.Args.Get(0).Raw
+			dest = ctx.Args.Get(1).Raw
 		)
 
 		_, ok := user.FindGroupByName(src)
@@ -481,8 +482,8 @@ func copygroup(b *bot.Bot) func(ctx *gumi.Ctx) error {
 		// Source group name (0), destination group name (1)
 		var (
 			cmd  = "copy"
-			src  = argTrim(ctx, 0)
-			dest = argTrim(ctx, 1)
+			src  = ctx.Args.Get(0).Raw
+			dest = ctx.Args.Get(1).Raw
 		)
 
 		group, ok := user.FindGroupByName(src)
@@ -494,7 +495,7 @@ func copygroup(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			return messages.ErrUserPairFail(src)
 		}
 
-		parent := argTrim(ctx, 2)
+		parent := dgoutils.TrimChannel(ctx, 2)
 		if _, ok := user.FindGroup(parent, false); ok {
 			return messages.ErrUserChannelAlreadyParent(parent)
 		}
@@ -841,14 +842,6 @@ func initCommand(b *bot.Bot, ctx *gumi.Ctx, argsLen int) (*store.User, error) {
 	}
 
 	return b.Store.User(context.Background(), ctx.Event.Author.ID)
-}
-
-func argTrim(ctx *gumi.Ctx, arg any) string {
-	if n, ok := arg.(int); ok {
-		return strings.Trim(ctx.Args.Get(n).Raw, "<#>")
-	}
-
-	return strings.Trim(fmt.Sprintf("%v", arg), "<#>")
 }
 
 // handleStoreError returns an error if any store error is raised.
