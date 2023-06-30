@@ -10,6 +10,7 @@ import (
 
 	"github.com/VTGare/boe-tea-go/artworks/deviant"
 	"github.com/VTGare/boe-tea-go/artworks/pixiv"
+	"github.com/VTGare/boe-tea-go/artworks/twitter"
 	"github.com/VTGare/boe-tea-go/bot"
 	"github.com/VTGare/boe-tea-go/commands"
 	"github.com/VTGare/boe-tea-go/handlers"
@@ -90,10 +91,11 @@ func main() {
 	}
 
 	// Temporary disabled
-	// b.AddProvider(twitter.New())
 	// b.AddProvider(artstation.New())
 
+	b.AddProvider(twitter.New())
 	b.AddProvider(deviant.New())
+
 	if pixiv, err := pixiv.New(cfg.Pixiv.ProxyHost, cfg.Pixiv.AuthToken, cfg.Pixiv.RefreshToken); err == nil {
 		log.Info("Successfully logged into Pixiv.")
 		b.AddProvider(pixiv)
