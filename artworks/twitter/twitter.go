@@ -46,7 +46,7 @@ type Video struct {
 
 func New() artworks.Provider {
 	return &Twitter{
-		providers: []artworks.Provider{newScraper(), newFxTwitter(), newNitter()},
+		providers: []artworks.Provider{newNitter(), newFxTwitter(), newScraper()},
 	}
 }
 
