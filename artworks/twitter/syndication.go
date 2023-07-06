@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sort"
 	"time"
 
 	"github.com/VTGare/boe-tea-go/artworks"
@@ -15,17 +16,16 @@ type twitterSyndication struct {
 }
 
 type twitterTweet struct {
-	Entities      twitterEntities `json:"entities,omitempty"`
-	ID            string          `json:"id_str,omitempty"`
-	Text          string          `json:"text,omitempty"`
-	User          twitterUser     `json:"user,omitempty"`
-	Photos        []twitterPhoto  `json:"photos,omitempty"`
-	Video         *twitterVideo   `json:"video,omitempty"`
-	QuotedTweet   *twitterTweet   `json:"quoted_tweet,omitempty"`
-	CreatedAt     time.Time       `json:"created_at,omitempty"`
-	RetweetCount  int             `json:"retweet_count,omitempty"`
-	FavoriteCount int             `json:"favorite_count,omitempty"`
-	ReplyCount    int             `json:"reply_count,omitempty"`
+	Entities      twitterEntities       `json:"entities,omitempty"`
+	ID            string                `json:"id_str,omitempty"`
+	Text          string                `json:"text,omitempty"`
+	User          twitterUser           `json:"user,omitempty"`
+	MediaDetails  []twitterMediaDetails `json:"mediaDetails,omitempty"`
+	QuotedTweet   *twitterTweet         `json:"quoted_tweet,omitempty"`
+	CreatedAt     time.Time             `json:"created_at,omitempty"`
+	RetweetCount  int                   `json:"retweet_count,omitempty"`
+	FavoriteCount int                   `json:"favorite_count,omitempty"`
+	ReplyCount    int                   `json:"reply_count,omitempty"`
 }
 
 type twitterEntities struct {
@@ -45,11 +45,18 @@ type twitterPhoto struct {
 	URL string
 }
 
-type twitterVideo struct {
-	Poster   string
+type twitterMediaDetails struct {
+	MediaURL  string            `json:"media_url_https,omitempty"`
+	Type      string            `json:"type,omitempty"`
+	VideoInfo *twitterVideoInfo `json:"video_info,omitempty"`
+}
+
+type twitterVideoInfo struct {
 	Variants []struct {
-		Src string
-	}
+		Bitrate     int    `json:"bitrate,omitempty"`
+		ContentType string `json:"content_type,omitempty"`
+		URL         string `json:"url,omitempty"`
+	} `json:"variants,omitempty"`
 }
 
 func newSyndication() artworks.Provider {
@@ -80,17 +87,9 @@ func (ts *twitterSyndication) Find(id string) (artworks.Artwork, error) {
 		return nil, fmt.Errorf("json decode: %w", err)
 	}
 
-	photos := make([]string, 0, len(tweet.Photos))
-	for _, photo := range tweet.Photos {
-		photos = append(photos, photo.URL)
-	}
-
-	videos := []Video{}
-	if tweet.Video != nil && len(tweet.Video.Variants) >= 2 {
-		videos = append(videos, Video{
-			Preview: tweet.Video.Poster,
-			URL:     tweet.Video.Variants[1].Src,
-		})
+	photos, videos, err := ts.handleMediaDetails(tweet.MediaDetails)
+	if err != nil {
+		return nil, fmt.Errorf("handle media details: %w", err)
 	}
 
 	art := &Artwork{
@@ -115,4 +114,63 @@ func (ts *twitterSyndication) Find(id string) (artworks.Artwork, error) {
 
 	art.AIGenerated = artworks.IsAIGenerated(hashtags...)
 	return art, nil
+}
+
+func (ts *twitterSyndication) handleMediaDetails(mds []twitterMediaDetails) ([]string, []Video, error) {
+	var (
+		photos []string
+		videos []Video
+	)
+
+	for _, md := range mds {
+		switch md.Type {
+		case "video":
+			video, err := ts.handleVideo(md.VideoInfo, md.MediaURL)
+			if err != nil {
+				return nil, nil, fmt.Errorf("handle video: %w", err)
+			}
+
+			if video.URL != "" {
+				videos = append(videos, video)
+			} else {
+				photos = append(photos, video.Preview)
+			}
+
+		case "photo":
+			photos = append(photos, md.MediaURL)
+		}
+	}
+
+	return photos, videos, nil
+}
+
+func (ts *twitterSyndication) handleVideo(video *twitterVideoInfo, poster string) (Video, error) {
+	sort.SliceStable(video.Variants, func(i, j int) bool {
+		return video.Variants[i].Bitrate > video.Variants[j].Bitrate
+	})
+
+	for _, variant := range video.Variants {
+		if variant.ContentType != "video/mp4" {
+			continue
+		}
+
+		resp, err := ts.client.Head(variant.URL)
+		if err != nil {
+			return Video{}, fmt.Errorf("head request: %w", err)
+		}
+
+		defer resp.Body.Close()
+
+		size := float64(resp.ContentLength) / (1 << 20)
+		if size > 25 {
+			continue
+		}
+
+		return Video{
+			Preview: poster,
+			URL:     variant.URL,
+		}, nil
+	}
+
+	return Video{Preview: poster}, nil
 }
