@@ -8,7 +8,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/VTGare/boe-tea-go/artworks/artstation"
 	"github.com/VTGare/boe-tea-go/artworks/deviant"
 	"github.com/VTGare/boe-tea-go/artworks/pixiv"
 	"github.com/VTGare/boe-tea-go/artworks/twitter"
@@ -91,9 +90,12 @@ func main() {
 		log.Fatal(err)
 	}
 
+	// Temporary disabled
+	// b.AddProvider(artstation.New())
+
 	b.AddProvider(twitter.New())
 	b.AddProvider(deviant.New())
-	b.AddProvider(artstation.New())
+
 	if pixiv, err := pixiv.New(cfg.Pixiv.ProxyHost, cfg.Pixiv.AuthToken, cfg.Pixiv.RefreshToken); err == nil {
 		log.Info("Successfully logged into Pixiv.")
 		b.AddProvider(pixiv)
