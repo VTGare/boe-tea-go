@@ -187,11 +187,11 @@ func groups(b *bot.Bot) func(ctx *gumi.Ctx) error {
 					locale.Parent,
 					fmt.Sprintf("<#%v> | `%v`", group.Parent, group.Parent),
 				)
-				children = fmt.Sprintf("**%v: **", locale.Children)
+				children = fmt.Sprintf("**%v:** \n", locale.Children)
 			}
 
 			name := fmt.Sprintf("%v «%v»", category, group.Name)
-			desc := fmt.Sprintf("%v%v%v",
+			desc := fmt.Sprintf("%v %v %v",
 				parent,
 				children,
 				strings.Join(arrays.Map(group.Children, func(s string) string {
@@ -234,7 +234,7 @@ func newgroup(b *bot.Bot) func(ctx *gumi.Ctx) error {
 		}
 
 		// Checks if parent is already used.
-		if _, ok := user.FindGroup(parent, true); ok {
+		if _, ok := user.FindGroup(parent); ok {
 			return messages.ErrInsertGroup(name, parent)
 		}
 
@@ -284,7 +284,7 @@ func newpair(b *bot.Bot) func(ctx *gumi.Ctx) error {
 				return messages.ErrIncorrectCmd(ctx.Command)
 			}
 
-			if _, ok := user.FindGroup(child, true); ok {
+			if _, ok := user.FindGroup(child); ok {
 				return messages.ErrInsertPair(name, children)
 			}
 		}
@@ -362,7 +362,7 @@ func push(b *bot.Bot) func(ctx *gumi.Ctx) error {
 				continue
 			}
 
-			if _, ok := user.FindGroup(channelID, true); ok {
+			if _, ok := user.FindGroup(channelID); ok {
 				continue
 			}
 
@@ -495,7 +495,7 @@ func copygroup(b *bot.Bot) func(ctx *gumi.Ctx) error {
 		}
 
 		parent := argTrim(ctx, 2)
-		if _, ok := user.FindGroup(parent, false); ok {
+		if _, ok := user.FindGroup(parent); ok {
 			return messages.ErrUserChannelAlreadyParent(parent)
 		}
 

@@ -199,8 +199,8 @@ func share(b *bot.Bot, s post.SkipMode) func(ctx *gumi.Ctx) error {
 
 		user, _ := b.Store.User(context.Background(), ctx.Event.Author.ID)
 		if user != nil {
-			if group, ok := user.FindGroup(ctx.Event.ChannelID, false); ok {
-				sent, err := p.Crosspost(user.ID, group.Name, group.Children)
+			if group, ok := user.FindGroup(ctx.Event.ChannelID); ok {
+				sent, err := p.Crosspost(user.ID, group)
 				if err != nil {
 					return err
 				}
@@ -254,7 +254,7 @@ func crosspost(b *bot.Bot) func(ctx *gumi.Ctx) error {
 
 		user, _ := b.Store.User(context.Background(), ctx.Event.Author.ID)
 		if user != nil {
-			if group, ok := user.FindGroup(ctx.Event.ChannelID, false); ok {
+			if group, ok := user.FindGroup(ctx.Event.ChannelID); ok {
 				excludedChannels := make(map[string]struct{})
 				for _, arg := range strings.Fields(ctx.Args.Raw) {
 					id := strings.Trim(arg, "<#>")
@@ -266,10 +266,11 @@ func crosspost(b *bot.Bot) func(ctx *gumi.Ctx) error {
 					return !ok
 				})
 
-				//If channels were successfully excluded, crosspost to a trimmed down
-				//collection of channels. Otherwise skip crossposting altogether.
+				// If channels were successfully excluded, crosspost to trimmed channels.
+				// Otherwise, don't crosspost at all.
 				if len(group.Children) > len(filtered) {
-					sent, err := p.Crosspost(user.ID, group.Name, filtered)
+					group.Children = filtered
+					sent, err := p.Crosspost(user.ID, group)
 					if err != nil {
 						return err
 					}

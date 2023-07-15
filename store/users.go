@@ -3,6 +3,8 @@ package store
 import (
 	"context"
 	"time"
+
+	"github.com/VTGare/boe-tea-go/internal/arrays"
 )
 
 type UserStore interface {
@@ -46,16 +48,18 @@ func DefaultUser(id string) *User {
 	}
 }
 
-func (u *User) FindGroup(channelID string, onlyPairs bool) (*Group, bool) {
+func (u *User) FindGroup(channelID string) (*Group, bool) {
 	for _, group := range u.Groups {
-		if !onlyPairs && group.Parent == channelID {
-			return group, true
-		} else if group.IsPair {
-			for _, child := range group.Children {
-				if child == channelID {
-					return group, true
-				}
+		if group.IsPair {
+			if arrays.Any(group.Children, channelID) {
+				return group, true
 			}
+
+			continue
+		}
+
+		if group.Parent == channelID {
+			return group, true
 		}
 	}
 
