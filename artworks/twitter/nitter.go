@@ -19,6 +19,7 @@ type nitter struct {
 
 func newNitter() artworks.Provider {
 	return &nitter{instances: []string{
+		"https://nitter.snopyta.org",
 		"https://nittereu.moomoo.me",
 		"https://nitter.fly.dev",
 		"https://nitter.1d4.us",
