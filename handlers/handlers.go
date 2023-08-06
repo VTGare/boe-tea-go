@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/VTGare/boe-tea-go/artworks"
+	"github.com/VTGare/boe-tea-go/artworks/twitter"
 	"github.com/VTGare/boe-tea-go/bot"
 	"github.com/VTGare/boe-tea-go/internal/arrays"
 	"github.com/VTGare/boe-tea-go/internal/cache"
@@ -594,49 +595,98 @@ func OnReactionRemove(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageRea
 // OnError creates an error response, logs them and sends the response on Discord.
 func OnError(b *bot.Bot) func(*gumi.Ctx, error) {
 	return func(ctx *gumi.Ctx, err error) {
-		eb := embeds.NewBuilder()
-
 		var (
-			cmdErr *messages.IncorrectCmd
-			usrErr *messages.UserErr
+			eb         = embeds.NewBuilder()
+			cmdErr     *messages.IncorrectCmd
+			usrErr     *messages.UserErr
+			artworkErr *artworks.Error
 		)
 
 		switch {
 		case errors.As(err, &cmdErr):
-			if ctx.Command != nil {
-				b.Log.With("error", err, "command", ctx.Command.Name, "arguments", ctx.Args.Raw).Error("failed to execute command due to a command error")
-
-			} else {
-				b.Log.With("error", err).Error("a command error occured")
-			}
-
-			eb.FailureTemplate(cmdErr.Error() + "\n" + cmdErr.Description)
-			eb.AddField(cmdErr.Embed.Usage, fmt.Sprintf("`%v`", cmdErr.Usage))
-			eb.AddField(cmdErr.Embed.Example, fmt.Sprintf("`%v`", cmdErr.Example))
+			eb = onCommandError(b, ctx, cmdErr)
 		case errors.As(err, &usrErr):
-			if err := usrErr.Unwrap(); err != nil {
-				if ctx.Command != nil {
-					b.Log.With("error", err, "command", ctx.Command.Name, "arguments", ctx.Args.Raw).Info("failed to execute command due to an user error")
-				} else {
-					b.Log.With("error", err).Info("an user error occured")
-				}
-			}
-
-			eb.FailureTemplate(usrErr.Error())
+			eb = onUserError(b, ctx, usrErr)
+		case errors.As(err, &artworkErr):
+			eb = onArtworkError(b, ctx, artworkErr)
 		default:
-			if ctx.Command != nil {
-				b.Log.With("error", err, "command", ctx.Command.Name, "arguments", ctx.Args.Raw).Error("failed to execute command due to an unexpected error")
-
-			} else {
-				b.Log.With("error", err).Error("an unexpected error occured")
-			}
-
-			eb.FailureTemplate("An unexpected error occured. Please try again later.\n" +
-				"If error persists, please let the developer know about it with `bt!feedback` command.")
+			eb = onDefaultError(b, ctx, err)
 		}
 
-		ctx.ReplyEmbed(eb.Finalize())
+		if err := ctx.ReplyEmbed(eb.Finalize()); err != nil {
+			b.Log.With("error", err).Error("failed to reply in error handler")
+		}
 	}
+}
+
+func onArtworkError(b *bot.Bot, gctx *gumi.Ctx, err *artworks.Error) *embeds.Builder {
+	eb := embeds.NewBuilder().FailureTemplate("")
+	eb.Title("❎ Failed to embed artwork")
+
+	switch {
+	// Common errors
+	case errors.Is(err, artworks.ErrArtworkNotFound):
+		eb.Description("Artwork has been removed or is invalid.")
+	case errors.Is(err, artworks.ErrRateLimited):
+		eb.Description("Boe Tea was rate limited. Please try again later.")
+
+	// Twitter errors
+	case errors.Is(err, twitter.ErrTweetNotFound):
+		eb.Description("Tweet not found or is NSFW. NSFW tweets can't be embedded due to API changes.")
+	case errors.Is(err, twitter.ErrPrivateAccount):
+		eb.Description("Unable to view this tweet because this account owner limits who can view their tweets.")
+
+	default:
+		return onDefaultError(b, gctx, err)
+	}
+
+	return eb
+}
+
+func onCommandError(b *bot.Bot, gctx *gumi.Ctx, err *messages.IncorrectCmd) *embeds.Builder {
+	if gctx.Command != nil {
+		b.Log.With("error", err, "command", gctx.Command.Name, "arguments", gctx.Args.Raw).Error("failed to execute command due to a command error")
+
+	} else {
+		b.Log.With("error", err).Error("a command error occured")
+	}
+
+	eb := embeds.NewBuilder()
+	eb.FailureTemplate(err.Error() + "\n" + err.Description)
+	eb.AddField(err.Embed.Usage, fmt.Sprintf("`%v`", err.Usage))
+	eb.AddField(err.Embed.Example, fmt.Sprintf("`%v`", err.Example))
+	return eb
+}
+
+func onUserError(b *bot.Bot, gctx *gumi.Ctx, err *messages.UserErr) *embeds.Builder {
+	if err := err.Unwrap(); err != nil {
+		if gctx.Command != nil {
+			b.Log.With("error", err, "command", gctx.Command.Name, "arguments", gctx.Args.Raw).Info("failed to execute command due to an user error")
+		} else {
+			b.Log.With("error", err).Info("an user error occured")
+		}
+	}
+
+	eb := embeds.NewBuilder()
+	return eb.FailureTemplate(err.Error())
+}
+
+func onDefaultError(b *bot.Bot, gctx *gumi.Ctx, err error) *embeds.Builder {
+	if gctx.Command != nil {
+		b.Log.With(
+			"error", err,
+			"command", gctx.Command.Name,
+			"arguments", gctx.Args.Raw,
+		).Error("failed to execute command due to an unexpected error")
+	} else {
+		b.Log.With("error", err).Error("an unexpected error occured")
+	}
+
+	eb := embeds.NewBuilder().FailureTemplate("An unexpected error occured. Please try again later.\n" +
+		"If error persists, please let the developer know about it with `bt!feedback` command.",
+	)
+
+	return eb
 }
 
 // OnRateLimit creates a response for users who use bot's command too frequently

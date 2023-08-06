@@ -70,6 +70,15 @@ func New() artworks.Provider {
 }
 
 func (d *DeviantArt) Find(id string) (artworks.Artwork, error) {
+	artwork, err := d._find(id)
+	if err != nil {
+		return nil, artworks.NewError(d, err)
+	}
+
+	return artwork, nil
+}
+
+func (d *DeviantArt) _find(id string) (artworks.Artwork, error) {
 	reqURL := "https://backend.deviantart.com/oembed?url=" + url.QueryEscape("deviantart.com/art/"+id)
 	resp, err := http.Get(reqURL)
 	if err != nil {

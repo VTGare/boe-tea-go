@@ -18,6 +18,12 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
+// Common Twitter errors
+var (
+	ErrTweetNotFound  = errors.New("tweet not found")
+	ErrPrivateAccount = errors.New("unable to view this tweet because account is private")
+)
+
 type Twitter struct {
 	twitterMatcher
 	providers []artworks.Provider
@@ -59,20 +65,19 @@ func (t *Twitter) Find(id string) (artworks.Artwork, error) {
 	for _, provider := range t.providers {
 		var err error
 		artwork, err = provider.Find(id)
-		if err != nil {
-			errs = append(errs, err)
-			continue
+		if errors.Is(err, ErrTweetNotFound) || errors.Is(err, ErrPrivateAccount) {
+			return nil, artworks.NewError(t, err)
 		}
 
-		tweet := artwork.(*Artwork)
-		if tweet.Username == "" {
+		if err != nil {
+			errs = append(errs, err)
 			continue
 		}
 
 		return artwork, nil
 	}
 
-	return &Artwork{}, errors.Join(errs...)
+	return &Artwork{}, artworks.NewError(t, errors.Join(errs...))
 }
 
 func (artwork *Artwork) StoreArtwork() *store.Artwork {
@@ -93,7 +98,7 @@ func (artwork *Artwork) StoreArtwork() *store.Artwork {
 // MessageSends transforms an artwork to discordgo embeds.
 func (a *Artwork) MessageSends(footer string, _ bool) ([]*discordgo.MessageSend, error) {
 	eb := embeds.NewBuilder()
-	if a.Username == "" && a.Len() == 0 {
+	if a.FullName == "" && a.Len() == 0 {
 		eb.Title("❎ Tweet doesn't exist.")
 		eb.Description("The tweet is NSFW or doesn't exist.\n\nUnsafe tweets can't be embedded due to API changes.")
 		eb.Footer(footer, "")

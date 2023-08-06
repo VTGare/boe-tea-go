@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/VTGare/boe-tea-go/artworks"
@@ -26,6 +27,8 @@ type twitterTweet struct {
 	RetweetCount  int                   `json:"retweet_count,omitempty"`
 	FavoriteCount int                   `json:"favorite_count,omitempty"`
 	ReplyCount    int                   `json:"reply_count,omitempty"`
+
+	Tombstone *twitterTombstone `json:"tombstone,omitempty"`
 }
 
 type twitterEntities struct {
@@ -59,6 +62,12 @@ type twitterVideoInfo struct {
 	} `json:"variants,omitempty"`
 }
 
+type twitterTombstone struct {
+	Text struct {
+		Text string `json:"text,omitempty"`
+	} `json:"text,omitempty"`
+}
+
 func newSyndication() artworks.Provider {
 	return &twitterSyndication{
 		twitterMatcher: twitterMatcher{},
@@ -75,16 +84,29 @@ func (ts *twitterSyndication) Find(id string) (artworks.Artwork, error) {
 
 	defer resp.Body.Close()
 
-	switch resp.StatusCode {
-	case http.StatusNotFound:
-		fallthrough
-	case http.StatusTooManyRequests:
-		return &Artwork{}, nil
+	if resp.StatusCode != http.StatusOK {
+		switch resp.StatusCode {
+		case http.StatusTooManyRequests:
+			return nil, artworks.ErrRateLimited
+		case http.StatusNotFound:
+			return nil, ErrTweetNotFound
+		default:
+			return nil, ErrTweetNotFound
+		}
 	}
 
 	tweet := &twitterTweet{}
 	if err := json.NewDecoder(resp.Body).Decode(tweet); err != nil {
 		return nil, fmt.Errorf("json decode: %w", err)
+	}
+
+	if tweet.Tombstone != nil {
+		text := tweet.Tombstone.Text.Text
+		if strings.Contains(text, "this account owner limits who can view their Tweets") {
+			return nil, ErrPrivateAccount
+		}
+
+		return nil, ErrTweetNotFound
 	}
 
 	photos, videos, err := ts.handleMediaDetails(tweet.MediaDetails)

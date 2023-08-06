@@ -59,7 +59,7 @@ func (fxt *fxTwitter) Find(id string) (artworks.Artwork, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return &Artwork{}, nil
+		return nil, ErrTweetNotFound
 	}
 
 	fxArtwork := &fxTwitterResponse{}

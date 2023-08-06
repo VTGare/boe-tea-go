@@ -79,6 +79,15 @@ func New() artworks.Provider {
 }
 
 func (as *Artstation) Find(id string) (artworks.Artwork, error) {
+	artwork, err := as._find(id)
+	if err != nil {
+		return nil, artworks.NewError(as, err)
+	}
+
+	return artwork, nil
+}
+
+func (as *Artstation) _find(id string) (artworks.Artwork, error) {
 	reqURL := fmt.Sprintf("https://www.artstation.com/projects/%v.json", id)
 	resp, err := http.Get(reqURL)
 	if err != nil {

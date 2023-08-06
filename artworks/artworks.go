@@ -1,6 +1,8 @@
 package artworks
 
 import (
+	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/VTGare/boe-tea-go/store"
@@ -19,6 +21,32 @@ type Artwork interface {
 	URL() string
 	Len() int
 }
+
+type Error struct {
+	provider string
+	cause    error
+}
+
+func (e *Error) Error() string {
+	return fmt.Sprintf("provider %v returned an error: %v", e.provider, e.cause.Error())
+}
+
+func (e *Error) Unwrap() error {
+	return e.cause
+}
+
+func NewError(p Provider, err error) error {
+	return &Error{
+		provider: fmt.Sprintf("%T", p),
+		cause:    err,
+	}
+}
+
+// Common errors
+var (
+	ErrArtworkNotFound = errors.New("artwork not found")
+	ErrRateLimited     = errors.New("provider rate limited")
+)
 
 func IsAIGenerated(contents ...string) bool {
 	aiTags := []string{

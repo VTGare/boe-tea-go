@@ -16,10 +16,8 @@ import (
 	"github.com/everpcpc/pixiv"
 )
 
-var (
-	regex = regexp.MustCompile(
-		`(?i)http(?:s)?:\/\/(?:www\.)?pixiv\.net\/(?:en\/)?(?:artworks\/|member_illust\.php\?)(?:mode=medium\&)?(?:illust_id=)?([0-9]+)`,
-	)
+var regex = regexp.MustCompile(
+	`(?i)http(?:s)?:\/\/(?:www\.)?pixiv\.net\/(?:en\/)?(?:artworks\/|member_illust\.php\?)(?:mode=medium\&)?(?:illust_id=)?([0-9]+)`,
 )
 
 type Pixiv struct {
@@ -75,6 +73,15 @@ func (p *Pixiv) Match(s string) (string, bool) {
 }
 
 func (p *Pixiv) Find(id string) (artworks.Artwork, error) {
+	artwork, err := p._find(id)
+	if err != nil {
+		return nil, artworks.NewError(p, err)
+	}
+
+	return artwork, nil
+}
+
+func (p *Pixiv) _find(id string) (artworks.Artwork, error) {
 	i, err := strconv.ParseUint(id, 10, 64)
 	if err != nil {
 		return nil, err
@@ -83,6 +90,10 @@ func (p *Pixiv) Find(id string) (artworks.Artwork, error) {
 	illust, err := p.app.IllustDetail(i)
 	if err != nil {
 		return nil, err
+	}
+
+	if illust.ID == 0 {
+		return nil, artworks.ErrArtworkNotFound
 	}
 
 	author := ""
@@ -169,16 +180,6 @@ func (a *Artwork) MessageSends(footer string, tagsEnabled bool) ([]*discordgo.Me
 		pages  = make([]*discordgo.MessageSend, 0, length)
 		eb     = embeds.NewBuilder()
 	)
-
-	if length == 0 {
-		eb.Title("❎ An error has occured.")
-		eb.Description("Pixiv artwork has been deleted or the ID does not exist.")
-		eb.Footer(footer, "")
-
-		return []*discordgo.MessageSend{
-			{Embeds: []*discordgo.MessageEmbed{eb.Finalize()}},
-		}, nil
-	}
 
 	if length > 1 {
 		eb.Title(fmt.Sprintf("%v by %v | Page %v / %v", a.Title, a.Author, 1, length))
