@@ -234,9 +234,13 @@ func newgroup(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			return messages.ErrChannelNotFound(err, parent)
 		}
 
+		if _, ok := user.FindGroupByName(name); ok {
+			return messages.ErrGroupAlreadyExists(name)
+		}
+
 		// Checks if parent is already used.
 		if _, ok := user.FindGroup(parent); ok {
-			return messages.ErrInsertGroup(name, parent)
+			return messages.ErrNewGroup(name, parent)
 		}
 
 		_, err = b.Store.CreateCrosspostGroup(context.Background(), user.ID, &store.Group{
@@ -246,7 +250,7 @@ func newgroup(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			IsPair:   false,
 		})
 
-		if err := handleStoreError(err, messages.ErrInsertGroup(name, parent)); err != nil {
+		if err := handleStoreError(err, messages.ErrNewGroup(name, parent)); err != nil {
 			return err
 		}
 
@@ -275,6 +279,10 @@ func newpair(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			return messages.ErrIncorrectCmd(ctx.Command)
 		}
 
+		if _, ok := user.FindGroupByName(name); ok {
+			return messages.ErrGroupAlreadyExists(name)
+		}
+
 		for _, child := range children {
 			ch, err := ctx.Session.Channel(child)
 			if err != nil {
@@ -286,7 +294,7 @@ func newpair(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			}
 
 			if _, ok := user.FindGroup(child); ok {
-				return messages.ErrInsertPair(name, children)
+				return messages.ErrNewPair(name, children)
 			}
 		}
 
@@ -297,7 +305,7 @@ func newpair(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			IsPair:   true,
 		})
 
-		if err := handleStoreError(err, messages.ErrInsertPair(name, children)); err != nil {
+		if err := handleStoreError(err, messages.ErrNewPair(name, children)); err != nil {
 			return err
 		}
 

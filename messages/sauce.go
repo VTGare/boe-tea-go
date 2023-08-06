@@ -35,7 +35,7 @@ func SauceNoImage() error {
 }
 
 func SauceRateLimit() error {
-	return newUserError("SauceNAO ratelimited Boe Tea. Please try again later.")
+	return newUserError("SauceNAO rate limited Boe Tea. Please try again later.")
 }
 
 func SauceError(err error) error {
