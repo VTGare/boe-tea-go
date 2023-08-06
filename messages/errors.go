@@ -56,12 +56,26 @@ func newUserError(msg string, errs ...error) *UserErr {
 	}
 }
 
-func ErrInsertGroup(group, parent string) error {
+func ErrNewGroup(group, channel string) error {
 	return newUserError(fmt.Sprintf(
 		"Couldn't create a new group. One of the following is true:\n%v\n%v",
-		"• Group named `"+group+"` already exist;",
-		"• Channel `"+parent+"` is a parent of another group.",
+		"• <#"+channel+"> is a parent of another group;",
+		"• <#"+channel+"> is part of a pair.",
 	))
+}
+
+func ErrNewPair(group string, channels []string) error {
+	return newUserError(fmt.Sprintf(
+		"Couldn't create a new pair. One of the following is true:\n%v\n%v",
+		"• <#"+channels[0]+"> or <#"+channels[1]+"> is a parent of another group;",
+		"• <#"+channels[0]+"> or <#"+channels[1]+"> is part of a pair",
+	))
+}
+
+func ErrGroupAlreadyExists(group string) error {
+	return newUserError(
+		fmt.Sprintf("Couldn't create a new group/pair. Group `%v` already exists", group),
+	)
 }
 
 func ErrDeleteGroup(group string) error {
@@ -88,7 +102,7 @@ func ErrUserNotFound(err error, id string) error {
 func ErrChannelNotFound(err error, id string) error {
 	return newUserError(
 		fmt.Sprintf(
-			"Channel with ID `%v` couldn't be fetched. Please make sure Boe Tea has access to it. If you believe it's a mistake please report it to the dev `bt!feedback`",
+			"<#%v> was not found. Please make sure Boe Tea has access to it. If you believe it's a mistake please report it to the dev `bt!feedback`",
 			id,
 		),
 		err,

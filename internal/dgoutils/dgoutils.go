@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/VTGare/gumi"
 	"github.com/bwmarrin/discordgo"
 )
 
@@ -15,6 +16,22 @@ var (
 	ErrNotRange    = errors.New("not range")
 	ErrRangeSyntax = errors.New("range low is higher than range high")
 )
+
+func TrimChannel(ctx *gumi.Ctx, n int) string {
+	if strings.HasPrefix(ctx.Args.Get(n).Raw, "<#") && strings.HasSuffix(ctx.Args.Get(n).Raw, ">") {
+		return strings.Trim(ctx.Args.Get(n).Raw, "<#>")
+	}
+
+	return ctx.Args.Get(n).Raw
+}
+
+func TrimUserMention(ctx *gumi.Ctx, n int) string {
+	if strings.HasPrefix(ctx.Args.Get(n).Raw, "<@") && strings.HasSuffix(ctx.Args.Get(n).Raw, ">") {
+		return strings.Trim(ctx.Args.Get(n).Raw, "<@>")
+	}
+
+	return ctx.Args.Get(n).Raw
+}
 
 func MemberHasPermission(s *discordgo.Session, guildID string, userID string, permission int64) (bool, error) {
 	member, err := s.State.Member(guildID, userID)
@@ -97,7 +114,7 @@ func (r *Range) Map() map[int]struct{} {
 	return m
 }
 
-//EmbedWidget is an interactive DiscordGo widget interface
+// EmbedWidget is an interactive DiscordGo widget interface
 type EmbedWidget struct {
 	s           *discordgo.Session
 	m           *discordgo.Message

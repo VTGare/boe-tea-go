@@ -3,6 +3,8 @@ package store
 import (
 	"context"
 	"time"
+
+	"github.com/VTGare/boe-tea-go/internal/arrays"
 )
 
 type UserStore interface {
@@ -11,7 +13,9 @@ type UserStore interface {
 	User(ctx context.Context, userID string) (*User, error)
 
 	CreateCrosspostGroup(ctx context.Context, userID string, group *Group) (*User, error)
+	CreateCrosspostPair(ctx context.Context, userID string, pair *Group) (*User, error)
 	DeleteCrosspostGroup(ctx context.Context, userID string, group string) (*User, error)
+	RenameCrosspostGroup(ctx context.Context, userID string, name string, newName string) (*User, error)
 	AddCrosspostChannel(ctx context.Context, userID string, group string, child string) (*User, error)
 	DeleteCrosspostChannel(ctx context.Context, userID string, group string, child string) (*User, error)
 }
@@ -30,6 +34,7 @@ type Group struct {
 	Name     string   `json:"name" bson:"name"`
 	Parent   string   `json:"parent" bson:"parent"`
 	Children []string `json:"children" bson:"children"`
+	IsPair   bool     `json:"is_pair" bson:"is_pair"`
 }
 
 func DefaultUser(id string) *User {
@@ -43,9 +48,17 @@ func DefaultUser(id string) *User {
 	}
 }
 
-func (u *User) FindGroup(parentID string) (*Group, bool) {
+func (u *User) FindGroup(channelID string) (*Group, bool) {
 	for _, group := range u.Groups {
-		if group.Parent == parentID {
+		if group.IsPair {
+			if arrays.Any(group.Children, channelID) {
+				return group, true
+			}
+
+			continue
+		}
+
+		if group.Parent == channelID {
 			return group, true
 		}
 	}

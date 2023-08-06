@@ -60,3 +60,12 @@ func Find[T any](slice []T, f func(T) bool) T {
 
 	return n
 }
+
+func Remove[T comparable](ss []T, match T) []T {
+	for i, s := range ss {
+		if s == match {
+			return append(ss[:i], ss[i+1:]...)
+		}
+	}
+	return ss
+}

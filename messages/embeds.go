@@ -105,6 +105,7 @@ type UserGroups struct {
 	Title       string
 	Description string
 	Group       string
+	Pair        string
 	Parent      string
 	Children    string
 }

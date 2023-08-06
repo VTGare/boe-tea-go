@@ -124,7 +124,7 @@ func (p *Post) Send() ([]*cache.MessageInfo, error) {
 	return p.send(guild, p.ctx.Event.ChannelID, res.Artworks)
 }
 
-func (p *Post) Crosspost(userID, group string, channels []string) ([]*cache.MessageInfo, error) {
+func (p *Post) Crosspost(userID string, group *store.Group) ([]*cache.MessageInfo, error) {
 	user, err := p.bot.Store.User(context.Background(), userID)
 	if err != nil {
 		return nil, err
@@ -134,13 +134,17 @@ func (p *Post) Crosspost(userID, group string, channels []string) ([]*cache.Mess
 		return []*cache.MessageInfo{}, nil
 	}
 
+	if group.IsPair {
+		group.Children = arrays.Remove(group.Children, p.ctx.Event.Message.ChannelID)
+	}
+
 	var (
 		wg      = sync.WaitGroup{}
-		msgChan = make(chan []*cache.MessageInfo, len(channels))
+		msgChan = make(chan []*cache.MessageInfo, len(group.Children))
 	)
 
-	wg.Add(len(channels))
-	for _, channelID := range channels {
+	wg.Add(len(group.Children))
+	for _, channelID := range group.Children {
 		log := p.bot.Log.With(
 			"user_id", userID,
 			"group", group,
@@ -156,9 +160,9 @@ func (p *Post) Crosspost(userID, group string, channels []string) ([]*cache.Mess
 			}
 
 			if _, err := p.ctx.Session.GuildMember(ch.GuildID, userID); err != nil {
-				log.Infof("Removing a channel from user's group. User left the server.")
-				if _, err := p.bot.Store.DeleteCrosspostChannel(context.Background(), userID, group, channelID); err != nil {
-					log.Errorf("Failed to remove a channel from user's group. Error: %v", err)
+				log.Debug("member left the server, removing crosspost channel")
+				if _, err := p.bot.Store.DeleteCrosspostChannel(context.Background(), userID, group.Name, channelID); err != nil {
+					log.With("error", err).Error("failed to remove a channel from user's group")
 				}
 
 				return
@@ -488,7 +492,7 @@ func (p *Post) generateMessages(guild *store.Guild, artworks []artworks.Artwork,
 
 				if p.crosspost {
 					msg.Embeds[0].Author = &discordgo.MessageEmbedAuthor{
-						Name:    messages.CrosspostBy(p.ctx.Event.Author.String()),
+						Name:    messages.CrosspostBy(p.ctx.Event.Author.Username),
 						IconURL: p.ctx.Event.Author.AvatarURL(""),
 					}
 				} else {

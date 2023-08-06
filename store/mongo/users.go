@@ -39,13 +39,7 @@ func (u *userStore) User(ctx context.Context, userID string) (*store.User, error
 		options.FindOneAndUpdate().SetUpsert(true).SetReturnDocument(options.After),
 	)
 
-	var user store.User
-	err := res.Decode(&user)
-	if err != nil {
-		return nil, err
-	}
-
-	return &user, nil
+	return resDecoder(res)
 }
 
 func (u *userStore) CreateUser(ctx context.Context, id string) (*store.User, error) {
@@ -67,13 +61,18 @@ func (u *userStore) CreateCrosspostGroup(ctx context.Context, userID string, gro
 		options.FindOneAndUpdate().SetReturnDocument(options.After),
 	)
 
-	var user store.User
-	err := res.Decode(&user)
-	if err != nil {
-		return nil, err
-	}
+	return resDecoder(res)
+}
 
-	return &user, nil
+func (u *userStore) CreateCrosspostPair(ctx context.Context, userID string, pair *store.Group) (*store.User, error) {
+	res := u.col.FindOneAndUpdate(
+		ctx,
+		bson.M{"user_id": userID, "channel_groups.name": bson.M{"$ne": pair.Name}, "channel_groups.parent": bson.M{"$nin": pair.Children}},
+		bson.M{"$push": bson.M{"channel_groups": pair}},
+		options.FindOneAndUpdate().SetReturnDocument(options.After),
+	)
+
+	return resDecoder(res)
 }
 
 func (u *userStore) DeleteCrosspostGroup(ctx context.Context, userID, group string) (*store.User, error) {
@@ -84,13 +83,18 @@ func (u *userStore) DeleteCrosspostGroup(ctx context.Context, userID, group stri
 		options.FindOneAndUpdate().SetReturnDocument(options.After),
 	)
 
-	var user store.User
-	err := res.Decode(&user)
-	if err != nil {
-		return nil, err
-	}
+	return resDecoder(res)
+}
 
-	return &user, nil
+func (u *userStore) RenameCrosspostGroup(ctx context.Context, userID, group, rename string) (*store.User, error) {
+	res := u.col.FindOneAndUpdate(
+		ctx,
+		bson.M{"user_id": userID, "channel_groups.name": bson.M{"$ne": rename, "$eq": group}},
+		bson.M{"$set": bson.M{"channel_groups.$.name": rename}},
+		options.FindOneAndUpdate().SetReturnDocument(options.After),
+	)
+
+	return resDecoder(res)
 }
 
 func (u *userStore) AddCrosspostChannel(ctx context.Context, userID, group, child string) (*store.User, error) {
@@ -101,13 +105,7 @@ func (u *userStore) AddCrosspostChannel(ctx context.Context, userID, group, chil
 		options.FindOneAndUpdate().SetReturnDocument(options.After),
 	)
 
-	var user store.User
-	err := res.Decode(&user)
-	if err != nil {
-		return nil, err
-	}
-
-	return &user, nil
+	return resDecoder(res)
 }
 
 func (u *userStore) DeleteCrosspostChannel(ctx context.Context, userID, group, child string) (*store.User, error) {
@@ -118,13 +116,7 @@ func (u *userStore) DeleteCrosspostChannel(ctx context.Context, userID, group, c
 		options.FindOneAndUpdate().SetReturnDocument(options.After),
 	)
 
-	var user store.User
-	err := res.Decode(&user)
-	if err != nil {
-		return nil, err
-	}
-
-	return &user, nil
+	return resDecoder(res)
 }
 
 func (u *userStore) UpdateUser(ctx context.Context, user *store.User) (*store.User, error) {
@@ -140,4 +132,14 @@ func (u *userStore) UpdateUser(ctx context.Context, user *store.User) (*store.Us
 	}
 
 	return user, nil
+}
+
+func resDecoder(res *mongo.SingleResult) (*store.User, error) {
+	var user store.User
+	err := res.Decode(&user)
+	if err != nil {
+		return nil, err
+	}
+
+	return &user, nil
 }
