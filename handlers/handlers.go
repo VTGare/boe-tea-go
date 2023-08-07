@@ -613,6 +613,10 @@ func OnError(b *bot.Bot) func(*gumi.Ctx, error) {
 			eb = onDefaultError(b, ctx, err)
 		}
 
+		if eb == nil {
+			return
+		}
+
 		if err := ctx.ReplyEmbed(eb.Finalize()); err != nil {
 			b.Log.With("error", err).Error("failed to reply in error handler")
 		}
@@ -632,6 +636,10 @@ func onArtworkError(b *bot.Bot, gctx *gumi.Ctx, err *artworks.Error) *embeds.Bui
 
 	// Twitter errors
 	case errors.Is(err, twitter.ErrTweetNotFound):
+		if gctx.Command == nil {
+			return nil
+		}
+
 		eb.Description("Tweet not found or is NSFW. NSFW tweets can't be embedded due to API changes.")
 	case errors.Is(err, twitter.ErrPrivateAccount):
 		eb.Description("Unable to view this tweet because this account owner limits who can view their tweets.")
@@ -646,7 +654,6 @@ func onArtworkError(b *bot.Bot, gctx *gumi.Ctx, err *artworks.Error) *embeds.Bui
 func onCommandError(b *bot.Bot, gctx *gumi.Ctx, err *messages.IncorrectCmd) *embeds.Builder {
 	if gctx.Command != nil {
 		b.Log.With("error", err, "command", gctx.Command.Name, "arguments", gctx.Args.Raw).Error("failed to execute command due to a command error")
-
 	} else {
 		b.Log.With("error", err).Error("a command error occured")
 	}
