@@ -2,6 +2,7 @@ package commands
 
 import (
 	"bytes"
+	"math/rand"
 	"text/template"
 	"time"
 
@@ -77,9 +78,19 @@ func memesGroup(b *bot.Bot) {
 		Example:     "bt!whois Faker",
 		Exec:        whois(b),
 	})
+
+	b.Router.RegisterCmd(&gumi.Command{
+		Name:        "gamba",
+		Group:       group,
+		Description: "GET IT TWISTED! 🗣️🗣️🗣️",
+		Aliases:     []string{"gacha", "getittwisted"},
+		Usage:       "bt!gamba",
+		Example:     "bt!gamba",
+		Exec:        gamba(b),
+	})
 }
 
-func brainpower(b *bot.Bot) func(ctx *gumi.Ctx) error {
+func brainpower(*bot.Bot) func(ctx *gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
 		return ctx.Reply(
 			"O-oooooooooo AAAAE-A-A-I-A-U- JO-oooooooooooo AAE-O-A-A-U-U-A- " +
@@ -88,7 +99,7 @@ func brainpower(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	}
 }
 
-func borgar(b *bot.Bot) func(ctx *gumi.Ctx) error {
+func borgar(*bot.Bot) func(ctx *gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
 		eb := embeds.NewBuilder()
 		eb.Title("Cute dino girl enjoys borgar.").
@@ -98,7 +109,7 @@ func borgar(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	}
 }
 
-func nuggets(b *bot.Bot) func(ctx *gumi.Ctx) error {
+func nuggets(*bot.Bot) func(ctx *gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
 		if ctx.Args.Len() < 2 {
 			return messages.ErrIncorrectCmd(ctx.Command)
@@ -118,7 +129,7 @@ func nuggets(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	}
 }
 
-func whois(b *bot.Bot) func(ctx *gumi.Ctx) error {
+func whois(*bot.Bot) func(ctx *gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
 		if ctx.Args.Len() < 1 {
 			return messages.ErrIncorrectCmd(ctx.Command)
@@ -134,5 +145,20 @@ func whois(b *bot.Bot) func(ctx *gumi.Ctx) error {
 		}
 
 		return ctx.Reply(buf.String())
+	}
+}
+
+func gamba(*bot.Bot) func(ctx *gumi.Ctx) error {
+	return func(ctx *gumi.Ctx) error {
+		getItTwisted := rand.Intn(10) != 0
+
+		var text string
+		if getItTwisted {
+			text = `🦍 🗣 GET IT TWISTED 🌪 , GAMBLE ✅ . PLEASE START GAMBLING 👍 . GAMBLING IS AN INVESTMENT 🎰 AND AN INVESTMENT ONLY 👍 . YOU WILL PROFIT 💰 , YOU WILL WIN ❗ ️. YOU WILL DO ALL OF THAT 💯 , YOU UNDERSTAND ⁉ ️ YOU WILL BECOME A BILLIONAIRE 💵 📈 AND REBUILD YOUR FUCKING LIFE 🤯`
+		} else {
+			text = `🦍 🗣️ DO NOT GET IT TWISTED 🌪️ , DO NOT GAMBLE 🚫 . DO NOT START GAMBLING ❌ . GAMBLING IS ENTERTAINMENT 🎰 AND ENTERTAINMENT ONLY 👍 . YOU WONT BREAK EVEN 🛑 , YOU WONT WIN ⚠️ ️. YOU WONT DO ANY OF THAT 💯 , YOU UNDERSTAND ⁉️ ️ YOU WILL ONLY GO INTO DEBT 💵 📉 AND RUIN YOUR FUCKING LIFE 😵`
+		}
+
+		return ctx.Reply(text)
 	}
 }
