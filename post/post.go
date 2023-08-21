@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/VTGare/boe-tea-go/artworks"
@@ -220,21 +219,30 @@ func (p *Post) fetch(guild *store.Guild, channelID string) (*fetchResult, error)
 		)
 
 		wg, _        = errgroup.WithContext(context.Background())
-		matched      int64
+		matched      = make(map[string]struct{})
 		artworksChan = make(chan interface{}, len(p.urls)*2)
 	)
 
 	for _, url := range p.urls {
-		url := url //shadowing loop variables.
+		for _, provider := range p.bot.ArtworkProviders {
+			id, ok := provider.Match(url)
+			if !ok {
+				continue
+			}
 
-		wg.Go(func() error {
-			for _, provider := range p.bot.ArtworkProviders {
-				id, ok := provider.Match(url)
-				if !ok {
-					continue
-				}
+			// If this artwork ID was matched before, skip it.
+			if _, ok := matched[id]; ok {
+				break
+			}
 
-				atomic.AddInt64(&matched, 1)
+			matched[id] = struct{}{}
+
+			var (
+				provider = provider
+				url      = url
+			)
+
+			wg.Go(func() error {
 				log := log.With(
 					"provider", reflect.TypeOf(provider),
 					"url", url,
@@ -313,11 +321,11 @@ func (p *Post) fetch(guild *store.Guild, channelID string) (*fetchResult, error)
 					artworksChan <- artwork
 				}
 
-				break
-			}
+				return nil
+			})
 
-			return nil
-		})
+			break
+		}
 	}
 
 	if err := wg.Wait(); err != nil {
@@ -329,7 +337,7 @@ func (p *Post) fetch(guild *store.Guild, channelID string) (*fetchResult, error)
 	res := &fetchResult{
 		Artworks: make([]artworks.Artwork, 0),
 		Reposts:  make([]*repost.Repost, 0),
-		Matched:  int(matched),
+		Matched:  len(matched),
 	}
 
 	for art := range artworksChan {
