@@ -33,4 +33,5 @@ var _ = DescribeTable(
 	Entry("Different domain", "https://google.com/i/status/123456", "", false),
 	Entry("Invalid URL", "efe", "", false),
 	Entry("vxtwitter link", "https://vxtwitter.com/i/status/1234", "1234", true),
+	Entry("X link", "https://x.com/i/status/1234", "1234", true),
 )
