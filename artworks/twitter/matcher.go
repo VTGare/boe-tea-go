@@ -16,7 +16,7 @@ func (twitterMatcher) Match(s string) (string, bool) {
 		return "", false
 	}
 
-	if !strings.Contains(u.Host, "twitter.com") {
+	if !strings.Contains(u.Host, "twitter.com") && u.Host != "x.com" {
 		return "", false
 	}
 
