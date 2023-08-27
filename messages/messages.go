@@ -5,7 +5,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/VTGare/boe-tea-go/bot"
 	"github.com/VTGare/boe-tea-go/internal/arrays"
+	"github.com/bwmarrin/discordgo"
 )
 
 func FormatBool(b bool) string {
@@ -93,6 +95,24 @@ func FormatDuration(d time.Duration) string {
 
 	sb.WriteString(fmt.Sprintf("%02d seconds", seconds))
 	return sb.String()
+}
+
+// Deletes a specified message after a certain time
+func ExpireMessage(b *bot.Bot, s *discordgo.Session, msg *discordgo.Message, warning string) {
+	go func() {
+		time.Sleep(15 * time.Second)
+		err := s.ChannelMessageDelete(msg.ChannelID, msg.ID)
+		if err != nil {
+			log := b.Log.With(
+				"guild_id", msg.GuildID,
+				"channel_id", msg.ChannelID,
+				"message_id", msg.ID,
+				"error", err,
+			)
+
+			log.Warn(warning)
+		}
+	}()
 }
 
 // Returns a Discord relative timestamp

@@ -600,6 +600,7 @@ func OnError(b *bot.Bot) func(*gumi.Ctx, error) {
 			cmdErr     *messages.IncorrectCmd
 			usrErr     *messages.UserErr
 			artworkErr *artworks.Error
+			expiry     bool = false
 		)
 
 		switch {
@@ -609,6 +610,7 @@ func OnError(b *bot.Bot) func(*gumi.Ctx, error) {
 			eb = onUserError(b, ctx, usrErr)
 		case errors.As(err, &artworkErr):
 			eb = onArtworkError(b, ctx, artworkErr)
+			expiry = true
 		default:
 			eb = onDefaultError(b, ctx, err)
 		}
@@ -617,8 +619,19 @@ func OnError(b *bot.Bot) func(*gumi.Ctx, error) {
 			return
 		}
 
-		if err := ctx.ReplyEmbed(eb.Finalize()); err != nil {
+		msg, err := ctx.Session.ChannelMessageSendEmbedReply(ctx.Event.ChannelID, eb.Finalize(),
+			&discordgo.MessageReference{
+				MessageID: ctx.Event.ID,
+				ChannelID: ctx.Event.ChannelID,
+				GuildID:   ctx.Event.GuildID,
+			})
+		if err != nil {
 			b.Log.With("error", err).Error("failed to reply in error handler")
+		}
+
+		if expiry {
+			warning := "failed to delete an error message"
+			messages.ExpireMessage(b, ctx.Session, msg, warning)
 		}
 	}
 }
