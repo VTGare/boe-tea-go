@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/VTGare/boe-tea-go/bot"
 	"github.com/VTGare/gumi"
 	"github.com/bwmarrin/discordgo"
 )
@@ -31,6 +32,24 @@ func TrimUserMention(ctx *gumi.Ctx, n int) string {
 	}
 
 	return ctx.Args.Get(n).Raw
+}
+
+// Deletes a specified message after a certain time
+func ExpireMessage(b *bot.Bot, s *discordgo.Session, msg *discordgo.Message) {
+	go func() {
+		time.Sleep(15 * time.Second)
+		err := s.ChannelMessageDelete(msg.ChannelID, msg.ID)
+		if err != nil {
+			log := b.Log.With(
+				"guild_id", msg.GuildID,
+				"channel_id", msg.ChannelID,
+				"message_id", msg.ID,
+				"error", err,
+			)
+
+			log.Warn("failed to expire message")
+		}
+	}()
 }
 
 func MemberHasPermission(s *discordgo.Session, guildID string, userID string, permission int64) (bool, error) {

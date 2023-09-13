@@ -376,8 +376,7 @@ func (p *Post) sendReposts(reposts []*repost.Repost) error {
 		return fmt.Errorf("failed to send message to discord: %w", err)
 	}
 
-	warning := "failed to delete a detected repost message"
-	messages.ExpireMessage(p.bot, p.ctx.Session, msg, warning)
+	dgoutils.ExpireMessage(p.bot, p.ctx.Session, msg)
 
 	return nil
 }

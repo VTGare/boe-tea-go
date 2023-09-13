@@ -12,6 +12,7 @@ import (
 	"github.com/VTGare/boe-tea-go/bot"
 	"github.com/VTGare/boe-tea-go/internal/arrays"
 	"github.com/VTGare/boe-tea-go/internal/cache"
+	"github.com/VTGare/boe-tea-go/internal/dgoutils"
 	"github.com/VTGare/boe-tea-go/messages"
 	"github.com/VTGare/boe-tea-go/post"
 	"github.com/VTGare/boe-tea-go/store"
@@ -630,8 +631,7 @@ func OnError(b *bot.Bot) func(*gumi.Ctx, error) {
 		}
 
 		if expiry {
-			warning := "failed to delete an error message"
-			messages.ExpireMessage(b, ctx.Session, msg, warning)
+			dgoutils.ExpireMessage(b, ctx.Session, msg)
 		}
 	}
 }

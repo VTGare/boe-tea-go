@@ -401,6 +401,7 @@ func push(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	}
 }
 
+// remove deletes one or more crosspost channels from a group.
 func remove(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
 		user, err := initCommand(b, ctx, 2)

@@ -96,8 +96,6 @@ func (p *Pixiv) _find(id string) (artworks.Artwork, error) {
 		return nil, artworks.ErrArtworkNotFound
 	}
 
-	fmt.Printf("%+v\n", illust)
-
 	author := ""
 	if illust.User != nil {
 		author = illust.User.Name
@@ -155,9 +153,6 @@ func (p *Pixiv) _find(id string) (artworks.Artwork, error) {
 
 		proxy: p.proxyHost,
 	}
-
-	fmt.Printf("%+v\n", artwork)
-	fmt.Printf("%+v\n", artwork.Images[0])
 
 	if artwork.Images[0].Original == "https://s.pximg.net/common/images/limit_sanity_level_360.png" {
 		return nil, artworks.ErrRateLimited
