@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/VTGare/boe-tea-go/artworks"
 	"github.com/VTGare/boe-tea-go/artworks/twitter"
@@ -114,7 +113,7 @@ func (p *Post) Send() ([]*cache.MessageInfo, error) {
 			}
 		}
 
-		err := p.sendReposts(guild, res.Reposts, 15*time.Second)
+		err := p.sendReposts(res.Reposts)
 		if err != nil {
 			log.Warn("failed to send reposts")
 		}
@@ -352,7 +351,7 @@ func (p *Post) fetch(guild *store.Guild, channelID string) (*fetchResult, error)
 	return res, nil
 }
 
-func (p *Post) sendReposts(guild *store.Guild, reposts []*repost.Repost, timeout time.Duration) error {
+func (p *Post) sendReposts(reposts []*repost.Repost) error {
 	locale := messages.RepostEmbed()
 
 	eb := embeds.NewBuilder()
@@ -377,20 +376,7 @@ func (p *Post) sendReposts(guild *store.Guild, reposts []*repost.Repost, timeout
 		return fmt.Errorf("failed to send message to discord: %w", err)
 	}
 
-	go func() {
-		time.Sleep(timeout)
-		err := p.ctx.Session.ChannelMessageDelete(msg.ChannelID, msg.ID)
-		if err != nil {
-			log := p.bot.Log.With(
-				"guild_id", guild.ID,
-				"channel_id", msg.ChannelID,
-				"message_id", msg.ID,
-				"error", err,
-			)
-
-			log.Warn("failed to delete a detected repost message")
-		}
-	}()
+	dgoutils.ExpireMessage(p.bot, p.ctx.Session, msg)
 
 	return nil
 }
