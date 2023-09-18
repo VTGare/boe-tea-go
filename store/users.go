@@ -15,6 +15,7 @@ type UserStore interface {
 	CreateCrosspostGroup(ctx context.Context, userID string, group *Group) (*User, error)
 	CreateCrosspostPair(ctx context.Context, userID string, pair *Group) (*User, error)
 	DeleteCrosspostGroup(ctx context.Context, userID string, group string) (*User, error)
+	EditCrosspostParent(ctx context.Context, userID string, group string, parent string) (*User, error)
 	RenameCrosspostGroup(ctx context.Context, userID string, name string, newName string) (*User, error)
 	AddCrosspostChannel(ctx context.Context, userID string, group string, child string) (*User, error)
 	DeleteCrosspostChannel(ctx context.Context, userID string, group string, child string) (*User, error)

@@ -90,6 +90,16 @@ func userGroup(b *bot.Bot) {
 	})
 
 	b.Router.RegisterCmd(&gumi.Command{
+		Name:        "editparent",
+		Group:       group,
+		Description: "Changes the parent channel of a crosspost group",
+		Usage:       "bt!editparent <group name> <parent channel>",
+		Example:     "bt!editparent cuteAnimeGirls #anime-pics",
+		RateLimiter: gumi.NewRateLimiter(10 * time.Second),
+		Exec:        editparent(b),
+	})
+
+	b.Router.RegisterCmd(&gumi.Command{
 		Name:        "rename",
 		Group:       group,
 		Description: "Renames a crosspost group",
@@ -347,7 +357,7 @@ func push(b *bot.Bot) func(ctx *gumi.Ctx) error {
 
 		group, ok := user.FindGroupByName(name)
 		if !ok {
-			return messages.ErrUserPushFail(name)
+			return messages.ErrGroupExistFail(name)
 		}
 
 		if group.IsPair {
@@ -415,7 +425,7 @@ func remove(b *bot.Bot) func(ctx *gumi.Ctx) error {
 
 		group, ok := user.FindGroupByName(name)
 		if !ok {
-			return messages.ErrUserRemoveFail(name)
+			return messages.ErrGroupExistFail(name)
 		}
 
 		if group.IsPair {
@@ -452,6 +462,45 @@ func remove(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	}
 }
 
+// editparent changes the parent channel of a group
+func editparent(b *bot.Bot) func(ctx *gumi.Ctx) error {
+	return func(ctx *gumi.Ctx) error {
+		user, err := initCommand(b, ctx, 2)
+
+		// Name of crosspost group
+		name := ctx.Args.Get(0).Raw
+		group, ok := user.FindGroupByName(name)
+		if !ok {
+			return messages.ErrGroupExistFail(name)
+		}
+
+		dest := dgoutils.TrimChannel(ctx, 1)
+		if _, err := ctx.Session.Channel(dest); err != nil {
+			return messages.ErrChannelNotFound(err, dest)
+		}
+
+		if group.IsPair {
+			return messages.ErrUserPairFail(name)
+		}
+
+		if _, ok := user.FindGroup(dest); ok {
+			return messages.ErrGroupAlreadyExists(dest)
+		}
+
+		if arrays.Any(group.Children, dest) {
+			return messages.ErrUserEditParentFail(group.Parent, dest)
+		}
+
+		_, err = b.Store.EditCrosspostParent(context.Background(), user.ID, name, dest)
+		if err := handleStoreError(err, messages.ErrUserEditParentFail(group.Parent, dest)); err != nil {
+			return err
+		}
+
+		return successMessage(ctx, messages.UserEditParentSuccess(group.Parent, dest))
+	}
+}
+
+// rename changes the name of a group
 func rename(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
 		user, err := initCommand(b, ctx, 2)
@@ -466,9 +515,8 @@ func rename(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			dest = ctx.Args.Get(1).Raw
 		)
 
-		_, ok := user.FindGroupByName(src)
-		if !ok {
-			return messages.ErrUserEditGroupFail(cmd, src, dest)
+		if _, ok := user.FindGroupByName(src); !ok {
+			return messages.ErrGroupExistFail(src)
 		}
 
 		_, err = b.Store.RenameCrosspostGroup(context.Background(), user.ID, src, dest)
@@ -497,7 +545,7 @@ func copygroup(b *bot.Bot) func(ctx *gumi.Ctx) error {
 
 		group, ok := user.FindGroupByName(src)
 		if !ok {
-			return messages.ErrUserEditGroupFail(cmd, src, dest)
+			return messages.ErrGroupExistFail(src)
 		}
 
 		if group.IsPair {

@@ -119,6 +119,17 @@ func (u *userStore) DeleteCrosspostChannel(ctx context.Context, userID, group, c
 	return resDecoder(res)
 }
 
+func (u *userStore) EditCrosspostParent(ctx context.Context, userID, group, parent string) (*store.User, error) {
+	res := u.col.FindOneAndUpdate(
+		ctx,
+		bson.M{"user_id": userID, "channel_groups.name": group, "channel_groups.parent": bson.M{"$ne": parent}},
+		bson.M{"$set": bson.M{"channel_groups.$.parent": parent}},
+		options.FindOneAndUpdate().SetReturnDocument(options.After),
+	)
+
+	return resDecoder(res)
+}
+
 func (u *userStore) UpdateUser(ctx context.Context, user *store.User) (*store.User, error) {
 	user.UpdatedAt = time.Now()
 	_, err := u.col.ReplaceOne(
