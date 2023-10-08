@@ -88,6 +88,16 @@ func memesGroup(b *bot.Bot) {
 		Example:     "bt!gamba",
 		Exec:        gamba(b),
 	})
+
+	b.Router.RegisterCmd(&gumi.Command{
+		Name:        "cake",
+		Group:       group,
+		Description: "Local God eats cake",
+		Aliases:     []string{},
+		Usage:       "bt!cake",
+		Example:     "bt!cake",
+		Exec:        cake(b),
+	})
 }
 
 func brainpower(*bot.Bot) func(ctx *gumi.Ctx) error {
@@ -160,5 +170,16 @@ func gamba(*bot.Bot) func(ctx *gumi.Ctx) error {
 		}
 
 		return ctx.Reply(text)
+	}
+}
+
+func cake(*bot.Bot) func(ctx *gumi.Ctx) error {
+	return func(ctx *gumi.Ctx) error {
+		eb := embeds.NewBuilder()
+		eb.Title("Local God eats cake").
+			Description("🙏🍰").
+			Image("https://cdn.discordapp.com/attachments/1129829799179853914/1160609012115578970/haruhi-haruhi-suzumiya.gif")
+
+		return ctx.ReplyEmbed(eb.Finalize())
 	}
 }
