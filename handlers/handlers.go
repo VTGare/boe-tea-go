@@ -666,9 +666,9 @@ func onArtworkError(b *bot.Bot, gctx *gumi.Ctx, err *artworks.Error) *embeds.Bui
 
 func onCommandError(b *bot.Bot, gctx *gumi.Ctx, err *messages.IncorrectCmd) *embeds.Builder {
 	if gctx.Command != nil {
-		b.Log.With("error", err, "command", gctx.Command.Name, "arguments", gctx.Args.Raw).Error("failed to execute command due to a command error")
+		b.Log.With("error", err, "command", gctx.Command.Name, "arguments", gctx.Args.Raw).Debug("failed to execute command due to a command error")
 	} else {
-		b.Log.With("error", err).Error("a command error occured")
+		b.Log.With("error", err).Debug("a command error occured")
 	}
 
 	eb := embeds.NewBuilder()

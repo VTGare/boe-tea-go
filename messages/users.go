@@ -84,6 +84,18 @@ func ErrUserChannelAlreadyParent(id string) error {
 	))
 }
 
+func UserEditParentSuccess(src, dest string) string {
+	return fmt.Sprintf(
+		"Parent channel <#%v> has been changed to <#%v>", src, dest,
+	)
+}
+
+func ErrUserEditParentFail(src, dest string) error {
+	return newUserError(fmt.Sprintf(
+		"Couldn't change parent channel <#%v> to <#%v>. ", src, dest,
+	))
+}
+
 func UserRenameSuccess(src, dest string) string {
 	return fmt.Sprintf(
 		"Group `%v` has been renamed to `%v`", src, dest,

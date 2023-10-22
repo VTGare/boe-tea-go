@@ -74,15 +74,18 @@ func ErrNewPair(group string, channels []string) error {
 
 func ErrGroupAlreadyExists(group string) error {
 	return newUserError(
-		fmt.Sprintf("Couldn't create a new group/pair. Group `%v` already exists", group),
+		fmt.Sprintf("Couldn't create a new group/pair. Group `%v` already exists.", group))
+}
+
+func ErrGroupExistFail(group string) error {
+	return newUserError(
+		fmt.Sprintf("Couldn't find group/pair `%v`. Group doesn't exist.", group),
 	)
 }
 
 func ErrDeleteGroup(group string) error {
 	return newUserError(fmt.Sprintf(
-		"Couldn't delete group `%v`. Group doesn't exist.",
-		group,
-	))
+		"Couldn't delete group `%v`. Group doesn't exist.", group))
 }
 
 func ErrGuildNotFound(err error, id string) error {
