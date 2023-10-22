@@ -466,6 +466,9 @@ func remove(b *bot.Bot) func(ctx *gumi.Ctx) error {
 func editparent(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
 		user, err := initCommand(b, ctx, 2)
+		if err != nil {
+			return err
+		}
 
 		// Name of crosspost group
 		name := ctx.Args.Get(0).Raw

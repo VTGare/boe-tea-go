@@ -86,13 +86,13 @@ func ErrUserChannelAlreadyParent(id string) error {
 
 func UserEditParentSuccess(src, dest string) string {
 	return fmt.Sprintf(
-		"Parent channel `%v` has been changed to `%v`", src, dest,
+		"Parent channel <#%v> has been changed to <#%v>", src, dest,
 	)
 }
 
 func ErrUserEditParentFail(src, dest string) error {
 	return newUserError(fmt.Sprintf(
-		"Couldn't change parent channel `%v` to `%v`. ", src, dest,
+		"Couldn't change parent channel <#%v> to <#%v>. ", src, dest,
 	))
 }
 
