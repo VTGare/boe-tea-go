@@ -228,7 +228,7 @@ func help(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	}
 }
 
-func ping(b *bot.Bot) func(ctx *gumi.Ctx) error {
+func ping(*bot.Bot) func(ctx *gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
 		eb := embeds.NewBuilder()
 
@@ -241,7 +241,7 @@ func ping(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	}
 }
 
-func about(b *bot.Bot) func(ctx *gumi.Ctx) error {
+func about(*bot.Bot) func(ctx *gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
 		locale := messages.AboutEmbed()
 
@@ -273,7 +273,7 @@ func about(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	}
 }
 
-func feedback(b *bot.Bot) func(ctx *gumi.Ctx) error {
+func feedback(*bot.Bot) func(ctx *gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
 		if ctx.Args.Len() == 0 {
 			return messages.ErrIncorrectCmd(ctx.Command)
@@ -432,7 +432,7 @@ func set(b *bot.Bot) func(ctx *gumi.Ctx) error {
 
 			eb := embeds.NewBuilder()
 			eb.Title("Current settings").Description(fmt.Sprintf("**%v**", gd.Name))
-			eb.Thumbnail(gd.IconURL())
+			eb.Thumbnail(gd.IconURL("320"))
 			eb.Footer("To change a setting use either its name or the name in parethesis", "")
 
 			eb.AddField(
@@ -722,7 +722,7 @@ func artchannels(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			)
 
 			eb.Title("Art channels")
-			eb.Thumbnail(gd.IconURL())
+			eb.Thumbnail(gd.IconURL("320"))
 			if len(guild.ArtChannels) == 0 {
 				eb.Description("You haven't added any art channels yet. Add your first art channel using `bt!artchannels add <channel mention>` command.")
 
@@ -743,7 +743,7 @@ func artchannels(b *bot.Bot) func(ctx *gumi.Ctx) error {
 
 					eb = embeds.NewBuilder()
 					eb.Title("Art channels")
-					eb.Thumbnail(gd.IconURL())
+					eb.Thumbnail(gd.IconURL("320"))
 					eb.Footer("Total: "+strconv.Itoa(len(guild.ArtChannels)), "")
 
 					sb.Reset()

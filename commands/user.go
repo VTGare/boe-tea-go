@@ -915,9 +915,9 @@ func handleStoreError(err error, message ...error) error {
 	case errors.Is(err, mongo.ErrNoDocuments):
 		if message != nil {
 			return message[0]
-		} else {
-			return nil
 		}
+
+		return nil
 	default:
 		return err
 	}
