@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/VTGare/boe-tea-go/artworks"
@@ -601,7 +602,7 @@ func OnError(b *bot.Bot) func(*gumi.Ctx, error) {
 			cmdErr     *messages.IncorrectCmd
 			usrErr     *messages.UserErr
 			artworkErr *artworks.Error
-			expiry     bool = false
+			expiry     = false
 		)
 
 		switch {
@@ -639,6 +640,11 @@ func OnError(b *bot.Bot) func(*gumi.Ctx, error) {
 func onArtworkError(b *bot.Bot, gctx *gumi.Ctx, err *artworks.Error) *embeds.Builder {
 	eb := embeds.NewBuilder().FailureTemplate("")
 	eb.Title("❎ Failed to embed artwork")
+
+	reactionErr := gctx.Session.MessageReactionAdd(gctx.Event.ChannelID, gctx.Event.ID, "🚫")
+	if reactionErr != nil && !strings.Contains(reactionErr.Error(), "403") {
+		b.Log.With("err", reactionErr).Error("failed to add artwork error reaction")
+	}
 
 	switch {
 	// Common errors
@@ -710,7 +716,7 @@ func onDefaultError(b *bot.Bot, gctx *gumi.Ctx, err error) *embeds.Builder {
 }
 
 // OnRateLimit creates a response for users who use bot's command too frequently
-func OnRateLimit(b *bot.Bot) func(*gumi.Ctx) error {
+func OnRateLimit(*bot.Bot) func(*gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
 		duration, err := ctx.Command.RateLimiter.Expires(ctx.Event.Author.ID)
 		if err != nil {
@@ -725,7 +731,7 @@ func OnRateLimit(b *bot.Bot) func(*gumi.Ctx) error {
 }
 
 // OnNoPerms creates a response for users who used a command without required permissions.
-func OnNoPerms(b *bot.Bot) func(ctx *gumi.Ctx) error {
+func OnNoPerms(*bot.Bot) func(ctx *gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
 		eb := embeds.NewBuilder()
 		eb.FailureTemplate(messages.NoPerms())
@@ -735,7 +741,7 @@ func OnNoPerms(b *bot.Bot) func(ctx *gumi.Ctx) error {
 }
 
 // OnNSFW creates a response for users who used a NSFW command in a SFW channel
-func OnNSFW(b *bot.Bot) func(ctx *gumi.Ctx) error {
+func OnNSFW(*bot.Bot) func(ctx *gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
 		eb := embeds.NewBuilder()
 
