@@ -99,6 +99,16 @@ func memesGroup(b *bot.Bot) {
 		Example:     "bt!cake",
 		Exec:        cake(b),
 	})
+
+	b.Router.RegisterCmd(&gumi.Command{
+		Name:        "frenzy",
+		Group:       group,
+		Description: "The moon is red.",
+		Aliases:     []string{},
+		Usage:       "bt!frenzy",
+		Example:     "bt!frenzy",
+		Exec:        frenzy(b),
+	})
 }
 
 func brainpower(*bot.Bot) func(ctx *gumi.Ctx) error {
@@ -197,8 +207,9 @@ func frenzy(*bot.Bot) func(ctx *gumi.Ctx) error {
 		image := arrays.RandomElement(frenzyImages)
 
 		eb := embeds.NewBuilder()
-		eb.Title("The moon is red.").
-			Description("The frenzy has begun.\nWe're out of time.\nRun if you value your life.").
+		eb.Title("🔴 The moon is red 🔴").
+			Description("*The frenzy has begun.* 🤪\n*We're out of time.* ⏳\n*Run if you value your life.* 🏃").
+			Color(0x880808).
 			Image(*image)
 
 		return ctx.ReplyEmbed(eb.Finalize())
