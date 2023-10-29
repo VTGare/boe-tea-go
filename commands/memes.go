@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/VTGare/boe-tea-go/bot"
+	"github.com/VTGare/boe-tea-go/internal/arrays"
 	"github.com/VTGare/boe-tea-go/messages"
 	"github.com/VTGare/embeds"
 	"github.com/VTGare/gumi"
@@ -179,6 +180,26 @@ func cake(*bot.Bot) func(ctx *gumi.Ctx) error {
 		eb.Title("Local God eats cake").
 			Description("🙏🍰").
 			Image("https://cdn.discordapp.com/attachments/1129829799179853914/1160609012115578970/haruhi-haruhi-suzumiya.gif")
+
+		return ctx.ReplyEmbed(eb.Finalize())
+	}
+}
+
+var frenzyImages = []string{
+	"https://media.tenor.com/wLs85BqnUJUAAAAC/eminence-in-shadow-shadow.gif",
+	"https://media.tenor.com/otI2t29q9RYAAAAC/the-eminence-in-shadow-the-eminence-of-shadow.gif",
+	"https://media.tenor.com/YmcBY9nlAwsAAAAC/cid-kagenou-eminence-in-shadow.gif",
+	"https://static.wikia.nocookie.net/to-be-a-power-in-the-shadows/images/9/9f/Red_Moon-_Anime.png",
+}
+
+func frenzy(*bot.Bot) func(ctx *gumi.Ctx) error {
+	return func(ctx *gumi.Ctx) error {
+		image := arrays.RandomElement(frenzyImages)
+
+		eb := embeds.NewBuilder()
+		eb.Title("The moon is red.").
+			Description("The frenzy has begun.\nWe're out of time.\nRun if you value your life.").
+			Image(*image)
 
 		return ctx.ReplyEmbed(eb.Finalize())
 	}

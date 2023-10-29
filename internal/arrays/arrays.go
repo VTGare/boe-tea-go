@@ -1,5 +1,10 @@
 package arrays
 
+import (
+	"math/rand"
+	"time"
+)
+
 func Any[T comparable](slice []T, cmp T) bool {
 	for _, val := range slice {
 		if val == cmp {
@@ -68,4 +73,16 @@ func Remove[T comparable](ss []T, match T) []T {
 		}
 	}
 	return ss
+}
+
+func RandomElement[T any](slice []T) *T {
+	l := len(slice)
+	if l == 0 {
+		return nil
+	}
+
+	s := rand.NewSource(time.Now().Unix())
+	r := rand.New(s)
+
+	return &slice[r.Intn(l)]
 }
