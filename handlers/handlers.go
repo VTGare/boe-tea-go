@@ -639,7 +639,7 @@ func OnError(b *bot.Bot) func(*gumi.Ctx, error) {
 
 func onArtworkError(b *bot.Bot, gctx *gumi.Ctx, err *artworks.Error) *embeds.Builder {
 	if gctx.Command == nil {
-		reactionErr := gctx.Session.MessageReactionAdd(gctx.Event.ChannelID, gctx.Event.ID, "🚫")
+		reactionErr := gctx.Session.MessageReactionAdd(gctx.Event.ChannelID, gctx.Event.ID, "😵‍💫")
 		if reactionErr != nil && !strings.Contains(reactionErr.Error(), "403") {
 			b.Log.With("err", reactionErr).Error("failed to add artwork error reaction")
 		}
