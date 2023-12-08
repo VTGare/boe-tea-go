@@ -15,7 +15,9 @@ type fxTwitter struct {
 }
 
 type fxTwitterResponse struct {
-	Tweet struct {
+	Code    int    `json:"code,omitempty"`
+	Message string `json:"message,omitempty"`
+	Tweet   struct {
 		URL    string `json:"url,omitempty"`
 		ID     string `json:"id,omitempty"`
 		Text   string `json:"text,omitempty"`
@@ -50,7 +52,7 @@ func newFxTwitter() artworks.Provider {
 }
 
 func (fxt *fxTwitter) Find(id string) (artworks.Artwork, error) {
-	url := fmt.Sprintf("https://fxtwitter.com/i/status/%v.json", id)
+	url := fmt.Sprintf("https://api.fxtwitter.com/i/status/%v", id)
 
 	resp, err := fxt.client.Get(url)
 	if err != nil {
@@ -58,8 +60,13 @@ func (fxt *fxTwitter) Find(id string) (artworks.Artwork, error) {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
+	switch resp.StatusCode {
+	case http.StatusOK:
+		break
+	case http.StatusNotFound:
 		return nil, ErrTweetNotFound
+	default:
+		return nil, fmt.Errorf("unexpected response status: %v", resp.Status)
 	}
 
 	fxArtwork := &fxTwitterResponse{}
