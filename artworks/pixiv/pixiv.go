@@ -154,8 +154,15 @@ func (p *Pixiv) _find(id string) (artworks.Artwork, error) {
 		proxy: p.proxyHost,
 	}
 
-	if artwork.Images[0].Original == "https://s.pximg.net/common/images/limit_sanity_level_360.png" {
-		return nil, artworks.ErrRateLimited
+	errImages := []string{
+		"limit_sanity_level_360.png",
+		"limit_unknown_360.png",
+	}
+
+	for _, img := range errImages {
+		if artwork.Images[0].Original == fmt.Sprintf("https://s.pximg.net/common/images/%s", img) {
+			return nil, artworks.ErrRateLimited
+		}
 	}
 
 	if illust.IllustAIType == pixiv.IllustAITypeAIGenerated {
