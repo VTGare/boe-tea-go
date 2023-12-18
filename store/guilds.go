@@ -62,7 +62,7 @@ func DefaultGuild(id string) *Guild {
 		RepostExpiration: 24 * time.Hour,
 		Crosspost:        true,
 		Reactions:        false,
-		SkipFirst:        true,
+		SkipFirst:        false,
 		ArtChannels:      make([]string, 0),
 		CreatedAt:        time.Now(),
 		UpdatedAt:        time.Now(),
