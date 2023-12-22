@@ -2,7 +2,7 @@ package commands
 
 import "github.com/VTGare/boe-tea-go/bot"
 
-func RegisterCommands(b *bot.Bot) {
+func Register(b *bot.Bot) {
 	generalGroup(b)
 	userGroup(b)
 	memesGroup(b)

@@ -13,6 +13,7 @@ import (
 	"github.com/VTGare/boe-tea-go/artworks/twitter"
 	"github.com/VTGare/boe-tea-go/bot"
 	"github.com/VTGare/boe-tea-go/commands"
+	"github.com/VTGare/boe-tea-go/commands/appcommands"
 	"github.com/VTGare/boe-tea-go/handlers"
 	"github.com/VTGare/boe-tea-go/internal/config"
 	"github.com/VTGare/boe-tea-go/internal/logger"
@@ -114,8 +115,11 @@ func main() {
 		OnPanicCallBack:         handlers.OnPanic(b),
 	})
 
-	handlers.RegisterHandlers(b)
-	commands.RegisterCommands(b)
+	appcommands.Register(b)
+	b.AddHandler(appcommands.Handler)
+
+	handlers.Register(b)
+	commands.Register(b)
 
 	if err := b.Open(); err != nil {
 		log.Fatal(err)
