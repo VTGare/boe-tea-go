@@ -112,7 +112,7 @@ func NotCommand(b *bot.Bot) func(*gumi.Ctx) error {
 	}
 }
 
-func RegisterHandlers(b *bot.Bot) {
+func Register(b *bot.Bot) {
 	b.AddHandler(OnReady(b))
 	b.AddHandler(OnGuildCreate(b))
 	b.AddHandler(OnGuildDelete(b))
