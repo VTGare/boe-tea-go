@@ -56,13 +56,17 @@ By adding Boe Tea to your server you are consenting to the policies outlined in 
 
 ## Documentation
 
-Please use `bt!help` command for documentation. Complete documentation is coming soon:tm:, maybe even this year.
+Please use `bt!help` command for documentation. Complete documentation is planned, but the progress is extremely slow.
+
+## Contributing
+
+[Please read the following](CONTRIBUTING.md)
 
 ## Deployment
 
 ### Requirements
 
-- Go (1.20+). Download Golang from <https://golang.org> or by using a package manager (e.g. Chocolatey on Windows, homebrew on Mac or pacman on ArchLinux).
+- Go (1.21+). Download Golang from <https://golang.org> or by using a package manager (e.g. Chocolatey on Windows, homebrew on Mac or pacman on ArchLinux).
 
 ### Locally
 
