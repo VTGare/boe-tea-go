@@ -16,7 +16,7 @@ import (
 	"github.com/VTGare/sengoku"
 	"github.com/bwmarrin/discordgo"
 	goCache "github.com/patrickmn/go-cache"
-	"github.com/servusdei2018/shards"
+	"github.com/servusdei2018/shards/v2"
 	"go.uber.org/zap"
 )
 
