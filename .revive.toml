@@ -31,25 +31,23 @@ warningCode = 0
 
 # The requirement is not met everywhere, but it should be turned into an error in the future.
 [rule.cyclomatic]
-    arguments = [20]
+  arguments = [20]
 
 # Maximum allowed return values
 [rule.function-result-limit]
   arguments = [3]
   severity = "error"
 
-# Enforce maps and slices to be initialized with a make function.
+# Enforce maps to be initialized with a make function.
 [rule.enforce-map-style]
-  arguments = ["make"]
-[rule.enforce-slice-style]
   arguments = ["make"]
 
 # In Go it is idiomatic to minimize nesting statements. For example: if ... else return should be converted to if not return.
 [rule.early-return]
-    arguments = ["preserveScope"]
+  arguments = ["preserveScope"]
 
 # Disabled
 [rule.package-comments]
-    Disabled=true
+  Disabled=true
 [rule.exported]
-    Disabled=true
+  Disabled=true
