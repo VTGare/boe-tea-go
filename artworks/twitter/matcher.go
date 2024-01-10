@@ -2,6 +2,7 @@ package twitter
 
 import (
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 
