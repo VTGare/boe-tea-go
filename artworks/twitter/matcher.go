@@ -16,7 +16,8 @@ func (twitterMatcher) Match(s string) (string, bool) {
 		return "", false
 	}
 
-	if !strings.Contains(u.Host, "twitter.com") && u.Host != "x.com" && u.Host != "fixupx.com" {
+	var regex = regexp.MustCompile(`^(?:fix(?:v|up))?x\.com|twitter\.com`)
+	if !regex.MatchString(u.Host) {
 		return "", false
 	}
 
