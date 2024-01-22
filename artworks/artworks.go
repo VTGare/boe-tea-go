@@ -61,7 +61,7 @@ func IsAIGenerated(contents ...string) bool {
 
 	for _, tag := range contents {
 		for _, test := range aiTags {
-			if strings.Contains(strings.ToLower(tag), test) {
+			if strings.EqualFold(tag, test) {
 				return true
 			}
 		}

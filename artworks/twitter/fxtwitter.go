@@ -4,10 +4,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/VTGare/boe-tea-go/artworks"
+	"github.com/VTGare/boe-tea-go/internal/arrays"
 )
+
+var nonAlphanumericRegex = regexp.MustCompile(`[^\p{L}\p{N} -]+`)
 
 type fxTwitter struct {
 	twitterMatcher
@@ -107,7 +112,9 @@ func (fxt *fxTwitter) Find(id string) (artworks.Artwork, error) {
 		NSFW:      true,
 	}
 
-	artwork.AIGenerated = artworks.IsAIGenerated(artwork.Content)
+	artwork.AIGenerated = artworks.IsAIGenerated(arrays.Map(strings.Fields(artwork.Content), func(s string) string {
+		return nonAlphanumericRegex.ReplaceAllString(s, "")
+	})...)
 
 	return artwork, nil
 }

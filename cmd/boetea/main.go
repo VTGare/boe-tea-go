@@ -105,7 +105,7 @@ func main() {
 		Commands:                make(map[string]*gumi.Command),
 		AuthorID:                cfg.Discord.AuthorID,
 		PrefixResolver:          handlers.PrefixResolver(b),
-		NotCommandCallback:      handlers.NotCommand(b),
+		NotCommandCallback:      handlers.OnMessage(b),
 		OnErrorCallback:         handlers.OnError(b),
 		OnRateLimitCallback:     handlers.OnRateLimit(b),
 		OnNSFWCallback:          handlers.OnNSFW(b),

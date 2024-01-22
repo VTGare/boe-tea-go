@@ -52,7 +52,7 @@ type Video struct {
 
 func New() artworks.Provider {
 	return &Twitter{
-		providers: []artworks.Provider{newFxTwitter(), newSyndication()},
+		providers: []artworks.Provider{newFxTwitter()},
 	}
 }
 

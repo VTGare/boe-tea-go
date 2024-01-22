@@ -19,6 +19,7 @@ import (
 	"github.com/VTGare/boe-tea-go/store"
 	"github.com/VTGare/embeds"
 	"github.com/VTGare/gumi"
+
 	"github.com/bwmarrin/discordgo"
 	"go.mongodb.org/mongo-driver/mongo"
 	"mvdan.cc/xurls/v2"
@@ -42,14 +43,14 @@ func PrefixResolver(b *bot.Bot) func(s *discordgo.Session, m *discordgo.MessageC
 	}
 }
 
-func OnPanic(b *bot.Bot) func(*gumi.Ctx, interface{}) {
-	return func(ctx *gumi.Ctx, r interface{}) {
+func OnPanic(b *bot.Bot) func(*gumi.Ctx, any) {
+	return func(ctx *gumi.Ctx, r any) {
 		b.Log.Errorf("%v", r)
 	}
 }
 
-// NotCommand is executed on every message that isn't a command.
-func NotCommand(b *bot.Bot) func(*gumi.Ctx) error {
+// OnMessage is executed on every message that isn't a command.
+func OnMessage(b *bot.Bot) func(*gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
 		guild, err := b.Store.Guild(context.Background(), ctx.Event.GuildID)
 		if err != nil {
@@ -66,7 +67,6 @@ func NotCommand(b *bot.Bot) func(*gumi.Ctx) error {
 			}
 
 			p := post.New(b, ctx, urls...)
-
 			sent, err := p.Send()
 			if err != nil {
 				return err
