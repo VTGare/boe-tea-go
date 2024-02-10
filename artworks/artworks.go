@@ -3,6 +3,7 @@ package artworks
 import (
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/VTGare/boe-tea-go/store"
