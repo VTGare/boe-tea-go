@@ -48,6 +48,13 @@ var (
 	ErrRateLimited     = errors.New("provider rate limited")
 )
 
+func EscapeMarkdown(content string) string {
+	for _, markdown := range []string{"# ", "## ", "### "} {
+		content = strings.ReplaceAll(content, markdown, "\\"+markdown)
+	}
+	return content
+}
+
 func IsAIGenerated(contents ...string) bool {
 	aiTags := []string{
 		"aiart",

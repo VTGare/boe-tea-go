@@ -108,7 +108,7 @@ func (a *Artwork) MessageSends(footer string, _ bool) ([]*discordgo.MessageSend,
 		}, nil
 	}
 
-	eb.URL(a.Permalink).Description(a.Content).Timestamp(a.Timestamp)
+	eb.URL(a.Permalink).Description(artworks.EscapeMarkdown(a.Content)).Timestamp(a.Timestamp)
 
 	if a.Retweets > 0 {
 		eb.AddField("Retweets", strconv.Itoa(a.Retweets), true)
