@@ -49,10 +49,15 @@ var (
 )
 
 func EscapeMarkdown(content string) string {
-	for _, markdown := range []string{"# ", "## ", "### "} {
-		content = strings.ReplaceAll(content, markdown, "\\"+markdown)
+	contents := strings.Split(content, "\n")
+	regex := regexp.MustCompile("^#{1,3}")
+
+	for i, line := range contents {
+		if regex.MatchString(line) {
+			contents[i] = "\\" + line
+		}
 	}
-	return content
+	return strings.Join(contents, "\n")
 }
 
 func IsAIGenerated(contents ...string) bool {
