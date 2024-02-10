@@ -94,14 +94,14 @@ func (fxt *fxTwitter) Find(id string) (artworks.Artwork, error) {
 
 	var username string
 	if fxArtwork.Tweet.Author.Name != "" {
-		username = "@" + fxArtwork.Tweet.Author.Name
+		username = "@" + fxArtwork.Tweet.Author.ScreenName
 	}
 
 	artwork := &Artwork{
 		Videos:    videos,
 		Photos:    photos,
 		ID:        fxArtwork.Tweet.ID,
-		FullName:  fxArtwork.Tweet.Author.ScreenName,
+		FullName:  fxArtwork.Tweet.Author.Name,
 		Username:  username,
 		Content:   fxArtwork.Tweet.Text,
 		Permalink: fxArtwork.Tweet.URL,
