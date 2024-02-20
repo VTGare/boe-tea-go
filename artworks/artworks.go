@@ -3,6 +3,7 @@ package artworks
 import (
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/VTGare/boe-tea-go/store"
@@ -47,6 +48,18 @@ var (
 	ErrArtworkNotFound = errors.New("artwork not found")
 	ErrRateLimited     = errors.New("provider rate limited")
 )
+
+func EscapeMarkdown(content string) string {
+	contents := strings.Split(content, "\n")
+	regex := regexp.MustCompile("^#{1,3}")
+
+	for i, line := range contents {
+		if regex.MatchString(line) {
+			contents[i] = "\\" + line
+		}
+	}
+	return strings.Join(contents, "\n")
+}
 
 func IsAIGenerated(contents ...string) bool {
 	aiTags := []string{

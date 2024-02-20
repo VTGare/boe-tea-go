@@ -159,7 +159,7 @@ func (artwork *ArtstationResponse) MessageSends(footer string, tagsEnabled bool)
 
 	if tagsEnabled {
 		desc := bluemonday.StrictPolicy().Sanitize(artwork.Description)
-		eb.Description(desc)
+		eb.Description(artworks.EscapeMarkdown(desc))
 	}
 
 	eb.URL(artwork.URL()).
