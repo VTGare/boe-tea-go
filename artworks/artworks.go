@@ -69,6 +69,7 @@ func IsAIGenerated(contents ...string) bool {
 		"createdwithai",
 		"dall-e",
 		"midjourney",
+		"nijijourney",
 		"stablediffusion",
 	}
 
