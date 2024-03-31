@@ -10,7 +10,6 @@ func Sentry(dsn string) (zap.Option, error) {
 	err := sentry.Init(sentry.ClientOptions{
 		Dsn: dsn,
 	})
-
 	if err != nil {
 		return nil, err
 	}

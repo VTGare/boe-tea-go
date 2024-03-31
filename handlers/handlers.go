@@ -146,7 +146,7 @@ func OnGuildCreate(b *bot.Bot) func(*discordgo.Session, *discordgo.GuildCreate) 
 // OnGuildDelete logs guild outages and guilds that kicked the bot out.
 func OnGuildDelete(b *bot.Bot) func(*discordgo.Session, *discordgo.GuildDelete) {
 	return func(s *discordgo.Session, g *discordgo.GuildDelete) {
-		var log = b.Log.With(
+		log := b.Log.With(
 			"guild_id", g.ID,
 		)
 
@@ -168,7 +168,7 @@ func OnGuildBanAdd(b *bot.Bot) func(*discordgo.Session, *discordgo.GuildBanAdd) 
 
 func OnMessageRemove(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageDelete) {
 	return func(s *discordgo.Session, m *discordgo.MessageDelete) {
-		var log = b.Log.With("channel_id", m.ChannelID, "parent_id", m.ID)
+		log := b.Log.With("channel_id", m.ChannelID, "parent_id", m.ID)
 		msg, ok := b.EmbedCache.Get(
 			m.ChannelID,
 			m.ID,
@@ -203,7 +203,7 @@ func OnMessageRemove(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageDele
 
 func OnReactionAdd(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageReactionAdd) {
 	return func(s *discordgo.Session, r *discordgo.MessageReactionAdd) {
-		//Do nothing for bot's own reactions
+		// Do nothing for bot's own reactions
 		if r.UserID == s.State.User.ID {
 			return
 		}
@@ -468,7 +468,7 @@ func OnReactionAdd(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageReacti
 
 func OnReactionRemove(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageReactionRemove) {
 	return func(s *discordgo.Session, r *discordgo.MessageReactionRemove) {
-		//Do nothing for bot's own reactions
+		// Do nothing for bot's own reactions
 		if r.UserID == s.State.User.ID {
 			return
 		}
@@ -483,8 +483,8 @@ func OnReactionRemove(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageRea
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 		defer cancel()
 
-		//Do nothing if user was banned recently. Discord removes all reactions
-		//of banned users on the server which in turn removes all bookmarks.
+		// Do nothing if user was banned recently. Discord removes all reactions
+		// of banned users on the server which in turn removes all bookmarks.
 		if _, ok := b.BannedUsers.Get(r.UserID); ok {
 			return
 		}

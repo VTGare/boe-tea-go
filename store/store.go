@@ -14,6 +14,4 @@ type Store interface {
 	Close(context.Context) error
 }
 
-var (
-	ErrArtworkNotFound = errors.New("artwork not found")
-)
+var ErrArtworkNotFound = errors.New("artwork not found")

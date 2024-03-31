@@ -58,7 +58,6 @@ func (rd redisDetector) Find(channelID, artworkID string) (*Repost, error) {
 
 		return nil
 	})
-
 	if err != nil {
 		return nil, err
 	}
@@ -89,7 +88,6 @@ func (rd redisDetector) Create(repost *Repost, duration time.Duration) error {
 
 		return nil
 	})
-
 	if err != nil {
 		return err
 	}

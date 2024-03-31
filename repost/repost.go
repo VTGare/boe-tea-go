@@ -5,9 +5,7 @@ import (
 	"time"
 )
 
-var (
-	ErrNotFound = errors.New("repost not found")
-)
+var ErrNotFound = errors.New("repost not found")
 
 type Detector interface {
 	Find(channelID string, artworkID string) (*Repost, error)
