@@ -80,17 +80,17 @@ func (t *Twitter) Find(id string) (artworks.Artwork, error) {
 	return &Artwork{}, artworks.NewError(t, errors.Join(errs...))
 }
 
-func (artwork *Artwork) StoreArtwork() *store.Artwork {
-	media := make([]string, 0, len(artwork.Photos)+len(artwork.Videos))
+func (a *Artwork) StoreArtwork() *store.Artwork {
+	media := make([]string, 0, len(a.Photos)+len(a.Videos))
 
-	media = append(media, artwork.Photos...)
-	for _, video := range artwork.Videos {
+	media = append(media, a.Photos...)
+	for _, video := range a.Videos {
 		media = append(media, video.Preview)
 	}
 
 	return &store.Artwork{
-		Author: artwork.Username,
-		URL:    artwork.Permalink,
+		Author: a.Username,
+		URL:    a.Permalink,
 		Images: media,
 	}
 }
@@ -127,38 +127,7 @@ func (a *Artwork) MessageSends(footer string, _ bool) ([]*discordgo.MessageSend,
 	}
 
 	if len(a.Videos) > 0 {
-		video := a.Videos[0]
-
-		resp, err := http.Get(video.URL)
-		if err != nil {
-			return nil, fmt.Errorf("error downloading twitter video: %w", err)
-		}
-		defer resp.Body.Close()
-
-		b, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return nil, fmt.Errorf("error reading twitter video: %w", err)
-		}
-
-		uri, err := url.Parse(video.URL)
-		if err != nil {
-			return nil, err
-		}
-
-		splits := strings.Split(uri.Path, "/")
-
-		eb.Title(fmt.Sprintf("%v (%v)", a.FullName, a.Username))
-		msg := &discordgo.MessageSend{
-			Embeds: []*discordgo.MessageEmbed{eb.Finalize()},
-			Files: []*discordgo.File{
-				{
-					Name:   splits[len(splits)-1],
-					Reader: bytes.NewReader(b),
-				},
-			},
-		}
-
-		return []*discordgo.MessageSend{msg}, nil
+		return a.videoEmbed(eb)
 	}
 
 	length := len(a.Photos)
@@ -193,6 +162,52 @@ func (a *Artwork) MessageSends(footer string, _ bool) ([]*discordgo.MessageSend,
 	}
 
 	return tweets, nil
+}
+
+func (a *Artwork) videoEmbed(eb *embeds.Builder) ([]*discordgo.MessageSend, error) {
+	files := make([]*discordgo.File, 0, len(a.Videos))
+	for _, video := range a.Videos {
+		file, err := downloadVideo(video.URL)
+		if err != nil {
+			return nil, err
+		}
+
+		files = append(files, file)
+	}
+
+	eb.Title(fmt.Sprintf("%v (%v)", a.FullName, a.Username))
+	msg := &discordgo.MessageSend{
+		Embeds: []*discordgo.MessageEmbed{eb.Finalize()},
+		Files:  files,
+	}
+
+	return []*discordgo.MessageSend{msg}, nil
+}
+
+func downloadVideo(fileURL string) (*discordgo.File, error) {
+	resp, err := http.Get(fileURL)
+	if err != nil {
+		return nil, fmt.Errorf("error downloading twitter video: %w", err)
+	}
+
+	defer resp.Body.Close()
+
+	b, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("error reading twitter video: %w", err)
+	}
+
+	uri, err := url.Parse(fileURL)
+	if err != nil {
+		return nil, err
+	}
+
+	splits := strings.Split(uri.Path, "/")
+
+	return &discordgo.File{
+		Name:   splits[len(splits)-1],
+		Reader: bytes.NewReader(b),
+	}, nil
 }
 
 func (a *Artwork) URL() string {

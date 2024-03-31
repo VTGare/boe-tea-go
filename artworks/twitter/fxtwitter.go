@@ -44,6 +44,11 @@ type fxTwitterResponse struct {
 				Type         string `json:"type,omitempty"`
 				URL          string `json:"url,omitempty"`
 				ThumbnailURL string `json:"thumbnail_url,omitempty"`
+				Variants     []struct {
+					Bitrate     int    `json:"bitrate,omitempty"`
+					ContentType string `json:"content_type,omitempty"`
+					URL         string `json:"url,omitempty"`
+				}
 			} `json:"videos,omitempty"`
 		} `json:"media,omitempty"`
 	} `json:"tweet,omitempty"`
@@ -81,9 +86,18 @@ func (fxt *fxTwitter) Find(id string) (artworks.Artwork, error) {
 
 	videos := make([]Video, 0, len(fxArtwork.Tweet.Media.Videos))
 	for _, v := range fxArtwork.Tweet.Media.Videos {
+		videoURL := v.URL // default to highest quality url
+
+		// if at least 3 variants exist, pick second best quality to save bandwidth. the slice is sorted by bitrate by default.
+		// first variant is always in m3u streaming format, so we need at least 3 variants to get this.
+		if len(v.Variants) > 2 {
+			secondBest := v.Variants[len(v.Variants)-2]
+			videoURL = secondBest.URL
+		}
+
 		videos = append(videos, Video{
 			Preview: v.ThumbnailURL,
-			URL:     v.URL,
+			URL:     videoURL,
 		})
 	}
 
