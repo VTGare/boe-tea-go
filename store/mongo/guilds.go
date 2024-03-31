@@ -17,7 +17,7 @@ type guildStore struct {
 }
 
 func (g guildStore) Guild(ctx context.Context, id string) (*store.Guild, error) {
-	//If guild ID is empty, return DM guild settings.
+	// If guild ID is empty, return DM guild settings.
 	if id == "" {
 		return store.UserGuild(), nil
 	}

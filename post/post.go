@@ -92,7 +92,6 @@ func (p *Post) Send() ([]*cache.MessageInfo, error) {
 				p.ctx.Session.State.User.ID,
 				discordgo.PermissionAdministrator|discordgo.PermissionManageMessages,
 			)
-
 			if err != nil {
 				log.With("error", err).Warn("failed to check if boe tea has permissions")
 			}
@@ -276,7 +275,6 @@ func (p *Post) fetch(guild *store.Guild, channelID string) (*fetchResult, error)
 						},
 						guild.RepostExpiration,
 					)
-
 					if err != nil {
 						log.With("error", err).Error("error creating a repost")
 					}
@@ -436,9 +434,7 @@ func (p *Post) send(guild *store.Guild, channelID string, artworks []artworks.Ar
 
 	allMessages = p.handleLimit(allMessages, guild.Limit)
 	if p.crosspost {
-		var (
-			first = allMessages[0][0]
-		)
+		first := allMessages[0][0]
 
 		first.Content = first.Embeds[0].URL + "\n" + first.Content
 	}

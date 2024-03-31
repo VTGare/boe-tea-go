@@ -41,7 +41,6 @@ func (b *bookmarkStore) ListBookmarks(ctx context.Context, userID string, filter
 		f,
 		options.Find().SetSort(bson.M{"created_at": order}),
 	)
-
 	if err != nil {
 		return nil, fmt.Errorf("failed to find bookmarks: %w", err)
 	}
@@ -94,7 +93,6 @@ func (b *bookmarkStore) AddBookmark(ctx context.Context, bookmark *store.Bookmar
 			bson.M{"artwork_id": bookmark.ArtworkID},
 			bson.M{"$inc": bson.M{"favourites": 1}},
 		)
-
 		if err != nil {
 			return false, fmt.Errorf("failed to increment artwork favorite count: %w", err)
 		}
@@ -141,7 +139,6 @@ func (b *bookmarkStore) DeleteBookmark(ctx context.Context, bookmark *store.Book
 			bson.M{"artwork_id": bookmark.ArtworkID},
 			bson.M{"$inc": bson.M{"favourites": -1}},
 		)
-
 		if err != nil {
 			return false, fmt.Errorf("failed to increment artwork favorite count: %w", err)
 		}

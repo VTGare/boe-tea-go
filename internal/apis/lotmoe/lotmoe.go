@@ -21,9 +21,7 @@ GET /files = requires Authorization token, returns all saved files.
 POST /files = requires Authorization token and a file in multipart form.
 */
 
-var (
-	hostURL = "https://api.lot.moe"
-)
+var hostURL = "https://api.lot.moe"
 
 type Client struct {
 	httpClient *http.Client
@@ -55,7 +53,6 @@ func NewClient(username, password string) (*Client, error) {
 		fmt.Sprintf("%v/auth/login", hostURL),
 		strings.NewReader(form.Encode()),
 	)
-
 	if err != nil {
 		return nil, err
 	}
@@ -107,7 +104,6 @@ func (lm *Client) files() (*getFilesResponse, error) {
 		fmt.Sprintf("%v/files", hostURL),
 		nil,
 	)
-
 	if err != nil {
 		return nil, err
 	}
@@ -147,7 +143,6 @@ func (lm *Client) upload(filename string, reader io.Reader) (string, error) {
 		fmt.Sprintf("%v/files", hostURL),
 		&buf,
 	)
-
 	if err != nil {
 		return "", err
 	}

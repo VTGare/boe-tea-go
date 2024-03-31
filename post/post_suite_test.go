@@ -18,9 +18,7 @@ func TestPost(t *testing.T) {
 }
 
 var _ = Describe("Generate Messages Tests", func() {
-	var (
-		post Post
-	)
+	var post Post
 
 	It("", func() {
 		post.generateMessages(nil, nil, "")

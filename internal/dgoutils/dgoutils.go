@@ -156,17 +156,15 @@ const (
 	WidgetActionLastPage
 )
 
-var (
-	actionMap = map[string]WidgetAction{
-		"⏮": WidgetActionFirstPage,
-		"⏪": WidgetActionFiveDown,
-		"◀": WidgetActionPreviousPage,
-		"⏹": WidgetActionStop,
-		"▶": WidgetActionNextPage,
-		"⏩": WidgetActionFiveUp,
-		"⏭": WidgetActionLastPage,
-	}
-)
+var actionMap = map[string]WidgetAction{
+	"⏮": WidgetActionFirstPage,
+	"⏪": WidgetActionFiveDown,
+	"◀": WidgetActionPreviousPage,
+	"⏹": WidgetActionStop,
+	"▶": WidgetActionNextPage,
+	"⏩": WidgetActionFiveUp,
+	"⏭": WidgetActionLastPage,
+}
 
 func (a WidgetAction) String() string {
 	return []string{"⏮", "⏪", "◀", "⏹", "▶", "⏩", "⏭"}[a]

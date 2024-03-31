@@ -5,7 +5,6 @@ go 1.21
 toolchain go1.21.0
 
 require (
-	github.com/PuerkitoBio/goquery v1.8.1
 	github.com/ReneKroon/ttlcache v1.7.0
 	github.com/VTGare/embeds v0.1.1
 	github.com/VTGare/gumi v0.4.3
@@ -27,7 +26,6 @@ require (
 )
 
 require (
-	github.com/andybalholm/cascadia v1.3.2 // indirect
 	github.com/aymerick/douceur v0.2.0 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/dghubble/sling v1.4.1 // indirect

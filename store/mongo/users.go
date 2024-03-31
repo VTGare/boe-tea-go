@@ -137,7 +137,6 @@ func (u *userStore) UpdateUser(ctx context.Context, user *store.User) (*store.Us
 		bson.M{"user_id": user.ID},
 		user,
 	)
-
 	if err != nil {
 		return nil, err
 	}

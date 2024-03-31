@@ -52,7 +52,6 @@ func (m *mongoStore) Init(ctx context.Context) error {
 	}
 
 	return nil
-
 }
 
 func (m *mongoStore) Close(ctx context.Context) error {

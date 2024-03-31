@@ -8,7 +8,7 @@ import (
 	"github.com/ReneKroon/ttlcache"
 )
 
-//Cache represents a thread-safe map
+// Cache represents a thread-safe map
 type Cache struct {
 	mx    sync.RWMutex
 	cache map[string]interface{}
@@ -65,7 +65,7 @@ type EmbedCache struct {
 	cache *ttlcache.Cache
 }
 
-//MessageInfo is a message/channel ID pair.
+// MessageInfo is a message/channel ID pair.
 type MessageInfo struct {
 	MessageID string
 	ChannelID string
@@ -124,7 +124,7 @@ func (ec *EmbedCache) Remove(channelID, messageID string) bool {
 	return ec.cache.Remove(key)
 }
 
-//NewEmbedCache creates a new embed cache for storing IDs of embeds users posted.
+// NewEmbedCache creates a new embed cache for storing IDs of embeds users posted.
 func NewEmbedCache() *EmbedCache {
 	cache := ttlcache.NewCache()
 	cache.SetTTL(15 * time.Minute)

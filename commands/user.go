@@ -825,7 +825,7 @@ func unfav(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			query = ctx.Args.Get(0).Raw
 		)
 
-		//If ID is not an integer assign query to the URL.
+		// If ID is not an integer assign query to the URL.
 		if id, err = strconv.Atoi(query); err != nil {
 			url = query
 		}

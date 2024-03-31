@@ -163,7 +163,7 @@ func share(b *bot.Bot, s post.SkipMode) func(ctx *gumi.Ctx) error {
 			return messages.ErrIncorrectCmd(ctx.Command)
 		}
 
-		//Trim <> in case someone wraps the link in it.
+		// Trim <> in case someone wraps the link in it.
 		url := strings.Trim(ctx.Args.Get(0).Raw, "<>")
 		ctx.Args.Remove(0)
 
@@ -316,7 +316,6 @@ func leaderboard(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			flags.FlagTypeDuring,
 			flags.FlagTypeLimit,
 		)
-
 		if err != nil {
 			return err
 		}
@@ -374,7 +373,7 @@ func search(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			return messages.ErrIncorrectCmd(ctx.Command)
 		}
 
-		//Remove $'s to sanitize the input
+		// Remove $'s to sanitize the input
 		query := strings.Replace(ctx.Args.Get(0).Raw, "$", "", -1)
 
 		var (
@@ -394,7 +393,6 @@ func search(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			flags.FlagTypeSort,
 			flags.FlagTypeOrder,
 		)
-
 		if err != nil {
 			return err
 		}
@@ -422,7 +420,6 @@ func search(b *bot.Bot) func(ctx *gumi.Ctx) error {
 		}
 
 		artworks, err := b.Store.SearchArtworks(context.Background(), filter, opts)
-
 		if err != nil {
 			return err
 		}

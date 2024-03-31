@@ -515,7 +515,6 @@ func set(b *bot.Bot) func(ctx *gumi.Ctx) error {
 				ctx.Event.Author.ID,
 				discordgo.PermissionAdministrator|discordgo.PermissionManageServer,
 			)
-
 			if err != nil {
 				return err
 			}
@@ -961,7 +960,6 @@ func addchannel(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			guild.ID,
 			channels,
 		)
-
 		if err != nil {
 			return err
 		}
@@ -1022,7 +1020,6 @@ func removechannel(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			guild.ID,
 			channels,
 		)
-
 		if err != nil {
 			if errors.Is(err, mongo.ErrNoDocuments) {
 				return messages.RemoveArtChannelFail(channels)
