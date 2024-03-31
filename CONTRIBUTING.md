@@ -21,6 +21,7 @@ In addition there's some software that is required to develop, compile and run B
   - Mac and Windows: you can just install [Docker Desktop](https://www.docker.com/products/docker-desktop)
   - Linux: you need to install [Docker Server](https://docs.docker.com/install/#server) and [Docker Compose](https://docs.docker.com/compose/install/) separately
 - [revive](https://github.com/mgechev/revive): linter of our choice.
+- [gofumpt](https://github.com/mvdan/gofumpt): code formatter of our choice.
 
 ### Editor configuration
 
@@ -31,9 +32,16 @@ The [Go](https://marketplace.visualstudio.com/items?itemName=golang.Go) extensio
 Please add the following to your `settings.json` file in you're using VSCode
 ```
 "go.lintTool": "revive",
+
 "go.lintFlags": [
     "-config=${workspaceFolder}/.revive.toml"
-]
+],
+
+"go.useLanguageServer": true,
+
+"gopls": {
+  "formatting.gofumpt": true,
+}
 ```
 
 Then run `Go: Install/Update Tools` script that comes with the Go extension and you're good to Go.
