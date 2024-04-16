@@ -18,23 +18,21 @@ var (
 	ErrRangeSyntax = errors.New("range low is higher than range high")
 )
 
-func TrimChannel(ctx *gumi.Ctx, n int) string {
-	if strings.HasPrefix(ctx.Args.Get(n).Raw, "<#") && strings.HasSuffix(ctx.Args.Get(n).Raw, ">") {
-		return strings.Trim(ctx.Args.Get(n).Raw, "<#>")
+func TrimCommand(ctx *gumi.Ctx, n int) string {
+	var rawStr = ctx.Args.Get(n).Raw
+
+	if strings.HasPrefix(rawStr, "<#") && strings.HasSuffix(rawStr, ">") {
+		return strings.Trim(rawStr, "<#>")
 	}
 
-	return ctx.Args.Get(n).Raw
-}
-
-func TrimUserMention(ctx *gumi.Ctx, n int) string {
-	if strings.HasPrefix(ctx.Args.Get(n).Raw, "<@") && strings.HasSuffix(ctx.Args.Get(n).Raw, ">") {
-		return strings.Trim(ctx.Args.Get(n).Raw, "<@>")
+	if strings.HasPrefix(rawStr, "<@") && strings.HasSuffix(rawStr, ">") {
+		return strings.Trim(rawStr, "<@>")
 	}
 
-	return ctx.Args.Get(n).Raw
+	return rawStr
 }
 
-// Deletes a specified message after a certain time
+// ExpireMessage deletes a specified message after a certain time
 func ExpireMessage(b *bot.Bot, s *discordgo.Session, msg *discordgo.Message) {
 	go func() {
 		time.Sleep(15 * time.Second)
