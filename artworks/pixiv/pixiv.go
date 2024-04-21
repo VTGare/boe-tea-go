@@ -122,7 +122,7 @@ func (p *Pixiv) _find(id string) (artworks.Artwork, error) {
 		if page.OriginalImageURL != "" {
 			img := &Image{
 				Original: page.OriginalImageURL,
-				Preview:  illust.Images.Large,
+				Preview:  illust.Images.Medium,
 			}
 
 			images = append(images, img)
