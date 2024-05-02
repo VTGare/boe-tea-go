@@ -18,20 +18,9 @@ var (
 	ErrRangeSyntax = errors.New("range low is higher than range high")
 )
 
-func TrimChannel(ctx *gumi.Ctx, n int) string {
-	if strings.HasPrefix(ctx.Args.Get(n).Raw, "<#") && strings.HasSuffix(ctx.Args.Get(n).Raw, ">") {
-		return strings.Trim(ctx.Args.Get(n).Raw, "<#>")
-	}
-
-	return ctx.Args.Get(n).Raw
-}
-
-func TrimUserMention(ctx *gumi.Ctx, n int) string {
-	if strings.HasPrefix(ctx.Args.Get(n).Raw, "<@") && strings.HasSuffix(ctx.Args.Get(n).Raw, ">") {
-		return strings.Trim(ctx.Args.Get(n).Raw, "<@>")
-	}
-
-	return ctx.Args.Get(n).Raw
+// Trimmer trims <> in case someone wraps the link in it, and characters '!', '@', '#', and '&' for channels and user mentions.
+func Trimmer(ctx *gumi.Ctx, n int) string {
+	return strings.Trim(ctx.Args.Get(n).Raw, "<!@#&>")
 }
 
 // Deletes a specified message after a certain time

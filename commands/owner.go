@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/VTGare/boe-tea-go/bot"
+	"github.com/VTGare/boe-tea-go/internal/dgoutils"
 	"github.com/VTGare/boe-tea-go/messages"
 	"github.com/VTGare/embeds"
 	"github.com/VTGare/gumi"
@@ -29,7 +30,7 @@ func reply(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			return messages.ErrIncorrectCmd(ctx.Command)
 		}
 
-		userID := strings.Trim(ctx.Args.Get(0).Raw, "<@!>")
+		userID := dgoutils.Trimmer(ctx, 0)
 
 		s := b.ShardManager.SessionForDM()
 		ch, err := s.UserChannelCreate(userID)

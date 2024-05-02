@@ -239,7 +239,7 @@ func newgroup(b *bot.Bot) func(ctx *gumi.Ctx) error {
 
 		// Name of crosspost group.
 		name := ctx.Args.Get(0).Raw
-		parent := dgoutils.TrimChannel(ctx, 1)
+		parent := dgoutils.Trimmer(ctx, 1)
 		if _, err := ctx.Session.Channel(parent); err != nil {
 			return messages.ErrChannelNotFound(err, parent)
 		}
@@ -280,8 +280,8 @@ func newpair(b *bot.Bot) func(ctx *gumi.Ctx) error {
 		name := ctx.Args.Get(0).Raw
 		var children []string
 		children = append(children,
-			dgoutils.TrimChannel(ctx, 1),
-			dgoutils.TrimChannel(ctx, 2),
+			dgoutils.Trimmer(ctx, 1),
+			dgoutils.Trimmer(ctx, 2),
 		)
 
 		// Checks if crosspost channel is not parent channel.
@@ -366,7 +366,7 @@ func push(b *bot.Bot) func(ctx *gumi.Ctx) error {
 
 		inserted := make([]string, 0, ctx.Args.Len())
 		for arg := range ctx.Args.Arguments {
-			channelID := dgoutils.TrimChannel(ctx, arg)
+			channelID := dgoutils.Trimmer(ctx, arg)
 			ch, err := ctx.Session.Channel(channelID)
 			if err != nil {
 				return messages.ErrChannelNotFound(err, channelID)
@@ -434,7 +434,7 @@ func remove(b *bot.Bot) func(ctx *gumi.Ctx) error {
 
 		removed := make([]string, 0, ctx.Args.Len())
 		for arg := range ctx.Args.Arguments {
-			channelID := dgoutils.TrimChannel(ctx, arg)
+			channelID := dgoutils.Trimmer(ctx, arg)
 
 			if !arrays.Any(group.Children, channelID) {
 				continue
@@ -477,7 +477,7 @@ func editparent(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			return messages.ErrGroupExistFail(name)
 		}
 
-		dest := dgoutils.TrimChannel(ctx, 1)
+		dest := dgoutils.Trimmer(ctx, 1)
 		if _, err := ctx.Session.Channel(dest); err != nil {
 			return messages.ErrChannelNotFound(err, dest)
 		}
@@ -555,7 +555,7 @@ func copygroup(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			return messages.ErrUserPairFail(src)
 		}
 
-		parent := dgoutils.TrimChannel(ctx, 2)
+		parent := dgoutils.Trimmer(ctx, 2)
 		if _, ok := user.FindGroup(parent); ok {
 			return messages.ErrUserChannelAlreadyParent(parent)
 		}

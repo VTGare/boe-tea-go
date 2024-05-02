@@ -838,8 +838,8 @@ func artchannels(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			}
 
 			channels := make([]string, 0)
-			for _, arg := range ctx.Args.Arguments[1:] {
-				ch, err := ctx.Session.Channel(strings.Trim(arg.Raw, "<#>"))
+			for arg := range ctx.Args.Arguments[1:] {
+				ch, err := ctx.Session.Channel(dgoutils.Trimmer(ctx, arg))
 				if err != nil {
 					return err
 				}
