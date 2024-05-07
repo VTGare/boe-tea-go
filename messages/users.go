@@ -128,7 +128,7 @@ func ErrUnknownUserSetting(setting string) error {
 	))
 }
 
-func ErrUserUnbookmarkFail(query interface{}, err error) error {
+func ErrUserUnbookmarkFail(query any, err error) error {
 	return newUserError(fmt.Sprintf(
 		"Failed to remove a bookmark `[%v]`. Unexpected error occured: %v.", query, err),
 		err,

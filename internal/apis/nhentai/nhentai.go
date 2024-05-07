@@ -14,10 +14,10 @@ type API struct {
 }
 
 type nhentaiResult struct {
-	ID         interface{} `json:"id,omitempty"`
-	MediaID    string      `json:"media_id,omitempty"`
-	Titles     *Titles     `json:"title,omitempty"`
-	UploadDate int64       `json:"upload_date"`
+	ID         any     `json:"id,omitempty"`
+	MediaID    string  `json:"media_id,omitempty"`
+	Titles     *Titles `json:"title,omitempty"`
+	UploadDate int64   `json:"upload_date"`
 	Tags       []struct {
 		ID    int    `json:"id,omitempty"`
 		Type  string `json:"type,omitempty"`
@@ -25,8 +25,8 @@ type nhentaiResult struct {
 		URL   string `json:"url,omitempty"`
 		Count int    `json:"count,omitempty"`
 	} `json:"tags,omitempty"`
-	Pages     interface{} `json:"num_pages,omitempty"`
-	Favorites interface{} `json:"num_favorites,omitempty"`
+	Pages     any `json:"num_pages,omitempty"`
+	Favorites any `json:"num_favorites,omitempty"`
 }
 
 type Hentai struct {
@@ -211,7 +211,7 @@ func (n *API) get(id string) (*nhentaiResult, error) {
 	return nil, fmt.Errorf("unexpected api response: %v", resp.Status)
 }
 
-func interfaceToInt(i interface{}) int {
+func interfaceToInt(i any) int {
 	var res int
 
 	switch v := i.(type) {

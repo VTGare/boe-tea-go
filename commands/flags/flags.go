@@ -19,8 +19,8 @@ const (
 	FlagTypeMode
 )
 
-func FromArgs(args []string, flags ...FlagType) (map[FlagType]interface{}, error) {
-	m := make(map[FlagType]interface{})
+func FromArgs(args []string, flags ...FlagType) (map[FlagType]any, error) {
+	m := make(map[FlagType]any)
 
 	for _, t := range flags {
 		for _, arg := range args {

@@ -85,7 +85,7 @@ func (b *Bot) AddProvider(provider artworks.Provider) {
 	b.ArtworkProviders = append(b.ArtworkProviders, provider)
 }
 
-func (b *Bot) AddHandler(handler interface{}) {
+func (b *Bot) AddHandler(handler any) {
 	b.ShardManager.AddHandler(handler)
 }
 

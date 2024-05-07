@@ -761,8 +761,8 @@ func changeUserSettings(b *bot.Bot, ctx *gumi.Ctx) error {
 	var (
 		settingName     = ctx.Args.Get(0)
 		newSetting      = ctx.Args.Get(1)
-		newSettingEmbed interface{}
-		oldSettingEmbed interface{}
+		newSettingEmbed any
+		oldSettingEmbed any
 	)
 
 	switch settingName.Raw {
