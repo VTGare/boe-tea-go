@@ -50,7 +50,7 @@ func memesGroup(b *bot.Bot) {
 		Usage:       "You know how to use it.",
 		Example:     "catJAM",
 		RateLimiter: gumi.NewRateLimiter(15 * time.Second),
-		Exec:        brainpower(b),
+		Exec:        brainPower(b),
 	})
 
 	b.Router.RegisterCmd(&gumi.Command{
@@ -77,7 +77,7 @@ func memesGroup(b *bot.Bot) {
 		Description: "Who is Faker?",
 		Usage:       "bt!whois <person 1>",
 		Example:     "bt!whois Faker",
-		Exec:        whois(b),
+		Exec:        whoIs(b),
 	})
 
 	b.Router.RegisterCmd(&gumi.Command{
@@ -111,7 +111,7 @@ func memesGroup(b *bot.Bot) {
 	})
 }
 
-func brainpower(*bot.Bot) func(ctx *gumi.Ctx) error {
+func brainPower(*bot.Bot) func(ctx *gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
 		return ctx.Reply(
 			"O-oooooooooo AAAAE-A-A-I-A-U- JO-oooooooooooo AAE-O-A-A-U-U-A- " +
@@ -150,7 +150,7 @@ func nuggets(*bot.Bot) func(ctx *gumi.Ctx) error {
 	}
 }
 
-func whois(*bot.Bot) func(ctx *gumi.Ctx) error {
+func whoIs(*bot.Bot) func(ctx *gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
 		if err := dgoutils.InitCommand(ctx, 1); err != nil {
 			return err

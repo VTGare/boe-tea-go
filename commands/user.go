@@ -44,7 +44,7 @@ func userGroup(b *bot.Bot) {
 		Usage:       "bt!newgroup <group name> <parent channel>",
 		Example:     "bt!newgroup lewds #nsfw",
 		RateLimiter: gumi.NewRateLimiter(10 * time.Second),
-		Exec:        newgroup(b),
+		Exec:        newGroup(b),
 	})
 
 	b.Router.RegisterCmd(&gumi.Command{
@@ -55,7 +55,7 @@ func userGroup(b *bot.Bot) {
 		Usage:       "bt!newpair <pair name> <first channel> <second channel>",
 		Example:     "bt!newpair lewds #nsfw #nsfw-pics",
 		RateLimiter: gumi.NewRateLimiter(10 * time.Second),
-		Exec:        newpair(b),
+		Exec:        newPair(b),
 	})
 
 	b.Router.RegisterCmd(&gumi.Command{
@@ -65,7 +65,7 @@ func userGroup(b *bot.Bot) {
 		Usage:       "bt!delgroup <group name>",
 		Example:     "bt!delgroup schooldays",
 		RateLimiter: gumi.NewRateLimiter(10 * time.Second),
-		Exec:        delgroup(b),
+		Exec:        delGroup(b),
 	})
 
 	b.Router.RegisterCmd(&gumi.Command{
@@ -96,7 +96,7 @@ func userGroup(b *bot.Bot) {
 		Usage:       "bt!editparent <group name> <parent channel>",
 		Example:     "bt!editparent cuteAnimeGirls #anime-pics",
 		RateLimiter: gumi.NewRateLimiter(10 * time.Second),
-		Exec:        editparent(b),
+		Exec:        editParent(b),
 	})
 
 	b.Router.RegisterCmd(&gumi.Command{
@@ -116,7 +116,7 @@ func userGroup(b *bot.Bot) {
 		Usage:       "bt!copygroup <from> <to> <parent channel id>",
 		Example:     "bt!copygroup sfw1 sfw2 #za-warudo",
 		RateLimiter: gumi.NewRateLimiter(10 * time.Second),
-		Exec:        copygroup(b),
+		Exec:        copyGroup(b),
 	})
 
 	b.Router.RegisterCmd(&gumi.Command{
@@ -159,7 +159,7 @@ func userGroup(b *bot.Bot) {
 			"crosspost": "**Options:** `[on, off]`. Switches crossposting in general.",
 		},
 		RateLimiter: gumi.NewRateLimiter(10 * time.Second),
-		Exec:        userset(b),
+		Exec:        userSet(b),
 	})
 }
 
@@ -229,8 +229,8 @@ func groups(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	}
 }
 
-// newgroup creates a new crosspost group.
-func newgroup(b *bot.Bot) func(ctx *gumi.Ctx) error {
+// newGroup creates a new crosspost group.
+func newGroup(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
 		user, err := initCommand(b, ctx, 2)
 		if err != nil {
@@ -268,8 +268,8 @@ func newgroup(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	}
 }
 
-// newgroup creates a new crosspost pair.
-func newpair(b *bot.Bot) func(ctx *gumi.Ctx) error {
+// newPair creates a new crosspost pair.
+func newPair(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
 		user, err := initCommand(b, ctx, 3)
 		if err != nil {
@@ -323,8 +323,8 @@ func newpair(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	}
 }
 
-// delgroup deletes a crosspost group.
-func delgroup(b *bot.Bot) func(ctx *gumi.Ctx) error {
+// delGroup deletes a crosspost group.
+func delGroup(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
 		user, err := initCommand(b, ctx, 1)
 		if err != nil {
@@ -462,8 +462,8 @@ func remove(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	}
 }
 
-// editparent changes the parent channel of a group
-func editparent(b *bot.Bot) func(ctx *gumi.Ctx) error {
+// editParent changes the parent channel of a group
+func editParent(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
 		user, err := initCommand(b, ctx, 2)
 		if err != nil {
@@ -531,8 +531,8 @@ func rename(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	}
 }
 
-// copygroup copies a crosspost group with a new name and parent channel.
-func copygroup(b *bot.Bot) func(ctx *gumi.Ctx) error {
+// copyGroup copies a crosspost group with a new name and parent channel.
+func copyGroup(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
 		user, err := initCommand(b, ctx, 3)
 		if err != nil {
@@ -702,7 +702,7 @@ func bookmarks(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	}
 }
 
-func userset(b *bot.Bot) func(ctx *gumi.Ctx) error {
+func userSet(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
 		switch {
 		case ctx.Args.Len() == 0:
@@ -735,7 +735,7 @@ func showUserProfile(b *bot.Bot, ctx *gumi.Ctx) error {
 		locale.Settings,
 		fmt.Sprintf(
 			"**%v:** %v | **%v:** %v",
-			locale.Crosspost, messages.FormatBool(user.Crosspost),
+			locale.CrossPost, messages.FormatBool(user.Crosspost),
 			locale.DM, messages.FormatBool(user.DM),
 		),
 	)

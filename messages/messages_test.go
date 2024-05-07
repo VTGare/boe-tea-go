@@ -36,7 +36,7 @@ func TestClickHere(t *testing.T) {
 		args args
 		want string
 	}{
-		{"with full URL", args{"http://example.com"}, "[Click here](http://example.com)"},
+		{"with full URL", args{"https://example.com"}, "[Click here](https://example.com)"},
 		{"with short URL", args{"example.com"}, "[Click here](example.com)"},
 	}
 	for _, tt := range tests {
@@ -80,8 +80,8 @@ func TestCrosspostBy(t *testing.T) {
 		args args
 		want string
 	}{
-		{"with some author name", args{"nabi"}, "Crosspost requested by nabi"},
-		{"with empty author name", args{""}, "Crosspost requested by anonymous"},
+		{"with some author name", args{"nabi"}, "CrossPost requested by nabi"},
+		{"with empty author name", args{""}, "CrossPost requested by anonymous"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -101,7 +101,7 @@ func generalGroup(b *bot.Bot) {
 		GuildOnly:   true,
 		Permissions: discordgo.PermissionAdministrator | discordgo.PermissionManageServer,
 		RateLimiter: gumi.NewRateLimiter(5 * time.Second),
-		Exec:        artchannels(b),
+		Exec:        artChannels(b),
 	})
 
 	b.Router.RegisterCmd(&gumi.Command{
@@ -114,7 +114,7 @@ func generalGroup(b *bot.Bot) {
 		GuildOnly:   true,
 		Permissions: discordgo.PermissionAdministrator | discordgo.PermissionManageServer,
 		RateLimiter: gumi.NewRateLimiter(5 * time.Second),
-		Exec:        addchannel(b),
+		Exec:        addChannel(b),
 	})
 
 	b.Router.RegisterCmd(&gumi.Command{
@@ -127,7 +127,7 @@ func generalGroup(b *bot.Bot) {
 		GuildOnly:   true,
 		Permissions: discordgo.PermissionAdministrator | discordgo.PermissionManageServer,
 		RateLimiter: gumi.NewRateLimiter(5 * time.Second),
-		Exec:        removechannel(b),
+		Exec:        removeChannel(b),
 	})
 }
 
@@ -412,294 +412,7 @@ func commandStats(b *bot.Bot, ctx *gumi.Ctx) error {
 	return ctx.ReplyEmbed(eb.Finalize())
 }
 
-func set(b *bot.Bot) func(ctx *gumi.Ctx) error {
-	return func(ctx *gumi.Ctx) error {
-		showSettings := func() error {
-			gd, err := ctx.Session.Guild(ctx.Event.GuildID)
-			if err != nil {
-				return messages.ErrGuildNotFound(err, ctx.Event.GuildID)
-			}
-
-			guild, err := b.Store.Guild(context.Background(), gd.ID)
-			if err != nil {
-				switch {
-				case errors.Is(err, mongo.ErrNoDocuments):
-					return messages.ErrGuildNotFound(err, ctx.Event.GuildID)
-				default:
-					return err
-				}
-			}
-
-			eb := embeds.NewBuilder()
-			eb.Title("Current settings").Description(fmt.Sprintf("**%v**", gd.Name))
-			eb.Thumbnail(gd.IconURL("320"))
-			eb.Footer("To change a setting use either its name or the name in parethesis", "")
-
-			eb.AddField(
-				"General",
-				fmt.Sprintf(
-					"**%v**: %v | **%v**: %v",
-					"Prefix", guild.Prefix,
-					"NSFW", messages.FormatBool(guild.NSFW),
-				),
-			)
-
-			eb.AddField(
-				"Features",
-				fmt.Sprintf(
-					"**%v**: %v | **%v**: %v\n**%v**: %v | **%v**: %v\n**%v**: %v | **%v**: %v",
-					"Repost", guild.Repost,
-					"Expiration (repost.expiration)", guild.RepostExpiration,
-					"Crosspost", messages.FormatBool(guild.Crosspost),
-					"Reactions", messages.FormatBool(guild.Reactions),
-					"Tags", messages.FormatBool(guild.Tags),
-					"Footer messages (footer)", messages.FormatBool(guild.FlavorText),
-				),
-			)
-
-			eb.AddField(
-				"Pixiv settings",
-				fmt.Sprintf(
-					"**%v**: %v | **%v**: %v",
-					"Status (pixiv)", messages.FormatBool(guild.Pixiv),
-					"Limit", strconv.Itoa(guild.Limit),
-				),
-			)
-
-			eb.AddField(
-				"Twitter settings",
-				fmt.Sprintf(
-					"**%v**: %v | **%v**: %v",
-					"Status (twitter)", messages.FormatBool(guild.Twitter),
-					"Skip First (twitter.skip)", messages.FormatBool(guild.SkipFirst),
-				),
-			)
-
-			eb.AddField(
-				"DeviantArt settings",
-				fmt.Sprintf(
-					"**%v**: %v",
-					"Status (deviant)", messages.FormatBool(guild.Deviant),
-				),
-			)
-
-			eb.AddField(
-				"ArtStation settings",
-				fmt.Sprintf(
-					"**%v**: %v",
-					"Status (artstation)", messages.FormatBool(guild.Artstation),
-				),
-			)
-
-			var artChannels []string
-			if len(guild.ArtChannels) > 5 {
-				artChannels = []string{"There are more than 5 art channels, use `bt!artchannels` command to see them."}
-			} else {
-				artChannels = arrays.Map(guild.ArtChannels, func(s string) string {
-					return fmt.Sprintf("<#%v> | `%v`", s, s)
-				})
-			}
-
-			eb.AddField(
-				"Art channels",
-				"Use `bt!artchannels` command to list or manage art channels!\n\n"+strings.Join(artChannels, "\n"),
-			)
-
-			return ctx.ReplyEmbed(eb.Finalize())
-		}
-
-		changeSetting := func() error {
-			perms, err := dgoutils.MemberHasPermission(
-				ctx.Session,
-				ctx.Event.GuildID,
-				ctx.Event.Author.ID,
-				discordgo.PermissionAdministrator|discordgo.PermissionManageServer,
-			)
-			if err != nil {
-				return err
-			}
-
-			if !perms {
-				return ctx.Router.OnNoPermissionsCallback(ctx)
-			}
-
-			guild, err := b.Store.Guild(context.Background(), ctx.Event.GuildID)
-			if err != nil {
-				return err
-			}
-
-			var (
-				settingName     = ctx.Args.Get(0)
-				newSetting      = ctx.Args.Get(1)
-				newSettingEmbed interface{}
-				oldSettingEmbed interface{}
-			)
-
-			switch settingName.Raw {
-			case "prefix":
-				if unicode.IsLetter(rune(newSetting.Raw[len(newSetting.Raw)-1])) {
-					newSetting.Raw += " "
-				}
-
-				if len(newSetting.Raw) > 5 {
-					return messages.ErrPrefixTooLong(newSetting.Raw)
-				}
-
-				oldSettingEmbed = guild.Prefix
-				newSettingEmbed = newSetting.Raw
-				guild.Prefix = newSetting.Raw
-			case "limit":
-				limit, err := strconv.Atoi(newSetting.Raw)
-				if err != nil {
-					return messages.ErrParseInt(newSetting.Raw)
-				}
-
-				oldSettingEmbed = guild.Limit
-				newSettingEmbed = limit
-				guild.Limit = limit
-			case "repost":
-				if newSetting.Raw != string(store.GuildRepostEnabled) &&
-					newSetting.Raw != string(store.GuildRepostDisabled) &&
-					newSetting.Raw != string(store.GuildRepostStrict) {
-					return messages.ErrUnknownRepostOption(newSetting.Raw)
-				}
-
-				oldSettingEmbed = guild.Repost
-				newSettingEmbed = newSetting.Raw
-				guild.Repost = store.GuildRepost(newSetting.Raw)
-			case "repost.expiration":
-				dur, err := time.ParseDuration(newSetting.Raw)
-				if err != nil {
-					return messages.ErrParseDuration(newSetting.Raw)
-				}
-
-				if dur < 1*time.Minute || dur > 168*time.Hour {
-					return messages.ErrExpirationOutOfRange(newSetting.Raw)
-				}
-
-				oldSettingEmbed = guild.RepostExpiration
-				newSettingEmbed = dur
-				guild.RepostExpiration = dur
-			case "nsfw":
-				nsfw, err := parseBool(newSetting.Raw)
-				if err != nil {
-					return err
-				}
-
-				oldSettingEmbed = guild.NSFW
-				newSettingEmbed = nsfw
-				guild.NSFW = nsfw
-			case "crosspost":
-				crosspost, err := parseBool(newSetting.Raw)
-				if err != nil {
-					return err
-				}
-
-				oldSettingEmbed = guild.Crosspost
-				newSettingEmbed = crosspost
-				guild.Crosspost = crosspost
-			case "reactions":
-				new, err := parseBool(newSetting.Raw)
-				if err != nil {
-					return err
-				}
-
-				oldSettingEmbed = guild.Reactions
-				newSettingEmbed = new
-				guild.Reactions = new
-			case "pixiv":
-				new, err := parseBool(newSetting.Raw)
-				if err != nil {
-					return err
-				}
-
-				oldSettingEmbed = guild.Pixiv
-				newSettingEmbed = new
-				guild.Pixiv = new
-			case "twitter":
-				new, err := parseBool(newSetting.Raw)
-				if err != nil {
-					return err
-				}
-
-				oldSettingEmbed = guild.Twitter
-				newSettingEmbed = new
-				guild.Twitter = new
-			case "deviant":
-				new, err := parseBool(newSetting.Raw)
-				if err != nil {
-					return err
-				}
-
-				oldSettingEmbed = guild.Deviant
-				newSettingEmbed = new
-				guild.Deviant = new
-			case "artstation":
-				new, err := parseBool(newSetting.Raw)
-				if err != nil {
-					return err
-				}
-
-				oldSettingEmbed = guild.Artstation
-				newSettingEmbed = new
-				guild.Artstation = new
-			case "tags":
-				new, err := parseBool(newSetting.Raw)
-				if err != nil {
-					return err
-				}
-
-				oldSettingEmbed = guild.Tags
-				newSettingEmbed = new
-				guild.Tags = new
-			case "footer":
-				new, err := parseBool(newSetting.Raw)
-				if err != nil {
-					return err
-				}
-
-				oldSettingEmbed = guild.FlavorText
-				newSettingEmbed = new
-				guild.FlavorText = new
-			case "twitter.skip":
-				new, err := parseBool(newSetting.Raw)
-				if err != nil {
-					return err
-				}
-
-				oldSettingEmbed = guild.SkipFirst
-				newSettingEmbed = new
-				guild.SkipFirst = new
-			default:
-				return messages.ErrUnknownSetting(settingName.Raw)
-			}
-
-			_, err = b.Store.UpdateGuild(context.Background(), guild)
-			if err != nil {
-				return err
-			}
-
-			eb := embeds.NewBuilder()
-			eb.InfoTemplate("Successfully changed setting.")
-			eb.AddField("Setting name", settingName.Raw, true)
-			eb.AddField("Old setting", fmt.Sprintf("%v", oldSettingEmbed), true)
-			eb.AddField("New setting", fmt.Sprintf("%v", newSettingEmbed), true)
-
-			return ctx.ReplyEmbed(eb.Finalize())
-		}
-
-		switch {
-		case ctx.Args.Len() == 0:
-			return showSettings()
-		case ctx.Args.Len() >= 2:
-			return changeSetting()
-		default:
-			return messages.ErrIncorrectCmd(ctx.Command)
-		}
-	}
-}
-
-func artchannels(b *bot.Bot) func(ctx *gumi.Ctx) error {
+func artChannels(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
 		switch {
 		case ctx.Args.Len() == 0:
@@ -888,7 +601,7 @@ func artchannels(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	}
 }
 
-func addchannel(b *bot.Bot) func(ctx *gumi.Ctx) error {
+func addChannel(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
 		if err := dgoutils.InitCommand(ctx, 1); err != nil {
 			return err
@@ -970,7 +683,7 @@ func addchannel(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	}
 }
 
-func removechannel(b *bot.Bot) func(ctx *gumi.Ctx) error {
+func removeChannel(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
 		if err := dgoutils.InitCommand(ctx, 1); err != nil {
 			return err

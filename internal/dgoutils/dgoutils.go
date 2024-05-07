@@ -31,7 +31,7 @@ func Trimmer(ctx *gumi.Ctx, n int) string {
 	return strings.Trim(ctx.Args.Get(n).Raw, "<!@#&>")
 }
 
-// Deletes a specified message after a certain time
+// ExpireMessage deletes a specified message after a certain time
 func ExpireMessage(b *bot.Bot, s *discordgo.Session, msg *discordgo.Message) {
 	go func() {
 		time.Sleep(15 * time.Second)

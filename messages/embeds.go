@@ -95,7 +95,7 @@ type UserProfile struct {
 	Title     string
 	Settings  string
 	DM        string
-	Crosspost string
+	CrossPost string
 	Stats     string
 	Groups    string
 	Bookmarks string
@@ -167,7 +167,7 @@ var embeds = map[Language]map[EmbedType]any{
 				Title:            "Features",
 				Repost:           "Repost",
 				RepostExpiration: "Expiration (repost.expiration)",
-				Crosspost:        "Crosspost",
+				Crosspost:        "CrossPost",
 				Reactions:        "Reactions",
 				Tags:             "Tags",
 				FlavourText:      "Footer quotes (footer)",
