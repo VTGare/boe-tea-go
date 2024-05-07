@@ -10,8 +10,6 @@ import (
 
 	"github.com/VTGare/boe-tea-go/bot"
 	"github.com/VTGare/boe-tea-go/commands/flags"
-	"github.com/VTGare/boe-tea-go/internal/arrays"
-	"github.com/VTGare/boe-tea-go/internal/cache"
 	"github.com/VTGare/boe-tea-go/internal/dgoutils"
 	"github.com/VTGare/boe-tea-go/messages"
 	"github.com/VTGare/boe-tea-go/post"
@@ -97,15 +95,15 @@ func artworksGroup(b *bot.Bot) {
 	})
 
 	b.Router.RegisterCmd(&gumi.Command{
-		Name:        "crosspost",
+		Name:        "crosspostexclude",
 		Group:       group,
-		Aliases:     []string{"cp"},
+		Aliases:     []string{"crosspost, cp, cpex"},
 		Description: "Shares an artwork from a URL without crossposting.",
-		Usage:       "bt!crosspost <artwork url> [excluded channels (by default all)]",
-		Example:     "bt!crosspost https://pixiv.net/artworks/86341538 #seiso-channel",
+		Usage:       "bt!crosspostexclude <artwork url> [excluded channels (by default all)]",
+		Example:     "bt!crosspostexclude https://pixiv.net/artworks/86341538 #seiso-channel",
 		GuildOnly:   true,
 		RateLimiter: gumi.NewRateLimiter(5 * time.Second),
-		Exec:        crosspost(b),
+		Exec:        crossPostExclude(b),
 	})
 }
 
@@ -157,7 +155,7 @@ func parseArtworkArgument(arg string) (int, string, bool) {
 	return 0, "", false
 }
 
-func share(b *bot.Bot, s post.SkipMode) func(ctx *gumi.Ctx) error {
+func share(b *bot.Bot, skip post.SkipMode) func(ctx *gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
 		if err := dgoutils.InitCommand(ctx, 1); err != nil {
 			return err
@@ -166,72 +164,16 @@ func share(b *bot.Bot, s post.SkipMode) func(ctx *gumi.Ctx) error {
 		url := dgoutils.Trimmer(ctx, 0)
 		ctx.Args.Remove(0)
 
-		indices := make(map[int]struct{})
-		for _, arg := range strings.Fields(ctx.Args.Raw) {
-			index, err := strconv.Atoi(arg)
-			if err != nil {
-				ran, err := dgoutils.NewRange(arg)
-				if err != nil {
-					return messages.ErrSkipIndexSyntax(arg)
-				}
-
-				for _, index := range ran.Array() {
-					indices[index] = struct{}{}
-				}
-			} else {
-				indices[index] = struct{}{}
-			}
-		}
-
-		p := post.New(b, ctx, url)
-		if len(indices) > 0 {
-			p.SetSkip(indices, s)
-		}
-
-		allSent := make([]*cache.MessageInfo, 0)
-		sent, err := p.Send()
-		if err != nil {
+		p := post.New(b, ctx, skip, url)
+		if err := p.Send(); err != nil {
 			return err
-		}
-
-		allSent = append(allSent, sent...)
-
-		user, _ := b.Store.User(context.Background(), ctx.Event.Author.ID)
-		if user != nil {
-			if group, ok := user.FindGroup(ctx.Event.ChannelID); ok {
-				sent, err := p.Crosspost(user.ID, group)
-				if err != nil {
-					return err
-				}
-
-				allSent = append(allSent, sent...)
-			}
-		}
-
-		if len(allSent) > 0 {
-			b.EmbedCache.Set(
-				ctx.Event.Author.ID,
-				ctx.Event.ChannelID,
-				ctx.Event.ID,
-				true,
-				allSent...,
-			)
-
-			for _, msg := range allSent {
-				b.EmbedCache.Set(
-					ctx.Event.Author.ID,
-					msg.ChannelID,
-					msg.MessageID,
-					false,
-				)
-			}
 		}
 
 		return nil
 	}
 }
 
-func crosspost(b *bot.Bot) func(ctx *gumi.Ctx) error {
+func crossPostExclude(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
 		if err := dgoutils.InitCommand(ctx, 1); err != nil {
 			return err
@@ -240,61 +182,10 @@ func crosspost(b *bot.Bot) func(ctx *gumi.Ctx) error {
 		url := dgoutils.Trimmer(ctx, 0)
 		ctx.Args.Remove(0)
 
-		p := post.New(b, ctx, url)
-
-		allSent := make([]*cache.MessageInfo, 0)
-		sent, err := p.Send()
-		if err != nil {
+		p := post.New(b, ctx, post.SkipModeNone, url)
+		p.ExcludeChannel = true
+		if err := p.Send(); err != nil {
 			return err
-		}
-
-		allSent = append(allSent, sent...)
-
-		user, _ := b.Store.User(context.Background(), ctx.Event.Author.ID)
-		if user != nil {
-			if group, ok := user.FindGroup(ctx.Event.ChannelID); ok {
-				excludedChannels := make(map[string]struct{})
-				for _, arg := range strings.Fields(ctx.Args.Raw) {
-					id := strings.Trim(arg, "<#>")
-					excludedChannels[id] = struct{}{}
-				}
-
-				filtered := arrays.Filter(group.Children, func(s string) bool {
-					_, ok := excludedChannels[s]
-					return !ok
-				})
-
-				// If channels were successfully excluded, crosspost to trimmed channels.
-				// Otherwise, don't crosspost at all.
-				if len(group.Children) > len(filtered) {
-					group.Children = filtered
-					sent, err := p.Crosspost(user.ID, group)
-					if err != nil {
-						return err
-					}
-
-					allSent = append(allSent, sent...)
-				}
-			}
-		}
-
-		if len(allSent) > 0 {
-			b.EmbedCache.Set(
-				ctx.Event.Author.ID,
-				ctx.Event.ChannelID,
-				ctx.Event.ID,
-				true,
-				allSent...,
-			)
-
-			for _, msg := range allSent {
-				b.EmbedCache.Set(
-					ctx.Event.Author.ID,
-					msg.ChannelID,
-					msg.MessageID,
-					false,
-				)
-			}
 		}
 
 		return nil

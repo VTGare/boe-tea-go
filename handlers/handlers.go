@@ -25,6 +25,16 @@ import (
 	"mvdan.cc/xurls/v2"
 )
 
+func RegisterHandlers(b *bot.Bot) {
+	b.AddHandler(OnReady(b))
+	b.AddHandler(OnGuildCreate(b))
+	b.AddHandler(OnGuildDelete(b))
+	b.AddHandler(OnGuildBanAdd(b))
+	b.AddHandler(OnReactionAdd(b))
+	b.AddHandler(OnReactionRemove(b))
+	b.AddHandler(OnMessageRemove(b))
+}
+
 // PrefixResolver returns an array of guild's prefixes and bot mentions.
 func PrefixResolver(b *bot.Bot) func(s *discordgo.Session, m *discordgo.MessageCreate) []string {
 	return func(s *discordgo.Session, m *discordgo.MessageCreate) []string {
@@ -57,69 +67,22 @@ func OnMessage(b *bot.Bot) func(*gumi.Ctx) error {
 			return err
 		}
 
-		allSent := make([]*cache.MessageInfo, 0)
-		if len(guild.ArtChannels) == 0 || arrays.Any(guild.ArtChannels, ctx.Event.ChannelID) {
-			rx := xurls.Strict()
-			urls := rx.FindAllString(ctx.Event.Content, -1)
-
-			if len(urls) == 0 {
-				return nil
-			}
-
-			p := post.New(b, ctx, urls...)
-			sent, err := p.Send()
-			if err != nil {
-				return err
-			}
-
-			allSent = append(allSent, sent...)
-			user, err := b.Store.User(context.Background(), ctx.Event.Author.ID)
-			if err != nil {
-				if !errors.Is(err, mongo.ErrNoDocuments) {
-					return err
-				}
-			} else {
-				if user.Crosspost {
-					group, ok := user.FindGroup(ctx.Event.ChannelID)
-					if ok {
-						sent, _ := p.Crosspost(ctx.Event.Author.ID, group)
-						allSent = append(allSent, sent...)
-					}
-				}
-			}
+		if !(len(guild.ArtChannels) == 0 || arrays.Any(guild.ArtChannels, ctx.Event.ChannelID)) {
+			return nil
 		}
 
-		if len(allSent) > 0 {
-			b.EmbedCache.Set(
-				ctx.Event.Author.ID,
-				ctx.Event.ChannelID,
-				ctx.Event.ID,
-				true,
-				allSent...,
-			)
+		urls := xurls.Strict().FindAllString(ctx.Event.Content, -1)
+		if len(urls) == 0 {
+			return nil
+		}
 
-			for _, msg := range allSent {
-				b.EmbedCache.Set(
-					ctx.Event.Author.ID,
-					msg.ChannelID,
-					msg.MessageID,
-					false,
-				)
-			}
+		p := post.New(b, ctx, post.SkipModeNone, urls...)
+		if err = p.Send(); err != nil {
+			return err
 		}
 
 		return nil
 	}
-}
-
-func RegisterHandlers(b *bot.Bot) {
-	b.AddHandler(OnReady(b))
-	b.AddHandler(OnGuildCreate(b))
-	b.AddHandler(OnGuildDelete(b))
-	b.AddHandler(OnGuildBanAdd(b))
-	b.AddHandler(OnReactionAdd(b))
-	b.AddHandler(OnReactionRemove(b))
-	b.AddHandler(OnMessageRemove(b))
 }
 
 // OnReady logs that bot's up.
@@ -286,19 +249,15 @@ func OnReactionAdd(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageReacti
 				return nil
 			}
 
-			url := ""
-			if len(msg.Embeds) > 0 {
-				embed := msg.Embeds[0]
-				url = embed.URL
-			}
-
-			regex := xurls.Strict()
-			if url == "" {
-				url = regex.FindString(msg.Content)
-			}
-
-			if url == "" {
+			if len(msg.Embeds) < 1 {
 				return nil
+			}
+
+			url := ""
+			if url = msg.Embeds[0].URL; url == "" {
+				if url = xurls.Strict().FindString(msg.Content); url == "" {
+					return nil
+				}
 			}
 
 			msg.Author = dgUser
@@ -310,13 +269,12 @@ func OnReactionAdd(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageReacti
 				Router: b.Router,
 			}
 
-			p := post.New(b, gumiCtx, url)
+			p := post.New(b, gumiCtx, post.SkipModeNone, url)
 			sent := make([]*cache.MessageInfo, 0)
-			user, _ := b.Store.User(ctx, r.UserID)
-			if user != nil {
+
+			if user, _ := b.Store.User(ctx, r.UserID); user != nil {
 				if group, ok := user.FindGroup(r.ChannelID); ok {
-					sent, err = p.Crosspost(user.ID, group)
-					if err != nil {
+					if sent, err = p.CrossPost(user.ID, group); err != nil {
 						return err
 					}
 				}

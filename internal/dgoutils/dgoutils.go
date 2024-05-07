@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/VTGare/boe-tea-go/bot"
+	"github.com/VTGare/boe-tea-go/messages"
 	"github.com/VTGare/gumi"
 	"github.com/bwmarrin/discordgo"
 )

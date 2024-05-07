@@ -8,7 +8,7 @@ import (
 
 	"github.com/VTGare/boe-tea-go/bot"
 	"github.com/VTGare/boe-tea-go/internal/arrays"
-	"github.com/VTGare/boe-tea-go/messages"
+	"github.com/VTGare/boe-tea-go/internal/dgoutils"
 	"github.com/VTGare/embeds"
 	"github.com/VTGare/gumi"
 )
