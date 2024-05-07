@@ -897,8 +897,8 @@ func artworkToEmbed(artwork *store.Artwork, image string, ind, length int) *disc
 }
 
 func initCommand(b *bot.Bot, ctx *gumi.Ctx, argsLen int) (*store.User, error) {
-	if ctx.Args.Len() < argsLen {
-		return nil, messages.ErrIncorrectCmd(ctx.Command)
+	if err := dgoutils.InitCommand(ctx, argsLen); err != nil {
+		return nil, err
 	}
 
 	return b.Store.User(context.Background(), ctx.Event.Author.ID)

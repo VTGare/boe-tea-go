@@ -26,8 +26,8 @@ func ownerGroup(b *bot.Bot) {
 
 func reply(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
-		if ctx.Args.Len() < 2 {
-			return messages.ErrIncorrectCmd(ctx.Command)
+		if err := dgoutils.InitCommand(ctx, 2); err != nil {
+			return err
 		}
 
 		userID := dgoutils.Trimmer(ctx, 0)

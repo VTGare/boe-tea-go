@@ -111,8 +111,8 @@ func artworksGroup(b *bot.Bot) {
 
 func artwork(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
-		if ctx.Args.Len() == 0 {
-			return messages.ErrIncorrectCmd(ctx.Command)
+		if err := dgoutils.InitCommand(ctx, 1); err != nil {
+			return err
 		}
 
 		arg := ctx.Args.Get(0).Raw
@@ -159,8 +159,8 @@ func parseArtworkArgument(arg string) (int, string, bool) {
 
 func share(b *bot.Bot, s post.SkipMode) func(ctx *gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
-		if ctx.Args.Len() < 1 {
-			return messages.ErrIncorrectCmd(ctx.Command)
+		if err := dgoutils.InitCommand(ctx, 1); err != nil {
+			return err
 		}
 
 		url := dgoutils.Trimmer(ctx, 0)
@@ -233,8 +233,8 @@ func share(b *bot.Bot, s post.SkipMode) func(ctx *gumi.Ctx) error {
 
 func crosspost(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
-		if ctx.Args.Len() < 1 {
-			return messages.ErrIncorrectCmd(ctx.Command)
+		if err := dgoutils.InitCommand(ctx, 1); err != nil {
+			return err
 		}
 
 		url := dgoutils.Trimmer(ctx, 0)
@@ -367,8 +367,8 @@ func leaderboard(b *bot.Bot) func(ctx *gumi.Ctx) error {
 
 func search(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
-		if ctx.Args.Len() < 1 {
-			return messages.ErrIncorrectCmd(ctx.Command)
+		if err := dgoutils.InitCommand(ctx, 1); err != nil {
+			return err
 		}
 
 		// Remove $'s to sanitize the input

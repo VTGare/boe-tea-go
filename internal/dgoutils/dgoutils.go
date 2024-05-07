@@ -18,6 +18,14 @@ var (
 	ErrRangeSyntax = errors.New("range low is higher than range high")
 )
 
+func InitCommand(ctx *gumi.Ctx, argsLen int) error {
+	if ctx.Args.Len() < argsLen {
+		return messages.ErrIncorrectCmd(ctx.Command)
+	}
+
+	return nil
+}
+
 // Trimmer trims <> in case someone wraps the link in it, and characters '!', '@', '#', and '&' for channels and user mentions.
 func Trimmer(ctx *gumi.Ctx, n int) string {
 	return strings.Trim(ctx.Args.Get(n).Raw, "<!@#&>")

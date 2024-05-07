@@ -57,8 +57,8 @@ func sourceGroup(b *bot.Bot) {
 
 func nhentai(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
-		if ctx.Args.Len() == 0 {
-			return messages.ErrIncorrectCmd(ctx.Command)
+		if err := dgoutils.InitCommand(ctx, 1); err != nil {
+			return err
 		}
 
 		id := ctx.Args.Get(0).Raw

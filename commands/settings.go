@@ -275,8 +275,8 @@ func about(*bot.Bot) func(ctx *gumi.Ctx) error {
 
 func feedback(*bot.Bot) func(ctx *gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
-		if ctx.Args.Len() == 0 {
-			return messages.ErrIncorrectCmd(ctx.Command)
+		if err := dgoutils.InitCommand(ctx, 1); err != nil {
+			return err
 		}
 
 		eb := embeds.NewBuilder()
@@ -890,8 +890,8 @@ func artchannels(b *bot.Bot) func(ctx *gumi.Ctx) error {
 
 func addchannel(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
-		if ctx.Args.Len() == 0 {
-			return messages.ErrIncorrectCmd(ctx.Command)
+		if err := dgoutils.InitCommand(ctx, 1); err != nil {
+			return err
 		}
 
 		guild, err := b.Store.Guild(context.Background(), ctx.Event.GuildID)
@@ -972,8 +972,8 @@ func addchannel(b *bot.Bot) func(ctx *gumi.Ctx) error {
 
 func removechannel(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
-		if ctx.Args.Len() == 0 {
-			return messages.ErrIncorrectCmd(ctx.Command)
+		if err := dgoutils.InitCommand(ctx, 1); err != nil {
+			return err
 		}
 
 		guild, err := b.Store.Guild(context.Background(), ctx.Event.GuildID)
