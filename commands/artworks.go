@@ -164,7 +164,28 @@ func share(b *bot.Bot, skip post.SkipMode) func(ctx *gumi.Ctx) error {
 		url := dgoutils.Trimmer(ctx, 0)
 		ctx.Args.Remove(0)
 
+		indices := make(map[int]struct{})
+		for _, arg := range strings.Fields(ctx.Args.Raw) {
+			index, err := strconv.Atoi(arg)
+			if err != nil {
+				ran, err := dgoutils.NewRange(arg)
+				if err != nil {
+					return messages.ErrSkipIndexSyntax(arg)
+				}
+
+				for _, index := range ran.Array() {
+					indices[index] = struct{}{}
+				}
+			} else {
+				indices[index] = struct{}{}
+			}
+		}
+
 		p := post.New(b, ctx, skip, url)
+		if len(indices) > 0 {
+			p.Indices = indices
+		}
+
 		if err := p.Send(); err != nil {
 			return err
 		}

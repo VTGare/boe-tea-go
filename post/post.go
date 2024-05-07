@@ -468,10 +468,7 @@ func (p *Post) sendMessages(guild *store.Guild, channelID string, artworks []art
 	}
 
 	// It only happens from commands so only first artwork should be affected.
-	if allMessages[0], err = p.skipArtworks(allMessages[0]); err != nil {
-		return nil, err
-	}
-
+	allMessages[0] = p.skipArtworks(allMessages[0])
 	sendMessage := func(message *discordgo.MessageSend) error {
 		s := p.Ctx.Session
 		if p.CrossPostMode {
@@ -574,30 +571,7 @@ func (p *Post) generateMessages(guild *store.Guild, artworks []artworks.Artwork,
 	return messageSends, nil
 }
 
-func (p *Post) skipArtworks(embeds []*discordgo.MessageSend) ([]*discordgo.MessageSend, error) {
-	if p.SkipMode != SkipModeNone {
-		indices := make(map[int]struct{})
-		for _, arg := range strings.Fields(p.Ctx.Args.Raw) {
-			index, err := strconv.Atoi(arg)
-			if err != nil {
-				ran, err := dgoutils.NewRange(arg)
-				if err != nil {
-					return nil, messages.ErrSkipIndexSyntax(arg)
-				}
-
-				for _, index := range ran.Array() {
-					indices[index] = struct{}{}
-				}
-			} else {
-				indices[index] = struct{}{}
-			}
-		}
-
-		if len(indices) > 0 {
-			p.Indices = indices
-		}
-	}
-
+func (p *Post) skipArtworks(embeds []*discordgo.MessageSend) []*discordgo.MessageSend {
 	filtered := make([]*discordgo.MessageSend, 0)
 	switch p.SkipMode {
 	case SkipModeExclude:
@@ -613,10 +587,10 @@ func (p *Post) skipArtworks(embeds []*discordgo.MessageSend) ([]*discordgo.Messa
 			}
 		}
 	case SkipModeNone:
-		return embeds, nil
+		return embeds
 	}
 
-	return filtered, nil
+	return filtered
 }
 
 func (p *Post) skipFirst(guild *store.Guild, a artworks.Artwork) bool {
