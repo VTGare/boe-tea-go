@@ -131,7 +131,7 @@ var _ = Describe("Skip Pages Tests", func() {
 		}
 
 		post.SkipMode = SkipModeInclude
-		result, _ := post.skipArtworks(artworks)
+		result := post.skipArtworks(artworks)
 
 		Expect(result).Should(And(
 			HaveLen(2),
@@ -145,7 +145,7 @@ var _ = Describe("Skip Pages Tests", func() {
 		}
 
 		post.SkipMode = SkipModeInclude
-		result, _ := post.skipArtworks(artworks)
+		result := post.skipArtworks(artworks)
 
 		Expect(result).Should(And(
 			HaveLen(2),
@@ -159,7 +159,7 @@ var _ = Describe("Skip Pages Tests", func() {
 		}
 
 		post.SkipMode = SkipModeExclude
-		result, _ := post.skipArtworks(artworks)
+		result := post.skipArtworks(artworks)
 
 		Expect(result).Should(And(
 			HaveLen(2),
@@ -173,7 +173,7 @@ var _ = Describe("Skip Pages Tests", func() {
 		}
 
 		post.SkipMode = SkipModeExclude
-		result, _ := post.skipArtworks(artworks)
+		result := post.skipArtworks(artworks)
 
 		Expect(result).Should(And(
 			HaveLen(4),
@@ -190,7 +190,7 @@ var _ = Describe("Skip Pages Tests", func() {
 		}
 
 		post.SkipMode = SkipModeInclude
-		result, _ := post.skipArtworks(artworks)
+		result := post.skipArtworks(artworks)
 
 		Expect(result).Should(HaveLen(0))
 	})
