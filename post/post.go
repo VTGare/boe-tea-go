@@ -9,9 +9,6 @@ import (
 	"strings"
 	"sync"
 
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.uber.org/zap"
-
 	"github.com/VTGare/boe-tea-go/artworks"
 	"github.com/VTGare/boe-tea-go/artworks/twitter"
 	"github.com/VTGare/boe-tea-go/bot"
@@ -24,6 +21,7 @@ import (
 	"github.com/VTGare/embeds"
 	"github.com/VTGare/gumi"
 	"github.com/bwmarrin/discordgo"
+	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -66,12 +64,12 @@ func New(bot *bot.Bot, ctx *gumi.Ctx, skip SkipMode, urls ...string) *Post {
 }
 
 func (p *Post) Send() error {
-	guild, err := p.Bot.Store.Guild(context.Background(), p.Ctx.Event.GuildID)
+	guild, err := p.Bot.Store.Guild(p.Bot.Context, p.Ctx.Event.GuildID)
 	if err != nil {
 		return fmt.Errorf("failed to get a guild: %w", err)
 	}
 
-	user, err := p.Bot.Store.User(context.Background(), p.Ctx.Event.Author.ID)
+	user, err := p.Bot.Store.User(p.Bot.Context, p.Ctx.Event.Author.ID)
 	if err != nil {
 		return fmt.Errorf("failed to get a user: %w", err)
 	}
@@ -101,11 +99,6 @@ func (p *Post) Send() error {
 
 	allSent := make([]*cache.MessageInfo, 0)
 	allSent = append(allSent, sent...)
-
-	user, err = p.Bot.Store.User(context.Background(), p.Ctx.Event.Author.ID)
-	if err != nil && !errors.Is(err, mongo.ErrNoDocuments) {
-		return err
-	}
 
 	if group, ok := user.FindGroup(p.Ctx.Event.ChannelID); user.Crosspost && ok {
 		// If channels were successfully excluded, crosspost to trimmed channels.
@@ -159,7 +152,7 @@ func (p *Post) Send() error {
 }
 
 func (p *Post) CrossPost(userID string, group *store.Group) ([]*cache.MessageInfo, error) {
-	user, err := p.Bot.Store.User(context.Background(), userID)
+	user, err := p.Bot.Store.User(p.Bot.Context, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -195,14 +188,14 @@ func (p *Post) CrossPost(userID string, group *store.Group) ([]*cache.MessageInf
 
 			if _, err := p.Ctx.Session.GuildMember(ch.GuildID, userID); err != nil {
 				log.Debug("member left the server, removing crosspost channel")
-				if _, err := p.Bot.Store.DeleteCrosspostChannel(context.Background(), userID, group.Name, channelID); err != nil {
+				if _, err := p.Bot.Store.DeleteCrosspostChannel(p.Bot.Context, userID, group.Name, channelID); err != nil {
 					log.With("error", err).Error("failed to remove a channel from user's group")
 				}
 
 				return
 			}
 
-			guild, err := p.Bot.Store.Guild(context.Background(), ch.GuildID)
+			guild, err := p.Bot.Store.Guild(p.Bot.Context, ch.GuildID)
 			if err != nil {
 				log.Infof("Couldn't crosspost. Find Guild error: %v", err)
 				return

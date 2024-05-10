@@ -1,7 +1,6 @@
 package commands
 
 import (
-	"context"
 	"errors"
 	"net/url"
 	"strconv"
@@ -119,7 +118,7 @@ func artwork(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			return messages.ErrIncorrectCmd(ctx.Command)
 		}
 
-		artwork, err := b.Store.Artwork(context.Background(), id, url)
+		artwork, err := b.Store.Artwork(b.Context, id, url)
 		if err != nil {
 			switch {
 			case errors.Is(err, mongo.ErrNoDocuments):
@@ -248,7 +247,7 @@ func leaderboard(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			Sort:  store.ByPopularity,
 		}
 
-		artworks, err := b.Store.SearchArtworks(context.Background(), filter, opts)
+		artworks, err := b.Store.SearchArtworks(b.Context, filter, opts)
 		if err != nil {
 			return err
 		}
@@ -329,7 +328,7 @@ func search(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			Sort:  sort,
 		}
 
-		artworks, err := b.Store.SearchArtworks(context.Background(), filter, opts)
+		artworks, err := b.Store.SearchArtworks(b.Context, filter, opts)
 		if err != nil {
 			return err
 		}

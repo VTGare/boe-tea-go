@@ -253,7 +253,7 @@ func newGroup(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			return messages.ErrNewGroup(name, parent)
 		}
 
-		_, err = b.Store.CreateCrosspostGroup(context.Background(), user.ID, &store.Group{
+		_, err = b.Store.CreateCrosspostGroup(b.Context, user.ID, &store.Group{
 			Name:     name,
 			Parent:   parent,
 			Children: []string{},
@@ -309,7 +309,7 @@ func newPair(b *bot.Bot) func(ctx *gumi.Ctx) error {
 		}
 
 		sort.Strings(children)
-		_, err = b.Store.CreateCrosspostPair(context.Background(), user.ID, &store.Group{
+		_, err = b.Store.CreateCrosspostPair(b.Context, user.ID, &store.Group{
 			Name:     name,
 			Children: children,
 			IsPair:   true,
@@ -334,7 +334,7 @@ func delGroup(b *bot.Bot) func(ctx *gumi.Ctx) error {
 		// Name of crosspost group.
 		name := ctx.Args.Get(0).Raw
 
-		_, err = b.Store.DeleteCrosspostGroup(context.Background(), user.ID, name)
+		_, err = b.Store.DeleteCrosspostGroup(b.Context, user.ID, name)
 		if err := handleStoreError(err, messages.ErrDeleteGroup(name)); err != nil {
 			return err
 		}
@@ -390,7 +390,7 @@ func push(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			}
 
 			_, err = b.Store.AddCrosspostChannel(
-				context.Background(),
+				b.Context,
 				user.ID,
 				name,
 				channelID,
@@ -441,7 +441,7 @@ func remove(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			}
 
 			_, err = b.Store.DeleteCrosspostChannel(
-				context.Background(),
+				b.Context,
 				user.ID,
 				name,
 				channelID,
@@ -494,7 +494,7 @@ func editParent(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			return messages.ErrUserEditParentFail(group.Parent, dest)
 		}
 
-		_, err = b.Store.EditCrosspostParent(context.Background(), user.ID, name, dest)
+		_, err = b.Store.EditCrosspostParent(b.Context, user.ID, name, dest)
 		if err := handleStoreError(err, messages.ErrUserEditParentFail(group.Parent, dest)); err != nil {
 			return err
 		}
@@ -522,7 +522,7 @@ func rename(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			return messages.ErrGroupExistFail(src)
 		}
 
-		_, err = b.Store.RenameCrosspostGroup(context.Background(), user.ID, src, dest)
+		_, err = b.Store.RenameCrosspostGroup(b.Context, user.ID, src, dest)
 		if err != nil {
 			return messages.ErrUserEditGroupFail(cmd, src, dest)
 		}
@@ -568,7 +568,7 @@ func copyGroup(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			}),
 		}
 
-		_, err = b.Store.CreateCrosspostGroup(context.Background(), user.ID, newGroup)
+		_, err = b.Store.CreateCrosspostGroup(b.Context, user.ID, newGroup)
 		if err != nil {
 			return messages.ErrUserEditGroupFail(cmd, src, dest)
 		}
@@ -716,12 +716,12 @@ func userSet(b *bot.Bot) func(ctx *gumi.Ctx) error {
 }
 
 func showUserProfile(b *bot.Bot, ctx *gumi.Ctx) error {
-	user, err := b.Store.User(context.Background(), ctx.Event.Author.ID)
+	user, err := b.Store.User(b.Context, ctx.Event.Author.ID)
 	if err != nil {
 		return err
 	}
 
-	bookmarks, err := b.Store.CountBookmarks(context.Background(), ctx.Event.Author.ID)
+	bookmarks, err := b.Store.CountBookmarks(b.Context, ctx.Event.Author.ID)
 	if err != nil {
 		return err
 	}
@@ -753,7 +753,7 @@ func showUserProfile(b *bot.Bot, ctx *gumi.Ctx) error {
 }
 
 func changeUserSettings(b *bot.Bot, ctx *gumi.Ctx) error {
-	user, err := b.Store.User(context.Background(), ctx.Event.Author.ID)
+	user, err := b.Store.User(b.Context, ctx.Event.Author.ID)
 	if err != nil {
 		return err
 	}
@@ -798,7 +798,7 @@ func changeUserSettings(b *bot.Bot, ctx *gumi.Ctx) error {
 		return messages.ErrUnknownUserSetting(settingName.Raw)
 	}
 
-	_, err = b.Store.UpdateUser(context.Background(), user)
+	_, err = b.Store.UpdateUser(b.Context, user)
 	if err != nil {
 		return err
 	}
@@ -832,7 +832,7 @@ func unfav(b *bot.Bot) func(ctx *gumi.Ctx) error {
 
 		var artwork *store.Artwork
 		if url != "" {
-			artwork, err = b.Store.Artwork(context.Background(), 0, url)
+			artwork, err = b.Store.Artwork(b.Context, 0, url)
 			if err != nil {
 				return messages.ErrArtworkNotFound(query)
 			}
@@ -840,7 +840,7 @@ func unfav(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			id = artwork.ID
 		}
 
-		deleted, err := b.Store.DeleteBookmark(context.Background(), &store.Bookmark{UserID: ctx.Event.Author.ID, ArtworkID: id})
+		deleted, err := b.Store.DeleteBookmark(b.Context, &store.Bookmark{UserID: ctx.Event.Author.ID, ArtworkID: id})
 		if err != nil {
 			return messages.ErrUserUnbookmarkFail(query, err)
 		}
@@ -901,7 +901,7 @@ func initCommand(b *bot.Bot, ctx *gumi.Ctx, argsLen int) (*store.User, error) {
 		return nil, err
 	}
 
-	return b.Store.User(context.Background(), ctx.Event.Author.ID)
+	return b.Store.User(b.Context, ctx.Event.Author.ID)
 }
 
 // handleStoreError returns an error if any store error is raised.

@@ -1,7 +1,6 @@
 package commands
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"runtime"
@@ -139,7 +138,7 @@ func set(b *bot.Bot) func(ctx *gumi.Ctx) error {
 				return messages.ErrGuildNotFound(err, ctx.Event.GuildID)
 			}
 
-			guild, err := b.Store.Guild(context.Background(), gd.ID)
+			guild, err := b.Store.Guild(b.Context, gd.ID)
 			if err != nil {
 				switch {
 				case errors.Is(err, mongo.ErrNoDocuments):
@@ -242,7 +241,7 @@ func set(b *bot.Bot) func(ctx *gumi.Ctx) error {
 				return ctx.Router.OnNoPermissionsCallback(ctx)
 			}
 
-			guild, err := b.Store.Guild(context.Background(), ctx.Event.GuildID)
+			guild, err := b.Store.Guild(b.Context, ctx.Event.GuildID)
 			if err != nil {
 				return err
 			}
@@ -373,7 +372,7 @@ func set(b *bot.Bot) func(ctx *gumi.Ctx) error {
 				return messages.ErrUnknownSetting(settingName.Raw)
 			}
 
-			_, err = b.Store.UpdateGuild(context.Background(), guild)
+			_, err = b.Store.UpdateGuild(b.Context, guild)
 			if err != nil {
 				return err
 			}
@@ -683,7 +682,7 @@ func artChannels(b *bot.Bot) func(ctx *gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
 		switch {
 		case ctx.Args.Len() == 0:
-			guild, err := b.Store.Guild(context.Background(), ctx.Event.GuildID)
+			guild, err := b.Store.Guild(b.Context, ctx.Event.GuildID)
 			if err != nil {
 				return messages.ErrGuildNotFound(err, ctx.Event.GuildID)
 			}
@@ -762,7 +761,7 @@ func artChannels(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			switch action.Raw {
 			case "add":
 				execute = func(guildID string, channels []string) error {
-					if _, err := b.Store.AddArtChannels(context.Background(), guildID, channels); err != nil {
+					if _, err := b.Store.AddArtChannels(b.Context, guildID, channels); err != nil {
 						return err
 					}
 
@@ -787,7 +786,7 @@ func artChannels(b *bot.Bot) func(ctx *gumi.Ctx) error {
 				}
 			case "remove":
 				execute = func(guildID string, channels []string) error {
-					if _, err := b.Store.DeleteArtChannels(context.Background(), guildID, channels); err != nil {
+					if _, err := b.Store.DeleteArtChannels(b.Context, guildID, channels); err != nil {
 						return err
 					}
 
@@ -812,7 +811,7 @@ func artChannels(b *bot.Bot) func(ctx *gumi.Ctx) error {
 				}
 			}
 
-			guild, err := b.Store.Guild(context.Background(), ctx.Event.GuildID)
+			guild, err := b.Store.Guild(b.Context, ctx.Event.GuildID)
 			if err != nil {
 				return messages.ErrGuildNotFound(err, ctx.Event.GuildID)
 			}
@@ -874,7 +873,7 @@ func addChannel(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			return err
 		}
 
-		guild, err := b.Store.Guild(context.Background(), ctx.Event.GuildID)
+		guild, err := b.Store.Guild(b.Context, ctx.Event.GuildID)
 		if err != nil {
 			return messages.ErrGuildNotFound(err, ctx.Event.GuildID)
 		}
@@ -936,7 +935,7 @@ func addChannel(b *bot.Bot) func(ctx *gumi.Ctx) error {
 		}
 
 		_, err = b.Store.AddArtChannels(
-			context.Background(),
+			b.Context,
 			guild.ID,
 			channels,
 		)
@@ -956,7 +955,7 @@ func removeChannel(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			return err
 		}
 
-		guild, err := b.Store.Guild(context.Background(), ctx.Event.GuildID)
+		guild, err := b.Store.Guild(b.Context, ctx.Event.GuildID)
 		if err != nil {
 			return messages.ErrGuildNotFound(err, ctx.Event.GuildID)
 		}
@@ -996,7 +995,7 @@ func removeChannel(b *bot.Bot) func(ctx *gumi.Ctx) error {
 		}
 
 		_, err = b.Store.DeleteArtChannels(
-			context.Background(),
+			b.Context,
 			guild.ID,
 			channels,
 		)

@@ -125,7 +125,7 @@ func main() {
 	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
 	<-sc
 
-	store.Close(context.Background())
+	store.Close(b.Context)
 	repostDetector.Close()
 	b.Close()
 }

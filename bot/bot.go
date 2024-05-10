@@ -1,6 +1,7 @@
 package bot
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -27,6 +28,7 @@ type Bot struct {
 	Stats     *stats.Stats
 	StartTime time.Time
 	Router    *gumi.Router
+	Context   context.Context
 
 	// caches
 	BannedUsers  *ttlcache.Cache
@@ -63,9 +65,13 @@ func New(config *config.Config, store store.Store, logger *zap.SugaredLogger, rd
 		return nil, fmt.Errorf("failed to create nhentai api client: %w", err)
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
 	return &Bot{
 		Log:            logger,
 		Config:         config,
+		Context:        ctx,
 		RepostDetector: rd,
 		BannedUsers:    banned,
 		EmbedCache:     cache.NewEmbedCache(),

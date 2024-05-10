@@ -62,7 +62,7 @@ func OnPanic(b *bot.Bot) func(*gumi.Ctx, any) {
 // OnMessage is executed on every message that isn't a command.
 func OnMessage(b *bot.Bot) func(*gumi.Ctx) error {
 	return func(ctx *gumi.Ctx) error {
-		guild, err := b.Store.Guild(context.Background(), ctx.Event.GuildID)
+		guild, err := b.Store.Guild(b.Context, ctx.Event.GuildID)
 		if err != nil {
 			return err
 		}
@@ -95,10 +95,10 @@ func OnReady(b *bot.Bot) func(*discordgo.Session, *discordgo.Ready) {
 // OnGuildCreate loads server configuration on launch and creates new database entries when joining a new server.
 func OnGuildCreate(b *bot.Bot) func(*discordgo.Session, *discordgo.GuildCreate) {
 	return func(s *discordgo.Session, g *discordgo.GuildCreate) {
-		_, err := b.Store.Guild(context.Background(), g.ID)
+		_, err := b.Store.Guild(b.Context, g.ID)
 		if errors.Is(err, mongo.ErrNoDocuments) {
 			b.Log.With("guild", g.Name, "guild_id", g.ID).Info("joined a guild")
-			_, err := b.Store.CreateGuild(context.Background(), g.ID)
+			_, err := b.Store.CreateGuild(b.Context, g.ID)
 			if err != nil {
 				b.Log.With("error", err, "guild_id", g.ID).Error("failed to insert guild")
 			}
