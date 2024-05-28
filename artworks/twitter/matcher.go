@@ -17,7 +17,7 @@ func (twitterMatcher) Match(s string) (string, bool) {
 		return "", false
 	}
 
-	if ok, _ := regexp.MatchString("^(?:mobile\.)?(?:(?:fix(?:up|v))?x|(?:[fv]x)?twitter)\\.com$", u.Host); !ok {
+	if ok, _ := regexp.MatchString("^(?:mobile\\.)?(?:(?:fix(?:up|v))?x|(?:[fv]x)?twitter)\\.com$", u.Host); !ok {
 		return "", false
 	}
 
