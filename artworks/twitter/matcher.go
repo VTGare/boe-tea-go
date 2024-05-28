@@ -2,6 +2,7 @@ package twitter
 
 import (
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -16,7 +17,7 @@ func (twitterMatcher) Match(s string) (string, bool) {
 		return "", false
 	}
 
-	if !strings.Contains(u.Host, "twitter.com") && u.Host != "x.com" {
+	if ok, _ := regexp.MatchString("^(?:(?:fix(?:up|v))?x|(?:[fv]x)?twitter)\\.com$", u.Host); !ok {
 		return "", false
 	}
 
