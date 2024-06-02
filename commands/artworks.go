@@ -109,10 +109,10 @@ func artworksGroup(b *bot.Bot) {
 
 func artwork(b *bot.Bot) func(*gumi.Ctx) error {
 	return func(gctx *gumi.Ctx) error {
-		if gctx.Args.Len() < 1 {
-			return messages.ErrIncorrectCmd(gctx.Command)
+		if err := dgoutils.ValidateArgs(gctx, 1); err != nil {
+			return err
 		}
-
+	
 		arg := gctx.Args.Get(0).Raw
 		id, url, ok := parseArtworkArgument(arg)
 		if !ok {
