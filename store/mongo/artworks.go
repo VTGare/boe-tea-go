@@ -87,7 +87,7 @@ func (a *artworkStore) CreateArtwork(ctx context.Context, artwork *store.Artwork
 
 	defer session.EndSession(ctx)
 
-	callback := func(sessionContext mongo.SessionContext) (interface{}, error) {
+	callback := func(sessionContext mongo.SessionContext) (any, error) {
 		sres := a.db.Collection("counters").FindOneAndUpdate(
 			sessionContext,
 			bson.M{"_id": "artworks"},

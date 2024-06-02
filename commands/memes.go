@@ -8,7 +8,7 @@ import (
 
 	"github.com/VTGare/boe-tea-go/bot"
 	"github.com/VTGare/boe-tea-go/internal/arrays"
-	"github.com/VTGare/boe-tea-go/messages"
+	"github.com/VTGare/boe-tea-go/internal/dgoutils"
 	"github.com/VTGare/embeds"
 	"github.com/VTGare/gumi"
 )
@@ -50,7 +50,7 @@ func memesGroup(b *bot.Bot) {
 		Usage:       "You know how to use it.",
 		Example:     "catJAM",
 		RateLimiter: gumi.NewRateLimiter(15 * time.Second),
-		Exec:        brainpower(b),
+		Exec:        brainPower(b),
 	})
 
 	b.Router.RegisterCmd(&gumi.Command{
@@ -77,7 +77,7 @@ func memesGroup(b *bot.Bot) {
 		Description: "Who is Faker?",
 		Usage:       "bt!whois <person 1>",
 		Example:     "bt!whois Faker",
-		Exec:        whois(b),
+		Exec:        whoIs(b),
 	})
 
 	b.Router.RegisterCmd(&gumi.Command{
@@ -111,66 +111,66 @@ func memesGroup(b *bot.Bot) {
 	})
 }
 
-func brainpower(*bot.Bot) func(ctx *gumi.Ctx) error {
-	return func(ctx *gumi.Ctx) error {
-		return ctx.Reply(
+func brainPower(*bot.Bot) func(*gumi.Ctx) error {
+	return func(gctx *gumi.Ctx) error {
+		return gctx.Reply(
 			"O-oooooooooo AAAAE-A-A-I-A-U- JO-oooooooooooo AAE-O-A-A-U-U-A- " +
 				"E-eee-ee-eee AAAAE-A-E-I-E-A-JO-ooo-oo-oo-oo EEEEO-A-AAA-AAAA",
 		)
 	}
 }
 
-func borgar(*bot.Bot) func(ctx *gumi.Ctx) error {
-	return func(ctx *gumi.Ctx) error {
+func borgar(*bot.Bot) func(*gumi.Ctx) error {
+	return func(gctx *gumi.Ctx) error {
 		eb := embeds.NewBuilder()
 		eb.Title("Cute dino girl enjoys borgar.").
 			Description("🦕🍔").
 			Image("https://i.kym-cdn.com/photos/images/original/001/568/282/ef2.gif")
-		return ctx.ReplyEmbed(eb.Finalize())
+		return gctx.ReplyEmbed(eb.Finalize())
 	}
 }
 
-func nuggets(*bot.Bot) func(ctx *gumi.Ctx) error {
-	return func(ctx *gumi.Ctx) error {
-		if ctx.Args.Len() < 2 {
-			return messages.ErrIncorrectCmd(ctx.Command)
+func nuggets(*bot.Bot) func(*gumi.Ctx) error {
+	return func(gctx *gumi.Ctx) error {
+		if err := dgoutils.ValidateArgs(gctx, 2); err != nil {
+			return err
 		}
 
 		n := &struct {
 			Amelia string
 			Ryo    string
-		}{Amelia: ctx.Args.Get(1).Raw, Ryo: ctx.Args.Get(0).Raw}
+		}{Amelia: gctx.Args.Get(1).Raw, Ryo: gctx.Args.Get(0).Raw}
 
 		buf := new(bytes.Buffer)
 		if err := nuggetsTemplatePart1.Execute(buf, n); err != nil {
 			return err
 		}
 
-		return ctx.Reply(buf.String())
+		return gctx.Reply(buf.String())
 	}
 }
 
-func whois(*bot.Bot) func(ctx *gumi.Ctx) error {
-	return func(ctx *gumi.Ctx) error {
-		if ctx.Args.Len() < 1 {
-			return messages.ErrIncorrectCmd(ctx.Command)
+func whoIs(*bot.Bot) func(*gumi.Ctx) error {
+	return func(gctx *gumi.Ctx) error {
+		if err := dgoutils.ValidateArgs(gctx, 1); err != nil {
+			return err
 		}
 
 		n := &struct {
 			Faker string
-		}{Faker: ctx.Args.Get(0).Raw}
+		}{Faker: gctx.Args.Get(0).Raw}
 
 		buf := new(bytes.Buffer)
 		if err := whoisTemplate.Execute(buf, n); err != nil {
 			return err
 		}
 
-		return ctx.Reply(buf.String())
+		return gctx.Reply(buf.String())
 	}
 }
 
-func gamba(*bot.Bot) func(ctx *gumi.Ctx) error {
-	return func(ctx *gumi.Ctx) error {
+func gamba(*bot.Bot) func(*gumi.Ctx) error {
+	return func(gctx *gumi.Ctx) error {
 		getItTwisted := rand.Intn(10) != 0
 
 		var text string
@@ -180,18 +180,18 @@ func gamba(*bot.Bot) func(ctx *gumi.Ctx) error {
 			text = `🦍 🗣️ DO NOT GET IT TWISTED 🌪️ , DO NOT GAMBLE 🚫 . DO NOT START GAMBLING ❌ . GAMBLING IS ENTERTAINMENT 🎰 AND ENTERTAINMENT ONLY 👍 . YOU WONT BREAK EVEN 🛑 , YOU WONT WIN ⚠️ ️. YOU WONT DO ANY OF THAT 💯 , YOU UNDERSTAND ⁉️ ️ YOU WILL ONLY GO INTO DEBT 💵 📉 AND RUIN YOUR FUCKING LIFE 😵`
 		}
 
-		return ctx.Reply(text)
+		return gctx.Reply(text)
 	}
 }
 
-func cake(*bot.Bot) func(ctx *gumi.Ctx) error {
-	return func(ctx *gumi.Ctx) error {
+func cake(*bot.Bot) func(*gumi.Ctx) error {
+	return func(gctx *gumi.Ctx) error {
 		eb := embeds.NewBuilder()
 		eb.Title("Local God eats cake").
 			Description("🙏🍰").
 			Image("https://cdn.discordapp.com/attachments/1129829799179853914/1160609012115578970/haruhi-haruhi-suzumiya.gif")
 
-		return ctx.ReplyEmbed(eb.Finalize())
+		return gctx.ReplyEmbed(eb.Finalize())
 	}
 }
 
@@ -202,8 +202,8 @@ var frenzyImages = []string{
 	"https://static.wikia.nocookie.net/to-be-a-power-in-the-shadows/images/9/9f/Red_Moon-_Anime.png",
 }
 
-func frenzy(*bot.Bot) func(ctx *gumi.Ctx) error {
-	return func(ctx *gumi.Ctx) error {
+func frenzy(*bot.Bot) func(*gumi.Ctx) error {
+	return func(gctx *gumi.Ctx) error {
 		image := arrays.RandomElement(frenzyImages)
 
 		eb := embeds.NewBuilder()
@@ -212,6 +212,6 @@ func frenzy(*bot.Bot) func(ctx *gumi.Ctx) error {
 			Color(0x880808).
 			Image(*image)
 
-		return ctx.ReplyEmbed(eb.Finalize())
+		return gctx.ReplyEmbed(eb.Finalize())
 	}
 }

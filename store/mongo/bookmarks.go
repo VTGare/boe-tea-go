@@ -74,7 +74,7 @@ func (b *bookmarkStore) AddBookmark(ctx context.Context, bookmark *store.Bookmar
 
 	defer session.EndSession(ctx)
 
-	callback := func(sessionCtx mongo.SessionContext) (interface{}, error) {
+	callback := func(sessionCtx mongo.SessionContext) (any, error) {
 		err := b.col.FindOne(ctx, bson.M{"user_id": bookmark.UserID, "artwork_id": bookmark.ArtworkID}).Err()
 		if err == nil {
 			return false, nil
@@ -120,7 +120,7 @@ func (b *bookmarkStore) DeleteBookmark(ctx context.Context, bookmark *store.Book
 
 	defer session.EndSession(ctx)
 
-	callback := func(sessionCtx mongo.SessionContext) (interface{}, error) {
+	callback := func(sessionCtx mongo.SessionContext) (any, error) {
 		res, err := b.col.DeleteOne(ctx, bson.M{"user_id": bookmark.UserID, "artwork_id": bookmark.ArtworkID})
 		if err != nil {
 			return false, fmt.Errorf("failed to delete bookmark: %w", err)

@@ -26,10 +26,7 @@ func NewRedis(addr string) (Detector, error) {
 	return &redisDetector{client}, nil
 }
 
-func (rd redisDetector) Find(channelID, artworkID string) (*Repost, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-	defer cancel()
-
+func (rd redisDetector) Find(ctx context.Context, channelID, artworkID string) (*Repost, error) {
 	var (
 		rep Repost
 		key = fmt.Sprintf("channel:%v:artwork:%v", channelID, artworkID)
@@ -66,13 +63,10 @@ func (rd redisDetector) Find(channelID, artworkID string) (*Repost, error) {
 	return &rep, nil
 }
 
-func (rd redisDetector) Create(repost *Repost, duration time.Duration) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-	defer cancel()
-
+func (rd redisDetector) Create(ctx context.Context, repost *Repost, duration time.Duration) error {
 	key := fmt.Sprintf("channel:%v:artwork:%v", repost.ChannelID, repost.ID)
 	_, err := rd.client.Pipelined(ctx, func(pipe redis.Pipeliner) error {
-		if _, err := rd.client.HSet(ctx, key, map[string]interface{}{
+		if _, err := rd.client.HSet(ctx, key, map[string]any{
 			"id":         repost.ID,
 			"url":        repost.URL,
 			"guild_id":   repost.GuildID,

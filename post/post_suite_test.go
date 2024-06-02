@@ -7,7 +7,9 @@ import (
 	"github.com/VTGare/boe-tea-go/artworks/twitter"
 	"github.com/VTGare/boe-tea-go/store"
 	"github.com/VTGare/gumi"
+
 	"github.com/bwmarrin/discordgo"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -21,7 +23,7 @@ var _ = Describe("Generate Messages Tests", func() {
 	var post Post
 
 	It("", func() {
-		post.generateMessages(nil, nil, "")
+		post.generateMessages(nil, nil)
 	})
 })
 
@@ -34,7 +36,7 @@ var _ = Describe("Skip First Tests", func() {
 	)
 
 	BeforeEach(func() {
-		post = Post{ctx: &gumi.Ctx{}}
+		post = Post{Ctx: &gumi.Ctx{}}
 		guild = &store.Guild{SkipFirst: true}
 		twitterArtwork = &twitter.Artwork{Photos: []string{"https://test.com/1.png"}}
 	})
@@ -44,7 +46,7 @@ var _ = Describe("Skip First Tests", func() {
 	})
 
 	It("shouldn't skip first if Twitter and command", func() {
-		post.ctx.Command = &gumi.Command{}
+		post.Ctx.Command = &gumi.Command{}
 		Expect(post.skipFirst(guild, twitterArtwork)).To(BeFalse())
 	})
 
@@ -58,7 +60,7 @@ var _ = Describe("Skip First Tests", func() {
 		Expect(post.skipFirst(guild, twitterArtwork)).To(BeTrue())
 	})
 
-	It("shouldn't skip first if skipFirst setting is false", func() {
+	It("shouldn't skip first if SkipFirst setting is false", func() {
 		guild.SkipFirst = false
 		Expect(post.skipFirst(guild, twitterArtwork)).To(BeFalse())
 	})
@@ -69,7 +71,7 @@ var _ = Describe("Skip First Tests", func() {
 	})
 
 	It("shouldn't skip first if Twitter and crosspost", func() {
-		post.crosspost = true
+		post.CrosspostMode = true
 		Expect(post.skipFirst(guild, twitterArtwork)).To(BeFalse())
 	})
 
@@ -126,11 +128,11 @@ var _ = Describe("Skip Pages Tests", func() {
 	)
 
 	It("should include first two", func() {
-		post.indices = map[int]struct{}{
+		post.Indices = map[int]struct{}{
 			1: {}, 2: {},
 		}
 
-		post.skipMode = SkipModeInclude
+		post.SkipMode = SkipModeInclude
 		result := post.skipArtworks(artworks)
 
 		Expect(result).Should(And(
@@ -140,11 +142,11 @@ var _ = Describe("Skip Pages Tests", func() {
 	})
 
 	It("should include last two", func() {
-		post.indices = map[int]struct{}{
+		post.Indices = map[int]struct{}{
 			3: {}, 4: {},
 		}
 
-		post.skipMode = SkipModeInclude
+		post.SkipMode = SkipModeInclude
 		result := post.skipArtworks(artworks)
 
 		Expect(result).Should(And(
@@ -154,11 +156,11 @@ var _ = Describe("Skip Pages Tests", func() {
 	})
 
 	It("should exclude last two", func() {
-		post.indices = map[int]struct{}{
+		post.Indices = map[int]struct{}{
 			3: {}, 4: {},
 		}
 
-		post.skipMode = SkipModeExclude
+		post.SkipMode = SkipModeExclude
 		result := post.skipArtworks(artworks)
 
 		Expect(result).Should(And(
@@ -168,11 +170,11 @@ var _ = Describe("Skip Pages Tests", func() {
 	})
 
 	It("shouldn't exclude anything", func() {
-		post.indices = map[int]struct{}{
+		post.Indices = map[int]struct{}{
 			5: {},
 		}
 
-		post.skipMode = SkipModeExclude
+		post.SkipMode = SkipModeExclude
 		result := post.skipArtworks(artworks)
 
 		Expect(result).Should(And(
@@ -185,11 +187,11 @@ var _ = Describe("Skip Pages Tests", func() {
 	})
 
 	It("shouldn't include anything", func() {
-		post.indices = map[int]struct{}{
+		post.Indices = map[int]struct{}{
 			5: {},
 		}
 
-		post.skipMode = SkipModeInclude
+		post.SkipMode = SkipModeInclude
 		result := post.skipArtworks(artworks)
 
 		Expect(result).Should(HaveLen(0))

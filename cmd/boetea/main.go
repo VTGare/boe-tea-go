@@ -26,8 +26,8 @@ import (
 	"go.uber.org/zap"
 )
 
-func initStore(mongoURI, database string) (store.Store, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+func initStore(ctx context.Context, mongoURI, database string) (store.Store, error) {
+	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
 
 	mongo, err := mongo.New(ctx, mongoURI, database)
@@ -69,7 +69,10 @@ func main() {
 
 	log := zapLogger.Sugar()
 
-	store, err := initStore(cfg.Mongo.URI, cfg.Mongo.Database)
+	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
+	defer cancel()
+
+	store, err := initStore(ctx, cfg.Mongo.URI, cfg.Mongo.Database)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -117,15 +120,7 @@ func main() {
 	handlers.RegisterHandlers(b)
 	commands.RegisterCommands(b)
 
-	if err := b.Open(); err != nil {
+	if err := b.Start(ctx); err != nil {
 		log.Fatal(err)
 	}
-
-	sc := make(chan os.Signal, 1)
-	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
-	<-sc
-
-	store.Close(context.Background())
-	repostDetector.Close()
-	b.Close()
 }

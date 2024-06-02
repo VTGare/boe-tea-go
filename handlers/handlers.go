@@ -25,10 +25,20 @@ import (
 	"mvdan.cc/xurls/v2"
 )
 
+func RegisterHandlers(b *bot.Bot) {
+	b.AddHandler(OnReady(b))
+	b.AddHandler(OnGuildCreate(b))
+	b.AddHandler(OnGuildDelete(b))
+	b.AddHandler(OnGuildBanAdd(b))
+	b.AddHandler(OnReactionAdd(b))
+	b.AddHandler(OnReactionRemove(b))
+	b.AddHandler(OnMessageRemove(b))
+}
+
 // PrefixResolver returns an array of guild's prefixes and bot mentions.
 func PrefixResolver(b *bot.Bot) func(s *discordgo.Session, m *discordgo.MessageCreate) []string {
 	return func(s *discordgo.Session, m *discordgo.MessageCreate) []string {
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		ctx, cancel := context.WithTimeout(b.Context, 5*time.Second)
 		defer cancel()
 
 		mention := fmt.Sprintf("<@%v> ", s.State.User.ID)
@@ -44,82 +54,34 @@ func PrefixResolver(b *bot.Bot) func(s *discordgo.Session, m *discordgo.MessageC
 }
 
 func OnPanic(b *bot.Bot) func(*gumi.Ctx, any) {
-	return func(ctx *gumi.Ctx, r any) {
+	return func(gctx *gumi.Ctx, r any) {
 		b.Log.Errorf("%v", r)
 	}
 }
 
 // OnMessage is executed on every message that isn't a command.
 func OnMessage(b *bot.Bot) func(*gumi.Ctx) error {
-	return func(ctx *gumi.Ctx) error {
-		guild, err := b.Store.Guild(context.Background(), ctx.Event.GuildID)
+	return func(gctx *gumi.Ctx) error {
+		ctx, cancel := context.WithTimeout(b.Context, 30*time.Second)
+		defer cancel()
+
+		guild, err := b.Store.Guild(ctx, gctx.Event.GuildID)
 		if err != nil {
 			return err
 		}
 
-		allSent := make([]*cache.MessageInfo, 0)
-		if len(guild.ArtChannels) == 0 || arrays.Any(guild.ArtChannels, ctx.Event.ChannelID) {
-			rx := xurls.Strict()
-			urls := rx.FindAllString(ctx.Event.Content, -1)
-
-			if len(urls) == 0 {
-				return nil
-			}
-
-			p := post.New(b, ctx, urls...)
-			sent, err := p.Send()
-			if err != nil {
-				return err
-			}
-
-			allSent = append(allSent, sent...)
-			user, err := b.Store.User(context.Background(), ctx.Event.Author.ID)
-			if err != nil {
-				if !errors.Is(err, mongo.ErrNoDocuments) {
-					return err
-				}
-			} else {
-				if user.Crosspost {
-					group, ok := user.FindGroup(ctx.Event.ChannelID)
-					if ok {
-						sent, _ := p.Crosspost(ctx.Event.Author.ID, group)
-						allSent = append(allSent, sent...)
-					}
-				}
-			}
+		if !(len(guild.ArtChannels) == 0 || arrays.Any(guild.ArtChannels, gctx.Event.ChannelID)) {
+			return nil
 		}
 
-		if len(allSent) > 0 {
-			b.EmbedCache.Set(
-				ctx.Event.Author.ID,
-				ctx.Event.ChannelID,
-				ctx.Event.ID,
-				true,
-				allSent...,
-			)
-
-			for _, msg := range allSent {
-				b.EmbedCache.Set(
-					ctx.Event.Author.ID,
-					msg.ChannelID,
-					msg.MessageID,
-					false,
-				)
-			}
+		urls := xurls.Strict().FindAllString(gctx.Event.Content, -1)
+		if len(urls) == 0 {
+			return nil
 		}
 
-		return nil
+		p := post.New(b, gctx, post.SkipModeNone, urls...)
+		return p.Send(ctx)
 	}
-}
-
-func RegisterHandlers(b *bot.Bot) {
-	b.AddHandler(OnReady(b))
-	b.AddHandler(OnGuildCreate(b))
-	b.AddHandler(OnGuildDelete(b))
-	b.AddHandler(OnGuildBanAdd(b))
-	b.AddHandler(OnReactionAdd(b))
-	b.AddHandler(OnReactionRemove(b))
-	b.AddHandler(OnMessageRemove(b))
 }
 
 // OnReady logs that bot's up.
@@ -132,12 +94,18 @@ func OnReady(b *bot.Bot) func(*discordgo.Session, *discordgo.Ready) {
 // OnGuildCreate loads server configuration on launch and creates new database entries when joining a new server.
 func OnGuildCreate(b *bot.Bot) func(*discordgo.Session, *discordgo.GuildCreate) {
 	return func(s *discordgo.Session, g *discordgo.GuildCreate) {
-		_, err := b.Store.Guild(context.Background(), g.ID)
+		ctx, cancel := context.WithTimeout(b.Context, 5*time.Second)
+		defer cancel()
+
+		_, err := b.Store.Guild(ctx, g.ID)
 		if errors.Is(err, mongo.ErrNoDocuments) {
-			b.Log.With("guild", g.Name, "guild_id", g.ID).Info("joined a guild")
-			_, err := b.Store.CreateGuild(context.Background(), g.ID)
+			b.Log.With("guild", g.Name, "guild_id", g.ID).Info("invited to a new server")
+			_, err := b.Store.CreateGuild(ctx, g.ID)
 			if err != nil {
-				b.Log.With("error", err, "guild_id", g.ID).Error("failed to insert guild")
+				b.Log.With(
+					"error", err,
+					"guild_id", g.ID,
+				).Error("failed to create a new guild")
 			}
 		}
 	}
@@ -208,17 +176,14 @@ func OnReactionAdd(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageReacti
 			return
 		}
 
-		var (
-			log = b.Log.With(
-				"guild_id", r.GuildID,
-				"channel_id", r.ChannelID,
-				"message_id", r.MessageID,
-				"user_id", r.UserID,
-			)
-			name        = r.Emoji.APIName()
-			ctx, cancel = context.WithTimeout(context.Background(), 2*time.Minute)
+		log := b.Log.With(
+			"guild_id", r.GuildID,
+			"channel_id", r.ChannelID,
+			"message_id", r.MessageID,
+			"user_id", r.UserID,
 		)
 
+		ctx, cancel := context.WithTimeout(b.Context, 30*time.Second)
 		defer cancel()
 
 		deleteEmbed := func() error {
@@ -286,15 +251,13 @@ func OnReactionAdd(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageReacti
 				return nil
 			}
 
-			url := ""
+			var url string
 			if len(msg.Embeds) > 0 {
-				embed := msg.Embeds[0]
-				url = embed.URL
+				url = msg.Embeds[0].URL
 			}
 
-			regex := xurls.Strict()
 			if url == "" {
-				url = regex.FindString(msg.Content)
+				url = xurls.Strict().FindString(msg.Content)
 			}
 
 			if url == "" {
@@ -310,13 +273,12 @@ func OnReactionAdd(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageReacti
 				Router: b.Router,
 			}
 
-			p := post.New(b, gumiCtx, url)
+			p := post.New(b, gumiCtx, post.SkipModeNone, url)
 			sent := make([]*cache.MessageInfo, 0)
-			user, _ := b.Store.User(ctx, r.UserID)
-			if user != nil {
+
+			if user, _ := b.Store.User(ctx, r.UserID); user != nil {
 				if group, ok := user.FindGroup(r.ChannelID); ok {
-					sent, err = p.Crosspost(user.ID, group)
-					if err != nil {
+					if sent, err = p.Crosspost(ctx, user.ID, group); err != nil {
 						return err
 					}
 				}
@@ -394,7 +356,7 @@ func OnReactionAdd(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageReacti
 			}
 
 			var (
-				nsfw = name == "🤤"
+				nsfw = r.Emoji.APIName() == "🤤"
 				fav  = &store.Bookmark{
 					UserID:    r.UserID,
 					ArtworkID: artworkDB.ID,
@@ -448,6 +410,7 @@ func OnReactionAdd(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageReacti
 			return nil
 		}
 
+		name := r.Emoji.APIName()
 		switch {
 		case name == "❌":
 			if err := deleteEmbed(); err != nil {
@@ -480,7 +443,7 @@ func OnReactionRemove(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageRea
 			"user_id", r.UserID,
 		)
 
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		ctx, cancel := context.WithTimeout(b.Context, 10*time.Second)
 		defer cancel()
 
 		// Do nothing if user was banned recently. Discord removes all reactions
@@ -596,7 +559,7 @@ func OnReactionRemove(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageRea
 
 // OnError creates an error response, logs them and sends the response on Discord.
 func OnError(b *bot.Bot) func(*gumi.Ctx, error) {
-	return func(ctx *gumi.Ctx, err error) {
+	return func(gctx *gumi.Ctx, err error) {
 		var (
 			eb         = embeds.NewBuilder()
 			cmdErr     *messages.IncorrectCmd
@@ -607,32 +570,32 @@ func OnError(b *bot.Bot) func(*gumi.Ctx, error) {
 
 		switch {
 		case errors.As(err, &cmdErr):
-			eb = onCommandError(b, ctx, cmdErr)
+			eb = onCommandError(b, gctx, cmdErr)
 		case errors.As(err, &usrErr):
-			eb = onUserError(b, ctx, usrErr)
+			eb = onUserError(b, gctx, usrErr)
 		case errors.As(err, &artworkErr):
-			eb = onArtworkError(b, ctx, artworkErr)
+			eb = onArtworkError(b, gctx, artworkErr)
 			expiry = true
 		default:
-			eb = onDefaultError(b, ctx, err)
+			eb = onDefaultError(b, gctx, err)
 		}
 
 		if eb == nil {
 			return
 		}
 
-		msg, err := ctx.Session.ChannelMessageSendEmbedReply(ctx.Event.ChannelID, eb.Finalize(),
+		msg, err := gctx.Session.ChannelMessageSendEmbedReply(gctx.Event.ChannelID, eb.Finalize(),
 			&discordgo.MessageReference{
-				MessageID: ctx.Event.ID,
-				ChannelID: ctx.Event.ChannelID,
-				GuildID:   ctx.Event.GuildID,
+				MessageID: gctx.Event.ID,
+				ChannelID: gctx.Event.ChannelID,
+				GuildID:   gctx.Event.GuildID,
 			})
 		if err != nil {
 			b.Log.With("error", err).Error("failed to reply in error handler")
 		}
 
 		if expiry {
-			dgoutils.ExpireMessage(b, ctx.Session, msg)
+			dgoutils.ExpireMessage(b, gctx.Session, msg)
 		}
 	}
 }
@@ -721,8 +684,8 @@ func onDefaultError(b *bot.Bot, gctx *gumi.Ctx, err error) *embeds.Builder {
 
 // OnRateLimit creates a response for users who use bot's command too frequently
 func OnRateLimit(*bot.Bot) func(*gumi.Ctx) error {
-	return func(ctx *gumi.Ctx) error {
-		duration, err := ctx.Command.RateLimiter.Expires(ctx.Event.Author.ID)
+	return func(gctx *gumi.Ctx) error {
+		duration, err := gctx.Command.RateLimiter.Expires(gctx.Event.Author.ID)
 		if err != nil {
 			return err
 		}
@@ -730,37 +693,37 @@ func OnRateLimit(*bot.Bot) func(*gumi.Ctx) error {
 		eb := embeds.NewBuilder()
 		eb.FailureTemplate(messages.RateLimit(duration))
 
-		return ctx.ReplyEmbed(eb.Finalize())
+		return gctx.ReplyEmbed(eb.Finalize())
 	}
 }
 
 // OnNoPerms creates a response for users who used a command without required permissions.
-func OnNoPerms(*bot.Bot) func(ctx *gumi.Ctx) error {
-	return func(ctx *gumi.Ctx) error {
+func OnNoPerms(*bot.Bot) func(*gumi.Ctx) error {
+	return func(gctx *gumi.Ctx) error {
 		eb := embeds.NewBuilder()
 		eb.FailureTemplate(messages.NoPerms())
 
-		return ctx.ReplyEmbed(eb.Finalize())
+		return gctx.ReplyEmbed(eb.Finalize())
 	}
 }
 
 // OnNSFW creates a response for users who used a NSFW command in a SFW channel
-func OnNSFW(*bot.Bot) func(ctx *gumi.Ctx) error {
-	return func(ctx *gumi.Ctx) error {
+func OnNSFW(*bot.Bot) func(*gumi.Ctx) error {
+	return func(gctx *gumi.Ctx) error {
 		eb := embeds.NewBuilder()
 
-		eb.FailureTemplate(messages.NSFWCommand(ctx.Command.Name))
+		eb.FailureTemplate(messages.NSFWCommand(gctx.Command.Name))
 
-		return ctx.ReplyEmbed(eb.Finalize())
+		return gctx.ReplyEmbed(eb.Finalize())
 	}
 }
 
 // OnExecute logs every executed command.
-func OnExecute(b *bot.Bot) func(ctx *gumi.Ctx) error {
-	return func(ctx *gumi.Ctx) error {
-		b.Log.With("command", ctx.Command.Name, "arguments", ctx.Args.Raw, "guild_id", ctx.Event.GuildID, "channel_id", ctx.Event.ChannelID).Info("executing command")
+func OnExecute(b *bot.Bot) func(*gumi.Ctx) error {
+	return func(gctx *gumi.Ctx) error {
+		b.Log.With("command", gctx.Command.Name, "arguments", gctx.Args.Raw, "guild_id", gctx.Event.GuildID, "channel_id", gctx.Event.ChannelID).Info("executing command")
 
-		b.Stats.IncrementCommand(ctx.Command.Name)
+		b.Stats.IncrementCommand(gctx.Command.Name)
 		return nil
 	}
 }

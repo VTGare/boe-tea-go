@@ -36,7 +36,7 @@ func TestClickHere(t *testing.T) {
 		args args
 		want string
 	}{
-		{"with full URL", args{"http://example.com"}, "[Click here](http://example.com)"},
+		{"with full URL", args{"https://example.com"}, "[Click here](https://example.com)"},
 		{"with short URL", args{"example.com"}, "[Click here](example.com)"},
 	}
 	for _, tt := range tests {

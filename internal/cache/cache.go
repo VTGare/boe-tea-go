@@ -11,16 +11,16 @@ import (
 // Cache represents a thread-safe map
 type Cache struct {
 	mx    sync.RWMutex
-	cache map[string]interface{}
+	cache map[string]any
 }
 
 func New() *Cache {
 	return &Cache{
-		cache: make(map[string]interface{}),
+		cache: make(map[string]any),
 	}
 }
 
-func (c *Cache) Get(key string) (interface{}, bool) {
+func (c *Cache) Get(key string) (any, bool) {
 	c.mx.RLock()
 	defer c.mx.RUnlock()
 
@@ -28,7 +28,7 @@ func (c *Cache) Get(key string) (interface{}, bool) {
 	return v, ok
 }
 
-func (c *Cache) MustGet(key string) interface{} {
+func (c *Cache) MustGet(key string) any {
 	c.mx.RLock()
 	defer c.mx.RUnlock()
 
@@ -40,7 +40,7 @@ func (c *Cache) MustGet(key string) interface{} {
 	return nil
 }
 
-func (c *Cache) Set(key string, value interface{}) {
+func (c *Cache) Set(key string, value any) {
 	c.mx.Lock()
 	defer c.mx.Unlock()
 

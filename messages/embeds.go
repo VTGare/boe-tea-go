@@ -110,7 +110,7 @@ type UserGroups struct {
 	Children    string
 }
 
-var embeds = map[Language]map[EmbedType]interface{}{
+var embeds = map[Language]map[EmbedType]any{
 	English: {
 		artworkSearchWarning: &BaseEmbed{
 			Title:       "⚠ Warning!",

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/VTGare/boe-tea-go/bot"
+	"github.com/VTGare/boe-tea-go/messages"
 	"github.com/VTGare/gumi"
 	"github.com/bwmarrin/discordgo"
 )
@@ -18,23 +19,20 @@ var (
 	ErrRangeSyntax = errors.New("range low is higher than range high")
 )
 
-func TrimChannel(ctx *gumi.Ctx, n int) string {
-	if strings.HasPrefix(ctx.Args.Get(n).Raw, "<#") && strings.HasSuffix(ctx.Args.Get(n).Raw, ">") {
-		return strings.Trim(ctx.Args.Get(n).Raw, "<#>")
+func ValidateArgs(gctx *gumi.Ctx, argsLen int) error {
+	if gctx.Args.Len() < argsLen {
+		return messages.ErrIncorrectCmd(gctx.Command)
 	}
 
-	return ctx.Args.Get(n).Raw
+	return nil
 }
 
-func TrimUserMention(ctx *gumi.Ctx, n int) string {
-	if strings.HasPrefix(ctx.Args.Get(n).Raw, "<@") && strings.HasSuffix(ctx.Args.Get(n).Raw, ">") {
-		return strings.Trim(ctx.Args.Get(n).Raw, "<@>")
-	}
-
-	return ctx.Args.Get(n).Raw
+// Trimmer trims <> in case someone wraps the link in it, and characters '!', '@', '#', and '&' for channels and user mentions.
+func Trimmer(gctx *gumi.Ctx, n int) string {
+	return strings.Trim(gctx.Args.Get(n).Raw, "<!@#&>")
 }
 
-// Deletes a specified message after a certain time
+// ExpireMessage deletes a specified message after a certain time
 func ExpireMessage(b *bot.Bot, s *discordgo.Session, msg *discordgo.Message) {
 	go func() {
 		time.Sleep(15 * time.Second)
