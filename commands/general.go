@@ -2,17 +2,18 @@ package commands
 
 import (
 	"fmt"
+	"runtime"
+	"sort"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/VTGare/boe-tea-go/bot"
 	"github.com/VTGare/boe-tea-go/internal/arrays"
 	"github.com/VTGare/boe-tea-go/internal/dgoutils"
 	"github.com/VTGare/boe-tea-go/messages"
 	"github.com/VTGare/embeds"
 	"github.com/VTGare/gumi"
-	"runtime"
-	"sort"
-	"strconv"
-	"strings"
-	"time"
 )
 
 func generalGroup(b *bot.Bot) {
@@ -69,12 +70,12 @@ func generalGroup(b *bot.Bot) {
 	})
 }
 
-func about(*bot.Bot) func(ctx *gumi.Ctx) error {
-	return func(ctx *gumi.Ctx) error {
+func about(*bot.Bot) func(*gumi.Ctx) error {
+	return func(gctx *gumi.Ctx) error {
 		locale := messages.AboutEmbed()
 
 		eb := embeds.NewBuilder()
-		eb.Title(locale.Title).Thumbnail(ctx.Session.State.User.AvatarURL(""))
+		eb.Title(locale.Title).Thumbnail(gctx.Session.State.User.AvatarURL(""))
 		eb.Description(locale.Description)
 
 		eb.AddField(
@@ -97,17 +98,17 @@ func about(*bot.Bot) func(ctx *gumi.Ctx) error {
 			true,
 		)
 
-		return ctx.ReplyEmbed(eb.Finalize())
+		return gctx.ReplyEmbed(eb.Finalize())
 	}
 }
 
-func help(b *bot.Bot) func(ctx *gumi.Ctx) error {
-	return func(ctx *gumi.Ctx) error {
+func help(b *bot.Bot) func(*gumi.Ctx) error {
+	return func(gctx *gumi.Ctx) error {
 		eb := embeds.NewBuilder()
 
-		eb.Title("Boe Tea's Documentation").Thumbnail(ctx.Session.State.User.AvatarURL(""))
+		eb.Title("Boe Tea's Documentation").Thumbnail(gctx.Session.State.User.AvatarURL(""))
 		switch {
-		case ctx.Args.Len() == 0:
+		case gctx.Args.Len() == 0:
 			groups := make(map[string][]string)
 			added := make(map[string]struct{})
 
@@ -150,8 +151,8 @@ func help(b *bot.Bot) func(ctx *gumi.Ctx) error {
 					}), "\n"),
 				), true)
 			}
-		case ctx.Args.Len() >= 1:
-			name := ctx.Args.Get(0).Raw
+		case gctx.Args.Len() >= 1:
+			name := gctx.Args.Get(0).Raw
 
 			cmd, ok := b.Router.Commands[name]
 			if !ok {
@@ -194,54 +195,54 @@ func help(b *bot.Bot) func(ctx *gumi.Ctx) error {
 
 		}
 
-		return ctx.ReplyEmbed(eb.Finalize())
+		return gctx.ReplyEmbed(eb.Finalize())
 	}
 }
 
-func ping(*bot.Bot) func(ctx *gumi.Ctx) error {
-	return func(ctx *gumi.Ctx) error {
+func ping(*bot.Bot) func(*gumi.Ctx) error {
+	return func(gctx *gumi.Ctx) error {
 		eb := embeds.NewBuilder()
 
-		return ctx.ReplyEmbed(
+		return gctx.ReplyEmbed(
 			eb.Title("🏓 Pong!").AddField(
 				"Heartbeat latency",
-				ctx.Session.HeartbeatLatency().Round(time.Millisecond).String(),
+				gctx.Session.HeartbeatLatency().Round(time.Millisecond).String(),
 			).Finalize(),
 		)
 	}
 }
 
-func feedback(*bot.Bot) func(ctx *gumi.Ctx) error {
-	return func(ctx *gumi.Ctx) error {
-		if err := dgoutils.InitCommand(ctx, 1); err != nil {
+func feedback(*bot.Bot) func(*gumi.Ctx) error {
+	return func(gctx *gumi.Ctx) error {
+		if err := dgoutils.ValidateArgs(gctx, 1); err != nil {
 			return err
 		}
 
 		eb := embeds.NewBuilder()
 		eb.Author(
-			fmt.Sprintf("Feedback from %v", ctx.Event.Author.String()),
+			fmt.Sprintf("Feedback from %v", gctx.Event.Author.String()),
 			"",
-			ctx.Event.Author.AvatarURL(""),
+			gctx.Event.Author.AvatarURL(""),
 		).Description(
-			ctx.Args.Raw,
+			gctx.Args.Raw,
 		).AddField(
 			"Author Mention",
-			ctx.Event.Author.Mention(),
+			gctx.Event.Author.Mention(),
 			true,
 		).AddField(
 			"Author ID",
-			ctx.Event.Author.ID,
+			gctx.Event.Author.ID,
 			true,
 		)
 
-		if ctx.Event.GuildID != "" {
+		if gctx.Event.GuildID != "" {
 			eb.AddField(
-				"Guild", ctx.Event.GuildID, true,
+				"Guild", gctx.Event.GuildID, true,
 			)
 		}
 
-		if len(ctx.Event.Attachments) > 0 {
-			att := ctx.Event.Attachments[0]
+		if len(gctx.Event.Attachments) > 0 {
+			att := gctx.Event.Attachments[0]
 			if strings.HasSuffix(att.Filename, "png") ||
 				strings.HasSuffix(att.Filename, "jpg") ||
 				strings.HasSuffix(att.Filename, "gif") {
@@ -249,12 +250,12 @@ func feedback(*bot.Bot) func(ctx *gumi.Ctx) error {
 			}
 		}
 
-		ch, err := ctx.Session.UserChannelCreate(ctx.Router.AuthorID)
+		ch, err := gctx.Session.UserChannelCreate(gctx.Router.AuthorID)
 		if err != nil {
 			return err
 		}
 
-		_, err = ctx.Session.ChannelMessageSendEmbed(ch.ID, eb.Finalize())
+		_, err = gctx.Session.ChannelMessageSendEmbed(ch.ID, eb.Finalize())
 		if err != nil {
 			return err
 		}
@@ -262,33 +263,33 @@ func feedback(*bot.Bot) func(ctx *gumi.Ctx) error {
 		eb.Clear()
 
 		reply := eb.SuccessTemplate("Feedback message has been sent.").Finalize()
-		return ctx.ReplyEmbed(reply)
+		return gctx.ReplyEmbed(reply)
 	}
 }
 
-func stats(b *bot.Bot) func(ctx *gumi.Ctx) error {
-	return func(ctx *gumi.Ctx) error {
-		if ctx.Args.Len() == 0 {
-			return generalStats(b, ctx)
+func stats(b *bot.Bot) func(*gumi.Ctx) error {
+	return func(gctx *gumi.Ctx) error {
+		if gctx.Args.Len() == 0 {
+			return generalStats(b, gctx)
 		}
 
-		arg := ctx.Args.Get(0).Raw
+		arg := gctx.Args.Get(0).Raw
 		switch arg {
 		case "commands":
-			return commandStats(b, ctx)
+			return commandStats(b, gctx)
 		case "artworks":
-			return artworkStats(b, ctx)
+			return artworkStats(b, gctx)
 		case "general":
-			return generalStats(b, ctx)
+			return generalStats(b, gctx)
 		default:
-			return messages.ErrIncorrectCmd(ctx.Command)
+			return messages.ErrIncorrectCmd(gctx.Command)
 		}
 	}
 }
 
-func generalStats(b *bot.Bot, ctx *gumi.Ctx) error {
+func generalStats(b *bot.Bot, gctx *gumi.Ctx) error {
 	var (
-		s   = ctx.Session
+		s   = gctx.Session
 		mem runtime.MemStats
 	)
 	runtime.ReadMemStats(&mem)
@@ -323,10 +324,10 @@ func generalStats(b *bot.Bot, ctx *gumi.Ctx) error {
 		AddField("Uptime", messages.FormatDuration(uptime), true).
 		AddField("RAM used", fmt.Sprintf("%v MB", mem.Alloc/1024/1024), true)
 
-	return ctx.ReplyEmbed(eb.Finalize())
+	return gctx.ReplyEmbed(eb.Finalize())
 }
 
-func artworkStats(b *bot.Bot, ctx *gumi.Ctx) error {
+func artworkStats(b *bot.Bot, gctx *gumi.Ctx) error {
 	eb := embeds.NewBuilder()
 	eb.Title("Artwork stats")
 
@@ -335,10 +336,10 @@ func artworkStats(b *bot.Bot, ctx *gumi.Ctx) error {
 		eb.AddField(item.Name, strconv.FormatInt(item.Count, 10))
 	}
 
-	return ctx.ReplyEmbed(eb.Finalize())
+	return gctx.ReplyEmbed(eb.Finalize())
 }
 
-func commandStats(b *bot.Bot, ctx *gumi.Ctx) error {
+func commandStats(b *bot.Bot, gctx *gumi.Ctx) error {
 	eb := embeds.NewBuilder()
 	eb.Title("Command stats")
 
@@ -347,5 +348,5 @@ func commandStats(b *bot.Bot, ctx *gumi.Ctx) error {
 		eb.AddField(item.Name, strconv.FormatInt(item.Count, 10), true)
 	}
 
-	return ctx.ReplyEmbed(eb.Finalize())
+	return gctx.ReplyEmbed(eb.Finalize())
 }

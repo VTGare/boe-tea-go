@@ -20,7 +20,7 @@ func UserProfileEmbed(username string) *UserProfile {
 		Title:     fmt.Sprintf("%v's profile", username),
 		Settings:  "Settings",
 		DM:        "DM",
-		CrossPost: "CrossPost",
+		Crosspost: "Crosspost",
 		Stats:     "Stats",
 		Groups:    "Groups",
 		Bookmarks: "Bookmarks",

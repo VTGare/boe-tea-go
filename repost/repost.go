@@ -1,6 +1,7 @@
 package repost
 
 import (
+	"context"
 	"errors"
 	"time"
 )
@@ -8,8 +9,8 @@ import (
 var ErrNotFound = errors.New("repost not found")
 
 type Detector interface {
-	Find(channelID string, artworkID string) (*Repost, error)
-	Create(*Repost, time.Duration) error
+	Find(ctx context.Context, channelID string, artworkID string) (*Repost, error)
+	Create(context.Context, *Repost, time.Duration) error
 	Close() error
 }
 

@@ -45,7 +45,12 @@ type Bot struct {
 	Store        store.Store
 }
 
-func New(config *config.Config, store store.Store, logger *zap.SugaredLogger, rd repost.Detector) (*Bot, error) {
+func New(
+	config *config.Config,
+	store store.Store,
+	logger *zap.SugaredLogger,
+	rd repost.Detector,
+) (*Bot, error) {
 	mgr, err := shards.New("Bot " + config.Discord.Token)
 	if err != nil {
 		return nil, fmt.Errorf("failed to init a shard manager: %w", err)
@@ -65,13 +70,9 @@ func New(config *config.Config, store store.Store, logger *zap.SugaredLogger, rd
 		return nil, fmt.Errorf("failed to create nhentai api client: %w", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
 	return &Bot{
 		Log:            logger,
 		Config:         config,
-		Context:        ctx,
 		RepostDetector: rd,
 		BannedUsers:    banned,
 		EmbedCache:     cache.NewEmbedCache(),
@@ -95,21 +96,27 @@ func (b *Bot) AddHandler(handler any) {
 	b.ShardManager.AddHandler(handler)
 }
 
-func (b *Bot) Open() error {
+func (b *Bot) Start(ctx context.Context) error {
 	b.ShardManager.AddHandler(b.Router.Handler())
 
 	b.StartTime = time.Now()
 	b.Stats = stats.New(b.Router, b.ArtworkProviders)
+	b.Context = ctx
 
+	b.Log.Debug("starting a bot")
 	if err := b.ShardManager.Start(); err != nil {
 		return err
 	}
 
-	b.Log.Info("Started a bot.")
+	select {
+	case <-ctx.Done():
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
 
-	return nil
-}
+		b.Store.Close(shutdownCtx)
+		b.RepostDetector.Close()
+		b.ShardManager.Shutdown()
 
-func (b *Bot) Close() error {
-	return b.ShardManager.Shutdown()
+		return ctx.Err()
+	}
 }

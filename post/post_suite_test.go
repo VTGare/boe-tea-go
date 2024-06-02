@@ -7,7 +7,9 @@ import (
 	"github.com/VTGare/boe-tea-go/artworks/twitter"
 	"github.com/VTGare/boe-tea-go/store"
 	"github.com/VTGare/gumi"
+
 	"github.com/bwmarrin/discordgo"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -21,7 +23,7 @@ var _ = Describe("Generate Messages Tests", func() {
 	var post Post
 
 	It("", func() {
-		post.generateMessages(nil, nil, "")
+		post.generateMessages(nil, nil)
 	})
 })
 
@@ -69,7 +71,7 @@ var _ = Describe("Skip First Tests", func() {
 	})
 
 	It("shouldn't skip first if Twitter and crosspost", func() {
-		post.CrossPostMode = true
+		post.CrosspostMode = true
 		Expect(post.skipFirst(guild, twitterArtwork)).To(BeFalse())
 	})
 

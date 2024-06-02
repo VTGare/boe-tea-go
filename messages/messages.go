@@ -39,9 +39,9 @@ func LimitExceeded(limit, artworks, count int) string {
 func CrosspostBy(author string) string {
 	switch author {
 	case "":
-		return "CrossPost requested by anonymous"
+		return "Crosspost requested by anonymous"
 	default:
-		return fmt.Sprintf("CrossPost requested by %v", author)
+		return fmt.Sprintf("Crosspost requested by %v", author)
 	}
 }
 

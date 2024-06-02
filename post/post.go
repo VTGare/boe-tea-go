@@ -21,7 +21,6 @@ import (
 	"github.com/VTGare/embeds"
 	"github.com/VTGare/gumi"
 	"github.com/bwmarrin/discordgo"
-	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -41,7 +40,7 @@ type Post struct {
 	Urls           []string
 	Indices        map[int]struct{}
 	SkipMode       SkipMode
-	CrossPostMode  bool
+	CrosspostMode  bool
 	ExcludeChannel bool
 }
 
@@ -51,25 +50,25 @@ type fetchResult struct {
 	Matched  int
 }
 
-func New(bot *bot.Bot, ctx *gumi.Ctx, skip SkipMode, urls ...string) *Post {
+func New(bot *bot.Bot, gctx *gumi.Ctx, skip SkipMode, urls ...string) *Post {
 	return &Post{
 		Bot:            bot,
-		Ctx:            ctx,
+		Ctx:            gctx,
 		Urls:           urls,
 		Indices:        make(map[int]struct{}),
 		SkipMode:       skip,
-		CrossPostMode:  false,
+		CrosspostMode:  false,
 		ExcludeChannel: false,
 	}
 }
 
-func (p *Post) Send() error {
-	guild, err := p.Bot.Store.Guild(p.Bot.Context, p.Ctx.Event.GuildID)
+func (p *Post) Send(ctx context.Context) error {
+	guild, err := p.Bot.Store.Guild(ctx, p.Ctx.Event.GuildID)
 	if err != nil {
 		return fmt.Errorf("failed to get a guild: %w", err)
 	}
 
-	user, err := p.Bot.Store.User(p.Bot.Context, p.Ctx.Event.Author.ID)
+	user, err := p.Bot.Store.User(ctx, p.Ctx.Event.Author.ID)
 	if err != nil {
 		return fmt.Errorf("failed to get a user: %w", err)
 	}
@@ -78,19 +77,12 @@ func (p *Post) Send() error {
 		return nil
 	}
 
-	// Fetch artworks
-	res, err := p.fetch(guild, p.Ctx.Event.ChannelID)
+	res, err := p.fetch(ctx, guild, p.Ctx.Event.ChannelID)
 	if err != nil {
-		return fmt.Errorf("failed to Fetch artworks: %w", err)
+		return fmt.Errorf("failed to fetch artworks: %w", err)
 	}
 
-	log := p.Bot.Log.With(
-		"guild_id", guild.ID,
-		"user_id", user.ID,
-	)
-
-	// Repost artworks
-	p.repost(guild, res, log)
+	p.handleReposts(guild, res)
 
 	sent, err := p.sendMessages(guild, p.Ctx.Event.ChannelID, res.Artworks)
 	if err != nil {
@@ -120,7 +112,7 @@ func (p *Post) Send() error {
 			}
 		}
 
-		sent, err = p.CrossPost(user.ID, group)
+		sent, err = p.Crosspost(ctx, user.ID, group)
 		if err != nil {
 			return err
 		}
@@ -151,8 +143,8 @@ func (p *Post) Send() error {
 	return nil
 }
 
-func (p *Post) CrossPost(userID string, group *store.Group) ([]*cache.MessageInfo, error) {
-	user, err := p.Bot.Store.User(p.Bot.Context, userID)
+func (p *Post) Crosspost(ctx context.Context, userID string, group *store.Group) ([]*cache.MessageInfo, error) {
+	user, err := p.Bot.Store.User(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -177,44 +169,45 @@ func (p *Post) CrossPost(userID string, group *store.Group) ([]*cache.MessageInf
 			"group", group,
 			"channel_id", channelID,
 		)
-
+		
 		go func(channelID string) {
 			defer wg.Done()
 			ch, err := p.Ctx.Session.Channel(channelID)
 			if err != nil {
-				log.Infow("Couldn't crosspost. Error: %v", err)
+				log.With("error", err).Info("failed to crosspost")
 				return
 			}
 
 			if _, err := p.Ctx.Session.GuildMember(ch.GuildID, userID); err != nil {
 				log.Debug("member left the server, removing crosspost channel")
-				if _, err := p.Bot.Store.DeleteCrosspostChannel(p.Bot.Context, userID, group.Name, channelID); err != nil {
+				if _, err := p.Bot.Store.DeleteCrosspostChannel(ctx, userID, group.Name, channelID); err != nil {
 					log.With("error", err).Error("failed to remove a channel from user's group")
 				}
 
 				return
 			}
 
-			guild, err := p.Bot.Store.Guild(p.Bot.Context, ch.GuildID)
+			guild, err := p.Bot.Store.Guild(ctx, ch.GuildID)
 			if err != nil {
-				log.Infof("Couldn't crosspost. Find Guild error: %v", err)
+				log.With("error", err).Info("failed to find guild")
 				return
 			}
 
 			if guild.Crosspost {
 				if len(guild.ArtChannels) == 0 || arrays.Any(guild.ArtChannels, ch.ID) {
-					p.CrossPostMode = true
-					res, err := p.fetch(guild, channelID)
+					p.CrosspostMode = true
+					res, err := p.fetch(ctx, guild, channelID)
 					if err != nil {
-						log.Infof("Couldn't crosspost. Fetch error: %v", err)
+						log.With("error", err).Error("failed to fetch artworks")
 						return
 					}
 
 					sent, err := p.sendMessages(guild, channelID, res.Artworks)
 					if err != nil {
-						log.Infof("Couldn't crosspost. Senderer error: %v", err)
+						log.With("error", err).Error("failed to send messages")
 						return
 					}
+					
 					msgChan <- sent
 				}
 			}
@@ -234,18 +227,18 @@ func (p *Post) CrossPost(userID string, group *store.Group) ([]*cache.MessageInf
 	return sent, nil
 }
 
-func (p *Post) fetch(guild *store.Guild, channelID string) (*fetchResult, error) {
+func (p *Post) fetch(ctx context.Context, guild *store.Guild, channelID string) (*fetchResult, error) {
 	var (
 		log = p.Bot.Log.With(
 			"guild_id", guild.ID,
 			"channel_id", channelID,
 		)
 
-		wg, _        = errgroup.WithContext(context.Background())
 		matched      = make(map[string]struct{})
 		artworksChan = make(chan any, len(p.Urls)*2)
 	)
 
+	wg, gctx := errgroup.WithContext(ctx)
 	for _, url := range p.Urls {
 		for _, provider := range p.Bot.ArtworkProviders {
 			id, ok := provider.Match(url)
@@ -274,14 +267,14 @@ func (p *Post) fetch(guild *store.Guild, channelID string) (*fetchResult, error)
 
 				var isRepost bool
 				if guild.Repost != store.GuildRepostDisabled {
-					rep, err := p.Bot.RepostDetector.Find(channelID, id)
+					rep, err := p.Bot.RepostDetector.Find(gctx, channelID, id)
 					if err != nil && !errors.Is(err, repost.ErrNotFound) {
 						log.Error("failed to find a repost")
 					}
 
 					if rep != nil {
 						artworksChan <- rep
-						if p.CrossPostMode || guild.Repost == store.GuildRepostStrict {
+						if p.CrosspostMode || guild.Repost == store.GuildRepostStrict {
 							return nil
 						}
 
@@ -291,6 +284,7 @@ func (p *Post) fetch(guild *store.Guild, channelID string) (*fetchResult, error)
 
 				if guild.Repost != store.GuildRepostDisabled && !isRepost {
 					err := p.Bot.RepostDetector.Create(
+						gctx,
 						&repost.Repost{
 							ID:        id,
 							URL:       url,
@@ -306,11 +300,12 @@ func (p *Post) fetch(guild *store.Guild, channelID string) (*fetchResult, error)
 				}
 
 				_, isTwitter := provider.(*twitter.Twitter)
+
 				// Only post the artwork any of the following is true:
 				// - The provider is enabled in guild settings.
 				// - The function is called from a command
 				// - Crossposting a Twitter artwork. Bypasses Guild settings by design.
-				if provider.Enabled(guild) || p.Ctx.Command != nil || (p.CrossPostMode && isTwitter) {
+				if provider.Enabled(guild) || p.Ctx.Command != nil || (p.CrosspostMode && isTwitter) {
 					var (
 						artwork artworks.Artwork
 						key     = fmt.Sprintf("%T:%v", provider, id)
@@ -329,7 +324,7 @@ func (p *Post) fetch(guild *store.Guild, channelID string) (*fetchResult, error)
 					}
 
 					// Only add reactions to the original message for Twitter links.
-					if guild.Reactions && p.Ctx.Command == nil && isTwitter && artwork != nil && artwork.Len() > 0 && !p.CrossPostMode {
+					if guild.Reactions && p.Ctx.Command == nil && isTwitter && artwork != nil && artwork.Len() > 0 && !p.CrosspostMode {
 						err := p.addBookmarkReactions(p.Ctx.Event.Message)
 						if err != nil {
 							log.With("error", err).Debug("failed to add bookmark reactions")
@@ -374,70 +369,69 @@ func (p *Post) fetch(guild *store.Guild, channelID string) (*fetchResult, error)
 	return res, nil
 }
 
-func (p *Post) repost(guild *store.Guild, res *fetchResult, log *zap.SugaredLogger) {
-	if len(res.Reposts) > 0 {
-		if guild.Repost == store.GuildRepostStrict {
-			perm, err := dgoutils.MemberHasPermission(
-				p.Ctx.Session,
-				guild.ID,
-				p.Ctx.Session.State.User.ID,
-				discordgo.PermissionAdministrator|discordgo.PermissionManageMessages,
-			)
-			if err != nil {
-				log.With("error", err).Warn("failed to check if boe tea has permissions")
-			}
+func (p *Post) handleReposts(guild *store.Guild, res *fetchResult) error {
+	log := p.Bot.Log.With(
+		"guild_id", guild.ID,
+		"user_id", p.Ctx.Event.Author.ID,
+	)
 
-			if perm && res.Matched == len(res.Reposts) {
-				var (
-					channelID = p.Ctx.Event.ChannelID
-					messageID = p.Ctx.Event.ID
-				)
+	if len(res.Reposts) == 0 {
+		return nil
+	}
 
-				err := p.Ctx.Session.ChannelMessageDelete(channelID, messageID)
-				if err != nil {
-					log.With(
-						"channel_id", channelID,
-						"message_id", messageID,
-					).Warn("failed to delete a message")
-				}
-			}
-		}
-
-		sendReposts := func(reposts []*repost.Repost) error {
-			locale := messages.RepostEmbed()
-
-			eb := embeds.NewBuilder()
-			eb.Title(locale.Title)
-			for ind, rep := range reposts {
-				eb.AddField(
-					fmt.Sprintf("#%v | %v", ind+1, rep.ID),
-					fmt.Sprintf(
-						"**%v %v**\n**URL:** %v\n\n%v",
-						locale.Expires, messages.RelativeTimestamp(rep.ExpiresAt),
-						rep.URL,
-						messages.NamedLink(
-							locale.OriginalMessage,
-							fmt.Sprintf("https://discord.com/channels/%v/%v/%v", rep.GuildID, rep.ChannelID, rep.MessageID),
-						),
-					),
-				)
-			}
-
-			msg, err := p.Ctx.Session.ChannelMessageSendEmbed(p.Ctx.Event.ChannelID, eb.Finalize())
-			if err != nil {
-				return fmt.Errorf("failed to send message to discord: %w", err)
-			}
-
-			dgoutils.ExpireMessage(p.Bot, p.Ctx.Session, msg)
-
-			return nil
-		}
-
-		err := sendReposts(res.Reposts)
+	if guild.Repost == store.GuildRepostStrict {
+		perm, err := dgoutils.MemberHasPermission(
+			p.Ctx.Session,
+			guild.ID,
+			p.Ctx.Session.State.User.ID,
+			discordgo.PermissionAdministrator|discordgo.PermissionManageMessages,
+		)
 		if err != nil {
-			log.Warn("failed to send reposts")
+			log.With("error", err).Warn("failed to check delete message perms")
+		}
+
+		if perm && res.Matched == len(res.Reposts) {
+			var (
+				channelID = p.Ctx.Event.ChannelID
+				messageID = p.Ctx.Event.ID
+			)
+
+			err := p.Ctx.Session.ChannelMessageDelete(channelID, messageID)
+			if err != nil {
+				log.With(
+					"channel_id", channelID,
+					"message_id", messageID,
+				).Warn("failed to delete original repost message")
+			}
 		}
 	}
+
+	locale := messages.RepostEmbed()
+
+	eb := embeds.NewBuilder()
+	eb.Title(locale.Title)
+	for ind, rep := range res.Reposts {
+		eb.AddField(
+			fmt.Sprintf("#%v | %v", ind+1, rep.ID),
+			fmt.Sprintf(
+				"**%v %v**\n**URL:** %v\n\n%v",
+				locale.Expires, messages.RelativeTimestamp(rep.ExpiresAt),
+				rep.URL,
+				messages.NamedLink(
+					locale.OriginalMessage,
+					fmt.Sprintf("https://discord.com/channels/%v/%v/%v", rep.GuildID, rep.ChannelID, rep.MessageID),
+				),
+			),
+		)
+	}
+
+	msg, err := p.Ctx.Session.ChannelMessageSendEmbed(p.Ctx.Event.ChannelID, eb.Finalize())
+	if err != nil {
+		return fmt.Errorf("failed to send message to discord: %w", err)
+	}
+
+	dgoutils.ExpireMessage(p.Bot, p.Ctx.Session, msg)
+	return nil
 }
 
 func (p *Post) sendMessages(guild *store.Guild, channelID string, artworks []artworks.Artwork) ([]*cache.MessageInfo, error) {
@@ -446,7 +440,7 @@ func (p *Post) sendMessages(guild *store.Guild, channelID string, artworks []art
 		return sent, nil
 	}
 
-	allMessages, err := p.generateMessages(guild, artworks, channelID)
+	allMessages, err := p.generateMessages(guild, artworks)
 	if err != nil {
 		return nil, err
 	}
@@ -464,7 +458,7 @@ func (p *Post) sendMessages(guild *store.Guild, channelID string, artworks []art
 	allMessages[0] = p.skipArtworks(allMessages[0])
 	sendMessage := func(message *discordgo.MessageSend) error {
 		s := p.Ctx.Session
-		if p.CrossPostMode {
+		if p.CrosspostMode {
 			guildID, err := strconv.ParseInt(guild.ID, 10, 64)
 			if err != nil {
 				return fmt.Errorf("failed to parse guild id: %w", err)
@@ -493,7 +487,7 @@ func (p *Post) sendMessages(guild *store.Guild, channelID string, artworks []art
 	}
 
 	allMessages = p.handleLimit(allMessages, guild.Limit)
-	if p.CrossPostMode {
+	if p.CrosspostMode {
 		first := allMessages[0][0]
 
 		first.Content = first.Embeds[0].URL + "\n" + first.Content
@@ -502,7 +496,7 @@ func (p *Post) sendMessages(guild *store.Guild, channelID string, artworks []art
 	log := p.Bot.Log.With(
 		"guild_id", guild.ID,
 		"channel_id", channelID,
-		"crosspost", p.CrossPostMode,
+		"crosspost", p.CrosspostMode,
 	)
 
 	for _, messages := range allMessages {
@@ -517,7 +511,7 @@ func (p *Post) sendMessages(guild *store.Guild, channelID string, artworks []art
 	return sent, nil
 }
 
-func (p *Post) generateMessages(guild *store.Guild, artworks []artworks.Artwork, channelID string) ([][]*discordgo.MessageSend, error) {
+func (p *Post) generateMessages(guild *store.Guild, artworks []artworks.Artwork) ([][]*discordgo.MessageSend, error) {
 	messageSends := make([][]*discordgo.MessageSend, 0, len(artworks))
 	for _, artwork := range artworks {
 		if artwork != nil {
@@ -540,7 +534,7 @@ func (p *Post) generateMessages(guild *store.Guild, artworks []artworks.Artwork,
 					continue
 				}
 
-				if p.CrossPostMode {
+				if p.CrosspostMode {
 					msg.Embeds[0].Author = &discordgo.MessageEmbedAuthor{
 						Name:    messages.CrosspostBy(p.Ctx.Event.Author.Username),
 						IconURL: p.Ctx.Event.Author.AvatarURL(""),
@@ -604,14 +598,14 @@ func (p *Post) skipFirst(guild *store.Guild, a artworks.Artwork) bool {
 		return true
 	}
 
-	if len(tweet.Videos) > 0 || p.CrossPostMode {
+	if len(tweet.Videos) > 0 || p.CrosspostMode {
 		return false
 	}
 
 	return true
 }
 
-func (p *Post) handleLimit(allMessages [][]*discordgo.MessageSend, limit int) [][]*discordgo.MessageSend {
+func (*Post) handleLimit(allMessages [][]*discordgo.MessageSend, limit int) [][]*discordgo.MessageSend {
 	count := 0
 	for _, messages := range allMessages {
 		count += len(messages)

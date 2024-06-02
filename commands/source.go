@@ -55,13 +55,13 @@ func sourceGroup(b *bot.Bot) {
 	})
 }
 
-func nhentai(b *bot.Bot) func(ctx *gumi.Ctx) error {
-	return func(ctx *gumi.Ctx) error {
-		if err := dgoutils.InitCommand(ctx, 1); err != nil {
+func nhentai(b *bot.Bot) func(*gumi.Ctx) error {
+	return func(gctx *gumi.Ctx) error {
+		if err := dgoutils.ValidateArgs(gctx, 1); err != nil {
 			return err
 		}
 
-		id := ctx.Args.Get(0).Raw
+		id := gctx.Args.Get(0).Raw
 		hentai, err := b.NHentai.FindHentai(id)
 		if err != nil {
 			switch {
@@ -127,16 +127,16 @@ func nhentai(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			eb.AddField("Tags", tagsToString(genres))
 		}
 
-		return ctx.ReplyEmbed(eb.Finalize())
+		return gctx.ReplyEmbed(eb.Finalize())
 	}
 }
 
-func sauce(b *bot.Bot) func(ctx *gumi.Ctx) error {
-	return func(ctx *gumi.Ctx) error {
+func sauce(b *bot.Bot) func(*gumi.Ctx) error {
+	return func(gctx *gumi.Ctx) error {
 		url, ok := findImage(
-			ctx.Session,
-			ctx.Event,
-			strings.Fields(ctx.Args.Raw),
+			gctx.Session,
+			gctx.Event,
+			strings.Fields(gctx.Args.Raw),
 		)
 
 		if !ok {
@@ -165,8 +165,8 @@ func sauce(b *bot.Bot) func(ctx *gumi.Ctx) error {
 		}
 
 		sauceEmbeds := sauceNAOEmbeds(filtered)
-		widget := dgoutils.NewWidget(ctx.Session, ctx.Event.Author.ID, sauceEmbeds)
-		return widget.Start(ctx.Event.ChannelID)
+		widget := dgoutils.NewWidget(gctx.Session, gctx.Event.Author.ID, sauceEmbeds)
+		return widget.Start(gctx.Event.ChannelID)
 	}
 }
 

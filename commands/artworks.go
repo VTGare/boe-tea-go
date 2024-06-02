@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"context"
 	"errors"
 	"net/url"
 	"strconv"
@@ -102,23 +103,26 @@ func artworksGroup(b *bot.Bot) {
 		Example:     "bt!crosspostexclude https://pixiv.net/artworks/86341538 #seiso-channel",
 		GuildOnly:   true,
 		RateLimiter: gumi.NewRateLimiter(5 * time.Second),
-		Exec:        crossPostExclude(b),
+		Exec:        crosspostExclude(b),
 	})
 }
 
-func artwork(b *bot.Bot) func(ctx *gumi.Ctx) error {
-	return func(ctx *gumi.Ctx) error {
-		if err := dgoutils.InitCommand(ctx, 1); err != nil {
-			return err
+func artwork(b *bot.Bot) func(*gumi.Ctx) error {
+	return func(gctx *gumi.Ctx) error {
+		if gctx.Args.Len() < 1 {
+			return messages.ErrIncorrectCmd(gctx.Command)
 		}
 
-		arg := ctx.Args.Get(0).Raw
+		arg := gctx.Args.Get(0).Raw
 		id, url, ok := parseArtworkArgument(arg)
 		if !ok {
-			return messages.ErrIncorrectCmd(ctx.Command)
+			return messages.ErrIncorrectCmd(gctx.Command)
 		}
 
-		artwork, err := b.Store.Artwork(b.Context, id, url)
+		ctx, cancel := context.WithTimeout(b.Context, 5*time.Second)
+		defer cancel()
+
+		artwork, err := b.Store.Artwork(ctx, id, url)
 		if err != nil {
 			switch {
 			case errors.Is(err, mongo.ErrNoDocuments):
@@ -135,8 +139,8 @@ func artwork(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			embeds = append(embeds, embed)
 		}
 
-		widget := dgoutils.NewWidget(ctx.Session, ctx.Event.Author.ID, embeds)
-		return widget.Start(ctx.Event.ChannelID)
+		widget := dgoutils.NewWidget(gctx.Session, gctx.Event.Author.ID, embeds)
+		return widget.Start(gctx.Event.ChannelID)
 	}
 }
 
@@ -154,17 +158,17 @@ func parseArtworkArgument(arg string) (int, string, bool) {
 	return 0, "", false
 }
 
-func share(b *bot.Bot, skip post.SkipMode) func(ctx *gumi.Ctx) error {
-	return func(ctx *gumi.Ctx) error {
-		if err := dgoutils.InitCommand(ctx, 1); err != nil {
+func share(b *bot.Bot, skip post.SkipMode) func(*gumi.Ctx) error {
+	return func(gctx *gumi.Ctx) error {
+		if err := dgoutils.ValidateArgs(gctx, 1); err != nil {
 			return err
 		}
 
-		url := dgoutils.Trimmer(ctx, 0)
-		ctx.Args.Remove(0)
+		url := dgoutils.Trimmer(gctx, 0)
+		gctx.Args.Remove(0)
 
 		indices := make(map[int]struct{})
-		for _, arg := range strings.Fields(ctx.Args.Raw) {
+		for _, arg := range strings.Fields(gctx.Args.Raw) {
 			index, err := strconv.Atoi(arg)
 			if err != nil {
 				ran, err := dgoutils.NewRange(arg)
@@ -180,43 +184,42 @@ func share(b *bot.Bot, skip post.SkipMode) func(ctx *gumi.Ctx) error {
 			}
 		}
 
-		p := post.New(b, ctx, skip, url)
+		p := post.New(b, gctx, skip, url)
 		if len(indices) > 0 {
 			p.Indices = indices
 		}
 
-		if err := p.Send(); err != nil {
-			return err
-		}
+		ctx, cancel := context.WithTimeout(b.Context, 30*time.Second)
+		defer cancel()
 
-		return nil
+		return p.Send(ctx)
 	}
 }
 
-func crossPostExclude(b *bot.Bot) func(ctx *gumi.Ctx) error {
-	return func(ctx *gumi.Ctx) error {
-		if err := dgoutils.InitCommand(ctx, 1); err != nil {
+func crosspostExclude(b *bot.Bot) func(*gumi.Ctx) error {
+	return func(gctx *gumi.Ctx) error {
+		if err := dgoutils.ValidateArgs(gctx, 1); err != nil {
 			return err
 		}
 
-		url := dgoutils.Trimmer(ctx, 0)
-		ctx.Args.Remove(0)
+		url := dgoutils.Trimmer(gctx, 0)
+		gctx.Args.Remove(0)
 
-		p := post.New(b, ctx, post.SkipModeNone, url)
+		p := post.New(b, gctx, post.SkipModeNone, url)
 		p.ExcludeChannel = true
-		if err := p.Send(); err != nil {
-			return err
-		}
 
-		return nil
+		ctx, cancel := context.WithTimeout(b.Context, 30*time.Second)
+		defer cancel()
+
+		return p.Send(ctx)
 	}
 }
 
-func leaderboard(b *bot.Bot) func(ctx *gumi.Ctx) error {
-	return func(ctx *gumi.Ctx) error {
+func leaderboard(b *bot.Bot) func(*gumi.Ctx) error {
+	return func(gctx *gumi.Ctx) error {
 		var (
 			limit  int64 = 100
-			args         = strings.Fields(ctx.Args.Raw)
+			args         = strings.Fields(gctx.Args.Raw)
 			filter       = store.ArtworkFilter{}
 		)
 
@@ -247,16 +250,19 @@ func leaderboard(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			Sort:  store.ByPopularity,
 		}
 
-		artworks, err := b.Store.SearchArtworks(b.Context, filter, opts)
+		ctx, cancel := context.WithTimeout(b.Context, 10*time.Second)
+		defer cancel()
+
+		artworks, err := b.Store.SearchArtworks(ctx, filter, opts)
 		if err != nil {
 			return err
 		}
 
 		artworkEmbeds := make([]*discordgo.MessageEmbed, 0, len(artworks))
 
-		ch, err := ctx.Session.Channel(ctx.Event.ChannelID)
+		ch, err := gctx.Session.Channel(gctx.Event.ChannelID)
 		if err != nil {
-			return messages.ErrChannelNotFound(err, ctx.Event.ChannelID)
+			return messages.ErrChannelNotFound(err, gctx.Event.ChannelID)
 		}
 
 		if !ch.NSFW {
@@ -271,25 +277,25 @@ func leaderboard(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			artworkEmbeds = append(artworkEmbeds, artworkToEmbed(artwork, artwork.Images[0], ind, len(artworks)))
 		}
 
-		wg := dgoutils.NewWidget(ctx.Session, ctx.Event.Author.ID, artworkEmbeds)
-		return wg.Start(ctx.Event.ChannelID)
+		wg := dgoutils.NewWidget(gctx.Session, gctx.Event.Author.ID, artworkEmbeds)
+		return wg.Start(gctx.Event.ChannelID)
 	}
 }
 
-func search(b *bot.Bot) func(ctx *gumi.Ctx) error {
-	return func(ctx *gumi.Ctx) error {
-		if err := dgoutils.InitCommand(ctx, 1); err != nil {
+func search(b *bot.Bot) func(*gumi.Ctx) error {
+	return func(gctx *gumi.Ctx) error {
+		if err := dgoutils.ValidateArgs(gctx, 1); err != nil {
 			return err
 		}
 
 		// Remove $'s to sanitize the input
-		query := strings.Replace(ctx.Args.Get(0).Raw, "$", "", -1)
+		query := strings.Replace(gctx.Args.Get(0).Raw, "$", "", -1)
 
 		var (
 			limit  int64 = 100
 			order        = store.Descending
 			sort         = store.ByTime
-			args         = strings.Fields(ctx.Args.Raw)
+			args         = strings.Fields(gctx.Args.Raw)
 			filter       = store.ArtworkFilter{
 				Query: query,
 			}
@@ -328,7 +334,10 @@ func search(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			Sort:  sort,
 		}
 
-		artworks, err := b.Store.SearchArtworks(b.Context, filter, opts)
+		ctx, cancel := context.WithTimeout(b.Context, 10*time.Second)
+		defer cancel()
+
+		artworks, err := b.Store.SearchArtworks(ctx, filter, opts)
 		if err != nil {
 			return err
 		}
@@ -339,9 +348,9 @@ func search(b *bot.Bot) func(ctx *gumi.Ctx) error {
 
 		artworkEmbeds := make([]*discordgo.MessageEmbed, 0, len(artworks))
 
-		ch, err := ctx.Session.Channel(ctx.Event.ChannelID)
+		ch, err := gctx.Session.Channel(gctx.Event.ChannelID)
 		if err != nil {
-			return messages.ErrChannelNotFound(err, ctx.Event.ChannelID)
+			return messages.ErrChannelNotFound(err, gctx.Event.ChannelID)
 		}
 
 		if !ch.NSFW {
@@ -356,7 +365,7 @@ func search(b *bot.Bot) func(ctx *gumi.Ctx) error {
 			artworkEmbeds = append(artworkEmbeds, artworkToEmbed(artwork, artwork.Images[0], ind, len(artworks)))
 		}
 
-		wg := dgoutils.NewWidget(ctx.Session, ctx.Event.Author.ID, artworkEmbeds)
-		return wg.Start(ctx.Event.ChannelID)
+		wg := dgoutils.NewWidget(gctx.Session, gctx.Event.Author.ID, artworkEmbeds)
+		return wg.Start(gctx.Event.ChannelID)
 	}
 }
