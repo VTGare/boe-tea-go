@@ -65,7 +65,7 @@ type deviantEmbed struct {
 
 func New() artworks.Provider {
 	return &DeviantArt{
-		regex: regexp.MustCompile(`(?i)https:\/\/(?:www\.)?deviantart\.com\/[\w]+\/art\/([\w\-]+)`),
+		regex: regexp.MustCompile(`(?i)https://(?:www\.)?deviantart\.com/[\w]+/art/([\w\-]+)`),
 	}
 }
 

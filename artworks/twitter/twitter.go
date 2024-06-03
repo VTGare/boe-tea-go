@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -51,8 +52,13 @@ type Video struct {
 }
 
 func New() artworks.Provider {
+	re := regexp.MustCompile(`^(?:mobile\\.)?(?:(?:fix(?:up|v))?x|(?:[fv]x)?twitter)\\.com$`)
+
 	return &Twitter{
-		providers: []artworks.Provider{newFxTwitter()},
+		providers: []artworks.Provider{newFxTwitter(re)},
+		twitterMatcher: twitterMatcher{
+			regex: re,
+		},
 	}
 }
 

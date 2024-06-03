@@ -16,13 +16,10 @@ import (
 	"github.com/everpcpc/pixiv"
 )
 
-var regex = regexp.MustCompile(
-	`(?i)http(?:s)?:\/\/(?:www\.)?pixiv\.net\/(?:en\/)?(?:artworks\/|member_illust\.php\?)(?:mode=medium\&)?(?:illust_id=)?([0-9]+)`,
-)
-
 type Pixiv struct {
 	app       *pixiv.AppPixivAPI
 	proxyHost string
+	regex     *regexp.Regexp
 }
 
 type Artwork struct {
@@ -60,11 +57,12 @@ func New(proxyHost, authToken, refreshToken string) (artworks.Provider, error) {
 	return &Pixiv{
 		app:       pixiv.NewApp(),
 		proxyHost: proxyHost,
+		regex:     regexp.MustCompile(`(?i)https?://(?:www\.)?pixiv\.net/(?:en/)?(?:artworks/|member_illust\.php\?)(?:mode=medium&)?(?:illust_id=)?([0-9]+)`),
 	}, nil
 }
 
 func (p *Pixiv) Match(s string) (string, bool) {
-	res := regex.FindStringSubmatch(s)
+	res := p.regex.FindStringSubmatch(s)
 	if res == nil {
 		return "", false
 	}
