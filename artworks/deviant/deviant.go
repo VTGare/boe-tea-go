@@ -70,47 +70,40 @@ func New() artworks.Provider {
 }
 
 func (d *DeviantArt) Find(id string) (artworks.Artwork, error) {
-	artwork, err := d._find(id)
-	if err != nil {
-		return nil, artworks.NewError(d, err)
-	}
+	return artworks.NewError(d, func() (artworks.Artwork, error) {
+		reqURL := "https://backend.deviantart.com/oembed?url=" + url.QueryEscape("deviantart.com/art/"+id)
+		resp, err := http.Get(reqURL)
+		if err != nil {
+			return nil, err
+		}
+		defer resp.Body.Close()
 
-	return artwork, nil
-}
+		var res deviantEmbed
+		err = json.NewDecoder(resp.Body).Decode(&res)
+		if err != nil {
+			return nil, err
+		}
 
-func (d *DeviantArt) _find(id string) (artworks.Artwork, error) {
-	reqURL := "https://backend.deviantart.com/oembed?url=" + url.QueryEscape("deviantart.com/art/"+id)
-	resp, err := http.Get(reqURL)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
+		artwork := &Artwork{
+			Title: res.Title,
+			Author: &Author{
+				Name: res.AuthorName,
+				URL:  res.AuthorURL,
+			},
+			ImageURL:     res.URL,
+			ThumbnailURL: res.ThumbnailURL,
+			Tags:         strings.Split(res.Tags, ", "),
+			Views:        res.Community.Statistics.Attributes.Views,
+			Favorites:    res.Community.Statistics.Attributes.Favorites,
+			Comments:     res.Community.Statistics.Attributes.Comments,
+			CreatedAt:    res.Pubdate,
+			url:          res.AuthorURL + "/art/" + id,
+		}
 
-	var res deviantEmbed
-	err = json.NewDecoder(resp.Body).Decode(&res)
-	if err != nil {
-		return nil, err
-	}
+		artwork.AIGenerated = artworks.IsAIGenerated(artwork.Tags...)
 
-	artwork := &Artwork{
-		Title: res.Title,
-		Author: &Author{
-			Name: res.AuthorName,
-			URL:  res.AuthorURL,
-		},
-		ImageURL:     res.URL,
-		ThumbnailURL: res.ThumbnailURL,
-		Tags:         strings.Split(res.Tags, ", "),
-		Views:        res.Community.Statistics.Attributes.Views,
-		Favorites:    res.Community.Statistics.Attributes.Favorites,
-		Comments:     res.Community.Statistics.Attributes.Comments,
-		CreatedAt:    res.Pubdate,
-		url:          res.AuthorURL + "/art/" + id,
-	}
-
-	artwork.AIGenerated = artworks.IsAIGenerated(artwork.Tags...)
-
-	return artwork, nil
+		return artwork, nil
+	})
 }
 
 func (d *DeviantArt) Match(s string) (string, bool) {

@@ -63,27 +63,29 @@ func New() artworks.Provider {
 }
 
 func (t *Twitter) Find(id string) (artworks.Artwork, error) {
-	var (
-		artwork artworks.Artwork
-		errs    []error
-	)
+	return artworks.NewError(t, func() (artworks.Artwork, error) {
+		var (
+			artwork artworks.Artwork
+			errs    []error
+		)
 
-	for _, provider := range t.providers {
-		var err error
-		artwork, err = provider.Find(id)
-		if errors.Is(err, ErrTweetNotFound) || errors.Is(err, ErrPrivateAccount) {
-			return nil, artworks.NewError(t, err)
+		for _, provider := range t.providers {
+			var err error
+			artwork, err = provider.Find(id)
+			if errors.Is(err, ErrTweetNotFound) || errors.Is(err, ErrPrivateAccount) {
+				return nil, err
+			}
+
+			if err != nil {
+				errs = append(errs, err)
+				continue
+			}
+
+			return artwork, nil
 		}
 
-		if err != nil {
-			errs = append(errs, err)
-			continue
-		}
-
-		return artwork, nil
-	}
-
-	return &Artwork{}, artworks.NewError(t, errors.Join(errs...))
+		return &Artwork{}, errors.Join(errs...)
+	})
 }
 
 func (a *Artwork) StoreArtwork() *store.Artwork {

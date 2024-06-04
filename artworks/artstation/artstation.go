@@ -77,32 +77,25 @@ func New() artworks.Provider {
 }
 
 func (as *Artstation) Find(id string) (artworks.Artwork, error) {
-	artwork, err := as._find(id)
-	if err != nil {
-		return nil, artworks.NewError(as, err)
-	}
+	return artworks.NewError(as, func() (artworks.Artwork, error) {
+		reqURL := fmt.Sprintf("https://www.artstation.com/projects/%v.json", id)
+		resp, err := http.Get(reqURL)
+		if err != nil {
+			return nil, err
+		}
 
-	return artwork, nil
-}
+		defer resp.Body.Close()
 
-func (as *Artstation) _find(id string) (artworks.Artwork, error) {
-	reqURL := fmt.Sprintf("https://www.artstation.com/projects/%v.json", id)
-	resp, err := http.Get(reqURL)
-	if err != nil {
-		return nil, err
-	}
+		res := &ArtstationResponse{}
+		err = json.NewDecoder(resp.Body).Decode(res)
+		if err != nil {
+			return nil, err
+		}
 
-	defer resp.Body.Close()
+		res.AIGenerated = artworks.IsAIGenerated(res.Tags...)
 
-	res := &ArtstationResponse{}
-	err = json.NewDecoder(resp.Body).Decode(res)
-	if err != nil {
-		return nil, err
-	}
-
-	res.AIGenerated = artworks.IsAIGenerated(res.Tags...)
-
-	return res, nil
+		return res, nil
+	})
 }
 
 func (as *Artstation) Match(url string) (string, bool) {

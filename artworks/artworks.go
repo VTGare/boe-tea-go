@@ -36,11 +36,17 @@ func (e *Error) Unwrap() error {
 	return e.cause
 }
 
-func NewError(p Provider, err error) error {
-	return &Error{
-		provider: fmt.Sprintf("%T", p),
-		cause:    err,
+func NewError(p Provider, find func() (Artwork, error)) (Artwork, error) {
+	artwork, err := find()
+
+	if err != nil {
+		return nil, &Error{
+			provider: fmt.Sprintf("%T", p),
+			cause:    err,
+		}
 	}
+
+	return artwork, nil
 }
 
 // Common errors
