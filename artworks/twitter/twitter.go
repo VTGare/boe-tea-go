@@ -52,7 +52,7 @@ type Video struct {
 }
 
 func New() artworks.Provider {
-	re := regexp.MustCompile(`^(?:mobile\\.)?(?:(?:fix(?:up|v))?x|(?:[fv]x)?twitter)\\.com$`)
+	re := regexp.MustCompile(`^(?:mobile\.)?(?:(?:fix(?:up|v))?x|(?:[fv]x)?twitter)\.com$`)
 
 	return &Twitter{
 		providers: []artworks.Provider{newFxTwitter(re)},
