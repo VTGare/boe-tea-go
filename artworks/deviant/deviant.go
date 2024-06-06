@@ -14,7 +14,6 @@ import (
 	"github.com/VTGare/boe-tea-go/internal/arrays"
 	"github.com/VTGare/boe-tea-go/messages"
 	"github.com/VTGare/boe-tea-go/store"
-	"github.com/VTGare/embeds"
 	"github.com/bwmarrin/discordgo"
 )
 
@@ -120,36 +119,28 @@ func (d *DeviantArt) Enabled(g *store.Guild) bool {
 }
 
 func (a *Artwork) MessageSends(footer string, tagsEnabled bool) ([]*discordgo.MessageSend, error) {
-	eb := embeds.NewBuilder()
-
-	eb.Title(fmt.Sprintf("%v by %v", a.Title, a.Author.Name)).
-		Image(a.ImageURL).
-		URL(a.url).
-		Timestamp(a.CreatedAt).
-		AddField("Views", strconv.Itoa(a.Views), true).
-		AddField("Favorites", strconv.Itoa(a.Favorites), true)
+	eb := &artworks.Embed{
+		Title:       a.Title,
+		Username:    a.Author.Name,
+		FieldName1:  "Views",
+		FieldValue1: strconv.Itoa(a.Views),
+		FieldName2:  "Favorites",
+		FieldValue2: []string{strconv.Itoa(a.Favorites)},
+		Images:      []string{a.ImageURL},
+		URL:         a.url,
+		Timestamp:   a.CreatedAt,
+		Footer:      footer,
+		AIGenerated: a.AIGenerated,
+	}
 
 	if tagsEnabled && len(a.Tags) > 0 {
 		tags := arrays.Map(a.Tags, func(s string) string {
-			return messages.NamedLink(
-				s, "https://www.deviantart.com/tag/"+s,
-			)
+			return messages.NamedLink(s, "https://www.deviantart.com/tag/"+s)
 		})
-
-		eb.Description("**Tags:**\n" + strings.Join(tags, " • "))
+		eb.Description = fmt.Sprintf("**Tags:**\n%v", strings.Join(tags, " • "))
 	}
 
-	if footer != "" {
-		eb.Footer(footer, "")
-	}
-
-	if a.AIGenerated {
-		eb.AddField("⚠️ Disclaimer", "This artwork is AI-generated.")
-	}
-
-	return []*discordgo.MessageSend{
-		{Embeds: []*discordgo.MessageEmbed{eb.Finalize()}},
-	}, nil
+	return eb.ToEmbed(), nil
 }
 
 func (a *Artwork) StoreArtwork() *store.Artwork {

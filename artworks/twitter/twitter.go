@@ -105,8 +105,8 @@ func (a *Artwork) StoreArtwork() *store.Artwork {
 
 // MessageSends transforms an artwork to discordgo embeds.
 func (a *Artwork) MessageSends(footer string, _ bool) ([]*discordgo.MessageSend, error) {
-	eb := embeds.NewBuilder()
 	if a.FullName == "" && a.Len() == 0 {
+		eb := embeds.NewBuilder()
 		eb.Title("❎ Tweet doesn't exist.")
 		eb.Description("The tweet is NSFW or doesn't exist.\n\nUnsafe tweets can't be embedded due to API changes.")
 		eb.Footer(footer, "")
@@ -116,80 +116,41 @@ func (a *Artwork) MessageSends(footer string, _ bool) ([]*discordgo.MessageSend,
 		}, nil
 	}
 
-	eb.URL(a.Permalink).Description(artworks.EscapeMarkdown(a.Content)).Timestamp(a.Timestamp)
-
-	if a.Retweets > 0 {
-		eb.AddField("Retweets", strconv.Itoa(a.Retweets), true)
-	}
-
-	if a.Likes > 0 {
-		eb.AddField("Likes", strconv.Itoa(a.Likes), true)
-	}
-
-	if footer != "" {
-		eb.Footer(footer, "")
-	}
-
-	if a.AIGenerated {
-		eb.AddField("⚠️ Disclaimer", "This artwork is AI-generated.")
+	eb := &artworks.Embed{
+		Title:       a.FullName,
+		Username:    a.Username,
+		Description: a.Content,
+		FieldName1:  "Likes",
+		FieldValue1: strconv.Itoa(a.Likes),
+		FieldName2:  "Retweets",
+		FieldValue2: []string{strconv.Itoa(a.Retweets)},
+		URL:         a.Permalink,
+		Timestamp:   a.Timestamp,
+		AIGenerated: a.AIGenerated,
 	}
 
 	if len(a.Videos) > 0 {
 		return a.videoEmbed(eb)
 	}
 
-	length := len(a.Photos)
-	tweets := make([]*discordgo.MessageSend, 0, length)
-	if length > 1 {
-		eb.Title(fmt.Sprintf("%v (%v) | Page %v / %v", a.FullName, a.Username, 1, length))
-	} else {
-		eb.Title(fmt.Sprintf("%v (%v)", a.FullName, a.Username))
+	for _, image := range a.Photos {
+		eb.Images = append(eb.Images, image)
 	}
 
-	if length > 0 {
-		eb.Image(a.Photos[0])
-	}
-
-	tweets = append(tweets, &discordgo.MessageSend{
-		Embeds: []*discordgo.MessageEmbed{eb.Finalize()},
-	})
-
-	if len(a.Photos) > 1 {
-		for ind, photo := range a.Photos[1:] {
-			eb := embeds.NewBuilder()
-
-			eb.Title(fmt.Sprintf("%v (%v) | Page %v / %v", a.FullName, a.Username, ind+2, length)).URL(a.Permalink)
-			eb.Image(photo).Timestamp(a.Timestamp)
-
-			if footer != "" {
-				eb.Footer(footer, "")
-			}
-
-			tweets = append(tweets, &discordgo.MessageSend{Embeds: []*discordgo.MessageEmbed{eb.Finalize()}})
-		}
-	}
-
-	return tweets, nil
+	return eb.ToEmbed(), nil
 }
 
-func (a *Artwork) videoEmbed(eb *embeds.Builder) ([]*discordgo.MessageSend, error) {
-	files := make([]*discordgo.File, 0, len(a.Videos))
+func (a *Artwork) videoEmbed(eb *artworks.Embed) ([]*discordgo.MessageSend, error) {
 	for _, video := range a.Videos {
 		file, err := downloadVideo(video.URL)
 		if err != nil {
 			return nil, err
 		}
 
-		files = append(files, file)
+		eb.Files = append(eb.Files, file)
 	}
 
-	eb.Title(fmt.Sprintf("%v (%v)", a.FullName, a.Username))
-	msg := &discordgo.MessageSend{
-		Embeds: []*discordgo.MessageEmbed{eb.Finalize()},
-		Files:  files,
-	}
-
-	return []*discordgo.MessageSend{msg}, nil
+	return eb.ToEmbed(), nil
 }
 
 func downloadVideo(fileURL string) (*discordgo.File, error) {

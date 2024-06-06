@@ -11,7 +11,6 @@ import (
 	"github.com/VTGare/boe-tea-go/internal/arrays"
 	"github.com/VTGare/boe-tea-go/messages"
 	"github.com/VTGare/boe-tea-go/store"
-	"github.com/VTGare/embeds"
 	"github.com/bwmarrin/discordgo"
 	"github.com/everpcpc/pixiv"
 )
@@ -177,61 +176,31 @@ func (a *Artwork) StoreArtwork() *store.Artwork {
 }
 
 func (a *Artwork) MessageSends(footer string, tagsEnabled bool) ([]*discordgo.MessageSend, error) {
-	var (
-		length = len(a.Images)
-		pages  = make([]*discordgo.MessageSend, 0, length)
-		eb     = embeds.NewBuilder()
-	)
-
-	if length > 1 {
-		eb.Title(fmt.Sprintf("%v by %v | Page %v / %v", a.Title, a.Author, 1, length))
-	} else {
-		eb.Title(fmt.Sprintf("%v by %v", a.Title, a.Author))
+	eb := &artworks.Embed{
+		Title:       a.Title,
+		Username:    a.Author,
+		FieldName1:  "Likes",
+		FieldValue1: strconv.Itoa(a.Likes),
+		FieldName2:  "Original quality",
+		URL:         a.url,
+		Timestamp:   time.Time{},
+		Footer:      footer,
+		AIGenerated: a.AIGenerated,
 	}
 
 	if tagsEnabled && len(a.Tags) > 0 {
 		tags := arrays.Map(a.Tags, func(s string) string {
 			return fmt.Sprintf("[%v](https://pixiv.net/en/tags/%v/artworks)", s, s)
 		})
-
-		eb.Description(fmt.Sprintf("**Tags**\n%v", strings.Join(tags, " • ")))
+		eb.Description = fmt.Sprintf("**Tags**\n%v", strings.Join(tags, " • "))
 	}
 
-	eb.URL(a.url).
-		AddField("Likes", strconv.Itoa(a.Likes), true).
-		AddField("Original quality", messages.ClickHere(a.Images[0].originalProxy(a.proxy)), true).
-		Timestamp(a.CreatedAt)
-
-	if footer != "" {
-		eb.Footer(footer, "")
+	for _, image := range a.Images {
+		eb.Images = append(eb.Images, image.previewProxy(a.proxy))
+		eb.FieldValue2 = append(eb.FieldValue2, messages.ClickHere(image.originalProxy(a.proxy)))
 	}
 
-	if a.AIGenerated {
-		eb.AddField("⚠️ Disclaimer", "This artwork is AI-generated.")
-	}
-
-	eb.Image(a.Images[0].previewProxy(a.proxy))
-	pages = append(pages, &discordgo.MessageSend{Embeds: []*discordgo.MessageEmbed{eb.Finalize()}})
-	if length > 1 {
-		for ind, image := range a.Images[1:] {
-			eb := embeds.NewBuilder()
-
-			eb.Title(fmt.Sprintf("%v by %v | Page %v / %v", a.Title, a.Author, ind+2, length))
-			eb.Image(image.previewProxy(a.proxy))
-			eb.URL(a.url).Timestamp(a.CreatedAt)
-
-			if footer != "" {
-				eb.Footer(footer, "")
-			}
-
-			eb.AddField("Likes", strconv.Itoa(a.Likes), true)
-			eb.AddField("Original quality", messages.ClickHere(image.originalProxy(a.proxy)), true)
-
-			pages = append(pages, &discordgo.MessageSend{Embeds: []*discordgo.MessageEmbed{eb.Finalize()}})
-		}
-	}
-
-	return pages, nil
+	return eb.ToEmbed(), nil
 }
 
 func (a *Artwork) URL() string {

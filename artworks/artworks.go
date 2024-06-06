@@ -1,7 +1,6 @@
 package artworks
 
 import (
-	"regexp"
 	"strings"
 
 	"github.com/VTGare/boe-tea-go/store"
@@ -19,18 +18,6 @@ type Artwork interface {
 	MessageSends(footer string, tags bool) ([]*discordgo.MessageSend, error)
 	URL() string
 	Len() int
-}
-
-func EscapeMarkdown(content string) string {
-	contents := strings.Split(content, "\n")
-	regex := regexp.MustCompile("^#{1,3}")
-
-	for i, line := range contents {
-		if regex.MatchString(line) {
-			contents[i] = "\\" + line
-		}
-	}
-	return strings.Join(contents, "\n")
 }
 
 func IsAIGenerated(contents ...string) bool {

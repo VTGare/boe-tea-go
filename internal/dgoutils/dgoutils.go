@@ -19,6 +19,14 @@ var (
 	ErrRangeSyntax = errors.New("range low is higher than range high")
 )
 
+func Ternary[T any](condition bool, a T, b T) T {
+	if condition {
+		return a
+	}
+
+	return b
+}
+
 func ValidateArgs(gctx *gumi.Ctx, argsLen int) error {
 	if gctx.Args.Len() < argsLen {
 		return messages.ErrIncorrectCmd(gctx.Command)

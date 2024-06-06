@@ -126,13 +126,8 @@ func (artwork *ArtstationResponse) StoreArtwork() *store.Artwork {
 }
 
 func (artwork *ArtstationResponse) MessageSends(footer string, tagsEnabled bool) ([]*discordgo.MessageSend, error) {
-	var (
-		length = len(artwork.Assets)
-		pages  = make([]*discordgo.MessageSend, 0, length)
-		eb     = embeds.NewBuilder()
-	)
-
-	if length == 0 {
+	if len(artwork.Assets) == 0 {
+		eb := embeds.NewBuilder()
 		eb.Title("❎ An error has occured.")
 		eb.Description("Artwork has been deleted or the ID does not exist.")
 		eb.Footer(footer, "")
@@ -142,51 +137,28 @@ func (artwork *ArtstationResponse) MessageSends(footer string, tagsEnabled bool)
 		}, nil
 	}
 
-	if length > 1 {
-		eb.Title(fmt.Sprintf("%v by %v | Page %v / %v", artwork.Title, artwork.User.Name, 1, length))
-	} else {
-		eb.Title(fmt.Sprintf("%v by %v", artwork.Title, artwork.User.Name))
+	eb := &artworks.Embed{
+		Title:       artwork.Title,
+		Username:    artwork.User.Name,
+		FieldName1:  "Likes",
+		FieldValue1: strconv.Itoa(artwork.LikesCount),
+		FieldName2:  "Views",
+		FieldValue2: []string{strconv.Itoa(artwork.ViewsCount)},
+		URL:         artwork.Permalink,
+		Timestamp:   artwork.CreatedAt,
+		Footer:      footer,
+		AIGenerated: artwork.AIGenerated,
 	}
 
 	if tagsEnabled {
-		desc := bluemonday.StrictPolicy().Sanitize(artwork.Description)
-		eb.Description(artworks.EscapeMarkdown(desc))
+		eb.Description = bluemonday.StrictPolicy().Sanitize(artwork.Description)
 	}
 
-	eb.URL(artwork.URL()).
-		AddField("Likes", strconv.Itoa(artwork.LikesCount), true).
-		AddField("Views", strconv.Itoa(artwork.ViewsCount), true).
-		Timestamp(artwork.CreatedAt)
-
-	if footer != "" {
-		eb.Footer(footer, "")
+	for _, image := range artwork.Assets {
+		eb.Images = append(eb.Images, image.ImageURL)
 	}
 
-	if artwork.AIGenerated {
-		eb.AddField("⚠️ Disclaimer", "This artwork is AI-generated.")
-	}
-
-	eb.Image(artwork.Assets[0].ImageURL)
-	pages = append(pages, &discordgo.MessageSend{Embeds: []*discordgo.MessageEmbed{eb.Finalize()}})
-	if length > 1 {
-		for ind, image := range artwork.Assets[1:] {
-			eb := embeds.NewBuilder()
-
-			eb.Title(fmt.Sprintf("%v by %v | Page %v / %v", artwork.Title, artwork.User.Name, ind+2, length)).
-				Image(image.ImageURL).
-				URL(artwork.URL()).
-				Timestamp(artwork.CreatedAt)
-
-			if footer != "" {
-				eb.Footer(footer, "")
-			}
-
-			eb.AddField("Likes", strconv.Itoa(artwork.LikesCount), true)
-			pages = append(pages, &discordgo.MessageSend{Embeds: []*discordgo.MessageEmbed{eb.Finalize()}})
-		}
-	}
-
-	return pages, nil
+	return eb.ToEmbed(), nil
 }
 
 func (artwork *ArtstationResponse) URL() string {

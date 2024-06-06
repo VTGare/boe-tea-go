@@ -9,8 +9,6 @@ import (
 var (
 	ErrArtworkNotFound = errors.New("artwork not found")
 	ErrRateLimited     = errors.New("provider rate limited")
-	AIDisclaimer       = "⚠️ Disclaimer"
-	AIDescription      = "This artwork is AI-generated."
 )
 
 type Error struct {
