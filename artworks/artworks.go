@@ -20,7 +20,7 @@ type Artwork interface {
 	Len() int
 }
 
-func IsAIGenerated(contents ...string) bool {
+func IsAIGenerated(content ...string) bool {
 	aiTags := []string{
 		"aiart",
 		"aigenerated",
@@ -32,7 +32,7 @@ func IsAIGenerated(contents ...string) bool {
 		"stablediffusion",
 	}
 
-	for _, tag := range contents {
+	for _, tag := range content {
 		for _, test := range aiTags {
 			if strings.EqualFold(tag, test) {
 				return true
