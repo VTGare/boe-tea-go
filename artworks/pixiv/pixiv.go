@@ -44,12 +44,15 @@ type Image struct {
 	Original string
 }
 
-func New(proxyHost, authToken, refreshToken string) (artworks.Provider, error) {
+func LoadAuth(authToken, refreshToken string) error {
 	_, err := pixiv.LoadAuth(authToken, refreshToken, time.Now())
 	if err != nil {
-		return nil, err
+		return err
 	}
+	return nil
+}
 
+func New(proxyHost string) artworks.Provider {
 	if proxyHost == "" {
 		proxyHost = "https://boetea.dev"
 	}
@@ -58,7 +61,7 @@ func New(proxyHost, authToken, refreshToken string) (artworks.Provider, error) {
 		app:       pixiv.NewApp(),
 		proxyHost: proxyHost,
 		regex:     regexp.MustCompile(`(?i)https?://(?:www\.)?pixiv\.net/(?:en/)?(?:artworks/|member_illust\.php\?)(?:mode=medium&)?(?:illust_id=)?([0-9]+)`),
-	}, nil
+	}
 }
 
 func (p *Pixiv) Match(s string) (string, bool) {

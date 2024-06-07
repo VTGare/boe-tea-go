@@ -16,9 +16,9 @@ func TestArtstation(t *testing.T) {
 var _ = DescribeTable(
 	"Match Artstation URL",
 	func(url string, expectedID string, expectedResult bool) {
-		as := artstation.New()
+		provider := artstation.New()
 
-		id, ok := as.Match(url)
+		id, ok := provider.Match(url)
 		Expect(id).To(BeEquivalentTo(expectedID))
 		Expect(ok).To(BeEquivalentTo(expectedResult))
 	},
