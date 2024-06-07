@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/VTGare/boe-tea-go/artworks/embed"
 	"io"
 	"net/http"
 	"net/url"
@@ -116,7 +117,7 @@ func (a *Artwork) MessageSends(footer string, _ bool) ([]*discordgo.MessageSend,
 		}, nil
 	}
 
-	eb := &artworks.Embed{
+	eb := &embed.Embed{
 		Title:       a.FullName,
 		Username:    a.Username,
 		Description: a.Content,
@@ -140,7 +141,7 @@ func (a *Artwork) MessageSends(footer string, _ bool) ([]*discordgo.MessageSend,
 	return eb.ToEmbed(), nil
 }
 
-func (a *Artwork) videoEmbed(eb *artworks.Embed) ([]*discordgo.MessageSend, error) {
+func (a *Artwork) videoEmbed(eb *embed.Embed) ([]*discordgo.MessageSend, error) {
 	for _, video := range a.Videos {
 		file, err := downloadVideo(video.URL)
 		if err != nil {

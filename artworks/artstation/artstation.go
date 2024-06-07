@@ -3,6 +3,7 @@ package artstation
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/VTGare/boe-tea-go/artworks/embed"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -137,7 +138,7 @@ func (artwork *ArtstationResponse) MessageSends(footer string, tagsEnabled bool)
 		}, nil
 	}
 
-	eb := &artworks.Embed{
+	eb := &embed.Embed{
 		Title:       artwork.Title,
 		Username:    artwork.User.Name,
 		FieldName1:  "Likes",
@@ -151,7 +152,7 @@ func (artwork *ArtstationResponse) MessageSends(footer string, tagsEnabled bool)
 	}
 
 	if tagsEnabled {
-		eb.Description = bluemonday.StrictPolicy().Sanitize(artwork.Description)
+		eb.Tags = bluemonday.StrictPolicy().Sanitize(artwork.Description)
 	}
 
 	for _, image := range artwork.Assets {

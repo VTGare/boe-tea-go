@@ -1,4 +1,4 @@
-package artworks
+package embed
 
 import (
 	"fmt"
@@ -14,6 +14,7 @@ type Embed struct {
 	Title       string
 	Username    string
 	Description string
+	Tags        string
 	FieldName1  string
 	FieldValue1 string
 	FieldName2  string
@@ -49,19 +50,23 @@ func (e *Embed) ToEmbed() []*discordgo.MessageSend {
 		eb.URL(e.URL)
 		eb.Timestamp(e.Timestamp)
 
-		if i < len(e.FieldValue2) {
-			eb.AddField(e.FieldName1, e.FieldValue1, true)
-			eb.AddField(e.FieldName2, e.FieldValue2[i], true)
-		}
-
 		if i == 0 {
 			if e.Description != "" {
 				eb.Description(EscapeMarkdown(e.Description))
 			}
 
-			if e.AIGenerated {
-				eb.AddField("⚠️ Disclaimer", "This artwork is AI-generated.")
+			if e.Tags != "" {
+				eb.AddField("Tags", e.Tags)
 			}
+		}
+
+		if i < len(e.FieldValue2) {
+			eb.AddField(e.FieldName1, e.FieldValue1, true)
+			eb.AddField(e.FieldName2, e.FieldValue2[i], true)
+		}
+
+		if i == 0 && e.AIGenerated {
+			eb.AddField("⚠️ Disclaimer", "This artwork is AI-generated.")
 		}
 
 		if e.Footer != "" {
