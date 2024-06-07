@@ -2,6 +2,7 @@ package pixiv
 
 import (
 	"fmt"
+	"github.com/VTGare/boe-tea-go/artworks/embed"
 	"regexp"
 	"strconv"
 	"strings"
@@ -176,7 +177,7 @@ func (a *Artwork) StoreArtwork() *store.Artwork {
 }
 
 func (a *Artwork) MessageSends(footer string, tagsEnabled bool) ([]*discordgo.MessageSend, error) {
-	eb := &artworks.Embed{
+	eb := &embed.Embed{
 		Title:       a.Title,
 		Username:    a.Author,
 		FieldName1:  "Likes",

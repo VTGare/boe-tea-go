@@ -3,6 +3,7 @@ package deviant
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/VTGare/boe-tea-go/artworks/embed"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -119,7 +120,7 @@ func (d *DeviantArt) Enabled(g *store.Guild) bool {
 }
 
 func (a *Artwork) MessageSends(footer string, tagsEnabled bool) ([]*discordgo.MessageSend, error) {
-	eb := &artworks.Embed{
+	eb := &embed.Embed{
 		Title:       a.Title,
 		Username:    a.Author.Name,
 		FieldName1:  "Views",
