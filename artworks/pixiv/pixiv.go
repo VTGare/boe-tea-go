@@ -187,7 +187,7 @@ func (a *Artwork) MessageSends(footer string, tagsEnabled bool) ([]*discordgo.Me
 		FieldValue1: strconv.Itoa(a.Likes),
 		FieldName2:  "Original quality",
 		URL:         a.url,
-		Timestamp:   time.Time{},
+		Timestamp:   a.CreatedAt,
 		Footer:      footer,
 		AIGenerated: a.AIGenerated,
 	}
