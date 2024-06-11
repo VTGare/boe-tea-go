@@ -2,14 +2,15 @@ package pixiv
 
 import (
 	"fmt"
-	"github.com/VTGare/boe-tea-go/artworks/embed"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/VTGare/boe-tea-go/artworks"
+	"github.com/VTGare/boe-tea-go/artworks/embed"
 	"github.com/VTGare/boe-tea-go/internal/arrays"
+	"github.com/VTGare/boe-tea-go/internal/dgoutils"
 	"github.com/VTGare/boe-tea-go/messages"
 	"github.com/VTGare/boe-tea-go/store"
 	"github.com/bwmarrin/discordgo"
@@ -89,13 +90,6 @@ func (p *Pixiv) Find(id string) (artworks.Artwork, error) {
 			return nil, artworks.ErrArtworkNotFound
 		}
 
-		author := ""
-		if illust.User != nil {
-			author = illust.User.Name
-		} else {
-			author = "Unknown"
-		}
-
 		tags := make([]string, 0)
 		nsfw := false
 		for _, tag := range illust.Tags {
@@ -103,11 +97,10 @@ func (p *Pixiv) Find(id string) (artworks.Artwork, error) {
 				nsfw = true
 			}
 
-			if tag.TranslatedName != "" {
-				tags = append(tags, tag.TranslatedName)
-			} else {
-				tags = append(tags, tag.Name)
-			}
+			tags = dgoutils.Ternary(tag.TranslatedName != "",
+				append(tags, tag.TranslatedName),
+				append(tags, tag.Name),
+			)
 		}
 
 		images := make([]*Image, 0, illust.PageCount)
@@ -131,38 +124,33 @@ func (p *Pixiv) Find(id string) (artworks.Artwork, error) {
 			images = append(images, img)
 		}
 
-		artwork := &Artwork{
-			ID:        id,
-			url:       "https://www.pixiv.net/en/artworks/" + id,
-			Title:     illust.Title,
-			Author:    author,
-			Tags:      tags,
-			Images:    images,
-			NSFW:      nsfw,
-			Type:      illust.Type,
-			Pages:     illust.PageCount,
-			Likes:     illust.TotalBookmarks,
-			CreatedAt: illust.CreateDate,
-
-			proxy: p.proxyHost,
-		}
-
 		errImages := []string{
 			"limit_sanity_level_360.png",
 			"limit_unknown_360.png",
 		}
 
 		for _, img := range errImages {
-			if artwork.Images[0].Original == fmt.Sprintf("https://s.pximg.net/common/images/%s", img) {
+			if images[0].Original == fmt.Sprintf("https://s.pximg.net/common/images/%s", img) {
 				return nil, artworks.ErrRateLimited
 			}
 		}
 
-		if illust.IllustAIType == pixiv.IllustAITypeAIGenerated {
-			artwork.AIGenerated = true
-		}
+		return &Artwork{
+			ID:          id,
+			url:         "https://www.pixiv.net/en/artworks/" + id,
+			Title:       illust.Title,
+			Author:      dgoutils.Ternary(illust.User != nil, illust.User.Name, "Unknown"),
+			Tags:        tags,
+			Images:      images,
+			NSFW:        nsfw,
+			Type:        illust.Type,
+			Pages:       illust.PageCount,
+			Likes:       illust.TotalBookmarks,
+			CreatedAt:   illust.CreateDate,
+			AIGenerated: illust.IllustAIType == pixiv.IllustAITypeAIGenerated,
 
-		return artwork, nil
+			proxy: p.proxyHost,
+		}, nil
 	})
 }
 

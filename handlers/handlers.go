@@ -70,7 +70,7 @@ func OnMessage(b *bot.Bot) func(*gumi.Ctx) error {
 			return err
 		}
 
-		if !(len(guild.ArtChannels) == 0 || arrays.Any(guild.ArtChannels, gctx.Event.ChannelID)) {
+		if !(len(guild.ArtChannels) == 0 || arrays.Check(gctx.Event.ChannelID, guild.ArtChannels)) {
 			return nil
 		}
 
