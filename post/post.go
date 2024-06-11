@@ -169,7 +169,7 @@ func (p *Post) Crosspost(ctx context.Context, userID string, group *store.Group)
 			"group", group,
 			"channel_id", channelID,
 		)
-		
+
 		go func(channelID string) {
 			defer wg.Done()
 			ch, err := p.Ctx.Session.Channel(channelID)
@@ -194,7 +194,7 @@ func (p *Post) Crosspost(ctx context.Context, userID string, group *store.Group)
 			}
 
 			if guild.Crosspost {
-				if len(guild.ArtChannels) == 0 || arrays.Any(guild.ArtChannels, ch.ID) {
+				if len(guild.ArtChannels) == 0 || arrays.Check(ch.ID, guild.ArtChannels) {
 					p.CrosspostMode = true
 					res, err := p.fetch(ctx, guild, channelID)
 					if err != nil {
@@ -207,7 +207,7 @@ func (p *Post) Crosspost(ctx context.Context, userID string, group *store.Group)
 						log.With("error", err).Error("failed to send messages")
 						return
 					}
-					
+
 					msgChan <- sent
 				}
 			}

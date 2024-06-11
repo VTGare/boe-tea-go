@@ -52,7 +52,7 @@ func DefaultUser(id string) *User {
 func (u *User) FindGroup(channelID string) (*Group, bool) {
 	for _, group := range u.Groups {
 		if group.IsPair {
-			if arrays.Any(group.Children, channelID) {
+			if arrays.Check(channelID, group.Children) {
 				return group, true
 			}
 

@@ -398,7 +398,7 @@ func push(b *bot.Bot) func(*gumi.Ctx) error {
 				continue
 			}
 
-			if arrays.Any(group.Children, channelID) {
+			if arrays.Check(channelID, group.Children) {
 				continue
 			}
 
@@ -452,7 +452,7 @@ func remove(b *bot.Bot) func(*gumi.Ctx) error {
 		for arg := range gctx.Args.Arguments {
 			channelID := dgoutils.Trimmer(gctx, arg)
 
-			if !arrays.Any(group.Children, channelID) {
+			if !arrays.Check(channelID, group.Children) {
 				continue
 			}
 
@@ -506,7 +506,7 @@ func editParent(b *bot.Bot) func(*gumi.Ctx) error {
 			return messages.ErrGroupAlreadyExists(dest)
 		}
 
-		if arrays.Any(group.Children, dest) {
+		if arrays.Check(dest, group.Children) {
 			return messages.ErrUserEditParentFail(group.Parent, dest)
 		}
 
