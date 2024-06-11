@@ -161,18 +161,16 @@ func set(b *bot.Bot) func(*gumi.Ctx) error {
 				),
 			)
 
-			var artChannels []string
-			if len(guild.ArtChannels) > 5 {
-				artChannels = []string{"There are more than 5 art channels, use `bt!artchannels` command to see them."}
-			} else {
-				artChannels = arrays.Map(guild.ArtChannels, func(s string) string {
+			channels := dgoutils.Ternary(len(guild.ArtChannels) > 5,
+				[]string{"There are more than 5 art channels, use `bt!artchannels` command to see them."},
+				arrays.Map(guild.ArtChannels, func(s string) string {
 					return fmt.Sprintf("<#%v> | `%v`", s, s)
-				})
-			}
+				}),
+			)
 
 			eb.AddField(
 				"Art channels",
-				"Use `bt!artchannels` command to list or manage art channels!\n\n"+strings.Join(artChannels, "\n"),
+				"Use `bt!artchannels` command to list or manage art channels!\n\n"+strings.Join(channels, "\n"),
 			)
 
 			return gctx.ReplyEmbed(eb.Finalize())

@@ -5,9 +5,15 @@ import (
 	"time"
 )
 
-func Any[T comparable](slice []T, cmp T) bool {
+func collate[T comparable](a, b T, c ...T) []T {
+	slice := make([]T, 0)
+	slice = append(slice, a, b)
+	return append(slice, c...)
+}
+
+func Check[T comparable](compare T, slice []T) bool {
 	for _, val := range slice {
-		if val == cmp {
+		if val == compare {
 			return true
 		}
 	}
@@ -15,10 +21,56 @@ func Any[T comparable](slice []T, cmp T) bool {
 	return false
 }
 
-func AnyFunc[T comparable](slice []T, f func(T) bool) bool {
+func CheckArgs[T comparable](compare, a, b T, c ...T) bool {
+	return Check(compare, collate(a, b, c...))
+}
+
+func CheckFunc[T comparable](f func(T) bool, slice []T) bool {
 	for _, val := range slice {
 		if f(val) {
 			return true
+		}
+	}
+
+	return false
+}
+
+func CheckFuncArgs[T comparable](f func(T) bool, a, b T, c ...T) bool {
+	return CheckFunc(f, collate(a, b, c...))
+}
+
+func CheckFuncCompare[T comparable](f func(T, T) bool, compare T, slice []T) bool {
+	for _, val := range slice {
+		if f(compare, val) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func CheckFuncCompareArgs[T comparable](f func(T, T) bool, compare, a, b T, c ...T) bool {
+	return CheckFuncCompare(f, compare, collate(a, b, c...))
+}
+
+func CheckArrays[T comparable](a, b []T) bool {
+	for _, val := range a {
+		for _, test := range b {
+			if val == test {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+func CheckArraysFunc[T comparable](f func(T, T) bool, a, b []T) bool {
+	for _, val := range a {
+		for _, test := range b {
+			if f(val, test) {
+				return true
+			}
 		}
 	}
 

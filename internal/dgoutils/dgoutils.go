@@ -19,6 +19,22 @@ var (
 	ErrRangeSyntax = errors.New("range low is higher than range high")
 )
 
+func Ternary[T any](condition bool, a T, b T) T {
+	if condition {
+		return a
+	}
+
+	return b
+}
+
+func TernaryFunc[T any](f func(T), condition bool, a T, b T) {
+	if condition {
+		f(a)
+	}
+
+	f(b)
+}
+
 func ValidateArgs(gctx *gumi.Ctx, argsLen int) error {
 	if gctx.Args.Len() < argsLen {
 		return messages.ErrIncorrectCmd(gctx.Command)
@@ -124,7 +140,7 @@ func (r *Range) Array() []int {
 }
 
 func (r *Range) Map() map[int]struct{} {
-	m := make(map[int]struct{}, 0)
+	m := make(map[int]struct{})
 	for i := r.Low; i <= r.High; i++ {
 		m[i] = struct{}{}
 	}

@@ -243,9 +243,8 @@ func feedback(*bot.Bot) func(*gumi.Ctx) error {
 
 		if len(gctx.Event.Attachments) > 0 {
 			att := gctx.Event.Attachments[0]
-			if strings.HasSuffix(att.Filename, "png") ||
-				strings.HasSuffix(att.Filename, "jpg") ||
-				strings.HasSuffix(att.Filename, "gif") {
+			if arrays.CheckFuncCompareArgs(
+				strings.HasSuffix, att.Filename, "png", "jpg", "gif") {
 				eb.Image(att.URL)
 			}
 		}

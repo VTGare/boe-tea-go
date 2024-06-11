@@ -12,11 +12,10 @@ import (
 	"github.com/VTGare/boe-tea-go/internal/arrays"
 )
 
-var nonAlphanumericRegex = regexp.MustCompile(`[^\p{L}\p{N} -]+`)
-
 type fxTwitter struct {
 	twitterMatcher
-	client *http.Client
+	client               *http.Client
+	nonAlphanumericRegex *regexp.Regexp
 }
 
 type fxTwitterResponse struct {
@@ -54,10 +53,13 @@ type fxTwitterResponse struct {
 	} `json:"tweet,omitempty"`
 }
 
-func newFxTwitter() artworks.Provider {
+func newFxTwitter(re *regexp.Regexp) artworks.Provider {
 	return &fxTwitter{
-		twitterMatcher: twitterMatcher{},
-		client:         &http.Client{},
+		client:               &http.Client{},
+		nonAlphanumericRegex: regexp.MustCompile(`[^\p{L}\p{N} -]+`),
+		twitterMatcher: twitterMatcher{
+			regex: re,
+		},
 	}
 }
 
@@ -127,7 +129,7 @@ func (fxt *fxTwitter) Find(id string) (artworks.Artwork, error) {
 	}
 
 	artwork.AIGenerated = artworks.IsAIGenerated(arrays.Map(strings.Fields(artwork.Content), func(s string) string {
-		return nonAlphanumericRegex.ReplaceAllString(s, "")
+		return fxt.nonAlphanumericRegex.ReplaceAllString(s, "")
 	})...)
 
 	return artwork, nil
