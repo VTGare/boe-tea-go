@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -11,7 +12,6 @@ import (
 	"github.com/VTGare/boe-tea-go/artworks"
 	"github.com/VTGare/boe-tea-go/artworks/twitter"
 	"github.com/VTGare/boe-tea-go/bot"
-	"github.com/VTGare/boe-tea-go/internal/arrays"
 	"github.com/VTGare/boe-tea-go/internal/cache"
 	"github.com/VTGare/boe-tea-go/internal/dgoutils"
 	"github.com/VTGare/boe-tea-go/messages"
@@ -70,7 +70,7 @@ func OnMessage(b *bot.Bot) func(*gumi.Ctx) error {
 			return err
 		}
 
-		if !(len(guild.ArtChannels) == 0 || arrays.Check(gctx.Event.ChannelID, guild.ArtChannels)) {
+		if !(len(guild.ArtChannels) == 0 || slices.Contains(guild.ArtChannels, gctx.Event.ChannelID)) {
 			return nil
 		}
 

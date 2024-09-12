@@ -27,14 +27,6 @@ func Ternary[T any](condition bool, a T, b T) T {
 	return b
 }
 
-func TernaryFunc[T any](f func(T), condition bool, a T, b T) {
-	if condition {
-		f(a)
-	}
-
-	f(b)
-}
-
 func ValidateArgs(gctx *gumi.Ctx, argsLen int) error {
 	if gctx.Args.Len() < argsLen {
 		return messages.ErrIncorrectCmd(gctx.Command)

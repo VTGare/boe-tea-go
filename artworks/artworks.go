@@ -1,11 +1,9 @@
 package artworks
 
 import (
-	"github.com/VTGare/boe-tea-go/internal/arrays"
-	"strings"
-
 	"github.com/VTGare/boe-tea-go/store"
 	"github.com/bwmarrin/discordgo"
+	"strings"
 )
 
 type Provider interface {
@@ -33,5 +31,12 @@ func IsAIGenerated(content ...string) bool {
 		"stablediffusion",
 	}
 
-	return arrays.CheckArraysFunc(strings.EqualFold, content, aiTags)
+	for _, tag := range content {
+		for _, test := range aiTags {
+			if strings.EqualFold(tag, test) {
+				return true
+			}
+		}
+	}
+	return false
 }
