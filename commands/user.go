@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -398,7 +399,7 @@ func push(b *bot.Bot) func(*gumi.Ctx) error {
 				continue
 			}
 
-			if arrays.Check(channelID, group.Children) {
+			if slices.Contains(group.Children, channelID) {
 				continue
 			}
 
@@ -452,7 +453,7 @@ func remove(b *bot.Bot) func(*gumi.Ctx) error {
 		for arg := range gctx.Args.Arguments {
 			channelID := dgoutils.Trimmer(gctx, arg)
 
-			if !arrays.Check(channelID, group.Children) {
+			if !slices.Contains(group.Children, channelID) {
 				continue
 			}
 
@@ -506,7 +507,7 @@ func editParent(b *bot.Bot) func(*gumi.Ctx) error {
 			return messages.ErrGroupAlreadyExists(dest)
 		}
 
-		if arrays.Check(dest, group.Children) {
+		if slices.Contains(group.Children, dest) {
 			return messages.ErrUserEditParentFail(group.Parent, dest)
 		}
 

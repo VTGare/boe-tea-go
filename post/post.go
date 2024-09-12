@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -194,7 +195,7 @@ func (p *Post) Crosspost(ctx context.Context, userID string, group *store.Group)
 			}
 
 			if guild.Crosspost {
-				if len(guild.ArtChannels) == 0 || arrays.Check(ch.ID, guild.ArtChannels) {
+				if len(guild.ArtChannels) == 0 || slices.Contains(guild.ArtChannels, ch.ID) {
 					p.CrosspostMode = true
 					res, err := p.fetch(ctx, guild, channelID)
 					if err != nil {

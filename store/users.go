@@ -2,9 +2,8 @@ package store
 
 import (
 	"context"
+	"slices"
 	"time"
-
-	"github.com/VTGare/boe-tea-go/internal/arrays"
 )
 
 type UserStore interface {
@@ -52,7 +51,7 @@ func DefaultUser(id string) *User {
 func (u *User) FindGroup(channelID string) (*Group, bool) {
 	for _, group := range u.Groups {
 		if group.IsPair {
-			if arrays.Check(channelID, group.Children) {
+			if slices.Contains(group.Children, channelID) {
 				return group, true
 			}
 
