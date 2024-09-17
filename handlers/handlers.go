@@ -30,6 +30,7 @@ func RegisterHandlers(b *bot.Bot) {
 	b.AddHandler(OnGuildCreate(b))
 	b.AddHandler(OnGuildDelete(b))
 	b.AddHandler(OnGuildBanAdd(b))
+	b.AddHandler(OnChannelDelete(b))
 	b.AddHandler(OnReactionAdd(b))
 	b.AddHandler(OnReactionRemove(b))
 	b.AddHandler(OnMessageRemove(b))
@@ -131,6 +132,27 @@ func OnGuildDelete(b *bot.Bot) func(*discordgo.Session, *discordgo.GuildDelete) 
 func OnGuildBanAdd(b *bot.Bot) func(*discordgo.Session, *discordgo.GuildBanAdd) {
 	return func(s *discordgo.Session, gb *discordgo.GuildBanAdd) {
 		b.BannedUsers.Set(gb.User.ID, struct{}{})
+	}
+}
+
+func OnChannelDelete(b *bot.Bot) func(*discordgo.Session, *discordgo.ChannelDelete) {
+	return func(s *discordgo.Session, ch *discordgo.ChannelDelete) {
+		guild, err := b.Store.Guild(b.Context, ch.GuildID)
+		if err != nil {
+			return
+		}
+
+		if len(guild.ArtChannels) == 0 {
+			return
+		}
+
+		if slices.Contains(guild.ArtChannels, ch.ID) {
+			_, err = b.Store.DeleteArtChannels(
+				b.Context,
+				guild.ID,
+				[]string{ch.ID},
+			)
+		}
 	}
 }
 

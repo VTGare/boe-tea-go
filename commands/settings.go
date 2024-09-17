@@ -645,7 +645,12 @@ func removeChannel(b *bot.Bot) func(*gumi.Ctx) error {
 		for _, arg := range gctx.Args.Arguments {
 			ch, err := gctx.Session.Channel(dgoutils.TrimmerRaw(arg.Raw))
 			if err != nil {
-				return messages.ErrChannelNotFound(err, arg.Raw)
+				if !strings.Contains(err.Error(), "404") {
+					return messages.ErrChannelNotFound(err, arg.Raw)
+				}
+
+				channels = append(channels, dgoutils.TrimmerRaw(arg.Raw))
+				continue
 			}
 
 			if ch.GuildID != gctx.Event.GuildID {
