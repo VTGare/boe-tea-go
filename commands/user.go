@@ -379,8 +379,8 @@ func push(b *bot.Bot) func(*gumi.Ctx) error {
 		defer cancel()
 
 		inserted := make([]string, 0, gctx.Args.Len())
-		for arg := range gctx.Args.Arguments {
-			channelID := dgoutils.Trimmer(gctx, arg)
+		for _, arg := range gctx.Args.Arguments {
+			channelID := dgoutils.TrimmerRaw(arg.Raw)
 			ch, err := gctx.Session.Channel(channelID)
 			if err != nil {
 				return messages.ErrChannelNotFound(err, channelID)
@@ -450,8 +450,8 @@ func remove(b *bot.Bot) func(*gumi.Ctx) error {
 		defer cancel()
 
 		removed := make([]string, 0, gctx.Args.Len())
-		for arg := range gctx.Args.Arguments {
-			channelID := dgoutils.Trimmer(gctx, arg)
+		for _, arg := range gctx.Args.Arguments {
+			channelID := dgoutils.TrimmerRaw(arg.Raw)
 
 			if !slices.Contains(group.Children, channelID) {
 				continue
