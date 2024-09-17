@@ -40,6 +40,11 @@ func Trimmer(gctx *gumi.Ctx, n int) string {
 	return strings.Trim(gctx.Args.Get(n).Raw, "<!@#&>")
 }
 
+// TrimmerRaw is the same as Trimmer but directly on a Raw string.
+func TrimmerRaw(arg string) string {
+	return strings.Trim(arg, "<!@#&>")
+}
+
 // ExpireMessage deletes a specified message after a certain time
 func ExpireMessage(b *bot.Bot, s *discordgo.Session, msg *discordgo.Message) {
 	go func() {

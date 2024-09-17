@@ -492,8 +492,8 @@ func artChannels(b *bot.Bot) func(*gumi.Ctx) error {
 			}
 
 			channels := make([]string, 0)
-			for arg := range gctx.Args.Arguments[1:] {
-				ch, err := gctx.Session.Channel(dgoutils.Trimmer(gctx, arg))
+			for _, arg := range gctx.Args.Arguments[1:] {
+				ch, err := gctx.Session.Channel(dgoutils.TrimmerRaw(arg.Raw))
 				if err != nil {
 					return err
 				}
@@ -558,7 +558,7 @@ func addChannel(b *bot.Bot) func(*gumi.Ctx) error {
 
 		channels := make([]string, 0)
 		for _, arg := range gctx.Args.Arguments {
-			ch, err := gctx.Session.Channel(strings.Trim(arg.Raw, "<#>"))
+			ch, err := gctx.Session.Channel(dgoutils.TrimmerRaw(arg.Raw))
 			if err != nil {
 				return err
 			}
@@ -643,7 +643,7 @@ func removeChannel(b *bot.Bot) func(*gumi.Ctx) error {
 
 		channels := make([]string, 0)
 		for _, arg := range gctx.Args.Arguments {
-			ch, err := gctx.Session.Channel(strings.Trim(arg.Raw, "<#>"))
+			ch, err := gctx.Session.Channel(dgoutils.TrimmerRaw(arg.Raw))
 			if err != nil {
 				return messages.ErrChannelNotFound(err, arg.Raw)
 			}

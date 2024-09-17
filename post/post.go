@@ -98,8 +98,8 @@ func (p *Post) Send(ctx context.Context) error {
 		// Otherwise, don't crosspost at all.
 		if p.ExcludeChannel {
 			excludedChannels := make(map[string]struct{})
-			for arg := range strings.Fields(p.Ctx.Args.Raw) {
-				id := dgoutils.Trimmer(p.Ctx, arg)
+			for _, arg := range strings.Fields(p.Ctx.Args.Raw) {
+				id := dgoutils.TrimmerRaw(arg)
 				excludedChannels[id] = struct{}{}
 			}
 
