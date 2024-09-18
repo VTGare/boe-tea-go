@@ -266,7 +266,6 @@ func (p *Post) fetch(ctx context.Context, guild *store.Guild, channelID string) 
 				)
 				log.Debug("matched a url")
 
-				var isRepost bool
 				if guild.Repost != store.GuildRepostDisabled {
 					rep, err := p.Bot.RepostDetector.Find(gctx, channelID, id)
 					if err != nil && !errors.Is(err, repost.ErrNotFound) {
@@ -278,25 +277,21 @@ func (p *Post) fetch(ctx context.Context, guild *store.Guild, channelID string) 
 						if p.CrosspostMode || guild.Repost == store.GuildRepostStrict {
 							return nil
 						}
-
-						isRepost = true
-					}
-				}
-
-				if guild.Repost != store.GuildRepostDisabled && !isRepost {
-					err := p.Bot.RepostDetector.Create(
-						gctx,
-						&repost.Repost{
-							ID:        id,
-							URL:       url,
-							GuildID:   guild.ID,
-							ChannelID: channelID,
-							MessageID: p.Ctx.Event.ID,
-						},
-						guild.RepostExpiration,
-					)
-					if err != nil {
-						log.With("error", err).Error("error creating a repost")
+					} else {
+						err := p.Bot.RepostDetector.Create(
+							gctx,
+							&repost.Repost{
+								ID:        id,
+								URL:       url,
+								GuildID:   guild.ID,
+								ChannelID: channelID,
+								MessageID: p.Ctx.Event.ID,
+							},
+							guild.RepostExpiration,
+						)
+						if err != nil {
+							log.With("error", err).Error("error creating a repost")
+						}
 					}
 				}
 
