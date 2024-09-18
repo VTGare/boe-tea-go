@@ -281,22 +281,22 @@ func (p *Post) fetch(ctx context.Context, guild *store.Guild, channelID string) 
 
 						isRepost = true
 					}
-				}
 
-				if guild.Repost != store.GuildRepostDisabled && !isRepost {
-					err := p.Bot.RepostDetector.Create(
-						gctx,
-						&repost.Repost{
-							ID:        id,
-							URL:       url,
-							GuildID:   guild.ID,
-							ChannelID: channelID,
-							MessageID: p.Ctx.Event.ID,
-						},
-						guild.RepostExpiration,
-					)
-					if err != nil {
-						log.With("error", err).Error("error creating a repost")
+					if !isRepost {
+						err := p.Bot.RepostDetector.Create(
+							gctx,
+							&repost.Repost{
+								ID:        id,
+								URL:       url,
+								GuildID:   guild.ID,
+								ChannelID: channelID,
+								MessageID: p.Ctx.Event.ID,
+							},
+							guild.RepostExpiration,
+						)
+						if err != nil {
+							log.With("error", err).Error("error creating a repost")
+						}
 					}
 				}
 
