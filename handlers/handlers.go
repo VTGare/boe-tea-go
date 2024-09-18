@@ -137,8 +137,11 @@ func OnGuildBanAdd(b *bot.Bot) func(*discordgo.Session, *discordgo.GuildBanAdd) 
 
 func OnChannelDelete(b *bot.Bot) func(*discordgo.Session, *discordgo.ChannelDelete) {
 	return func(s *discordgo.Session, ch *discordgo.ChannelDelete) {
+		log := b.Log.With("channel_id", ch.ID, "guild_id", ch.GuildID)
+
 		guild, err := b.Store.Guild(b.Context, ch.GuildID)
 		if err != nil {
+			log.With("error", err).Warn("failed to find guild")
 			return
 		}
 
@@ -152,6 +155,10 @@ func OnChannelDelete(b *bot.Bot) func(*discordgo.Session, *discordgo.ChannelDele
 				guild.ID,
 				[]string{ch.ID},
 			)
+
+			if err != nil {
+				log.With("error", err).Warn("failed to delete art channel")
+			}
 		}
 	}
 }
