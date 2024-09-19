@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/VTGare/embeds"
 	"reflect"
 	"slices"
 	"strconv"
@@ -19,7 +20,6 @@ import (
 	"github.com/VTGare/boe-tea-go/messages"
 	"github.com/VTGare/boe-tea-go/repost"
 	"github.com/VTGare/boe-tea-go/store"
-	"github.com/VTGare/embeds"
 	"github.com/VTGare/gumi"
 	"github.com/bwmarrin/discordgo"
 	"golang.org/x/sync/errgroup"
@@ -83,15 +83,15 @@ func (p *Post) Send(ctx context.Context) error {
 		return fmt.Errorf("failed to fetch artworks: %w", err)
 	}
 
-	p.handleReposts(guild, res)
-
-	sent, err := p.sendMessages(guild, p.Ctx.Event.ChannelID, res.Artworks)
+	sent, err := p.sendMessages(guild, p.Ctx.Event.ChannelID, res)
 	if err != nil {
 		return err
 	}
 
 	allSent := make([]*cache.MessageInfo, 0)
 	allSent = append(allSent, sent...)
+
+	p.handleReposts(guild, res)
 
 	if group, ok := user.FindGroup(p.Ctx.Event.ChannelID); user.Crosspost && ok {
 		// If channels were successfully excluded, crosspost to trimmed channels.
@@ -203,7 +203,7 @@ func (p *Post) Crosspost(ctx context.Context, userID string, group *store.Group)
 						return
 					}
 
-					sent, err := p.sendMessages(guild, channelID, res.Artworks)
+					sent, err := p.sendMessages(guild, channelID, res)
 					if err != nil {
 						log.With("error", err).Error("failed to send messages")
 						return
@@ -365,14 +365,14 @@ func (p *Post) fetch(ctx context.Context, guild *store.Guild, channelID string) 
 	return res, nil
 }
 
-func (p *Post) handleReposts(guild *store.Guild, res *fetchResult) error {
+func (p *Post) handleReposts(guild *store.Guild, res *fetchResult) {
 	log := p.Bot.Log.With(
 		"guild_id", guild.ID,
 		"user_id", p.Ctx.Event.Author.ID,
 	)
 
 	if len(res.Reposts) == 0 {
-		return nil
+		return
 	}
 
 	if guild.Repost == store.GuildRepostStrict {
@@ -392,8 +392,7 @@ func (p *Post) handleReposts(guild *store.Guild, res *fetchResult) error {
 				messageID = p.Ctx.Event.ID
 			)
 
-			err := p.Ctx.Session.ChannelMessageDelete(channelID, messageID)
-			if err != nil {
+			if err = p.Ctx.Session.ChannelMessageDelete(channelID, messageID); err != nil {
 				log.With(
 					"channel_id", channelID,
 					"message_id", messageID,
@@ -421,22 +420,21 @@ func (p *Post) handleReposts(guild *store.Guild, res *fetchResult) error {
 		)
 	}
 
-	msg, err := p.Ctx.Session.ChannelMessageSendEmbed(p.Ctx.Event.ChannelID, eb.Finalize())
+	repostMessage, err := p.Ctx.Session.ChannelMessageSendEmbed(p.Ctx.Event.ChannelID, eb.Finalize())
 	if err != nil {
-		return fmt.Errorf("failed to send message to discord: %w", err)
+		log.With("error", err).Warn("failed to send repost message")
 	}
 
-	dgoutils.ExpireMessage(p.Bot, p.Ctx.Session, msg)
-	return nil
+	dgoutils.ExpireMessage(p.Bot, p.Ctx.Session, repostMessage)
 }
 
-func (p *Post) sendMessages(guild *store.Guild, channelID string, artworks []artworks.Artwork) ([]*cache.MessageInfo, error) {
+func (p *Post) sendMessages(guild *store.Guild, channelID string, res *fetchResult) ([]*cache.MessageInfo, error) {
 	sent := make([]*cache.MessageInfo, 0)
-	if len(artworks) == 0 {
+	if len(res.Artworks) == 0 {
 		return sent, nil
 	}
 
-	allMessages, err := p.generateMessages(guild, artworks)
+	allMessages, err := p.generateMessages(guild, res.Artworks)
 	if err != nil {
 		return nil, err
 	}
@@ -446,7 +444,7 @@ func (p *Post) sendMessages(guild *store.Guild, channelID string, artworks []art
 	}
 
 	mediaCount := 0
-	for _, artwork := range artworks {
+	for _, artwork := range res.Artworks {
 		mediaCount += artwork.Len()
 	}
 
