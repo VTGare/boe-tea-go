@@ -195,6 +195,10 @@ func (a *Artwork) MessageSends(footer string, tagsEnabled bool) ([]*discordgo.Me
 	return eb.ToEmbed(), nil
 }
 
+func (a *Artwork) ArtworkID() string {
+	return a.ID
+}
+
 func (a *Artwork) URL() string {
 	return a.url
 }

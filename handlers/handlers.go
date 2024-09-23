@@ -167,8 +167,7 @@ func OnMessageRemove(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageDele
 	return func(s *discordgo.Session, m *discordgo.MessageDelete) {
 		log := b.Log.With("channel_id", m.ChannelID, "parent_id", m.ID)
 		msg, ok := b.EmbedCache.Get(
-			m.ChannelID,
-			m.ID,
+			m.ChannelID, m.ID,
 		)
 
 		if !ok {
@@ -179,18 +178,27 @@ func OnMessageRemove(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageDele
 			m.ChannelID, m.ID,
 		)
 
-		if msg.Parent {
+		if msg.IsParent {
 			log.With("user_id", msg.AuthorID).Info("removing children messages")
 
 			for _, child := range msg.Children {
+				log.With("user_id", msg.AuthorID, "message_id", child.MessageID).Info("removing a respost")
+
+				if err := b.RepostDetector.Delete(b.Context, child.ChannelID, child.ArtworkID); err != nil {
+					if strings.Contains(err.Error(), "repost not found") {
+						log.With("error", err)
+					}
+
+					log.With("error", err).Warn("failed to remove repost")
+				}
+
 				log.With("user_id", msg.AuthorID, "message_id", child.MessageID).Info("removing a child message")
 
 				b.EmbedCache.Remove(
 					child.ChannelID, child.MessageID,
 				)
 
-				err := s.ChannelMessageDelete(child.ChannelID, child.MessageID)
-				if err != nil {
+				if err := s.ChannelMessageDelete(child.ChannelID, child.MessageID); err != nil {
 					log.With("error", err, "message_id", child.MessageID).Warn("failed to delete child message")
 				}
 			}
@@ -233,7 +241,7 @@ func OnReactionAdd(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageReacti
 				return err
 			}
 
-			if !msg.Parent {
+			if !msg.IsParent {
 				return nil
 			}
 

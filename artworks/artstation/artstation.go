@@ -41,6 +41,7 @@ type ArtstationResponse struct {
 	HideAsAdult         bool `json:"hide_as_adult,omitempty"`
 	VisibleOnArtstation bool `json:"visible_on_artstation,omitempty"`
 
+	artworkID   string
 	AIGenerated bool
 	CreatedAt   time.Time `json:"created_at,omitempty"`
 }
@@ -93,6 +94,7 @@ func (as *Artstation) Find(id string) (artworks.Artwork, error) {
 			return nil, err
 		}
 
+		res.artworkID = id
 		res.AIGenerated = artworks.IsAIGenerated(res.Tags...)
 
 		return res, nil
@@ -160,6 +162,10 @@ func (artwork *ArtstationResponse) MessageSends(footer string, tagsEnabled bool)
 	}
 
 	return eb.ToEmbed(), nil
+}
+
+func (artwork *ArtstationResponse) ArtworkID() string {
+	return artwork.artworkID
 }
 
 func (artwork *ArtstationResponse) URL() string {

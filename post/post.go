@@ -450,7 +450,7 @@ func (p *Post) sendMessages(guild *store.Guild, channelID string, res *fetchResu
 
 	// It only happens from commands so only first artwork should be affected.
 	allMessages[0] = p.skipArtworks(allMessages[0])
-	sendMessage := func(message *discordgo.MessageSend) error {
+	sendMessage := func(message *discordgo.MessageSend, artworkID string) error {
 		s := p.Ctx.Session
 		if p.CrosspostMode {
 			guildID, err := strconv.ParseInt(guild.ID, 10, 64)
@@ -466,7 +466,7 @@ func (p *Post) sendMessages(guild *store.Guild, channelID string, res *fetchResu
 			return fmt.Errorf("failed to send message: %w", err)
 		}
 
-		sent = append(sent, &cache.MessageInfo{MessageID: msg.ID, ChannelID: msg.ChannelID})
+		sent = append(sent, &cache.MessageInfo{MessageID: msg.ID, ChannelID: msg.ChannelID, ArtworkID: artworkID})
 
 		// If URL isn't set then it's an error embed.
 		// If media count equals 0, it's most likely a Tweet without images and can't be bookmarked.
@@ -494,8 +494,8 @@ func (p *Post) sendMessages(guild *store.Guild, channelID string, res *fetchResu
 	)
 
 	for _, messages := range allMessages {
-		for _, message := range messages {
-			err := sendMessage(message)
+		for i, message := range messages {
+			err := sendMessage(message, res.Artworks[i].ArtworkID())
 			if err != nil {
 				log.With(err).Warn("failed to send artwork message")
 			}

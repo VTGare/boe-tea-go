@@ -69,6 +69,7 @@ type EmbedCache struct {
 type MessageInfo struct {
 	MessageID string
 	ChannelID string
+	ArtworkID string
 }
 
 // CachedEmbed stores information about an embed that's later retrieved in
@@ -78,7 +79,7 @@ type MessageInfo struct {
 // all embeds sent by Boe Tea by posting the message, including crossposted messages.
 type CachedPost struct {
 	AuthorID string
-	Parent   bool
+	IsParent bool
 	Children []*MessageInfo
 }
 
@@ -104,14 +105,14 @@ func (ec *EmbedCache) Get(channelID, messageID string) (*CachedPost, bool) {
 	return nil, false
 }
 
-func (ec *EmbedCache) Set(userID, channelID, messageID string, parent bool, children ...*MessageInfo) {
+func (ec *EmbedCache) Set(userID, channelID, messageID string, isParent bool, children ...*MessageInfo) {
 	key := ec.makeKey(
 		channelID, messageID,
 	)
 
 	ec.cache.Set(key, &CachedPost{
 		AuthorID: userID,
-		Parent:   parent,
+		IsParent: isParent,
 		Children: children,
 	})
 }

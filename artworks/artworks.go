@@ -15,6 +15,7 @@ type Provider interface {
 type Artwork interface {
 	StoreArtwork() *store.Artwork
 	MessageSends(footer string, tags bool) ([]*discordgo.MessageSend, error)
+	ArtworkID() string
 	URL() string
 	Len() int
 }

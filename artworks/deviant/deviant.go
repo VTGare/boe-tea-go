@@ -32,6 +32,7 @@ type Artwork struct {
 	Comments     int
 	AIGenerated  bool
 	CreatedAt    time.Time
+	artworkID    string
 	url          string
 }
 
@@ -96,6 +97,7 @@ func (d *DeviantArt) Find(id string) (artworks.Artwork, error) {
 			Favorites:    res.Community.Statistics.Attributes.Favorites,
 			Comments:     res.Community.Statistics.Attributes.Comments,
 			CreatedAt:    res.Pubdate,
+			artworkID:    id,
 			url:          res.AuthorURL + "/art/" + id,
 		}
 
@@ -150,6 +152,10 @@ func (a *Artwork) StoreArtwork() *store.Artwork {
 		URL:    a.url,
 		Images: []string{a.ImageURL},
 	}
+}
+
+func (a *Artwork) ArtworkID() string {
+	return a.artworkID
 }
 
 func (a *Artwork) URL() string {

@@ -180,6 +180,10 @@ func downloadVideo(fileURL string) (*discordgo.File, error) {
 	}, nil
 }
 
+func (a *Artwork) ArtworkID() string {
+	return a.ID
+}
+
 func (a *Artwork) URL() string {
 	return a.Permalink
 }
