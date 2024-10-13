@@ -493,8 +493,8 @@ func (p *Post) sendMessages(guild *store.Guild, channelID string, res *fetchResu
 		"crosspost", p.CrosspostMode,
 	)
 
-	for _, messages := range allMessages {
-		for i, message := range messages {
+	for i, messages := range allMessages {
+		for _, message := range messages {
 			err := sendMessage(message, res.Artworks[i].ArtworkID())
 			if err != nil {
 				log.With(err).Warn("failed to send artwork message")
