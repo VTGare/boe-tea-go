@@ -2,7 +2,6 @@ package deviant
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -11,10 +10,10 @@ import (
 	"time"
 
 	"github.com/VTGare/boe-tea-go/artworks"
+	"github.com/VTGare/boe-tea-go/artworks/embed"
 	"github.com/VTGare/boe-tea-go/internal/arrays"
 	"github.com/VTGare/boe-tea-go/messages"
 	"github.com/VTGare/boe-tea-go/store"
-	"github.com/VTGare/embeds"
 	"github.com/bwmarrin/discordgo"
 )
 
@@ -33,6 +32,7 @@ type Artwork struct {
 	Comments     int
 	AIGenerated  bool
 	CreatedAt    time.Time
+	artworkID    string
 	url          string
 }
 
@@ -65,52 +65,46 @@ type deviantEmbed struct {
 
 func New() artworks.Provider {
 	return &DeviantArt{
-		regex: regexp.MustCompile(`(?i)https:\/\/(?:www\.)?deviantart\.com\/[\w]+\/art\/([\w\-]+)`),
+		regex: regexp.MustCompile(`(?i)https://(?:www\.)?deviantart\.com/\w+/art/([\w\-]+)`),
 	}
 }
 
 func (d *DeviantArt) Find(id string) (artworks.Artwork, error) {
-	artwork, err := d._find(id)
-	if err != nil {
-		return nil, artworks.NewError(d, err)
-	}
+	return artworks.NewError(d, func() (artworks.Artwork, error) {
+		reqURL := "https://backend.deviantart.com/oembed?url=" + url.QueryEscape("deviantart.com/art/"+id)
+		resp, err := http.Get(reqURL)
+		if err != nil {
+			return nil, err
+		}
+		defer resp.Body.Close()
 
-	return artwork, nil
-}
+		var res deviantEmbed
+		err = json.NewDecoder(resp.Body).Decode(&res)
+		if err != nil {
+			return nil, err
+		}
 
-func (d *DeviantArt) _find(id string) (artworks.Artwork, error) {
-	reqURL := "https://backend.deviantart.com/oembed?url=" + url.QueryEscape("deviantart.com/art/"+id)
-	resp, err := http.Get(reqURL)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
+		artwork := &Artwork{
+			Title: res.Title,
+			Author: &Author{
+				Name: res.AuthorName,
+				URL:  res.AuthorURL,
+			},
+			ImageURL:     res.URL,
+			ThumbnailURL: res.ThumbnailURL,
+			Tags:         strings.Split(res.Tags, ", "),
+			Views:        res.Community.Statistics.Attributes.Views,
+			Favorites:    res.Community.Statistics.Attributes.Favorites,
+			Comments:     res.Community.Statistics.Attributes.Comments,
+			CreatedAt:    res.Pubdate,
+			artworkID:    id,
+			url:          res.AuthorURL + "/art/" + id,
+		}
 
-	var res deviantEmbed
-	err = json.NewDecoder(resp.Body).Decode(&res)
-	if err != nil {
-		return nil, err
-	}
+		artwork.AIGenerated = artworks.IsAIGenerated(artwork.Tags...)
 
-	artwork := &Artwork{
-		Title: res.Title,
-		Author: &Author{
-			Name: res.AuthorName,
-			URL:  res.AuthorURL,
-		},
-		ImageURL:     res.URL,
-		ThumbnailURL: res.ThumbnailURL,
-		Tags:         strings.Split(res.Tags, ", "),
-		Views:        res.Community.Statistics.Attributes.Views,
-		Favorites:    res.Community.Statistics.Attributes.Favorites,
-		Comments:     res.Community.Statistics.Attributes.Comments,
-		CreatedAt:    res.Pubdate,
-		url:          res.AuthorURL + "/art/" + id,
-	}
-
-	artwork.AIGenerated = artworks.IsAIGenerated(artwork.Tags...)
-
-	return artwork, nil
+		return artwork, nil
+	})
 }
 
 func (d *DeviantArt) Match(s string) (string, bool) {
@@ -127,36 +121,28 @@ func (d *DeviantArt) Enabled(g *store.Guild) bool {
 }
 
 func (a *Artwork) MessageSends(footer string, tagsEnabled bool) ([]*discordgo.MessageSend, error) {
-	eb := embeds.NewBuilder()
-
-	eb.Title(fmt.Sprintf("%v by %v", a.Title, a.Author.Name)).
-		Image(a.ImageURL).
-		URL(a.url).
-		Timestamp(a.CreatedAt).
-		AddField("Views", strconv.Itoa(a.Views), true).
-		AddField("Favorites", strconv.Itoa(a.Favorites), true)
+	eb := &embed.Embed{
+		Title:       a.Title,
+		Username:    a.Author.Name,
+		FieldName1:  "Views",
+		FieldValue1: strconv.Itoa(a.Views),
+		FieldName2:  "Favorites",
+		FieldValue2: []string{strconv.Itoa(a.Favorites)},
+		Images:      []string{a.ImageURL},
+		URL:         a.url,
+		Timestamp:   a.CreatedAt,
+		Footer:      footer,
+		AIGenerated: a.AIGenerated,
+	}
 
 	if tagsEnabled && len(a.Tags) > 0 {
 		tags := arrays.Map(a.Tags, func(s string) string {
-			return messages.NamedLink(
-				s, "https://www.deviantart.com/tag/"+s,
-			)
+			return messages.NamedLink(s, "https://www.deviantart.com/tag/"+s)
 		})
-
-		eb.Description("**Tags:**\n" + strings.Join(tags, " • "))
+		eb.Tags = strings.Join(tags, " • ")
 	}
 
-	if footer != "" {
-		eb.Footer(footer, "")
-	}
-
-	if a.AIGenerated {
-		eb.AddField("⚠️ Disclaimer", "This artwork is AI-generated.")
-	}
-
-	return []*discordgo.MessageSend{
-		{Embeds: []*discordgo.MessageEmbed{eb.Finalize()}},
-	}, nil
+	return eb.ToEmbed(), nil
 }
 
 func (a *Artwork) StoreArtwork() *store.Artwork {
@@ -166,6 +152,10 @@ func (a *Artwork) StoreArtwork() *store.Artwork {
 		URL:    a.url,
 		Images: []string{a.ImageURL},
 	}
+}
+
+func (a *Artwork) ArtworkID() string {
+	return a.artworkID
 }
 
 func (a *Artwork) URL() string {

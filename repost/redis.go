@@ -26,6 +26,19 @@ func NewRedis(addr string) (Detector, error) {
 	return &redisDetector{client}, nil
 }
 
+func (rd redisDetector) exists(ctx context.Context, key string) error {
+	exists, err := rd.client.Exists(ctx, key).Result()
+	if err != nil {
+		return err
+	}
+
+	if exists == 0 {
+		return ErrNotFound
+	}
+
+	return nil
+}
+
 func (rd redisDetector) Find(ctx context.Context, channelID, artworkID string) (*Repost, error) {
 	var (
 		rep Repost
@@ -33,16 +46,11 @@ func (rd redisDetector) Find(ctx context.Context, channelID, artworkID string) (
 		ttl time.Duration
 	)
 
-	exists, err := rd.client.Exists(ctx, key).Result()
-	if err != nil {
+	if err := rd.exists(ctx, key); err != nil {
 		return nil, err
 	}
 
-	if exists == 0 {
-		return nil, ErrNotFound
-	}
-
-	_, err = rd.client.Pipelined(ctx, func(pipe redis.Pipeliner) error {
+	_, err := rd.client.Pipelined(ctx, func(pipe redis.Pipeliner) error {
 		err := rd.client.HGetAll(ctx, key).Scan(&rep)
 		if err != nil {
 			return err
@@ -77,6 +85,27 @@ func (rd redisDetector) Create(ctx context.Context, repost *Repost, duration tim
 		}
 
 		if _, err := rd.client.ExpireAt(ctx, key, time.Now().Add(duration)).Result(); err != nil {
+			return err
+		}
+
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (rd redisDetector) Delete(ctx context.Context, channelID, artworkID string) error {
+	key := fmt.Sprintf("channel:%v:artwork:%v", channelID, artworkID)
+
+	if err := rd.exists(ctx, key); err != nil {
+		return err
+	}
+
+	_, err := rd.client.Pipelined(ctx, func(pipe redis.Pipeliner) error {
+		if _, err := rd.client.Del(ctx, key).Result(); err != nil {
 			return err
 		}
 

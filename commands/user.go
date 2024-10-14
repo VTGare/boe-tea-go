@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -378,8 +379,8 @@ func push(b *bot.Bot) func(*gumi.Ctx) error {
 		defer cancel()
 
 		inserted := make([]string, 0, gctx.Args.Len())
-		for arg := range gctx.Args.Arguments {
-			channelID := dgoutils.Trimmer(gctx, arg)
+		for _, arg := range gctx.Args.Arguments {
+			channelID := dgoutils.TrimmerRaw(arg.Raw)
 			ch, err := gctx.Session.Channel(channelID)
 			if err != nil {
 				return messages.ErrChannelNotFound(err, channelID)
@@ -398,7 +399,7 @@ func push(b *bot.Bot) func(*gumi.Ctx) error {
 				continue
 			}
 
-			if arrays.Any(group.Children, channelID) {
+			if slices.Contains(group.Children, channelID) {
 				continue
 			}
 
@@ -449,10 +450,10 @@ func remove(b *bot.Bot) func(*gumi.Ctx) error {
 		defer cancel()
 
 		removed := make([]string, 0, gctx.Args.Len())
-		for arg := range gctx.Args.Arguments {
-			channelID := dgoutils.Trimmer(gctx, arg)
+		for _, arg := range gctx.Args.Arguments {
+			channelID := dgoutils.TrimmerRaw(arg.Raw)
 
-			if !arrays.Any(group.Children, channelID) {
+			if !slices.Contains(group.Children, channelID) {
 				continue
 			}
 
@@ -506,7 +507,7 @@ func editParent(b *bot.Bot) func(*gumi.Ctx) error {
 			return messages.ErrGroupAlreadyExists(dest)
 		}
 
-		if arrays.Any(group.Children, dest) {
+		if slices.Contains(group.Children, dest) {
 			return messages.ErrUserEditParentFail(group.Parent, dest)
 		}
 

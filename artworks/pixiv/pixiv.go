@@ -8,21 +8,19 @@ import (
 	"time"
 
 	"github.com/VTGare/boe-tea-go/artworks"
+	"github.com/VTGare/boe-tea-go/artworks/embed"
 	"github.com/VTGare/boe-tea-go/internal/arrays"
+	"github.com/VTGare/boe-tea-go/internal/dgoutils"
 	"github.com/VTGare/boe-tea-go/messages"
 	"github.com/VTGare/boe-tea-go/store"
-	"github.com/VTGare/embeds"
 	"github.com/bwmarrin/discordgo"
 	"github.com/everpcpc/pixiv"
-)
-
-var regex = regexp.MustCompile(
-	`(?i)http(?:s)?:\/\/(?:www\.)?pixiv\.net\/(?:en\/)?(?:artworks\/|member_illust\.php\?)(?:mode=medium\&)?(?:illust_id=)?([0-9]+)`,
 )
 
 type Pixiv struct {
 	app       *pixiv.AppPixivAPI
 	proxyHost string
+	regex     *regexp.Regexp
 }
 
 type Artwork struct {
@@ -47,12 +45,15 @@ type Image struct {
 	Original string
 }
 
-func New(proxyHost, authToken, refreshToken string) (artworks.Provider, error) {
+func LoadAuth(authToken, refreshToken string) error {
 	_, err := pixiv.LoadAuth(authToken, refreshToken, time.Now())
 	if err != nil {
-		return nil, err
+		return err
 	}
+	return nil
+}
 
+func New(proxyHost string) artworks.Provider {
 	if proxyHost == "" {
 		proxyHost = "https://boetea.dev"
 	}
@@ -60,11 +61,12 @@ func New(proxyHost, authToken, refreshToken string) (artworks.Provider, error) {
 	return &Pixiv{
 		app:       pixiv.NewApp(),
 		proxyHost: proxyHost,
-	}, nil
+		regex:     regexp.MustCompile(`(?i)https?://(?:www\.)?pixiv\.net/(?:en/)?(?:artworks/|member_illust\.php\?)(?:mode=medium&)?(?:illust_id=)?([0-9]+)`),
+	}
 }
 
 func (p *Pixiv) Match(s string) (string, bool) {
-	res := regex.FindStringSubmatch(s)
+	res := p.regex.FindStringSubmatch(s)
 	if res == nil {
 		return "", false
 	}
@@ -73,103 +75,83 @@ func (p *Pixiv) Match(s string) (string, bool) {
 }
 
 func (p *Pixiv) Find(id string) (artworks.Artwork, error) {
-	artwork, err := p._find(id)
-	if err != nil {
-		return nil, artworks.NewError(p, err)
-	}
-
-	return artwork, nil
-}
-
-func (p *Pixiv) _find(id string) (artworks.Artwork, error) {
-	i, err := strconv.ParseUint(id, 10, 64)
-	if err != nil {
-		return nil, err
-	}
-
-	illust, err := p.app.IllustDetail(i)
-	if err != nil {
-		return nil, err
-	}
-
-	if illust.ID == 0 {
-		return nil, artworks.ErrArtworkNotFound
-	}
-
-	author := ""
-	if illust.User != nil {
-		author = illust.User.Name
-	} else {
-		author = "Unknown"
-	}
-
-	tags := make([]string, 0)
-	nsfw := false
-	for _, tag := range illust.Tags {
-		if tag.Name == "R-18" {
-			nsfw = true
+	return artworks.NewError(p, func() (artworks.Artwork, error) {
+		i, err := strconv.ParseUint(id, 10, 64)
+		if err != nil {
+			return nil, err
 		}
 
-		if tag.TranslatedName != "" {
-			tags = append(tags, tag.TranslatedName)
-		} else {
-			tags = append(tags, tag.Name)
+		illust, err := p.app.IllustDetail(i)
+		if err != nil {
+			return nil, err
 		}
-	}
 
-	images := make([]*Image, 0, illust.PageCount)
-	if page := illust.MetaSinglePage; page != nil {
-		if page.OriginalImageURL != "" {
+		if illust.ID == 0 {
+			return nil, artworks.ErrArtworkNotFound
+		}
+
+		tags := make([]string, 0)
+		nsfw := false
+		for _, tag := range illust.Tags {
+			if tag.Name == "R-18" {
+				nsfw = true
+			}
+
+			tags = dgoutils.Ternary(tag.TranslatedName != "",
+				append(tags, tag.TranslatedName),
+				append(tags, tag.Name),
+			)
+		}
+
+		images := make([]*Image, 0, illust.PageCount)
+		if page := illust.MetaSinglePage; page != nil {
+			if page.OriginalImageURL != "" {
+				img := &Image{
+					Original: page.OriginalImageURL,
+					Preview:  illust.Images.Medium,
+				}
+
+				images = append(images, img)
+			}
+		}
+
+		for _, page := range illust.MetaPages {
 			img := &Image{
-				Original: page.OriginalImageURL,
-				Preview:  illust.Images.Medium,
+				Original: page.Images.Original,
+				Preview:  page.Images.Large,
 			}
 
 			images = append(images, img)
 		}
-	}
 
-	for _, page := range illust.MetaPages {
-		img := &Image{
-			Original: page.Images.Original,
-			Preview:  page.Images.Large,
+		errImages := []string{
+			"limit_sanity_level_360.png",
+			"limit_unknown_360.png",
 		}
 
-		images = append(images, img)
-	}
-
-	artwork := &Artwork{
-		ID:        id,
-		url:       "https://www.pixiv.net/en/artworks/" + id,
-		Title:     illust.Title,
-		Author:    author,
-		Tags:      tags,
-		Images:    images,
-		NSFW:      nsfw,
-		Type:      illust.Type,
-		Pages:     illust.PageCount,
-		Likes:     illust.TotalBookmarks,
-		CreatedAt: illust.CreateDate,
-
-		proxy: p.proxyHost,
-	}
-
-	errImages := []string{
-		"limit_sanity_level_360.png",
-		"limit_unknown_360.png",
-	}
-
-	for _, img := range errImages {
-		if artwork.Images[0].Original == fmt.Sprintf("https://s.pximg.net/common/images/%s", img) {
-			return nil, artworks.ErrRateLimited
+		for _, img := range errImages {
+			if images[0].Original == fmt.Sprintf("https://s.pximg.net/common/images/%s", img) {
+				return nil, artworks.ErrRateLimited
+			}
 		}
-	}
 
-	if illust.IllustAIType == pixiv.IllustAITypeAIGenerated {
-		artwork.AIGenerated = true
-	}
+		return &Artwork{
+			ID:          id,
+			url:         "https://www.pixiv.net/en/artworks/" + id,
+			Title:       illust.Title,
+			Author:      dgoutils.Ternary(illust.User != nil, illust.User.Name, "Unknown"),
+			Tags:        tags,
+			Images:      images,
+			NSFW:        nsfw,
+			Type:        illust.Type,
+			Pages:       illust.PageCount,
+			Likes:       illust.TotalBookmarks,
+			CreatedAt:   illust.CreateDate,
+			AIGenerated: illust.IllustAIType == pixiv.IllustAITypeAIGenerated,
 
-	return artwork, nil
+			proxy: p.proxyHost,
+		}, nil
+	})
 }
 
 func (p *Pixiv) Enabled(g *store.Guild) bool {
@@ -186,61 +168,35 @@ func (a *Artwork) StoreArtwork() *store.Artwork {
 }
 
 func (a *Artwork) MessageSends(footer string, tagsEnabled bool) ([]*discordgo.MessageSend, error) {
-	var (
-		length = len(a.Images)
-		pages  = make([]*discordgo.MessageSend, 0, length)
-		eb     = embeds.NewBuilder()
-	)
-
-	if length > 1 {
-		eb.Title(fmt.Sprintf("%v by %v | Page %v / %v", a.Title, a.Author, 1, length))
-	} else {
-		eb.Title(fmt.Sprintf("%v by %v", a.Title, a.Author))
+	eb := &embed.Embed{
+		Title:       a.Title,
+		Username:    a.Author,
+		FieldName1:  "Likes",
+		FieldValue1: strconv.Itoa(a.Likes),
+		FieldName2:  "Original quality",
+		URL:         a.url,
+		Timestamp:   a.CreatedAt,
+		Footer:      footer,
+		AIGenerated: a.AIGenerated,
 	}
 
 	if tagsEnabled && len(a.Tags) > 0 {
 		tags := arrays.Map(a.Tags, func(s string) string {
 			return fmt.Sprintf("[%v](https://pixiv.net/en/tags/%v/artworks)", s, s)
 		})
-
-		eb.Description(fmt.Sprintf("**Tags**\n%v", strings.Join(tags, " • ")))
+		eb.Tags = strings.Join(tags, " • ")
 	}
 
-	eb.URL(a.url).
-		AddField("Likes", strconv.Itoa(a.Likes), true).
-		AddField("Original quality", messages.ClickHere(a.Images[0].originalProxy(a.proxy)), true).
-		Timestamp(a.CreatedAt)
-
-	if footer != "" {
-		eb.Footer(footer, "")
+	for _, image := range a.Images {
+		eb.Images = append(eb.Images, image.previewProxy(a.proxy))
+		eb.FieldValue2 = append(eb.FieldValue2, messages.ClickHere(image.originalProxy(a.proxy)))
 	}
 
-	if a.AIGenerated {
-		eb.AddField("⚠️ Disclaimer", "This artwork is AI-generated.")
-	}
+	return eb.ToEmbed(), nil
+}
 
-	eb.Image(a.Images[0].previewProxy(a.proxy))
-	pages = append(pages, &discordgo.MessageSend{Embeds: []*discordgo.MessageEmbed{eb.Finalize()}})
-	if length > 1 {
-		for ind, image := range a.Images[1:] {
-			eb := embeds.NewBuilder()
-
-			eb.Title(fmt.Sprintf("%v by %v | Page %v / %v", a.Title, a.Author, ind+2, length))
-			eb.Image(image.previewProxy(a.proxy))
-			eb.URL(a.url).Timestamp(a.CreatedAt)
-
-			if footer != "" {
-				eb.Footer(footer, "")
-			}
-
-			eb.AddField("Likes", strconv.Itoa(a.Likes), true)
-			eb.AddField("Original quality", messages.ClickHere(image.originalProxy(a.proxy)), true)
-
-			pages = append(pages, &discordgo.MessageSend{Embeds: []*discordgo.MessageEmbed{eb.Finalize()}})
-		}
-	}
-
-	return pages, nil
+func (a *Artwork) ArtworkID() string {
+	return a.ID
 }
 
 func (a *Artwork) URL() string {
