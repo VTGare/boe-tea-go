@@ -187,9 +187,9 @@ func OnMessageRemove(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageDele
 				if err := b.RepostDetector.Delete(b.Context, child.ChannelID, child.ArtworkID); err != nil {
 					if strings.Contains(err.Error(), "repost not found") {
 						log.With("error", err)
+					} else {
+						log.With("error", err).Warn("failed to remove repost")
 					}
-
-					log.With("error", err).Warn("failed to remove repost")
 				}
 
 				log.With("user_id", msg.AuthorID, "message_id", child.MessageID).Info("removing a child message")
