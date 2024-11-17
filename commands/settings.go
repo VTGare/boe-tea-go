@@ -153,14 +153,6 @@ func set(b *bot.Bot) func(*gumi.Ctx) error {
 				),
 			)
 
-			eb.AddField(
-				"ArtStation settings",
-				fmt.Sprintf(
-					"**%v**: %v",
-					"Status (artstation)", messages.FormatBool(guild.Artstation),
-				),
-			)
-
 			channels := dgoutils.Ternary(len(guild.ArtChannels) > 5,
 				[]string{"There are more than 5 art channels, use `bt!artchannels` command to see them."},
 				arrays.Map(guild.ArtChannels, func(s string) string {
@@ -293,13 +285,6 @@ func set(b *bot.Bot) func(*gumi.Ctx) error {
 				}
 
 				guild.Deviant = applySetting(guild.Deviant, enable).(bool)
-			case "artstation":
-				enable, err := parseBool(newSetting.Raw)
-				if err != nil {
-					return err
-				}
-
-				applySetting(guild.Artstation, enable)
 			case "tags":
 				enable, err := parseBool(newSetting.Raw)
 				if err != nil {

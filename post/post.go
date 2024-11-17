@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/VTGare/embeds"
 	"reflect"
 	"slices"
 	"strconv"
@@ -20,6 +19,7 @@ import (
 	"github.com/VTGare/boe-tea-go/messages"
 	"github.com/VTGare/boe-tea-go/repost"
 	"github.com/VTGare/boe-tea-go/store"
+	"github.com/VTGare/embeds"
 	"github.com/VTGare/gumi"
 	"github.com/bwmarrin/discordgo"
 	"golang.org/x/sync/errgroup"
@@ -495,7 +495,7 @@ func (p *Post) sendMessages(guild *store.Guild, channelID string, res *fetchResu
 
 	for i, messages := range allMessages {
 		for _, message := range messages {
-			err := sendMessage(message, res.Artworks[i].ArtworkID())
+			err := sendMessage(message, res.Artworks[i].ID())
 			if err != nil {
 				log.With(err).Warn("failed to send artwork message")
 			}

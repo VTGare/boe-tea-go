@@ -114,7 +114,7 @@ func (fxt *fxTwitter) Find(id string) (artworks.Artwork, error) {
 	artwork := &Artwork{
 		Videos:    videos,
 		Photos:    photos,
-		ID:        fxArtwork.Tweet.ID,
+		id:        fxArtwork.Tweet.ID,
 		FullName:  fxArtwork.Tweet.Author.Name,
 		Username:  username,
 		Content:   fxArtwork.Tweet.Text,

@@ -61,7 +61,6 @@ type SetCommand struct {
 	PixivSettings      *PixivSettings
 	TwitterSettings    *ProviderSettings
 	DeviantSettings    *ProviderSettings
-	ArtstationSettings *ProviderSettings
 	ArtChannels        string
 }
 
@@ -151,10 +150,6 @@ var embeds = map[Language]map[EmbedType]any{
 			DeviantSettings: &ProviderSettings{
 				Title:   "DeviantArt settings",
 				Enabled: "Status (deviant)",
-			},
-			ArtstationSettings: &ProviderSettings{
-				Title:   "ArtStation settings",
-				Enabled: "Status (artstation)",
 			},
 			PixivSettings: &PixivSettings{
 				ProviderSettings: ProviderSettings{

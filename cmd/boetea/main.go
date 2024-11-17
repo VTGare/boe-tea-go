@@ -93,9 +93,6 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// Temporary disabled
-	// b.AddProvider(artstation.New())
-
 	b.AddProvider(twitter.New())
 	b.AddProvider(deviant.New())
 

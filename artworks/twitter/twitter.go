@@ -32,7 +32,7 @@ type Twitter struct {
 type Artwork struct {
 	Videos      []Video
 	Photos      []string
-	ID          string
+	id          string
 	FullName    string
 	Username    string
 	Content     string
@@ -162,6 +162,10 @@ func (a *Artwork) MessageSends(footer string, _ bool) ([]*discordgo.MessageSend,
 	}
 
 	return tweets, nil
+}
+
+func (a *Artwork) ID() string {
+	return a.id
 }
 
 func (a *Artwork) videoEmbed(eb *embeds.Builder) ([]*discordgo.MessageSend, error) {
