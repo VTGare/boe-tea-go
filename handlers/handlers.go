@@ -16,6 +16,7 @@ import (
 	"github.com/VTGare/boe-tea-go/internal/dgoutils"
 	"github.com/VTGare/boe-tea-go/messages"
 	"github.com/VTGare/boe-tea-go/post"
+	"github.com/VTGare/boe-tea-go/repost"
 	"github.com/VTGare/boe-tea-go/store"
 	"github.com/VTGare/embeds"
 	"github.com/VTGare/gumi"
@@ -155,7 +156,6 @@ func OnChannelDelete(b *bot.Bot) func(*discordgo.Session, *discordgo.ChannelDele
 				guild.ID,
 				[]string{ch.ID},
 			)
-
 			if err != nil {
 				log.With("error", err).Warn("failed to delete art channel")
 			}
@@ -182,12 +182,9 @@ func OnMessageRemove(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageDele
 			log.With("user_id", msg.AuthorID).Info("removing children messages")
 
 			for _, child := range msg.Children {
-				log.With("user_id", msg.AuthorID, "message_id", child.MessageID).Info("removing a respost")
-
+				log.With("user_id", msg.AuthorID, "message_id", child.MessageID).Info("removing a repost")
 				if err := b.RepostDetector.Delete(b.Context, child.ChannelID, child.ArtworkID); err != nil {
-					if strings.Contains(err.Error(), "repost not found") {
-						log.With("error", err)
-					} else {
+					if !errors.Is(err, repost.ErrNotFound) {
 						log.With("error", err).Warn("failed to remove repost")
 					}
 				}
