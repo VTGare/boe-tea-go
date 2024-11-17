@@ -553,6 +553,10 @@ func (p *Post) generateMessages(guild *store.Guild, artworks []artworks.Artwork)
 }
 
 func (p *Post) skipArtworks(embeds []*discordgo.MessageSend) []*discordgo.MessageSend {
+	if p.SkipMode == SkipModeNone || len(p.Indices) == 0 {
+		return embeds
+	}
+
 	filtered := make([]*discordgo.MessageSend, 0)
 	switch p.SkipMode {
 	case SkipModeExclude:
@@ -567,8 +571,6 @@ func (p *Post) skipArtworks(embeds []*discordgo.MessageSend) []*discordgo.Messag
 				filtered = append(filtered, val)
 			}
 		}
-	case SkipModeNone:
-		return embeds
 	}
 
 	return filtered
