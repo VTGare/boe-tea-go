@@ -2,21 +2,24 @@ package twitter
 
 import (
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 
 	"github.com/VTGare/boe-tea-go/store"
 )
 
-type twitterMatcher struct{}
+type twitterMatcher struct {
+	regex *regexp.Regexp
+}
 
-func (twitterMatcher) Match(s string) (string, bool) {
+func (tm twitterMatcher) Match(s string) (string, bool) {
 	u, err := url.ParseRequestURI(s)
 	if err != nil {
 		return "", false
 	}
 
-	if !strings.Contains(u.Host, "twitter.com") && u.Host != "x.com" {
+	if ok := tm.regex.MatchString(u.Host); !ok {
 		return "", false
 	}
 
