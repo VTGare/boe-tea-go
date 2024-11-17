@@ -153,6 +153,14 @@ func set(b *bot.Bot) func(*gumi.Ctx) error {
 				),
 			)
 
+			eb.AddField(
+				"Bluesky settings",
+				fmt.Sprintf(
+					"**%v**: %v",
+					"Status (bluesky)", messages.FormatBool(guild.Bluesky),
+				),
+			)
+
 			channels := dgoutils.Ternary(len(guild.ArtChannels) > 5,
 				[]string{"There are more than 5 art channels, use `bt!artchannels` command to see them."},
 				arrays.Map(guild.ArtChannels, func(s string) string {
@@ -271,6 +279,13 @@ func set(b *bot.Bot) func(*gumi.Ctx) error {
 				}
 
 				guild.Pixiv = applySetting(guild.Pixiv, enable).(bool)
+			case "bluesky":
+				enable, err := parseBool(newSetting.Raw)
+				if err != nil {
+					return err
+				}
+
+				guild.Bluesky = applySetting(guild.Bluesky, enable).(bool)
 			case "twitter":
 				enable, err := parseBool(newSetting.Raw)
 				if err != nil {

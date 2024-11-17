@@ -8,6 +8,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/VTGare/boe-tea-go/artworks/bluesky"
 	"github.com/VTGare/boe-tea-go/artworks/deviant"
 	"github.com/VTGare/boe-tea-go/artworks/pixiv"
 	"github.com/VTGare/boe-tea-go/artworks/twitter"
@@ -95,6 +96,7 @@ func main() {
 
 	b.AddProvider(twitter.New())
 	b.AddProvider(deviant.New())
+	b.AddProvider(bluesky.New())
 
 	if err := pixiv.LoadAuth(cfg.Pixiv.AuthToken, cfg.Pixiv.RefreshToken); err == nil {
 		log.Info("Successfully logged into Pixiv.")

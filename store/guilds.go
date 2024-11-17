@@ -20,6 +20,7 @@ type Guild struct {
 	Pixiv   bool `json:"pixiv" bson:"pixiv"`
 	Twitter bool `json:"twitter" bson:"twitter"`
 	Deviant bool `json:"deviant" bson:"deviant"`
+	Bluesky bool `json:"bluesky" bson:"bluesky"`
 
 	Tags       bool `json:"tags" bson:"tags"`
 	FlavorText bool `json:"flavour_text" bson:"flavour_text"`
@@ -55,6 +56,7 @@ func DefaultGuild(id string) *Guild {
 		Pixiv:            true,
 		Twitter:          true,
 		Deviant:          true,
+		Bluesky:          true,
 		Tags:             true,
 		FlavorText:       true,
 		Repost:           GuildRepostEnabled,
@@ -77,6 +79,7 @@ func UserGuild() *Guild {
 		Pixiv:            true,
 		Twitter:          true,
 		Deviant:          true,
+		Bluesky:          true,
 		Tags:             true,
 		FlavorText:       true,
 		SkipFirst:        true,
