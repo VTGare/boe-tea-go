@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -32,7 +33,7 @@ type Twitter struct {
 type Artwork struct {
 	Videos      []Video
 	Photos      []string
-	ID          string
+	id          string
 	FullName    string
 	Username    string
 	Content     string
@@ -53,6 +54,9 @@ type Video struct {
 func New() artworks.Provider {
 	return &Twitter{
 		providers: []artworks.Provider{newFxTwitter()},
+		twitterMatcher: twitterMatcher{
+			regex: regexp.MustCompile(`^(?:mobile\.)?(?:(?:fix(?:up|v))?x|(?:[fv]x)?twitter)\.com$`),
+		},
 	}
 }
 
@@ -162,6 +166,10 @@ func (a *Artwork) MessageSends(footer string, _ bool) ([]*discordgo.MessageSend,
 	}
 
 	return tweets, nil
+}
+
+func (a *Artwork) ID() string {
+	return a.id
 }
 
 func (a *Artwork) videoEmbed(eb *embeds.Builder) ([]*discordgo.MessageSend, error) {

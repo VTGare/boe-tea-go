@@ -16,17 +16,13 @@ import (
 	"github.com/everpcpc/pixiv"
 )
 
-var regex = regexp.MustCompile(
-	`(?i)http(?:s)?:\/\/(?:www\.)?pixiv\.net\/(?:en\/)?(?:artworks\/|member_illust\.php\?)(?:mode=medium\&)?(?:illust_id=)?([0-9]+)`,
-)
-
 type Pixiv struct {
 	app       *pixiv.AppPixivAPI
 	proxyHost string
+	regex     *regexp.Regexp
 }
 
 type Artwork struct {
-	ID          string
 	Type        string
 	Author      string
 	Title       string
@@ -38,6 +34,7 @@ type Artwork struct {
 	AIGenerated bool
 	CreatedAt   time.Time
 
+	id    string
 	url   string
 	proxy string
 }
@@ -47,12 +44,15 @@ type Image struct {
 	Original string
 }
 
-func New(proxyHost, authToken, refreshToken string) (artworks.Provider, error) {
+func LoadAuth(authToken, refreshToken string) error {
 	_, err := pixiv.LoadAuth(authToken, refreshToken, time.Now())
 	if err != nil {
-		return nil, err
+		return err
 	}
+	return nil
+}
 
+func New(proxyHost string) artworks.Provider {
 	if proxyHost == "" {
 		proxyHost = "https://boetea.dev"
 	}
@@ -60,11 +60,12 @@ func New(proxyHost, authToken, refreshToken string) (artworks.Provider, error) {
 	return &Pixiv{
 		app:       pixiv.NewApp(),
 		proxyHost: proxyHost,
-	}, nil
+		regex:     regexp.MustCompile(`(?i)https?://(?:www\.)?pixiv\.net/(?:en/)?(?:artworks/|member_illust\.php\?)(?:mode=medium&)?(?:illust_id=)?([0-9]+)`),
+	}
 }
 
 func (p *Pixiv) Match(s string) (string, bool) {
-	res := regex.FindStringSubmatch(s)
+	res := p.regex.FindStringSubmatch(s)
 	if res == nil {
 		return "", false
 	}
@@ -139,7 +140,7 @@ func (p *Pixiv) _find(id string) (artworks.Artwork, error) {
 	}
 
 	artwork := &Artwork{
-		ID:        id,
+		id:        id,
 		url:       "https://www.pixiv.net/en/artworks/" + id,
 		Title:     illust.Title,
 		Author:    author,
@@ -172,7 +173,7 @@ func (p *Pixiv) _find(id string) (artworks.Artwork, error) {
 	return artwork, nil
 }
 
-func (p *Pixiv) Enabled(g *store.Guild) bool {
+func (*Pixiv) Enabled(g *store.Guild) bool {
 	return g.Pixiv
 }
 
@@ -249,6 +250,10 @@ func (a *Artwork) URL() string {
 
 func (a *Artwork) Len() int {
 	return a.Pages
+}
+
+func (a *Artwork) ID() string {
+	return a.id
 }
 
 func (a *Artwork) imageURLs() []string {

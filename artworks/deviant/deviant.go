@@ -33,7 +33,9 @@ type Artwork struct {
 	Comments     int
 	AIGenerated  bool
 	CreatedAt    time.Time
-	url          string
+
+	id  string
+	url string
 }
 
 type Author struct {
@@ -78,7 +80,7 @@ func (d *DeviantArt) Find(id string) (artworks.Artwork, error) {
 	return artwork, nil
 }
 
-func (d *DeviantArt) _find(id string) (artworks.Artwork, error) {
+func (*DeviantArt) _find(id string) (artworks.Artwork, error) {
 	reqURL := "https://backend.deviantart.com/oembed?url=" + url.QueryEscape("deviantart.com/art/"+id)
 	resp, err := http.Get(reqURL)
 	if err != nil {
@@ -105,7 +107,9 @@ func (d *DeviantArt) _find(id string) (artworks.Artwork, error) {
 		Favorites:    res.Community.Statistics.Attributes.Favorites,
 		Comments:     res.Community.Statistics.Attributes.Comments,
 		CreatedAt:    res.Pubdate,
-		url:          res.AuthorURL + "/art/" + id,
+
+		id:  id,
+		url: res.AuthorURL + "/art/" + id,
 	}
 
 	artwork.AIGenerated = artworks.IsAIGenerated(artwork.Tags...)
@@ -122,7 +126,7 @@ func (d *DeviantArt) Match(s string) (string, bool) {
 	return res[1], true
 }
 
-func (d *DeviantArt) Enabled(g *store.Guild) bool {
+func (*DeviantArt) Enabled(g *store.Guild) bool {
 	return g.Deviant
 }
 
@@ -172,6 +176,10 @@ func (a *Artwork) URL() string {
 	return a.url
 }
 
-func (a *Artwork) Len() int {
+func (a *Artwork) ID() string {
+	return a.id
+}
+
+func (*Artwork) Len() int {
 	return 1
 }

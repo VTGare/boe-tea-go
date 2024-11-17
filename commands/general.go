@@ -243,10 +243,11 @@ func feedback(*bot.Bot) func(*gumi.Ctx) error {
 
 		if len(gctx.Event.Attachments) > 0 {
 			att := gctx.Event.Attachments[0]
-			if strings.HasSuffix(att.Filename, "png") ||
-				strings.HasSuffix(att.Filename, "jpg") ||
-				strings.HasSuffix(att.Filename, "gif") {
-				eb.Image(att.URL)
+
+			for _, suffix := range []string{"png", "jpg", "jpeg", "gif"} {
+				if strings.HasSuffix(att.Filename, suffix) {
+					eb.Image(att.URL)
+				}
 			}
 		}
 

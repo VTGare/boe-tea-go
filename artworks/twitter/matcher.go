@@ -9,15 +9,17 @@ import (
 	"github.com/VTGare/boe-tea-go/store"
 )
 
-type twitterMatcher struct{}
+type twitterMatcher struct {
+	regex *regexp.Regexp
+}
 
-func (twitterMatcher) Match(s string) (string, bool) {
+func (tm twitterMatcher) Match(s string) (string, bool) {
 	u, err := url.ParseRequestURI(s)
 	if err != nil {
 		return "", false
 	}
 
-	if ok, _ := regexp.MatchString("^(?:mobile\\.)?(?:(?:fix(?:up|v))?x|(?:[fv]x)?twitter)\\.com$", u.Host); !ok {
+	if ok := tm.regex.MatchString(u.Host); !ok {
 		return "", false
 	}
 

@@ -1,7 +1,6 @@
 package artworks
 
 import (
-	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -19,21 +18,9 @@ type Provider interface {
 type Artwork interface {
 	StoreArtwork() *store.Artwork
 	MessageSends(footer string, tags bool) ([]*discordgo.MessageSend, error)
+	ID() string
 	URL() string
 	Len() int
-}
-
-type Error struct {
-	provider string
-	cause    error
-}
-
-func (e *Error) Error() string {
-	return fmt.Sprintf("provider %v returned an error: %v", e.provider, e.cause.Error())
-}
-
-func (e *Error) Unwrap() error {
-	return e.cause
 }
 
 func NewError(p Provider, err error) error {
@@ -42,12 +29,6 @@ func NewError(p Provider, err error) error {
 		cause:    err,
 	}
 }
-
-// Common errors
-var (
-	ErrArtworkNotFound = errors.New("artwork not found")
-	ErrRateLimited     = errors.New("provider rate limited")
-)
 
 func EscapeMarkdown(content string) string {
 	contents := strings.Split(content, "\n")

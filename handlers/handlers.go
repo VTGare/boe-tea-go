@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -11,11 +12,11 @@ import (
 	"github.com/VTGare/boe-tea-go/artworks"
 	"github.com/VTGare/boe-tea-go/artworks/twitter"
 	"github.com/VTGare/boe-tea-go/bot"
-	"github.com/VTGare/boe-tea-go/internal/arrays"
 	"github.com/VTGare/boe-tea-go/internal/cache"
 	"github.com/VTGare/boe-tea-go/internal/dgoutils"
 	"github.com/VTGare/boe-tea-go/messages"
 	"github.com/VTGare/boe-tea-go/post"
+	"github.com/VTGare/boe-tea-go/repost"
 	"github.com/VTGare/boe-tea-go/store"
 	"github.com/VTGare/embeds"
 	"github.com/VTGare/gumi"
@@ -30,6 +31,7 @@ func RegisterHandlers(b *bot.Bot) {
 	b.AddHandler(OnGuildCreate(b))
 	b.AddHandler(OnGuildDelete(b))
 	b.AddHandler(OnGuildBanAdd(b))
+	b.AddHandler(OnChannelDelete(b))
 	b.AddHandler(OnReactionAdd(b))
 	b.AddHandler(OnReactionRemove(b))
 	b.AddHandler(OnMessageRemove(b))
@@ -70,7 +72,7 @@ func OnMessage(b *bot.Bot) func(*gumi.Ctx) error {
 			return err
 		}
 
-		if !(len(guild.ArtChannels) == 0 || arrays.Any(guild.ArtChannels, gctx.Event.ChannelID)) {
+		if !(len(guild.ArtChannels) == 0 || slices.Contains(guild.ArtChannels, gctx.Event.ChannelID)) {
 			return nil
 		}
 
@@ -134,12 +136,38 @@ func OnGuildBanAdd(b *bot.Bot) func(*discordgo.Session, *discordgo.GuildBanAdd) 
 	}
 }
 
+func OnChannelDelete(b *bot.Bot) func(*discordgo.Session, *discordgo.ChannelDelete) {
+	return func(s *discordgo.Session, ch *discordgo.ChannelDelete) {
+		log := b.Log.With("channel_id", ch.ID, "guild_id", ch.GuildID)
+
+		guild, err := b.Store.Guild(b.Context, ch.GuildID)
+		if err != nil {
+			log.With("error", err).Warn("failed to find guild")
+			return
+		}
+
+		if len(guild.ArtChannels) == 0 {
+			return
+		}
+
+		if slices.Contains(guild.ArtChannels, ch.ID) {
+			_, err = b.Store.DeleteArtChannels(
+				b.Context,
+				guild.ID,
+				[]string{ch.ID},
+			)
+			if err != nil {
+				log.With("error", err).Warn("failed to delete art channel")
+			}
+		}
+	}
+}
+
 func OnMessageRemove(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageDelete) {
 	return func(s *discordgo.Session, m *discordgo.MessageDelete) {
 		log := b.Log.With("channel_id", m.ChannelID, "parent_id", m.ID)
 		msg, ok := b.EmbedCache.Get(
-			m.ChannelID,
-			m.ID,
+			m.ChannelID, m.ID,
 		)
 
 		if !ok {
@@ -150,18 +178,24 @@ func OnMessageRemove(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageDele
 			m.ChannelID, m.ID,
 		)
 
-		if msg.Parent {
+		if msg.IsParent {
 			log.With("user_id", msg.AuthorID).Info("removing children messages")
 
 			for _, child := range msg.Children {
+				log.With("user_id", msg.AuthorID, "message_id", child.MessageID).Info("removing a repost")
+				if err := b.RepostDetector.Delete(b.Context, child.ChannelID, child.ArtworkID); err != nil {
+					if !errors.Is(err, repost.ErrNotFound) {
+						log.With("error", err).Warn("failed to remove repost")
+					}
+				}
+
 				log.With("user_id", msg.AuthorID, "message_id", child.MessageID).Info("removing a child message")
 
 				b.EmbedCache.Remove(
 					child.ChannelID, child.MessageID,
 				)
 
-				err := s.ChannelMessageDelete(child.ChannelID, child.MessageID)
-				if err != nil {
+				if err := s.ChannelMessageDelete(child.ChannelID, child.MessageID); err != nil {
 					log.With("error", err, "message_id", child.MessageID).Warn("failed to delete child message")
 				}
 			}
@@ -204,7 +238,7 @@ func OnReactionAdd(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageReacti
 				return err
 			}
 
-			if !msg.Parent {
+			if !msg.IsParent {
 				return nil
 			}
 

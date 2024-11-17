@@ -153,26 +153,16 @@ func set(b *bot.Bot) func(*gumi.Ctx) error {
 				),
 			)
 
-			eb.AddField(
-				"ArtStation settings",
-				fmt.Sprintf(
-					"**%v**: %v",
-					"Status (artstation)", messages.FormatBool(guild.Artstation),
-				),
-			)
-
-			var artChannels []string
-			if len(guild.ArtChannels) > 5 {
-				artChannels = []string{"There are more than 5 art channels, use `bt!artchannels` command to see them."}
-			} else {
-				artChannels = arrays.Map(guild.ArtChannels, func(s string) string {
+			channels := dgoutils.Ternary(len(guild.ArtChannels) > 5,
+				[]string{"There are more than 5 art channels, use `bt!artchannels` command to see them."},
+				arrays.Map(guild.ArtChannels, func(s string) string {
 					return fmt.Sprintf("<#%v> | `%v`", s, s)
-				})
-			}
+				}),
+			)
 
 			eb.AddField(
 				"Art channels",
-				"Use `bt!artchannels` command to list or manage art channels!\n\n"+strings.Join(artChannels, "\n"),
+				"Use `bt!artchannels` command to list or manage art channels!\n\n"+strings.Join(channels, "\n"),
 			)
 
 			return gctx.ReplyEmbed(eb.Finalize())
@@ -295,13 +285,6 @@ func set(b *bot.Bot) func(*gumi.Ctx) error {
 				}
 
 				guild.Deviant = applySetting(guild.Deviant, enable).(bool)
-			case "artstation":
-				enable, err := parseBool(newSetting.Raw)
-				if err != nil {
-					return err
-				}
-
-				applySetting(guild.Artstation, enable)
 			case "tags":
 				enable, err := parseBool(newSetting.Raw)
 				if err != nil {
@@ -494,8 +477,8 @@ func artChannels(b *bot.Bot) func(*gumi.Ctx) error {
 			}
 
 			channels := make([]string, 0)
-			for arg := range gctx.Args.Arguments[1:] {
-				ch, err := gctx.Session.Channel(dgoutils.Trimmer(gctx, arg))
+			for _, arg := range gctx.Args.Arguments[1:] {
+				ch, err := gctx.Session.Channel(dgoutils.TrimmerRaw(arg.Raw))
 				if err != nil {
 					return err
 				}
@@ -560,7 +543,7 @@ func addChannel(b *bot.Bot) func(*gumi.Ctx) error {
 
 		channels := make([]string, 0)
 		for _, arg := range gctx.Args.Arguments {
-			ch, err := gctx.Session.Channel(strings.Trim(arg.Raw, "<#>"))
+			ch, err := gctx.Session.Channel(dgoutils.TrimmerRaw(arg.Raw))
 			if err != nil {
 				return err
 			}
@@ -645,9 +628,14 @@ func removeChannel(b *bot.Bot) func(*gumi.Ctx) error {
 
 		channels := make([]string, 0)
 		for _, arg := range gctx.Args.Arguments {
-			ch, err := gctx.Session.Channel(strings.Trim(arg.Raw, "<#>"))
+			ch, err := gctx.Session.Channel(dgoutils.TrimmerRaw(arg.Raw))
 			if err != nil {
-				return messages.ErrChannelNotFound(err, arg.Raw)
+				if !strings.Contains(err.Error(), "404") {
+					return messages.ErrChannelNotFound(err, arg.Raw)
+				}
+
+				channels = append(channels, dgoutils.TrimmerRaw(arg.Raw))
+				continue
 			}
 
 			if ch.GuildID != gctx.Event.GuildID {

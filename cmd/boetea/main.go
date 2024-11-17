@@ -93,15 +93,12 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// Temporary disabled
-	// b.AddProvider(artstation.New())
-
 	b.AddProvider(twitter.New())
 	b.AddProvider(deviant.New())
 
-	if pixiv, err := pixiv.New(cfg.Pixiv.ProxyHost, cfg.Pixiv.AuthToken, cfg.Pixiv.RefreshToken); err == nil {
+	if err := pixiv.LoadAuth(cfg.Pixiv.AuthToken, cfg.Pixiv.RefreshToken); err == nil {
 		log.Info("Successfully logged into Pixiv.")
-		b.AddProvider(pixiv)
+		b.AddProvider(pixiv.New(cfg.Pixiv.ProxyHost))
 	}
 
 	b.AddRouter(&gumi.Router{

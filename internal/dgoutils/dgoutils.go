@@ -19,6 +19,14 @@ var (
 	ErrRangeSyntax = errors.New("range low is higher than range high")
 )
 
+func Ternary[T any](condition bool, a T, b T) T {
+	if condition {
+		return a
+	}
+
+	return b
+}
+
 func ValidateArgs(gctx *gumi.Ctx, argsLen int) error {
 	if gctx.Args.Len() < argsLen {
 		return messages.ErrIncorrectCmd(gctx.Command)
@@ -30,6 +38,11 @@ func ValidateArgs(gctx *gumi.Ctx, argsLen int) error {
 // Trimmer trims <> in case someone wraps the link in it, and characters '!', '@', '#', and '&' for channels and user mentions.
 func Trimmer(gctx *gumi.Ctx, n int) string {
 	return strings.Trim(gctx.Args.Get(n).Raw, "<!@#&>")
+}
+
+// TrimmerRaw is the same as Trimmer but directly on a Raw string.
+func TrimmerRaw(arg string) string {
+	return strings.Trim(arg, "<!@#&>")
 }
 
 // ExpireMessage deletes a specified message after a certain time
@@ -124,7 +137,7 @@ func (r *Range) Array() []int {
 }
 
 func (r *Range) Map() map[int]struct{} {
-	m := make(map[int]struct{}, 0)
+	m := make(map[int]struct{})
 	for i := r.Low; i <= r.High; i++ {
 		m[i] = struct{}{}
 	}

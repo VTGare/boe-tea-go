@@ -10,7 +10,8 @@ var ErrNotFound = errors.New("repost not found")
 
 type Detector interface {
 	Find(ctx context.Context, channelID string, artworkID string) (*Repost, error)
-	Create(context.Context, *Repost, time.Duration) error
+	Create(ctx context.Context, repost *Repost, duration time.Duration) error
+	Delete(ctx context.Context, channelID string, artworkID string) error
 	Close() error
 }
 

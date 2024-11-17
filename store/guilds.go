@@ -17,10 +17,9 @@ type Guild struct {
 	ID     string `json:"id" bson:"guild_id" validate:"required"`
 	Prefix string `json:"prefix" bson:"prefix" validate:"required,max=5"`
 
-	Pixiv      bool `json:"pixiv" bson:"pixiv"`
-	Twitter    bool `json:"twitter" bson:"twitter"`
-	Deviant    bool `json:"deviant" bson:"deviant"`
-	Artstation bool `json:"artstation" bson:"artstation"`
+	Pixiv   bool `json:"pixiv" bson:"pixiv"`
+	Twitter bool `json:"twitter" bson:"twitter"`
+	Deviant bool `json:"deviant" bson:"deviant"`
 
 	Tags       bool `json:"tags" bson:"tags"`
 	FlavorText bool `json:"flavour_text" bson:"flavour_text"`
