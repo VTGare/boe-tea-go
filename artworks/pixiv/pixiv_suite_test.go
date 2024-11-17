@@ -16,7 +16,7 @@ func TestPixiv(t *testing.T) {
 var _ = DescribeTable(
 	"Match Pixiv URL",
 	func(url string, expectedID string, expectedResult bool) {
-		provider := pixiv.New("")
+		provider := pixiv.Pixiv{}
 
 		id, ok := provider.Match(url)
 		Expect(id).To(BeEquivalentTo(expectedID))

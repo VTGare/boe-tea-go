@@ -1,9 +1,13 @@
 package artworks
 
 import (
+	"errors"
+	"fmt"
+	"regexp"
+	"strings"
+
 	"github.com/VTGare/boe-tea-go/store"
 	"github.com/bwmarrin/discordgo"
-	"strings"
 )
 
 type Provider interface {
@@ -15,12 +19,49 @@ type Provider interface {
 type Artwork interface {
 	StoreArtwork() *store.Artwork
 	MessageSends(footer string, tags bool) ([]*discordgo.MessageSend, error)
-	ArtworkID() string
 	URL() string
 	Len() int
 }
 
-func IsAIGenerated(content ...string) bool {
+type Error struct {
+	provider string
+	cause    error
+}
+
+func (e *Error) Error() string {
+	return fmt.Sprintf("provider %v returned an error: %v", e.provider, e.cause.Error())
+}
+
+func (e *Error) Unwrap() error {
+	return e.cause
+}
+
+func NewError(p Provider, err error) error {
+	return &Error{
+		provider: fmt.Sprintf("%T", p),
+		cause:    err,
+	}
+}
+
+// Common errors
+var (
+	ErrArtworkNotFound = errors.New("artwork not found")
+	ErrRateLimited     = errors.New("provider rate limited")
+)
+
+func EscapeMarkdown(content string) string {
+	contents := strings.Split(content, "\n")
+	regex := regexp.MustCompile("^#{1,3}")
+
+	for i, line := range contents {
+		if regex.MatchString(line) {
+			contents[i] = "\\" + line
+		}
+	}
+	return strings.Join(contents, "\n")
+}
+
+func IsAIGenerated(contents ...string) bool {
 	aiTags := []string{
 		"aiart",
 		"aigenerated",
@@ -32,7 +73,7 @@ func IsAIGenerated(content ...string) bool {
 		"stablediffusion",
 	}
 
-	for _, tag := range content {
+	for _, tag := range contents {
 		for _, test := range aiTags {
 			if strings.EqualFold(tag, test) {
 				return true

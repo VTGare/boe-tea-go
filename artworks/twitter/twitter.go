@@ -4,11 +4,9 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/VTGare/boe-tea-go/artworks/embed"
 	"io"
 	"net/http"
 	"net/url"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -53,40 +51,33 @@ type Video struct {
 }
 
 func New() artworks.Provider {
-	re := regexp.MustCompile(`^(?:mobile\.)?(?:(?:fix(?:up|v))?x|(?:[fv]x)?twitter)\.com$`)
-
 	return &Twitter{
-		providers: []artworks.Provider{newFxTwitter(re)},
-		twitterMatcher: twitterMatcher{
-			regex: re,
-		},
+		providers: []artworks.Provider{newFxTwitter()},
 	}
 }
 
 func (t *Twitter) Find(id string) (artworks.Artwork, error) {
-	return artworks.NewError(t, func() (artworks.Artwork, error) {
-		var (
-			artwork artworks.Artwork
-			errs    []error
-		)
+	var (
+		artwork artworks.Artwork
+		errs    []error
+	)
 
-		for _, provider := range t.providers {
-			var err error
-			artwork, err = provider.Find(id)
-			if errors.Is(err, ErrTweetNotFound) || errors.Is(err, ErrPrivateAccount) {
-				return nil, err
-			}
-
-			if err != nil {
-				errs = append(errs, err)
-				continue
-			}
-
-			return artwork, nil
+	for _, provider := range t.providers {
+		var err error
+		artwork, err = provider.Find(id)
+		if errors.Is(err, ErrTweetNotFound) || errors.Is(err, ErrPrivateAccount) {
+			return nil, artworks.NewError(t, err)
 		}
 
-		return &Artwork{}, errors.Join(errs...)
-	})
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+
+		return artwork, nil
+	}
+
+	return &Artwork{}, artworks.NewError(t, errors.Join(errs...))
 }
 
 func (a *Artwork) StoreArtwork() *store.Artwork {
@@ -106,8 +97,8 @@ func (a *Artwork) StoreArtwork() *store.Artwork {
 
 // MessageSends transforms an artwork to discordgo embeds.
 func (a *Artwork) MessageSends(footer string, _ bool) ([]*discordgo.MessageSend, error) {
+	eb := embeds.NewBuilder()
 	if a.FullName == "" && a.Len() == 0 {
-		eb := embeds.NewBuilder()
 		eb.Title("❎ Tweet doesn't exist.")
 		eb.Description("The tweet is NSFW or doesn't exist.\n\nUnsafe tweets can't be embedded due to API changes.")
 		eb.Footer(footer, "")
@@ -117,41 +108,80 @@ func (a *Artwork) MessageSends(footer string, _ bool) ([]*discordgo.MessageSend,
 		}, nil
 	}
 
-	eb := &embed.Embed{
-		Title:       a.FullName,
-		Username:    a.Username,
-		Description: a.Content,
-		FieldName1:  "Likes",
-		FieldValue1: strconv.Itoa(a.Likes),
-		FieldName2:  "Retweets",
-		FieldValue2: []string{strconv.Itoa(a.Retweets)},
-		URL:         a.Permalink,
-		Timestamp:   a.Timestamp,
-		AIGenerated: a.AIGenerated,
+	eb.URL(a.Permalink).Description(artworks.EscapeMarkdown(a.Content)).Timestamp(a.Timestamp)
+
+	if a.Retweets > 0 {
+		eb.AddField("Retweets", strconv.Itoa(a.Retweets), true)
+	}
+
+	if a.Likes > 0 {
+		eb.AddField("Likes", strconv.Itoa(a.Likes), true)
+	}
+
+	if footer != "" {
+		eb.Footer(footer, "")
+	}
+
+	if a.AIGenerated {
+		eb.AddField("⚠️ Disclaimer", "This artwork is AI-generated.")
 	}
 
 	if len(a.Videos) > 0 {
 		return a.videoEmbed(eb)
 	}
 
-	for _, image := range a.Photos {
-		eb.Images = append(eb.Images, image)
+	length := len(a.Photos)
+	tweets := make([]*discordgo.MessageSend, 0, length)
+	if length > 1 {
+		eb.Title(fmt.Sprintf("%v (%v) | Page %v / %v", a.FullName, a.Username, 1, length))
+	} else {
+		eb.Title(fmt.Sprintf("%v (%v)", a.FullName, a.Username))
 	}
 
-	return eb.ToEmbed(), nil
+	if length > 0 {
+		eb.Image(a.Photos[0])
+	}
+
+	tweets = append(tweets, &discordgo.MessageSend{
+		Embeds: []*discordgo.MessageEmbed{eb.Finalize()},
+	})
+
+	if len(a.Photos) > 1 {
+		for ind, photo := range a.Photos[1:] {
+			eb := embeds.NewBuilder()
+
+			eb.Title(fmt.Sprintf("%v (%v) | Page %v / %v", a.FullName, a.Username, ind+2, length)).URL(a.Permalink)
+			eb.Image(photo).Timestamp(a.Timestamp)
+
+			if footer != "" {
+				eb.Footer(footer, "")
+			}
+
+			tweets = append(tweets, &discordgo.MessageSend{Embeds: []*discordgo.MessageEmbed{eb.Finalize()}})
+		}
+	}
+
+	return tweets, nil
 }
 
-func (a *Artwork) videoEmbed(eb *embed.Embed) ([]*discordgo.MessageSend, error) {
+func (a *Artwork) videoEmbed(eb *embeds.Builder) ([]*discordgo.MessageSend, error) {
+	files := make([]*discordgo.File, 0, len(a.Videos))
 	for _, video := range a.Videos {
 		file, err := downloadVideo(video.URL)
 		if err != nil {
 			return nil, err
 		}
 
-		eb.Files = append(eb.Files, file)
+		files = append(files, file)
 	}
 
-	return eb.ToEmbed(), nil
+	eb.Title(fmt.Sprintf("%v (%v)", a.FullName, a.Username))
+	msg := &discordgo.MessageSend{
+		Embeds: []*discordgo.MessageEmbed{eb.Finalize()},
+		Files:  files,
+	}
+
+	return []*discordgo.MessageSend{msg}, nil
 }
 
 func downloadVideo(fileURL string) (*discordgo.File, error) {
@@ -178,10 +208,6 @@ func downloadVideo(fileURL string) (*discordgo.File, error) {
 		Name:   splits[len(splits)-1],
 		Reader: bytes.NewReader(b),
 	}, nil
-}
-
-func (a *Artwork) ArtworkID() string {
-	return a.ID
 }
 
 func (a *Artwork) URL() string {
