@@ -88,7 +88,7 @@ type Artwork struct {
 
 func New() *Bluesky {
 	return &Bluesky{
-		regex:  regexp.MustCompile(`(?i)https?://(?:www\.)?bsky\.app/profile/(\w.+)/post/(\w.+)`),
+		regex:  regexp.MustCompile(`(?i)https://(?:www\.)?bsky\.app/profile/(\w.+)/post/([\w\-]+)`),
 		client: http.DefaultClient,
 	}
 }
