@@ -51,12 +51,12 @@ func (rd redisDetector) Find(ctx context.Context, channelID, artworkID string) (
 	}
 
 	_, err := rd.client.Pipelined(ctx, func(pipe redis.Pipeliner) error {
-		err := rd.client.HGetAll(ctx, key).Scan(&rep)
+		err := pipe.HGetAll(ctx, key).Scan(&rep)
 		if err != nil {
 			return err
 		}
 
-		ttl, err = rd.client.TTL(ctx, key).Result()
+		ttl, err = pipe.TTL(ctx, key).Result()
 		if err != nil {
 			return err
 		}
@@ -74,7 +74,7 @@ func (rd redisDetector) Find(ctx context.Context, channelID, artworkID string) (
 func (rd redisDetector) Create(ctx context.Context, repost *Repost, duration time.Duration) error {
 	key := fmt.Sprintf("channel:%v:artwork:%v", repost.ChannelID, repost.ID)
 	_, err := rd.client.Pipelined(ctx, func(pipe redis.Pipeliner) error {
-		if _, err := rd.client.HSet(ctx, key, map[string]any{
+		if _, err := pipe.HSet(ctx, key, map[string]any{
 			"id":         repost.ID,
 			"url":        repost.URL,
 			"guild_id":   repost.GuildID,
@@ -84,7 +84,7 @@ func (rd redisDetector) Create(ctx context.Context, repost *Repost, duration tim
 			return err
 		}
 
-		if _, err := rd.client.ExpireAt(ctx, key, time.Now().Add(duration)).Result(); err != nil {
+		if _, err := pipe.ExpireAt(ctx, key, time.Now().Add(duration)).Result(); err != nil {
 			return err
 		}
 
@@ -104,14 +104,7 @@ func (rd redisDetector) Delete(ctx context.Context, channelID, artworkID string)
 		return err
 	}
 
-	_, err := rd.client.Pipelined(ctx, func(pipe redis.Pipeliner) error {
-		if _, err := rd.client.Del(ctx, key).Result(); err != nil {
-			return err
-		}
-
-		return nil
-	})
-	if err != nil {
+	if _, err := rd.client.Del(ctx, key).Result(); err != nil {
 		return err
 	}
 
