@@ -75,40 +75,32 @@ func (p *Pixiv) Match(s string) (string, bool) {
 }
 
 func (p *Pixiv) Find(id string) (artworks.Artwork, error) {
-	artwork, err := p._find(id)
-	if err != nil {
-		return nil, artworks.NewError(p, err)
-	}
+	return artworks.WrapError(p, func() (artworks.Artwork, error) {
+		i, err := strconv.ParseUint(id, 10, 64)
+		if err != nil {
+			return nil, err
+		}
 
-	return artwork, nil
-}
+		illust, err := p.app.IllustDetail(i)
+		if err != nil {
+			return nil, err
+		}
 
-func (p *Pixiv) _find(id string) (artworks.Artwork, error) {
-	i, err := strconv.ParseUint(id, 10, 64)
-	if err != nil {
-		return nil, err
-	}
-
-	illust, err := p.app.IllustDetail(i)
-	if err != nil {
-		return nil, err
-	}
-
-	if illust.ID == 0 {
-		return nil, artworks.ErrArtworkNotFound
-	}
+		if illust.ID == 0 {
+			return nil, artworks.ErrArtworkNotFound
+		}
 
 		author := ternary.If(illust.User != nil,
 			illust.User.Name,
 			"Unknown",
 		)
 
-	tags := make([]string, 0)
-	nsfw := false
-	for _, tag := range illust.Tags {
-		if tag.Name == "R-18" {
-			nsfw = true
-		}
+		tags := make([]string, 0)
+		nsfw := false
+		for _, tag := range illust.Tags {
+			if tag.Name == "R-18" {
+				nsfw = true
+			}
 
 			tags = ternary.If(tag.TranslatedName != "",
 				append(tags, tag.TranslatedName),
@@ -116,59 +108,60 @@ func (p *Pixiv) _find(id string) (artworks.Artwork, error) {
 			)
 		}
 
-	images := make([]*Image, 0, illust.PageCount)
-	if page := illust.MetaSinglePage; page != nil {
-		if page.OriginalImageURL != "" {
+		images := make([]*Image, 0, illust.PageCount)
+		if page := illust.MetaSinglePage; page != nil {
+			if page.OriginalImageURL != "" {
+				img := &Image{
+					Original: page.OriginalImageURL,
+					Preview:  illust.Images.Medium,
+				}
+
+				images = append(images, img)
+			}
+		}
+
+		for _, page := range illust.MetaPages {
 			img := &Image{
-				Original: page.OriginalImageURL,
-				Preview:  illust.Images.Medium,
+				Original: page.Images.Original,
+				Preview:  page.Images.Large,
 			}
 
 			images = append(images, img)
 		}
-	}
 
-	for _, page := range illust.MetaPages {
-		img := &Image{
-			Original: page.Images.Original,
-			Preview:  page.Images.Large,
+		artwork := &Artwork{
+			id:        id,
+			url:       "https://www.pixiv.net/en/artworks/" + id,
+			Title:     illust.Title,
+			Author:    author,
+			Tags:      tags,
+			Images:    images,
+			NSFW:      nsfw,
+			Type:      illust.Type,
+			Pages:     illust.PageCount,
+			Likes:     illust.TotalBookmarks,
+			CreatedAt: illust.CreateDate,
+
+			proxy: p.proxyHost,
 		}
 
-		images = append(images, img)
-	}
-
-	artwork := &Artwork{
-		id:        id,
-		url:       "https://www.pixiv.net/en/artworks/" + id,
-		Title:     illust.Title,
-		Author:    author,
-		Tags:      tags,
-		Images:    images,
-		NSFW:      nsfw,
-		Type:      illust.Type,
-		Pages:     illust.PageCount,
-		Likes:     illust.TotalBookmarks,
-		CreatedAt: illust.CreateDate,
-
-		proxy: p.proxyHost,
-	}
-
-	errImages := []string{
-		"limit_sanity_level_360.png",
-		"limit_unknown_360.png",
-	}
-
-	for _, img := range errImages {
-		if artwork.Images[0].Original == fmt.Sprintf("https://s.pximg.net/common/images/%s", img) {
-			return nil, artworks.ErrRateLimited
+		errImages := []string{
+			"limit_sanity_level_360.png",
+			"limit_unknown_360.png",
 		}
-	}
 
-	if illust.IllustAIType == pixiv.IllustAITypeAIGenerated {
-		artwork.AIGenerated = true
-	}
+		for _, img := range errImages {
+			if artwork.Images[0].Original == fmt.Sprintf("https://s.pximg.net/common/images/%s", img) {
+				return nil, artworks.ErrRateLimited
+			}
+		}
 
-	return artwork, nil
+		if illust.IllustAIType == pixiv.IllustAITypeAIGenerated {
+			artwork.AIGenerated = true
+		}
+
+		return artwork, nil
+	})
 }
 
 func (*Pixiv) Enabled(g *store.Guild) bool {

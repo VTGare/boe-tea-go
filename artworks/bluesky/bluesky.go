@@ -100,71 +100,73 @@ func (*Bluesky) Enabled(g *store.Guild) bool {
 
 // Find implements artworks.Provider.
 func (b *Bluesky) Find(id string) (artworks.Artwork, error) {
-	did, key, _ := strings.Cut(id, ":")
-	atURI := fmt.Sprintf("at://%v/app.bsky.feed.post/%v", did, key)
+	return artworks.WrapError(b, func() (artworks.Artwork, error) {
+		did, key, _ := strings.Cut(id, ":")
+		atURI := fmt.Sprintf("at://%v/app.bsky.feed.post/%v", did, key)
 
-	resp, err := b.client.Get("https://public.api.bsky.app/xrpc/app.bsky.feed.getPostThread?uri=" + atURI + "&depth=0")
-	if err != nil {
-		return nil, fmt.Errorf("http get: %w", err)
-	}
-	defer resp.Body.Close()
+		resp, err := b.client.Get("https://public.api.bsky.app/xrpc/app.bsky.feed.getPostThread?uri=" + atURI + "&depth=0")
+		if err != nil {
+			return nil, fmt.Errorf("http get: %w", err)
+		}
+		defer resp.Body.Close()
 
-	switch resp.StatusCode {
-	case http.StatusOK:
-		break
+		switch resp.StatusCode {
+		case http.StatusOK:
+			break
 
-	case http.StatusBadRequest:
-		fallthrough
-	case http.StatusInternalServerError:
-		return nil, artworks.ErrArtworkNotFound
-	default:
-		return nil, fmt.Errorf("unexpected response status: %v", resp.Status)
-	}
+		case http.StatusBadRequest:
+			fallthrough
+		case http.StatusInternalServerError:
+			return nil, artworks.ErrArtworkNotFound
+		default:
+			return nil, fmt.Errorf("unexpected response status: %v", resp.Status)
+		}
 
-	decoded := &Response{}
-	if err := json.NewDecoder(resp.Body).Decode(decoded); err != nil {
-		return nil, fmt.Errorf("decode: %w", err)
-	}
+		decoded := &Response{}
+		if err := json.NewDecoder(resp.Body).Decode(decoded); err != nil {
+			return nil, fmt.Errorf("decode: %w", err)
+		}
 
-	tags := make([]string, 0)
-	for _, facet := range decoded.Thread.Post.Record.Facets {
-		for _, feature := range facet.Features {
-			if feature.Type != "app.bsky.richtext.facet#tag" {
-				continue
+		tags := make([]string, 0)
+		for _, facet := range decoded.Thread.Post.Record.Facets {
+			for _, feature := range facet.Features {
+				if feature.Type != "app.bsky.richtext.facet#tag" {
+					continue
+				}
+
+				tags = append(tags, feature.Tag)
 			}
-
-			tags = append(tags, feature.Tag)
 		}
-	}
 
-	var images []string
-	switch decoded.Thread.Post.Embed.Type {
-	case EmbedTypeVideo:
-		images = []string{decoded.Thread.Post.Embed.Thumbnail}
-	case EmbedTypeImage:
-		images = make([]string, 0, len(decoded.Thread.Post.Embed.Images))
-		for _, image := range decoded.Thread.Post.Embed.Images {
-			images = append(images, image.Fullsize)
+		var images []string
+		switch decoded.Thread.Post.Embed.Type {
+		case EmbedTypeVideo:
+			images = []string{decoded.Thread.Post.Embed.Thumbnail}
+		case EmbedTypeImage:
+			images = make([]string, 0, len(decoded.Thread.Post.Embed.Images))
+			for _, image := range decoded.Thread.Post.Embed.Images {
+				images = append(images, image.Fullsize)
+			}
 		}
-	}
 
-	return &Artwork{
-		id:  id,
-		url: fmt.Sprintf("https://bsky.app/profile/%v/post/%v", did, key),
+		return &Artwork{
+			id:  id,
+			url: fmt.Sprintf("https://bsky.app/profile/%v/post/%v", did, key),
 
-		AuthorHandle:      decoded.Thread.Post.Author.Handle,
-		AuthorDisplayName: decoded.Thread.Post.Author.DisplayName,
+			AuthorHandle:      decoded.Thread.Post.Author.Handle,
+			AuthorDisplayName: decoded.Thread.Post.Author.DisplayName,
 
-		Tags:   tags,
-		Images: images,
+			Tags:   tags,
+			Images: images,
 
-		Text:        decoded.Thread.Post.Record.Text,
-		Likes:       decoded.Thread.Post.LikeCount,
-		Reposts:     decoded.Thread.Post.RepostCount,
-		Replies:     decoded.Thread.Post.ReplyCount,
-		CreatedAt:   decoded.Thread.Post.Record.CreatedAt,
-		AIGenerated: false,
-	}, nil
+			Text:        decoded.Thread.Post.Record.Text,
+			Likes:       decoded.Thread.Post.LikeCount,
+			Reposts:     decoded.Thread.Post.RepostCount,
+			Replies:     decoded.Thread.Post.ReplyCount,
+			CreatedAt:   decoded.Thread.Post.Record.CreatedAt,
+			AIGenerated: false,
+		}, nil
+	})
 }
 
 // Match implements artworks.Provider.
