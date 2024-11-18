@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -201,139 +202,98 @@ func set(b *bot.Bot) func(*gumi.Ctx) error {
 			}
 
 			var (
-				settingName     = gctx.Args.Get(0)
-				newSetting      = gctx.Args.Get(1)
-				newSettingEmbed any
-				oldSettingEmbed any
+				settingName = gctx.Args.Get(0).Raw
+				newSetting  = gctx.Args.Get(1).Raw
+				oldSetting  any
 			)
 
-			applySetting := func(guildSet any, newSet any) any {
-				oldSettingEmbed = guildSet
-				newSettingEmbed = newSet
-				return newSet
-			}
-
-			switch settingName.Raw {
+			switch settingName {
 			case "prefix":
-				if unicode.IsLetter(rune(newSetting.Raw[len(newSetting.Raw)-1])) {
-					newSetting.Raw += " "
+				if unicode.IsLetter(rune(newSetting[len(newSetting)-1])) {
+					newSetting += " "
 				}
 
-				if len(newSetting.Raw) > 5 {
-					return messages.ErrPrefixTooLong(newSetting.Raw)
+				if len(newSetting) > 5 {
+					return messages.ErrPrefixTooLong(newSetting)
 				}
 
-				guild.Prefix = applySetting(guild.Prefix, newSetting.Raw).(string)
+				oldSetting = guild.Prefix
+				guild.Prefix = newSetting
 			case "limit":
-				limit, err := strconv.Atoi(newSetting.Raw)
+				limit, err := strconv.Atoi(newSetting)
 				if err != nil {
-					return messages.ErrParseInt(newSetting.Raw)
+					return messages.ErrParseInt(newSetting)
 				}
 
-				guild.Limit = applySetting(guild.Limit, limit).(int)
+				oldSetting = guild.Limit
+				guild.Limit = limit
 			case "repost":
-				if newSetting.Raw != string(store.GuildRepostEnabled) &&
-					newSetting.Raw != string(store.GuildRepostDisabled) &&
-					newSetting.Raw != string(store.GuildRepostStrict) {
-					return messages.ErrUnknownRepostOption(newSetting.Raw)
+				if newSetting != string(store.GuildRepostStrict) {
+					enable, err := parseBool(newSetting)
+					if err != nil {
+						return messages.ErrUnknownRepostOption(newSetting)
+					}
+
+					newSetting = ternary.If(enable,
+						string(store.GuildRepostEnabled),
+						string(store.GuildRepostDisabled),
+					)
 				}
 
-				guild.Repost = store.GuildRepost(applySetting(guild.Repost, newSetting.Raw).(string))
-
+				oldSetting = guild.Repost
+				guild.Repost = store.GuildRepost(newSetting)
 			case "repost.expiration":
-				dur, err := time.ParseDuration(newSetting.Raw)
+				dur, err := time.ParseDuration(newSetting)
 				if err != nil {
-					return messages.ErrParseDuration(newSetting.Raw)
+					return messages.ErrParseDuration(newSetting)
 				}
 
 				if dur < 1*time.Minute || dur > 168*time.Hour {
-					return messages.ErrExpirationOutOfRange(newSetting.Raw)
+					return messages.ErrExpirationOutOfRange(newSetting)
 				}
 
-				guild.RepostExpiration = applySetting(guild.RepostExpiration, dur).(time.Duration)
-
-			case "nsfw":
-				enable, err := parseBool(newSetting.Raw)
+				oldSetting = guild.RepostExpiration
+				guild.RepostExpiration = dur
+			case "nsfw", "crosspost", "reactions", "bluesky", "deviant", "deviantart", "pixiv", "twitter", "tags", "footer", "twitter.skip":
+				enable, err := parseBool(newSetting)
 				if err != nil {
 					return err
 				}
 
-				guild.NSFW = applySetting(guild.NSFW, enable).(bool)
-
-			case "crosspost":
-				enable, err := parseBool(newSetting.Raw)
-				if err != nil {
-					return err
+				switch settingName {
+				case "nsfw":
+					oldSetting = guild.NSFW
+					guild.NSFW = enable
+				case "crosspost":
+					oldSetting = guild.Crosspost
+					guild.Crosspost = enable
+				case "reactions":
+					oldSetting = guild.Reactions
+					guild.Reactions = enable
+				case "bluesky":
+					oldSetting = guild.Bluesky
+					guild.Bluesky = enable
+				case "deviant", "deviantart":
+					oldSetting = guild.Deviant
+					guild.Deviant = enable
+				case "pixiv":
+					oldSetting = guild.Pixiv
+					guild.Pixiv = enable
+				case "twitter":
+					oldSetting = guild.Twitter
+					guild.Twitter = enable
+				case "tags":
+					oldSetting = guild.Tags
+					guild.Tags = enable
+				case "footer":
+					oldSetting = guild.FlavorText
+					guild.FlavorText = enable
+				case "twitter.skip":
+					oldSetting = guild.SkipFirst
+					guild.SkipFirst = enable
 				}
-
-				guild.Crosspost = applySetting(guild.Crosspost, enable).(bool)
-
-			case "reactions":
-				enable, err := parseBool(newSetting.Raw)
-				if err != nil {
-					return err
-				}
-
-				guild.Reactions = applySetting(guild.Reactions, enable).(bool)
-
-			case "pixiv":
-				enable, err := parseBool(newSetting.Raw)
-				if err != nil {
-					return err
-				}
-
-				guild.Pixiv = applySetting(guild.Pixiv, enable).(bool)
-
-			case "bluesky":
-				enable, err := parseBool(newSetting.Raw)
-				if err != nil {
-					return err
-				}
-
-				guild.Bluesky = applySetting(guild.Bluesky, enable).(bool)
-
-			case "twitter":
-				enable, err := parseBool(newSetting.Raw)
-				if err != nil {
-					return err
-				}
-
-				guild.Twitter = applySetting(guild.Twitter, enable).(bool)
-
-			case "deviant":
-				enable, err := parseBool(newSetting.Raw)
-				if err != nil {
-					return err
-				}
-
-				guild.Deviant = applySetting(guild.Deviant, enable).(bool)
-
-			case "tags":
-				enable, err := parseBool(newSetting.Raw)
-				if err != nil {
-					return err
-				}
-
-				guild.Tags = applySetting(guild.Tags, enable).(bool)
-
-			case "footer":
-				enable, err := parseBool(newSetting.Raw)
-				if err != nil {
-					return err
-				}
-
-				guild.FlavorText = applySetting(guild.FlavorText, enable).(bool)
-
-			case "twitter.skip":
-				enable, err := parseBool(newSetting.Raw)
-				if err != nil {
-					return err
-				}
-
-				guild.SkipFirst = applySetting(guild.SkipFirst, enable).(bool)
-
 			default:
-				return messages.ErrUnknownSetting(settingName.Raw)
+				return messages.ErrUnknownSetting(settingName)
 			}
 
 			_, err = b.Store.UpdateGuild(ctx, guild)
@@ -343,9 +303,9 @@ func set(b *bot.Bot) func(*gumi.Ctx) error {
 
 			eb := embeds.NewBuilder()
 			eb.InfoTemplate("Successfully changed setting.")
-			eb.AddField("Setting name", settingName.Raw, true)
-			eb.AddField("Old setting", fmt.Sprintf("%v", oldSettingEmbed), true)
-			eb.AddField("New setting", fmt.Sprintf("%v", newSettingEmbed), true)
+			eb.AddField("Setting name", settingName, true)
+			eb.AddField("Old setting", fmt.Sprintf("%v", oldSetting), true)
+			eb.AddField("New setting", fmt.Sprintf("%v", newSetting), true)
 
 			return gctx.ReplyEmbed(eb.Finalize())
 		}
@@ -712,11 +672,11 @@ func removeChannel(b *bot.Bot) func(*gumi.Ctx) error {
 
 func parseBool(s string) (bool, error) {
 	s = strings.ToLower(s)
-	if s == "true" || s == "enable" || s == "enabled" || s == "on" {
+	if slices.Contains([]string{"enable", "enabled", "true", "on"}, s) {
 		return true, nil
 	}
 
-	if s == "false" || s == "disable" || s == "disabled" || s == "off" {
+	if slices.Contains([]string{"disable", "disabled", "false", "off"}, s) {
 		return false, nil
 	}
 
