@@ -20,6 +20,7 @@ import (
 	"github.com/VTGare/gumi"
 	"github.com/VTGare/sengoku"
 	"github.com/bwmarrin/discordgo"
+	"github.com/julien040/go-ternary"
 )
 
 var (
@@ -76,11 +77,10 @@ func nhentai(b *bot.Bot) func(*gumi.Ctx) error {
 
 		eb := embeds.NewBuilder()
 
-		if hentai.Titles != nil {
-			eb.Title(hentai.Titles.Pretty)
-		} else {
-			eb.Title("No title")
-		}
+		eb.Title(ternary.If(hentai.Titles != nil,
+			hentai.Titles.Pretty,
+			"No title",
+		))
 
 		eb.URL(hentai.URL)
 		eb.Image(hentai.Cover)
@@ -181,11 +181,10 @@ func sauceNAOEmbeds(sauces []*sengoku.Sauce) []*discordgo.MessageEmbed {
 			titleBuilder.WriteString(fmt.Sprintf("[%v/%v] ", index+1, l))
 		}
 
-		if source.Title == "" {
-			titleBuilder.WriteString("No title")
-		} else {
-			titleBuilder.WriteString(source.Title)
-		}
+		titleBuilder.WriteString(ternary.If(source.Title == "",
+			"No title",
+			source.Title,
+		))
 
 		eb.Title(titleBuilder.String())
 		if source.Author != nil {

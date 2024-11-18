@@ -13,6 +13,7 @@ import (
 	"github.com/VTGare/boe-tea-go/store"
 	"github.com/VTGare/embeds"
 	"github.com/bwmarrin/discordgo"
+	"github.com/julien040/go-ternary"
 )
 
 type Bluesky struct {
@@ -199,11 +200,10 @@ func (a *Artwork) MessageSends(footer string, tagsEnabled bool) ([]*discordgo.Me
 
 	length := len(a.Images)
 	posts := make([]*discordgo.MessageSend, 0, length)
-	if length > 1 {
-		eb.Title(fmt.Sprintf("%v (%v) | Page %v / %v", a.AuthorDisplayName, a.AuthorHandle, 1, length))
-	} else {
-		eb.Title(fmt.Sprintf("%v (%v)", a.AuthorDisplayName, a.AuthorHandle))
-	}
+	eb.Title(ternary.If(length > 1,
+		fmt.Sprintf("%v (%v) | Page %v / %v", a.AuthorDisplayName, a.AuthorHandle, 1, length),
+		fmt.Sprintf("%v (%v)", a.AuthorDisplayName, a.AuthorHandle),
+	))
 
 	if length > 0 {
 		eb.Image(a.Images[0])

@@ -11,6 +11,7 @@ require (
 	github.com/everpcpc/pixiv v0.1.2
 	github.com/getsentry/sentry-go v0.27.0
 	github.com/go-redis/redis/v8 v8.11.5
+	github.com/julien040/go-ternary v1.0.0
 	github.com/onsi/ginkgo/v2 v2.21.0
 	github.com/onsi/gomega v1.34.2
 	github.com/servusdei2018/shards/v2 v2.4.0

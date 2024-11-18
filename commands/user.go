@@ -19,6 +19,7 @@ import (
 	"github.com/VTGare/embeds"
 	"github.com/VTGare/gumi"
 	"github.com/bwmarrin/discordgo"
+	"github.com/julien040/go-ternary"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
@@ -211,11 +212,10 @@ func groups(b *bot.Bot) func(*gumi.Ctx) error {
 				}), "\n"),
 			)
 
-			if group.IsPair {
-				groupList.Pairs = append(groupList.Pairs, groupData{name, desc})
-			} else {
-				groupList.Groups = append(groupList.Groups, groupData{name, desc})
-			}
+			dgoutils.IfElse(group.IsPair,
+				groupList.Pairs, append(groupList.Pairs, groupData{name, desc}),
+				groupList.Groups, append(groupList.Groups, groupData{name, desc}),
+			)
 		}
 
 		for _, pair := range groupList.Pairs {
@@ -901,20 +901,20 @@ func unfav(b *bot.Bot) func(*gumi.Ctx) error {
 }
 
 func artworkToEmbed(artwork *store.Artwork, image string, ind, length int) *discordgo.MessageEmbed {
-	title := ""
-	if length > 1 {
-		if artwork.Title == "" {
-			title = fmt.Sprintf("[%v/%v] %v", ind+1, length, artwork.Author)
-		} else {
-			title = fmt.Sprintf("[%v/%v] %v", ind+1, length, artwork.Title)
-		}
-	} else {
-		if artwork.Title == "" {
-			title = fmt.Sprintf("%v", artwork.Author)
-		} else {
-			title = fmt.Sprintf("%v", artwork.Title)
-		}
-	}
+	title := ternary.If(length > 1,
+		fmt.Sprintf("[%v/%v] %v", ind+1, length,
+			ternary.If(artwork.Title == "",
+				artwork.Author,
+				artwork.Title,
+			),
+		),
+		fmt.Sprintf("%v",
+			ternary.If(artwork.Title == "",
+				artwork.Author,
+				artwork.Title,
+			),
+		),
+	)
 
 	eb := embeds.NewBuilder()
 	eb.Title(title).URL(artwork.URL)

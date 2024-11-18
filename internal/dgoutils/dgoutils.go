@@ -11,6 +11,7 @@ import (
 	"github.com/VTGare/boe-tea-go/messages"
 	"github.com/VTGare/gumi"
 	"github.com/bwmarrin/discordgo"
+	"github.com/julien040/go-ternary"
 )
 
 var (
@@ -28,11 +29,10 @@ func Ternary[T any](condition bool, a T, b T) T {
 }
 
 func ValidateArgs(gctx *gumi.Ctx, argsLen int) error {
-	if gctx.Args.Len() < argsLen {
-		return messages.ErrIncorrectCmd(gctx.Command)
-	}
-
-	return nil
+	return ternary.If(gctx.Args.Len() < argsLen,
+		messages.ErrIncorrectCmd(gctx.Command),
+		nil,
+	)
 }
 
 // Trimmer trims <> in case someone wraps the link in it, and characters '!', '@', '#', and '&' for channels and user mentions.

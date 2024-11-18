@@ -22,6 +22,7 @@ import (
 	"github.com/VTGare/gumi"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/julien040/go-ternary"
 	"go.mongodb.org/mongo-driver/mongo"
 	"mvdan.cc/xurls/v2"
 )
@@ -120,11 +121,10 @@ func OnGuildDelete(b *bot.Bot) func(*discordgo.Session, *discordgo.GuildDelete) 
 			"guild_id", g.ID,
 		)
 
-		if g.Unavailable {
-			log.Info("guild outage")
-		} else {
-			log.Info("bot kicked/banned from guild")
-		}
+		log.Info(ternary.If(g.Unavailable,
+			"guild outage",
+			"bot kicked/banned from guild",
+		))
 	}
 }
 

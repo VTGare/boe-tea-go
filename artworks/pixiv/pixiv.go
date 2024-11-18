@@ -14,6 +14,7 @@ import (
 	"github.com/VTGare/embeds"
 	"github.com/bwmarrin/discordgo"
 	"github.com/everpcpc/pixiv"
+	"github.com/julien040/go-ternary"
 )
 
 type Pixiv struct {
@@ -97,12 +98,10 @@ func (p *Pixiv) _find(id string) (artworks.Artwork, error) {
 		return nil, artworks.ErrArtworkNotFound
 	}
 
-	author := ""
-	if illust.User != nil {
-		author = illust.User.Name
-	} else {
-		author = "Unknown"
-	}
+		author := ternary.If(illust.User != nil,
+			illust.User.Name,
+			"Unknown",
+		)
 
 	tags := make([]string, 0)
 	nsfw := false
@@ -111,12 +110,11 @@ func (p *Pixiv) _find(id string) (artworks.Artwork, error) {
 			nsfw = true
 		}
 
-		if tag.TranslatedName != "" {
-			tags = append(tags, tag.TranslatedName)
-		} else {
-			tags = append(tags, tag.Name)
+			tags = ternary.If(tag.TranslatedName != "",
+				append(tags, tag.TranslatedName),
+				append(tags, tag.Name),
+			)
 		}
-	}
 
 	images := make([]*Image, 0, illust.PageCount)
 	if page := illust.MetaSinglePage; page != nil {
@@ -193,11 +191,10 @@ func (a *Artwork) MessageSends(footer string, tagsEnabled bool) ([]*discordgo.Me
 		eb     = embeds.NewBuilder()
 	)
 
-	if length > 1 {
-		eb.Title(fmt.Sprintf("%v by %v | Page %v / %v", a.Title, a.Author, 1, length))
-	} else {
-		eb.Title(fmt.Sprintf("%v by %v", a.Title, a.Author))
-	}
+	eb.Title(ternary.If(length > 1,
+		fmt.Sprintf("%v by %v | Page %v / %v", a.Title, a.Author, 1, length),
+		fmt.Sprintf("%v by %v", a.Title, a.Author),
+	))
 
 	if tagsEnabled && len(a.Tags) > 0 {
 		tags := arrays.Map(a.Tags, func(s string) string {

@@ -11,6 +11,7 @@ import (
 	"github.com/VTGare/boe-tea-go/internal/dgoutils"
 	"github.com/VTGare/embeds"
 	"github.com/VTGare/gumi"
+	"github.com/julien040/go-ternary"
 )
 
 var (
@@ -173,7 +174,7 @@ func gamba(*bot.Bot) func(*gumi.Ctx) error {
 	return func(gctx *gumi.Ctx) error {
 		getItTwisted := rand.Intn(10) != 0
 
-		text := dgoutils.Ternary(getItTwisted,
+		text := ternary.If(getItTwisted,
 			`🦍 🗣 GET IT TWISTED 🌪 , GAMBLE ✅ . PLEASE START GAMBLING 👍 . GAMBLING IS AN INVESTMENT 🎰 AND AN INVESTMENT ONLY 👍 . YOU WILL PROFIT 💰 , YOU WILL WIN ❗ ️. YOU WILL DO ALL OF THAT 💯 , YOU UNDERSTAND ⁉ ️ YOU WILL BECOME A BILLIONAIRE 💵 📈 AND REBUILD YOUR FUCKING LIFE 🤯`,
 			`🦍 🗣️ DO NOT GET IT TWISTED 🌪️ , DO NOT GAMBLE 🚫 . DO NOT START GAMBLING ❌ . GAMBLING IS ENTERTAINMENT 🎰 AND ENTERTAINMENT ONLY 👍 . YOU WONT BREAK EVEN 🛑 , YOU WONT WIN ⚠️ ️. YOU WONT DO ANY OF THAT 💯 , YOU UNDERSTAND ⁉️ ️ YOU WILL ONLY GO INTO DEBT 💵 📉 AND RUIN YOUR FUCKING LIFE 😵`,
 		)
