@@ -212,10 +212,11 @@ func groups(b *bot.Bot) func(*gumi.Ctx) error {
 				}), "\n"),
 			)
 
-			dgoutils.IfElse(group.IsPair,
-				groupList.Pairs, append(groupList.Pairs, groupData{name, desc}),
-				groupList.Groups, append(groupList.Groups, groupData{name, desc}),
-			)
+			if group.IsPair {
+				groupList.Pairs = append(groupList.Pairs, groupData{name, desc})
+			} else {
+				groupList.Groups = append(groupList.Groups, groupData{name, desc})
+			}
 		}
 
 		for _, pair := range groupList.Pairs {
