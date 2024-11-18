@@ -792,38 +792,43 @@ func changeUserSettings(b *bot.Bot, gctx *gumi.Ctx) error {
 	}
 
 	var (
-		settingName = gctx.Args.Get(0).Raw
-		newSetting  = gctx.Args.Get(1).Raw
-		oldSetting  any
+		settingName     = gctx.Args.Get(0)
+		newSetting      = gctx.Args.Get(1)
+		newSettingEmbed any
+		oldSettingEmbed any
 	)
 
-	switch settingName {
+	switch settingName.Raw {
 	case "dm":
-		enable, err := parseBool(newSetting)
+		new, err := parseBool(newSetting.Raw)
 		if err != nil {
 			return err
 		}
 
-		oldSetting = user.DM
-		user.DM = enable
+		oldSettingEmbed = user.DM
+		newSettingEmbed = new
+		user.DM = new
 	case "crosspost":
-		enable, err := parseBool(newSetting)
+		new, err := parseBool(newSetting.Raw)
 		if err != nil {
 			return err
 		}
 
-		oldSetting = user.Crosspost
-		user.Crosspost = enable
+		oldSettingEmbed = user.Crosspost
+		newSettingEmbed = new
+		user.Crosspost = new
 	case "ignore":
-		enable, err := parseBool(newSetting)
+		new, err := parseBool(newSetting.Raw)
 		if err != nil {
 			return err
 		}
 
-		oldSetting = user.Ignore
-		user.Ignore = enable
+		oldSettingEmbed = user.Ignore
+		newSettingEmbed = new
+		user.Ignore = new
+
 	default:
-		return messages.ErrUnknownUserSetting(settingName)
+		return messages.ErrUnknownUserSetting(settingName.Raw)
 	}
 
 	_, err = b.Store.UpdateUser(ctx, user)
@@ -833,9 +838,9 @@ func changeUserSettings(b *bot.Bot, gctx *gumi.Ctx) error {
 
 	eb := embeds.NewBuilder()
 	eb.InfoTemplate("Successfully changed user setting.")
-	eb.AddField("Setting name", settingName, true)
-	eb.AddField("Old setting", fmt.Sprintf("%v", oldSetting), true)
-	eb.AddField("New setting", fmt.Sprintf("%v", newSetting), true)
+	eb.AddField("Setting name", settingName.Raw, true)
+	eb.AddField("Old setting", fmt.Sprintf("%v", oldSettingEmbed), true)
+	eb.AddField("New setting", fmt.Sprintf("%v", newSettingEmbed), true)
 
 	return gctx.ReplyEmbed(eb.Finalize())
 }
