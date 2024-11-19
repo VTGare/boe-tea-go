@@ -5,6 +5,8 @@ import (
 	"math/rand"
 	"os"
 	"time"
+
+	"github.com/julien040/go-ternary"
 )
 
 // Config is an application configuration struct.
@@ -78,12 +80,10 @@ func FromFile(path string) (*Config, error) {
 }
 
 func (c *Config) RandomQuote(nsfw bool) string {
-	var quotes []*Quote
-	if nsfw {
-		quotes = c.Quotes
-	} else {
-		quotes = c.safeQuotes
-	}
+	quotes := ternary.If(nsfw,
+		c.Quotes,
+		c.safeQuotes,
+	)
 
 	if l := len(quotes); l > 0 {
 		s := rand.NewSource(time.Now().Unix())

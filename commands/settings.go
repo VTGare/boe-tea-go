@@ -17,6 +17,7 @@ import (
 	"github.com/VTGare/embeds"
 	"github.com/VTGare/gumi"
 	"github.com/bwmarrin/discordgo"
+	"github.com/julien040/go-ternary"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
@@ -161,7 +162,7 @@ func set(b *bot.Bot) func(*gumi.Ctx) error {
 				),
 			)
 
-			channels := dgoutils.Ternary(len(guild.ArtChannels) > 5,
+			channels := ternary.If(len(guild.ArtChannels) > 5,
 				[]string{"There are more than 5 art channels, use `bt!artchannels` command to see them."},
 				arrays.Map(guild.ArtChannels, func(s string) string {
 					return fmt.Sprintf("<#%v> | `%v`", s, s)

@@ -5,6 +5,7 @@ import (
 	"sort"
 	"strconv"
 
+	"github.com/julien040/go-ternary"
 	cache "github.com/patrickmn/go-cache"
 )
 
@@ -111,11 +112,10 @@ func (s *StatefulStore) SearchArtworks(ctx context.Context, filter ArtworkFilter
 		newIDs   = make([]int, 0)
 	)
 
-	if len(opts) != 0 {
-		opt = opts[0]
-	} else {
-		opt = DefaultSearchOptions()
-	}
+	opt = ternary.If(len(opts) != 0,
+		opts[0],
+		DefaultSearchOptions(),
+	)
 
 	for _, id := range filter.IDs {
 		i, ok := s.cache.Get("artworks:" + strconv.Itoa(id))

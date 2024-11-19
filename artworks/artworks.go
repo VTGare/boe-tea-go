@@ -1,7 +1,6 @@
 package artworks
 
 import (
-	"fmt"
 	"regexp"
 	"strings"
 
@@ -21,13 +20,6 @@ type Artwork interface {
 	ID() string
 	URL() string
 	Len() int
-}
-
-func NewError(p Provider, err error) error {
-	return &Error{
-		provider: fmt.Sprintf("%T", p),
-		cause:    err,
-	}
 }
 
 func EscapeMarkdown(content string) string {

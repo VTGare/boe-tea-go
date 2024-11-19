@@ -15,6 +15,7 @@ import (
 	"github.com/VTGare/boe-tea-go/artworks"
 	"github.com/VTGare/boe-tea-go/store"
 	"github.com/VTGare/embeds"
+	"github.com/julien040/go-ternary"
 
 	"github.com/bwmarrin/discordgo"
 )
@@ -61,27 +62,29 @@ func New() artworks.Provider {
 }
 
 func (t *Twitter) Find(id string) (artworks.Artwork, error) {
-	var (
-		artwork artworks.Artwork
-		errs    []error
-	)
+	return artworks.WrapError(t, func() (artworks.Artwork, error) {
+		var (
+			artwork artworks.Artwork
+			errs    []error
+		)
 
-	for _, provider := range t.providers {
-		var err error
-		artwork, err = provider.Find(id)
-		if errors.Is(err, ErrTweetNotFound) || errors.Is(err, ErrPrivateAccount) {
-			return nil, artworks.NewError(t, err)
+		for _, provider := range t.providers {
+			var err error
+			artwork, err = provider.Find(id)
+			if errors.Is(err, ErrTweetNotFound) || errors.Is(err, ErrPrivateAccount) {
+				return nil, err
+			}
+
+			if err != nil {
+				errs = append(errs, err)
+				continue
+			}
+
+			return artwork, nil
 		}
 
-		if err != nil {
-			errs = append(errs, err)
-			continue
-		}
-
-		return artwork, nil
-	}
-
-	return &Artwork{}, artworks.NewError(t, errors.Join(errs...))
+		return &Artwork{}, errors.Join(errs...)
+	})
 }
 
 func (a *Artwork) StoreArtwork() *store.Artwork {
@@ -136,11 +139,10 @@ func (a *Artwork) MessageSends(footer string, _ bool) ([]*discordgo.MessageSend,
 
 	length := len(a.Photos)
 	tweets := make([]*discordgo.MessageSend, 0, length)
-	if length > 1 {
-		eb.Title(fmt.Sprintf("%v (%v) | Page %v / %v", a.FullName, a.Username, 1, length))
-	} else {
-		eb.Title(fmt.Sprintf("%v (%v)", a.FullName, a.Username))
-	}
+	eb.Title(ternary.If(length > 1,
+		fmt.Sprintf("%v (%v) | Page %v / %v", a.FullName, a.Username, 1, length),
+		fmt.Sprintf("%v (%v)", a.FullName, a.Username),
+	))
 
 	if length > 0 {
 		eb.Image(a.Photos[0])
