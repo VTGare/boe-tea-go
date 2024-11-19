@@ -88,7 +88,7 @@ type setting struct {
 	// Returns updated value, boolean and explanation why value isn't compatible if boolean is false.
 	process func(val string) (any, bool, string)
 
-	// Apply applies the new setting to guild struct and return old value.
+	// Return current value of the setting from guild struct, used to display old setting value before the change.
 	currentValue func(guild *store.Guild) any
 }
 
