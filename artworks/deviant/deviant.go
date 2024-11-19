@@ -123,6 +123,11 @@ func (*DeviantArt) Enabled(g *store.Guild) bool {
 	return g.Deviant
 }
 
+// Name implements artworks.Provider.
+func (*DeviantArt) Name() string {
+	return "deviant"
+}
+
 func (a *Artwork) MessageSends(footer string, tagsEnabled bool) ([]*discordgo.MessageSend, error) {
 	eb := embeds.NewBuilder()
 

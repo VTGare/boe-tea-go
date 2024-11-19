@@ -80,7 +80,156 @@ func settingsGroup(b *bot.Bot) {
 	})
 }
 
+type setting struct {
+	// Leave empty to use the map key, if not empty it will override the field name updated in the database with this value.
+	databaseName string
+
+	// Process validates and modifies the new value.
+	// Returns updated value, boolean and explanation why value isn't compatible if boolean is false.
+	process func(val string) (any, bool, string)
+
+	// Apply applies the new setting to guild struct and return old value.
+	currentValue func(guild *store.Guild) any
+}
+
+var settings = map[string]setting{
+	// Special cases
+	"prefix": {
+		process: func(val string) (any, bool, string) {
+			if unicode.IsLetter(rune(val[len(val)-1])) {
+				val += " "
+			}
+
+			if len(val) > 5 {
+				return nil, false, "Prefix is too long, maximum length is 5 characters."
+			}
+
+			return val, true, ""
+		},
+		currentValue: func(guild *store.Guild) any {
+			return guild.Prefix
+		},
+	},
+	"repost": {
+		process: func(val string) (any, bool, string) {
+			var repost store.GuildRepost
+			switch val {
+			case "enabled", "true", "on":
+				repost = store.GuildRepostEnabled
+			case "disabled", "false", "off":
+				repost = store.GuildRepostDisabled
+			case "strict":
+				repost = store.GuildRepostStrict
+			default:
+				return nil, false, fmt.Sprintf("`%v` isn't an option.\n**Accepted values:** [enabled, true, on] [disabled, false, off] or strict", val)
+			}
+
+			return repost, true, ""
+		},
+		currentValue: func(guild *store.Guild) any {
+			return guild.Repost
+		},
+	},
+	"repost.expiration": {
+		databaseName: "repost_expiration",
+		process: func(val string) (any, bool, string) {
+			dur, err := time.ParseDuration(val)
+			if err != nil {
+				return nil, false, fmt.Sprintf(
+					"Failed to convert `%v` to duration. "+
+						"Provide a number followed by a time unit like this: 1h or 1h30m.\n\n"+
+						"**Valid time units:** [\"ns\", \"ms\", \"s\", \"m\", \"h\"]", val,
+				)
+			}
+
+			if dur < 1*time.Minute || dur > 168*time.Hour {
+				return nil, false, "Expiration time is out of range. Please provide a duration between 1 minute and 168 hours."
+			}
+
+			return dur, true, ""
+		},
+		currentValue: func(guild *store.Guild) any {
+			return guild.RepostExpiration
+		},
+	},
+
+	// Integer
+	"limit": {
+		process: processInt,
+		currentValue: func(guild *store.Guild) any {
+			return guild.Limit
+		},
+	},
+
+	// Boolean
+	"nsfw": {
+		process: processBool,
+		currentValue: func(guild *store.Guild) any {
+			return guild.NSFW
+		},
+	},
+	"crosspost": {
+		process: processBool,
+		currentValue: func(guild *store.Guild) any {
+			return guild.Crosspost
+		},
+	},
+	"reactions": {
+		process: processBool,
+		currentValue: func(guild *store.Guild) any {
+			return guild.Reactions
+		},
+	},
+	"tags": {
+		process: processBool,
+		currentValue: func(guild *store.Guild) any {
+			return guild.Tags
+		},
+	},
+	"footer": {
+		databaseName: "flavour_text",
+		process:      processBool,
+		currentValue: func(guild *store.Guild) any {
+			return guild.FlavorText
+		},
+	},
+	"twitter.skip": {
+		databaseName: "skip_first",
+		process:      processBool,
+		currentValue: func(guild *store.Guild) any {
+			return guild.SkipFirst
+		},
+	},
+}
+
+func processInt(val string) (any, bool, string) {
+	num, err := strconv.Atoi(val)
+	if err != nil {
+		return nil, false, fmt.Sprintf("Failed to convert `%v` to an integer", val)
+	}
+
+	return num, true, ""
+}
+
+func processBool(val string) (any, bool, string) {
+	b, err := parseBool(val)
+	if err != nil {
+		return nil, false, "Failed to convert `%v` to boolean. **Accepted values:** [true, on, enabled] and [false, off, disabled]"
+	}
+
+	return b, true, ""
+}
+
 func set(b *bot.Bot) func(*gumi.Ctx) error {
+	for _, provider := range b.ArtworkProviders {
+		settings[provider.Name()] = setting{
+			process: processBool,
+			currentValue: func(guild *store.Guild) any {
+				return provider.Enabled(guild)
+			},
+		}
+	}
+
 	return func(gctx *gumi.Ctx) error {
 		showSettings := func() error {
 			gd, err := gctx.Session.Guild(gctx.Event.GuildID)
@@ -201,151 +350,35 @@ func set(b *bot.Bot) func(*gumi.Ctx) error {
 			}
 
 			var (
-				settingName     = gctx.Args.Get(0)
-				newSetting      = gctx.Args.Get(1)
-				newSettingEmbed any
-				oldSettingEmbed any
+				settingName = gctx.Args.Get(0).Raw
+				newValue    = gctx.Args.Get(1).Raw
 			)
 
-			applySetting := func(guildSet any, newSet any) any {
-				oldSettingEmbed = guildSet
-				newSettingEmbed = newSet
-				return newSet
+			setting, ok := settings[settingName]
+			if !ok {
+				return messages.ErrUnknownSetting(settingName)
 			}
 
-			switch settingName.Raw {
-			case "prefix":
-				if unicode.IsLetter(rune(newSetting.Raw[len(newSetting.Raw)-1])) {
-					newSetting.Raw += " "
-				}
-
-				if len(newSetting.Raw) > 5 {
-					return messages.ErrPrefixTooLong(newSetting.Raw)
-				}
-
-				guild.Prefix = applySetting(guild.Prefix, newSetting.Raw).(string)
-			case "limit":
-				limit, err := strconv.Atoi(newSetting.Raw)
-				if err != nil {
-					return messages.ErrParseInt(newSetting.Raw)
-				}
-
-				guild.Limit = applySetting(guild.Limit, limit).(int)
-			case "repost":
-				if newSetting.Raw != string(store.GuildRepostEnabled) &&
-					newSetting.Raw != string(store.GuildRepostDisabled) &&
-					newSetting.Raw != string(store.GuildRepostStrict) {
-					return messages.ErrUnknownRepostOption(newSetting.Raw)
-				}
-
-				guild.Repost = store.GuildRepost(applySetting(guild.Repost, newSetting.Raw).(string))
-
-			case "repost.expiration":
-				dur, err := time.ParseDuration(newSetting.Raw)
-				if err != nil {
-					return messages.ErrParseDuration(newSetting.Raw)
-				}
-
-				if dur < 1*time.Minute || dur > 168*time.Hour {
-					return messages.ErrExpirationOutOfRange(newSetting.Raw)
-				}
-
-				guild.RepostExpiration = applySetting(guild.RepostExpiration, dur).(time.Duration)
-
-			case "nsfw":
-				enable, err := parseBool(newSetting.Raw)
-				if err != nil {
-					return err
-				}
-
-				guild.NSFW = applySetting(guild.NSFW, enable).(bool)
-
-			case "crosspost":
-				enable, err := parseBool(newSetting.Raw)
-				if err != nil {
-					return err
-				}
-
-				guild.Crosspost = applySetting(guild.Crosspost, enable).(bool)
-
-			case "reactions":
-				enable, err := parseBool(newSetting.Raw)
-				if err != nil {
-					return err
-				}
-
-				guild.Reactions = applySetting(guild.Reactions, enable).(bool)
-
-			case "pixiv":
-				enable, err := parseBool(newSetting.Raw)
-				if err != nil {
-					return err
-				}
-
-				guild.Pixiv = applySetting(guild.Pixiv, enable).(bool)
-
-			case "bluesky":
-				enable, err := parseBool(newSetting.Raw)
-				if err != nil {
-					return err
-				}
-
-				guild.Bluesky = applySetting(guild.Bluesky, enable).(bool)
-
-			case "twitter":
-				enable, err := parseBool(newSetting.Raw)
-				if err != nil {
-					return err
-				}
-
-				guild.Twitter = applySetting(guild.Twitter, enable).(bool)
-
-			case "deviant":
-				enable, err := parseBool(newSetting.Raw)
-				if err != nil {
-					return err
-				}
-
-				guild.Deviant = applySetting(guild.Deviant, enable).(bool)
-
-			case "tags":
-				enable, err := parseBool(newSetting.Raw)
-				if err != nil {
-					return err
-				}
-
-				guild.Tags = applySetting(guild.Tags, enable).(bool)
-
-			case "footer":
-				enable, err := parseBool(newSetting.Raw)
-				if err != nil {
-					return err
-				}
-
-				guild.FlavorText = applySetting(guild.FlavorText, enable).(bool)
-
-			case "twitter.skip":
-				enable, err := parseBool(newSetting.Raw)
-				if err != nil {
-					return err
-				}
-
-				guild.SkipFirst = applySetting(guild.SkipFirst, enable).(bool)
-
-			default:
-				return messages.ErrUnknownSetting(settingName.Raw)
+			eb := embeds.NewBuilder()
+			val, ok, reason := setting.process(newValue)
+			if !ok {
+				eb.FailureTemplate(reason)
+				return gctx.ReplyEmbed(eb.Finalize())
 			}
 
-			_, err = b.Store.UpdateGuild(ctx, guild)
+			_, err = b.Store.UpdateGuild(
+				ctx, guild.ID,
+				ternary.If(setting.databaseName != "", setting.databaseName, settingName),
+				val,
+			)
 			if err != nil {
 				return err
 			}
 
-			eb := embeds.NewBuilder()
 			eb.InfoTemplate("Successfully changed setting.")
-			eb.AddField("Setting name", settingName.Raw, true)
-			eb.AddField("Old setting", fmt.Sprintf("%v", oldSettingEmbed), true)
-			eb.AddField("New setting", fmt.Sprintf("%v", newSettingEmbed), true)
+			eb.AddField("Setting name", settingName, true)
+			eb.AddField("New setting", fmt.Sprintf("%v", val), true)
+			eb.AddField("Old setting", fmt.Sprintf("%v", setting.currentValue(guild)), true)
 
 			return gctx.ReplyEmbed(eb.Finalize())
 		}

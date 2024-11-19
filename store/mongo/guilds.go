@@ -44,14 +44,18 @@ func (g *guildStore) CreateGuild(ctx context.Context, id string) (*store.Guild, 
 	return guild, nil
 }
 
-func (g *guildStore) UpdateGuild(ctx context.Context, guild *store.Guild) (*store.Guild, error) {
-	guild.UpdatedAt = time.Now()
-	_, err := g.col.ReplaceOne(ctx, bson.M{"guild_id": guild.ID}, guild, options.Replace().SetUpsert(false))
-	if err != nil {
-		return nil, err
-	}
+func (g *guildStore) UpdateGuild(ctx context.Context, guildID, field string, value any) (*store.Guild, error) {
+	res := g.col.FindOneAndUpdate(ctx, bson.M{"guild_id": guildID}, bson.M{
+		"$set": bson.M{
+			field:        value,
+			"updated_at": time.Now(),
+		},
+	}, options.FindOneAndUpdate().SetReturnDocument(options.After))
 
-	return guild, nil
+	var guild store.Guild
+	err := res.Decode(&guild)
+
+	return &guild, err
 }
 
 func (g *guildStore) AddArtChannels(ctx context.Context, guildID string, channels []string) (*store.Guild, error) {

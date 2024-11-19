@@ -164,6 +164,11 @@ func (p *Pixiv) Find(id string) (artworks.Artwork, error) {
 	})
 }
 
+// Name implements artworks.Provider.
+func (*Pixiv) Name() string {
+	return "pixiv"
+}
+
 func (*Pixiv) Enabled(g *store.Guild) bool {
 	return g.Pixiv
 }

@@ -9,6 +9,7 @@ import (
 )
 
 type Provider interface {
+	Name() string // Name gets a name of the provider for referencing in settings and the database or identifying it without using reflection
 	Match(url string) (string, bool)
 	Find(id string) (Artwork, error)
 	Enabled(*store.Guild) bool

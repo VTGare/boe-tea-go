@@ -98,6 +98,11 @@ func (*Bluesky) Enabled(g *store.Guild) bool {
 	return g.Bluesky
 }
 
+// Name implements artworks.Provider.
+func (*Bluesky) Name() string {
+	return "bluesky"
+}
+
 // Find implements artworks.Provider.
 func (b *Bluesky) Find(id string) (artworks.Artwork, error) {
 	return artworks.WrapError(b, func() (artworks.Artwork, error) {
