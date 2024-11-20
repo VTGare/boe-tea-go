@@ -8,7 +8,7 @@ import (
 type GuildStore interface {
 	Guild(ctx context.Context, guildID string) (*Guild, error)
 	CreateGuild(ctx context.Context, guildID string) (*Guild, error)
-	UpdateGuild(ctx context.Context, guild *Guild) (*Guild, error)
+	UpdateGuild(ctx context.Context, guildID string, field string, value any) (*Guild, error)
 	AddArtChannels(ctx context.Context, guildID string, channels []string) (*Guild, error)
 	DeleteArtChannels(ctx context.Context, guildID string, channels []string) (*Guild, error)
 }

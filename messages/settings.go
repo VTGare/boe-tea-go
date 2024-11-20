@@ -2,10 +2,6 @@ package messages
 
 import "fmt"
 
-func ErrPrefixTooLong(prefix string) error {
-	return newUserError(fmt.Sprintf("Prefix `%v` is too long. Maximum length is 5 characters", prefix))
-}
-
 func ErrUnknownSetting(setting string) error {
 	return newUserError(fmt.Sprintf("Unknown setting: `%v`. Please use `bt!set` to view existing settings", setting))
 }
@@ -16,24 +12,6 @@ func ErrParseBool(value string) error {
 
 func ErrParseInt(value string) error {
 	return newUserError(fmt.Sprintf("Failed to parse %v to integer", value))
-}
-
-func ErrParseDuration(value string) error {
-	return newUserError(
-		fmt.Sprintf("Failed to parse `%v` to duration. Valid time units are \"ns\", \"ms\", \"s\", \"m\", \"h\".\n%v",
-			value,
-			"**Example:**\n 1h30m",
-		),
-	)
-}
-
-func ErrExpirationOutOfRange(value string) error {
-	msg := fmt.Sprintf("Expiration duration `%v` is out of range. Minimum is `1m`, and maximum is `168h`.", value)
-	return newUserError(msg)
-}
-
-func ErrUnknownRepostOption(option string) error {
-	return newUserError(fmt.Sprintf("Unknown option: `%v`. Use one of the following options: `[enabled, disabled, strict]`", option))
 }
 
 func ErrForeignChannel(id string) error {

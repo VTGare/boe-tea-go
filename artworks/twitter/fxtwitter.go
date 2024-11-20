@@ -2,21 +2,38 @@ package twitter
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/VTGare/boe-tea-go/artworks"
 	"github.com/VTGare/boe-tea-go/internal/arrays"
+	"github.com/VTGare/boe-tea-go/store"
 )
 
 var nonAlphanumericRegex = regexp.MustCompile(`[^\p{L}\p{N} -]+`)
 
 type fxTwitter struct {
-	twitterMatcher
+	regex  *regexp.Regexp
 	client *http.Client
+}
+
+// Common Twitter errors
+var (
+	ErrTweetNotFound  = errors.New("tweet not found")
+	ErrPrivateAccount = errors.New("unable to view this tweet because account is private")
+)
+
+func New() artworks.Provider {
+	return &fxTwitter{
+		regex:  regexp.MustCompile(`^(?:mobile\.)?(?:(?:fix(?:up|v))?x|(?:[fv]x)?twitter)\.com$`),
+		client: &http.Client{},
+	}
 }
 
 type fxTwitterResponse struct {
@@ -54,81 +71,115 @@ type fxTwitterResponse struct {
 	} `json:"tweet,omitempty"`
 }
 
-func newFxTwitter() artworks.Provider {
-	return &fxTwitter{
-		twitterMatcher: twitterMatcher{},
-		client:         &http.Client{},
-	}
-}
-
 func (fxt *fxTwitter) Find(id string) (artworks.Artwork, error) {
-	url := fmt.Sprintf("https://api.fxtwitter.com/i/status/%v", id)
+	return artworks.WrapError(fxt, func() (artworks.Artwork, error) {
+		url := fmt.Sprintf("https://api.fxtwitter.com/i/status/%v", id)
 
-	resp, err := fxt.client.Get(url)
-	if err != nil {
-		return nil, fmt.Errorf("http get: %w", err)
-	}
-	defer resp.Body.Close()
+		resp, err := fxt.client.Get(url)
+		if err != nil {
+			return nil, fmt.Errorf("http get: %w", err)
+		}
+		defer resp.Body.Close()
 
-	switch resp.StatusCode {
-	case http.StatusOK:
-		break
-	case http.StatusNotFound:
-		return nil, ErrTweetNotFound
-	default:
-		return nil, fmt.Errorf("unexpected response status: %v", resp.Status)
-	}
-
-	fxArtwork := &fxTwitterResponse{}
-	if err := json.NewDecoder(resp.Body).Decode(fxArtwork); err != nil {
-		return nil, fmt.Errorf("decode: %w", err)
-	}
-
-	videos := make([]Video, 0, len(fxArtwork.Tweet.Media.Videos))
-	for _, v := range fxArtwork.Tweet.Media.Videos {
-		videoURL := v.URL // default to highest quality url
-
-		// if at least 3 variants exist, pick second best quality to save bandwidth. the slice is sorted by bitrate by default.
-		// first variant is always in m3u streaming format, so we need at least 3 variants to get this.
-		if len(v.Variants) > 2 {
-			secondBest := v.Variants[len(v.Variants)-2]
-			videoURL = secondBest.URL
+		switch resp.StatusCode {
+		case http.StatusOK:
+			break
+		case http.StatusNotFound:
+			return nil, ErrTweetNotFound
+		default:
+			return nil, fmt.Errorf("unexpected response status: %v", resp.Status)
 		}
 
-		videos = append(videos, Video{
-			Preview: v.ThumbnailURL,
-			URL:     videoURL,
-		})
+		fxArtwork := &fxTwitterResponse{}
+		if err := json.NewDecoder(resp.Body).Decode(fxArtwork); err != nil {
+			return nil, fmt.Errorf("decode: %w", err)
+		}
+
+		videos := make([]Video, 0, len(fxArtwork.Tweet.Media.Videos))
+		for _, v := range fxArtwork.Tweet.Media.Videos {
+			videoURL := v.URL // default to highest quality url
+
+			// if at least 3 variants exist, pick second best quality to save bandwidth. the slice is sorted by bitrate by default.
+			// first variant is always in m3u streaming format, so we need at least 3 variants to get this.
+			if len(v.Variants) > 2 {
+				secondBest := v.Variants[len(v.Variants)-2]
+				videoURL = secondBest.URL
+			}
+
+			videos = append(videos, Video{
+				Preview: v.ThumbnailURL,
+				URL:     videoURL,
+			})
+		}
+
+		photos := make([]string, 0, len(fxArtwork.Tweet.Media.Photos))
+		for _, p := range fxArtwork.Tweet.Media.Photos {
+			photos = append(photos, p.URL)
+		}
+
+		var username string
+		if fxArtwork.Tweet.Author.Name != "" {
+			username = "@" + fxArtwork.Tweet.Author.ScreenName
+		}
+
+		artwork := &Artwork{
+			Videos:    videos,
+			Photos:    photos,
+			id:        fxArtwork.Tweet.ID,
+			FullName:  fxArtwork.Tweet.Author.Name,
+			Username:  username,
+			Content:   fxArtwork.Tweet.Text,
+			Permalink: fxArtwork.Tweet.URL,
+			Timestamp: time.Unix(fxArtwork.Tweet.CreatedTimestamp, 0),
+			Likes:     fxArtwork.Tweet.Likes,
+			Replies:   fxArtwork.Tweet.Replies,
+			Retweets:  fxArtwork.Tweet.Retweets,
+			NSFW:      true,
+		}
+
+		artwork.AIGenerated = artworks.IsAIGenerated(arrays.Map(strings.Fields(artwork.Content), func(s string) string {
+			return nonAlphanumericRegex.ReplaceAllString(s, "")
+		})...)
+
+		return artwork, nil
+	})
+}
+
+func (fxt *fxTwitter) Match(s string) (string, bool) {
+	u, err := url.ParseRequestURI(s)
+	if err != nil {
+		return "", false
 	}
 
-	photos := make([]string, 0, len(fxArtwork.Tweet.Media.Photos))
-	for _, p := range fxArtwork.Tweet.Media.Photos {
-		photos = append(photos, p.URL)
+	if ok := fxt.regex.MatchString(u.Host); !ok {
+		return "", false
 	}
 
-	var username string
-	if fxArtwork.Tweet.Author.Name != "" {
-		username = "@" + fxArtwork.Tweet.Author.ScreenName
+	parts := strings.FieldsFunc(u.Path, func(r rune) bool {
+		return r == '/'
+	})
+
+	if len(parts) < 3 {
+		return "", false
 	}
 
-	artwork := &Artwork{
-		Videos:    videos,
-		Photos:    photos,
-		id:        fxArtwork.Tweet.ID,
-		FullName:  fxArtwork.Tweet.Author.Name,
-		Username:  username,
-		Content:   fxArtwork.Tweet.Text,
-		Permalink: fxArtwork.Tweet.URL,
-		Timestamp: time.Unix(fxArtwork.Tweet.CreatedTimestamp, 0),
-		Likes:     fxArtwork.Tweet.Likes,
-		Replies:   fxArtwork.Tweet.Replies,
-		Retweets:  fxArtwork.Tweet.Retweets,
-		NSFW:      true,
+	parts = parts[2:]
+	if parts[0] == "status" {
+		parts = parts[1:]
 	}
 
-	artwork.AIGenerated = artworks.IsAIGenerated(arrays.Map(strings.Fields(artwork.Content), func(s string) string {
-		return nonAlphanumericRegex.ReplaceAllString(s, "")
-	})...)
+	snowflake := parts[0]
+	if _, err := strconv.ParseUint(snowflake, 10, 64); err != nil {
+		return "", false
+	}
 
-	return artwork, nil
+	return snowflake, true
+}
+
+func (*fxTwitter) Enabled(g *store.Guild) bool {
+	return g.Twitter
+}
+
+func (*fxTwitter) Name() string {
+	return "twitter"
 }
