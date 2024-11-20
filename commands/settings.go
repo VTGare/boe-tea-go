@@ -366,6 +366,13 @@ func set(b *bot.Bot) func(*gumi.Ctx) error {
 				return gctx.ReplyEmbed(eb.Finalize())
 			}
 
+			if val == setting.currentValue(guild) {
+				eb.FailureTemplate(fmt.Sprintf(
+					"Old value for `%v` is equivalent to new value: `%v`.", settingName, val,
+				))
+				return gctx.ReplyEmbed(eb.Finalize())
+			}
+
 			_, err = b.Store.UpdateGuild(
 				ctx, guild.ID,
 				ternary.If(setting.databaseName != "", setting.databaseName, settingName),
