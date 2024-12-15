@@ -690,7 +690,8 @@ func bookmarks(b *bot.Bot) func(*gumi.Ctx) error {
 		}
 
 		wg := dgoutils.NewWidget(gctx.Session, gctx.Event.Author.ID, pages)
-		wg.WithCallback(func(wa dgoutils.WidgetAction, i int) error {
+		wg.WithCallback(func(_ dgoutils.WidgetAction, i int) error {
+			ctx := context.WithoutCancel(ctx)
 			if wg.Pages[i] != nil {
 				return nil
 			}
@@ -725,6 +726,7 @@ func bookmarks(b *bot.Bot) func(*gumi.Ctx) error {
 			wg.Pages[i] = page
 			return nil
 		})
+
 		return wg.Start(gctx.Event.ChannelID)
 	}
 }
