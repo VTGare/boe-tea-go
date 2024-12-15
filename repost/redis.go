@@ -43,31 +43,35 @@ func (rd redisDetector) Find(ctx context.Context, channelID, artworkID string) (
 	var (
 		rep Repost
 		key = fmt.Sprintf("channel:%v:artwork:%v", channelID, artworkID)
-		ttl time.Duration
 	)
 
 	if err := rd.exists(ctx, key); err != nil {
 		return nil, err
 	}
 
+	var (
+		repostResult *redis.StringStringMapCmd
+		ttlResult    *redis.DurationCmd
+	)
+
 	_, err := rd.client.Pipelined(ctx, func(pipe redis.Pipeliner) error {
-		err := pipe.HGetAll(ctx, key).Scan(&rep)
-		if err != nil {
+		repostResult = pipe.HGetAll(ctx, key)
+		if err := repostResult.Err(); err != nil {
 			return err
 		}
 
-		ttl, err = pipe.TTL(ctx, key).Result()
-		if err != nil {
-			return err
-		}
-
-		return nil
+		ttlResult = pipe.TTL(ctx, key)
+		return ttlResult.Err()
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	rep.ExpiresAt = time.Now().Add(ttl)
+	if err := repostResult.Scan(&rep); err != nil {
+		return nil, err
+	}
+
+	rep.ExpiresAt = time.Now().Add(ttlResult.Val())
 	return &rep, nil
 }
 
