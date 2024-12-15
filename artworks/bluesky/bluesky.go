@@ -182,7 +182,7 @@ func (b *Bluesky) Match(url string) (string, bool) {
 // MessageSends implements artworks.Artwork.
 func (a *Artwork) MessageSends(footer string, tagsEnabled bool) ([]*discordgo.MessageSend, error) {
 	eb := embeds.NewBuilder()
-	eb.URL(a.url).Description(artworks.EscapeMarkdown(a.Text)).Timestamp(a.CreatedAt)
+	eb.URL(a.url).Timestamp(a.CreatedAt)
 
 	if a.Reposts > 0 {
 		eb.AddField("Reposts", strconv.Itoa(a.Reposts), true)
@@ -211,9 +211,12 @@ func (a *Artwork) MessageSends(footer string, tagsEnabled bool) ([]*discordgo.Me
 		eb.Image(a.Images[0])
 	}
 
+	desc := a.Text
 	if tagsEnabled && len(a.Tags) > 0 {
-		eb.Description(fmt.Sprintf("**Tags**\n%v", strings.Join(a.Tags, " • ")))
+		desc = fmt.Sprintf("%v\n\n**Tags**\n%v", desc, strings.Join(a.Tags, " • "))
 	}
+
+	eb.Description(desc)
 
 	posts = append(posts, &discordgo.MessageSend{
 		Embeds: []*discordgo.MessageEmbed{eb.Finalize()},
