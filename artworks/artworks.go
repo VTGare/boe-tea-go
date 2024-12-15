@@ -15,6 +15,30 @@ type Provider interface {
 	Enabled(*store.Guild) bool
 }
 
+type ProviderBase struct {
+	name string
+}
+
+func (pb *ProviderBase) Name() string {
+	return pb.name
+}
+
+func (pb *ProviderBase) Enabled(g *store.Guild) bool {
+	provider, ok := g.Providers[pb.name]
+	if !ok {
+		// All providers are enabled by default, if provider entry doesn't exist then
+		// it wasn't created in the database yet because no one attempted to change it.
+		// Therefore, we return true.
+		return true
+	}
+
+	return !provider.Disabled
+}
+
+func NewProviderBase(name string) ProviderBase {
+	return ProviderBase{name: name}
+}
+
 type Artwork interface {
 	StoreArtwork() *store.Artwork
 	MessageSends(footer string, tags bool) ([]*discordgo.MessageSend, error)

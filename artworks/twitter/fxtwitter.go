@@ -13,12 +13,13 @@ import (
 
 	"github.com/VTGare/boe-tea-go/artworks"
 	"github.com/VTGare/boe-tea-go/internal/arrays"
-	"github.com/VTGare/boe-tea-go/store"
 )
 
 var nonAlphanumericRegex = regexp.MustCompile(`[^\p{L}\p{N} -]+`)
 
 type fxTwitter struct {
+	artworks.ProviderBase
+
 	regex  *regexp.Regexp
 	client *http.Client
 }
@@ -31,6 +32,8 @@ var (
 
 func New() artworks.Provider {
 	return &fxTwitter{
+		ProviderBase: artworks.NewProviderBase("twitter"),
+
 		regex:  regexp.MustCompile(`^(?:mobile\.)?(?:(?:fix(?:up|v))?x|(?:[fv]x)?twitter)\.com$`),
 		client: &http.Client{},
 	}
@@ -174,12 +177,4 @@ func (fxt *fxTwitter) Match(s string) (string, bool) {
 	}
 
 	return snowflake, true
-}
-
-func (*fxTwitter) Enabled(g *store.Guild) bool {
-	return g.Twitter
-}
-
-func (*fxTwitter) Name() string {
-	return "twitter"
 }

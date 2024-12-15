@@ -17,16 +17,18 @@ type Guild struct {
 	ID     string `json:"id" bson:"guild_id" validate:"required"`
 	Prefix string `json:"prefix" bson:"prefix" validate:"required,max=5"`
 
-	Pixiv   bool `json:"pixiv" bson:"pixiv"`
-	Twitter bool `json:"twitter" bson:"twitter"`
-	Deviant bool `json:"deviant" bson:"deviant"`
-	Bluesky bool `json:"bluesky" bson:"bluesky"`
+	Pixiv     bool `json:"pixiv" bson:"pixiv"`           // Deprecated: use guild.Providers instead
+	Twitter   bool `json:"twitter" bson:"twitter"`       // Deprecated: use guild.Providers instead
+	Deviant   bool `json:"deviant" bson:"deviant"`       // Deprecated: use guild.Providers instead
+	Bluesky   bool `json:"bluesky" bson:"bluesky"`       // Deprecated: use guild.Providers instead
+	SkipFirst bool `json:"skip_first" bson:"skip_first"` // Deprecated: use guild.Providers instead
+
+	Providers map[string]*Provider `json:"providers" bson:"providers"`
 
 	Tags       bool `json:"tags" bson:"tags"`
 	FlavorText bool `json:"flavour_text" bson:"flavour_text"`
 	Crosspost  bool `json:"crosspost" bson:"crosspost"`
 	Reactions  bool `json:"reactions" bson:"reactions"`
-	SkipFirst  bool `json:"skip_first" bson:"skip_first"`
 	Limit      int  `json:"limit" bson:"limit" validate:"required"`
 
 	Repost           GuildRepost   `json:"repost" bson:"repost" validate:"required"`
@@ -37,6 +39,12 @@ type Guild struct {
 
 	CreatedAt time.Time `json:"created_at" bson:"created_at" validate:"required"`
 	UpdatedAt time.Time `json:"updated_at" bson:"updated_at"`
+}
+
+type Provider struct {
+	Disabled  bool `json:"disabled" bson:"disabled"`
+	SkipFirst bool `json:"skip_first" bson:"skip_first"`
+	OnlyVideo bool `json:"only_video" bson:"only_video"`
 }
 
 type GuildRepost string

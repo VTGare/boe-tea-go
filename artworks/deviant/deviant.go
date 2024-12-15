@@ -19,6 +19,8 @@ import (
 )
 
 type DeviantArt struct {
+	artworks.ProviderBase
+
 	regex *regexp.Regexp
 }
 
@@ -67,6 +69,8 @@ type deviantEmbed struct {
 
 func New() artworks.Provider {
 	return &DeviantArt{
+		ProviderBase: artworks.NewProviderBase("deviant"),
+
 		regex: regexp.MustCompile(`(?i)https?://(?:www\.)?deviantart\.com/\w.+/art/([\w\-]+)`),
 	}
 }
@@ -117,15 +121,6 @@ func (d *DeviantArt) Match(s string) (string, bool) {
 	}
 
 	return res[1], true
-}
-
-func (*DeviantArt) Enabled(g *store.Guild) bool {
-	return g.Deviant
-}
-
-// Name implements artworks.Provider.
-func (*DeviantArt) Name() string {
-	return "deviant"
 }
 
 func (a *Artwork) MessageSends(footer string, tagsEnabled bool) ([]*discordgo.MessageSend, error) {

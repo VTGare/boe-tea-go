@@ -17,6 +17,8 @@ import (
 )
 
 type Bluesky struct {
+	artworks.ProviderBase
+
 	regex  *regexp.Regexp
 	client *http.Client
 }
@@ -88,19 +90,11 @@ type Artwork struct {
 
 func New() *Bluesky {
 	return &Bluesky{
+		ProviderBase: artworks.NewProviderBase("bluesky"),
+
 		regex:  regexp.MustCompile(`(?i)https://(?:www\.)?bsky\.app/profile/(\w.+)/post/([\w\-]+)`),
 		client: http.DefaultClient,
 	}
-}
-
-// Enabled implements artworks.Provider.
-func (*Bluesky) Enabled(g *store.Guild) bool {
-	return g.Bluesky
-}
-
-// Name implements artworks.Provider.
-func (*Bluesky) Name() string {
-	return "bluesky"
 }
 
 // Find implements artworks.Provider.
