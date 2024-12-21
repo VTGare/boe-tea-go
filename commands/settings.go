@@ -113,17 +113,15 @@ var settings = map[string]setting{
 	"repost": {
 		process: func(val string) (any, bool, string) {
 			var repost store.GuildRepost
-			switch val {
-			case "enabled", "true", "on":
-				repost = store.GuildRepostEnabled
-			case "disabled", "false", "off":
-				repost = store.GuildRepostDisabled
-			case "strict":
+			if val == "strict" {
 				repost = store.GuildRepostStrict
-			default:
-				return nil, false, fmt.Sprintf("`%v` isn't an option.\n**Accepted values:** [enabled, true, on] [disabled, false, off] or strict", val)
+			} else {
+				b, err := parseBool(val)
+				if err != nil {
+					return nil, false, fmt.Sprintf("`%v` isn't an option.\n**Accepted values:** [enable, enabled, true, on] [disable, disabled, false, off] or [strict]", val)
+				}
+				repost = ternary.If(b, store.GuildRepostEnabled, store.GuildRepostDisabled)
 			}
-
 			return repost, true, ""
 		},
 		currentValue: func(guild *store.Guild) any {
@@ -214,7 +212,7 @@ func processInt(val string) (any, bool, string) {
 func processBool(val string) (any, bool, string) {
 	b, err := parseBool(val)
 	if err != nil {
-		return nil, false, "Failed to convert `%v` to boolean. **Accepted values:** [true, on, enabled] and [false, off, disabled]"
+		return nil, false, "Failed to convert `%v` to boolean.\n**Accepted values:** [enable, enabled, true, on] or [disable, disabled, false, off]"
 	}
 
 	return b, true, ""
@@ -752,13 +750,11 @@ func removeChannel(b *bot.Bot) func(*gumi.Ctx) error {
 
 func parseBool(s string) (bool, error) {
 	s = strings.ToLower(s)
-	if s == "true" || s == "enable" || s == "enabled" || s == "on" {
+	switch s {
+	case "enable", "enabled", "true", "on":
 		return true, nil
-	}
-
-	if s == "false" || s == "disable" || s == "disabled" || s == "off" {
+	case "disable", "disabled", "false", "off":
 		return false, nil
 	}
-
 	return false, messages.ErrParseBool(s)
 }

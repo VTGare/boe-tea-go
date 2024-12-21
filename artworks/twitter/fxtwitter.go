@@ -35,7 +35,7 @@ func New() artworks.Provider {
 		ProviderBase: artworks.NewProviderBase("twitter"),
 
 		regex:  regexp.MustCompile(`^(?:mobile\.)?(?:(?:fix(?:up|v))?x|(?:[fv]x)?twitter)\.com$`),
-		client: &http.Client{},
+		client: http.DefaultClient,
 	}
 }
 
