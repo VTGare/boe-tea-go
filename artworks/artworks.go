@@ -48,14 +48,16 @@ type Artwork interface {
 
 func EscapeMarkdown(content string) string {
 	contents := strings.Split(content, "\n")
-	escape := []string{".", "-", "_", "|", "#", "~", "<", ">", "*"}
+	escape := regexp.MustCompile(`[._~|#<>*-]`)
 
 	for i, line := range contents {
-		newLine := line
-		for _, s := range escape {
-			newLine = strings.ReplaceAll(newLine, s, "\\"+s)
+		if index := escape.FindAllStringIndex(line, -1); index != nil {
+			newLine := line
+			for j, s := range index {
+				newLine = newLine[:s[0]+j] + "\\" + newLine[s[0]+j:]
+			}
+			contents[i] = newLine
 		}
-		contents[i] = newLine
 	}
 	return strings.Join(contents, "\n")
 }
