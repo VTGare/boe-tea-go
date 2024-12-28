@@ -1,6 +1,7 @@
 package artworks
 
 import (
+	"regexp"
 	"strings"
 
 	"github.com/VTGare/boe-tea-go/store"
