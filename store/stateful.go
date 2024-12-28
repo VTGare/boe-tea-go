@@ -46,8 +46,8 @@ func (s *StatefulStore) CreateGuild(ctx context.Context, guildID string) (*Guild
 	return guild, nil
 }
 
-func (s *StatefulStore) UpdateGuild(ctx context.Context, guild *Guild) (*Guild, error) {
-	guild, err := s.Store.UpdateGuild(ctx, guild)
+func (s *StatefulStore) UpdateGuild(ctx context.Context, guildID, field string, val any) (*Guild, error) {
+	guild, err := s.Store.UpdateGuild(ctx, guildID, field, val)
 	if err != nil {
 		return nil, err
 	}
