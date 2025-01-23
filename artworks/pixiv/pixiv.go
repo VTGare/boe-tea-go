@@ -2,6 +2,7 @@ package pixiv
 
 import (
 	"fmt"
+	"path"
 	"regexp"
 	"strconv"
 	"strings"
@@ -145,15 +146,9 @@ func (p *Pixiv) Find(id string) (artworks.Artwork, error) {
 			proxy: p.proxyHost,
 		}
 
-		errImages := []string{
-			"limit_sanity_level_360.png",
-			"limit_unknown_360.png",
-		}
-
-		for _, img := range errImages {
-			if artwork.Images[0].Original == fmt.Sprintf("https://s.pximg.net/common/images/%s", img) {
-				return nil, artworks.ErrRateLimited
-			}
+		imgFile := path.Base(artwork.Images[0].Original)
+		if strings.Contains(imgFile, "limit") {
+			return nil, artworks.ErrRateLimited
 		}
 
 		if illust.IllustAIType == pixiv.IllustAITypeAIGenerated {

@@ -1,7 +1,6 @@
 package artworks
 
 import (
-	"regexp"
 	"strings"
 
 	"github.com/VTGare/boe-tea-go/store"
@@ -24,12 +23,17 @@ type Artwork interface {
 
 func EscapeMarkdown(content string) string {
 	contents := strings.Split(content, "\n")
-	regex := regexp.MustCompile("^#{1,3}")
+	escape := []string{
+		".", "-", "_", "|", "#",
+		"~", "<", ">", "*",
+	}
 
 	for i, line := range contents {
-		if regex.MatchString(line) {
-			contents[i] = "\\" + line
+		newLine := line
+		for _, s := range escape {
+			newLine = strings.ReplaceAll(newLine, s, "\\"+s)
 		}
+		contents[i] = newLine
 	}
 	return strings.Join(contents, "\n")
 }
