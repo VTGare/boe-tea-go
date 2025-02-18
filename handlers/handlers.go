@@ -635,6 +635,13 @@ func OnError(b *bot.Bot) func(*gumi.Ctx, error) {
 }
 
 func onArtworkError(b *bot.Bot, gctx *gumi.Ctx, err *artworks.Error) *embeds.Builder {
+	b.Log.With(
+		"guild", gctx.Event.GuildID,
+		"channel", gctx.Event.ChannelID,
+		"content", gctx.Event.Content,
+		"err", err,
+	).Info("artwork error occurred")
+
 	if gctx.Command == nil {
 		reactionErr := gctx.Session.MessageReactionAdd(gctx.Event.ChannelID, gctx.Event.ID, "😵‍💫")
 		if reactionErr != nil && !strings.Contains(reactionErr.Error(), "403") {
