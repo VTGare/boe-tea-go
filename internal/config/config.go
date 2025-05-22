@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"math/rand"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/julien040/go-ternary"
@@ -54,8 +55,13 @@ type Quote struct {
 	NSFW    bool   `json:"nsfw"`
 }
 
-func FromFile(path string) (*Config, error) {
-	file, err := os.ReadFile(path)
+func FromFile(fileName string) (*Config, error) {
+	exe, err := os.Executable()
+	if err != nil {
+		return nil, err
+	}
+
+	file, err := os.ReadFile(filepath.Dir(exe) + "/" + fileName)
 	if err != nil {
 		return nil, err
 	}
