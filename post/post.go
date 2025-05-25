@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"reflect"
 	"slices"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -22,7 +23,6 @@ import (
 	"github.com/VTGare/embeds"
 	"github.com/VTGare/gumi"
 	"github.com/bwmarrin/discordgo"
-	"golang.org/x/sync/errgroup"
 )
 
 // SkipMode is an enum that configures what Indices are skipped from the send function
@@ -46,9 +46,16 @@ type Post struct {
 }
 
 type fetchResult struct {
-	Artworks []artworks.Artwork
-	Reposts  []*repost.Repost
-	Matched  int
+	artwork artworks.Artwork
+	repost  *repost.Repost
+	index   int
+	err     error
+}
+
+type fetchResults struct {
+	artworks []artworks.Artwork
+	reposts  []*repost.Repost
+	matched  int
 }
 
 func New(bot *bot.Bot, gctx *gumi.Ctx, skip SkipMode, urls ...string) *Post {
@@ -78,12 +85,12 @@ func (p *Post) Send(ctx context.Context) error {
 		return nil
 	}
 
-	res, err := p.fetch(ctx, guild, p.Ctx.Event.ChannelID)
+	results, err := p.fetch(ctx, guild, p.Ctx.Event.ChannelID)
 	if err != nil {
 		return fmt.Errorf("failed to fetch artworks: %w", err)
 	}
 
-	sent, err := p.sendMessages(guild, p.Ctx.Event.ChannelID, res)
+	sent, err := p.sendMessages(guild, p.Ctx.Event.ChannelID, results.artworks)
 	if err != nil {
 		return err
 	}
@@ -91,7 +98,7 @@ func (p *Post) Send(ctx context.Context) error {
 	allSent := make([]*cache.MessageInfo, 0)
 	allSent = append(allSent, sent...)
 
-	p.handleReposts(guild, res)
+	p.handleReposts(guild, results.reposts, results.matched)
 
 	if group, ok := user.FindGroup(p.Ctx.Event.ChannelID); user.Crosspost && ok {
 		// If channels were successfully excluded, crosspost to trimmed channels.
@@ -203,7 +210,7 @@ func (p *Post) Crosspost(ctx context.Context, userID string, group *store.Group)
 						return
 					}
 
-					sent, err := p.sendMessages(guild, channelID, res)
+					sent, err := p.sendMessages(guild, channelID, res.artworks)
 					if err != nil {
 						log.With("error", err).Error("failed to send messages")
 						return
@@ -228,19 +235,19 @@ func (p *Post) Crosspost(ctx context.Context, userID string, group *store.Group)
 	return sent, nil
 }
 
-func (p *Post) fetch(ctx context.Context, guild *store.Guild, channelID string) (*fetchResult, error) {
+func (p *Post) fetch(ctx context.Context, guild *store.Guild, channelID string) (fetchResults, error) {
 	var (
 		log = p.Bot.Log.With(
 			"guild_id", guild.ID,
 			"channel_id", channelID,
 		)
 
-		matched      = make(map[string]struct{})
-		artworksChan = make(chan any, len(p.Urls)*2)
+		matched = make(map[string]struct{})
+		results = make(chan fetchResult)
 	)
 
-	wg, gctx := errgroup.WithContext(ctx)
-	for _, url := range p.Urls {
+	var wg sync.WaitGroup
+	for index, url := range p.Urls {
 		for _, provider := range p.Bot.ArtworkProviders {
 			id, ok := provider.Match(url)
 			if !ok {
@@ -259,27 +266,31 @@ func (p *Post) fetch(ctx context.Context, guild *store.Guild, channelID string) 
 				url      = url
 			)
 
-			wg.Go(func() error {
+			wg.Add(1)
+			go func(ctx context.Context, index int) {
+				defer wg.Done()
+
 				log := log.With(
 					"provider", reflect.TypeOf(provider),
 					"url", url,
 				)
+
 				log.Debug("matched a url")
 
 				if guild.Repost != store.GuildRepostDisabled {
-					rep, err := p.Bot.RepostDetector.Find(gctx, channelID, id)
+					rep, err := p.Bot.RepostDetector.Find(ctx, channelID, id)
 					if err != nil && !errors.Is(err, repost.ErrNotFound) {
 						log.Error("failed to find a repost")
 					}
 
 					if rep != nil {
-						artworksChan <- rep
+						results <- fetchResult{repost: rep, index: index}
 						if p.CrosspostMode || guild.Repost == store.GuildRepostStrict {
-							return nil
+							return
 						}
 					} else {
 						err := p.Bot.RepostDetector.Create(
-							gctx,
+							ctx,
 							&repost.Repost{
 								ID:        id,
 								URL:       url,
@@ -313,7 +324,8 @@ func (p *Post) fetch(ctx context.Context, guild *store.Guild, channelID string) 
 						var err error
 						artwork, err = provider.Find(id)
 						if err != nil {
-							return err
+							results <- fetchResult{err: err}
+							return
 						}
 
 						p.Bot.ArtworkCache.Set(key, artwork, 0)
@@ -331,47 +343,59 @@ func (p *Post) fetch(ctx context.Context, guild *store.Guild, channelID string) 
 						p.Bot.Stats.IncrementArtwork(provider)
 					}()
 
-					artworksChan <- artwork
+					results <- fetchResult{artwork: artwork, index: index}
 				}
-
-				return nil
-			})
+			}(ctx, index)
 
 			break
 		}
 	}
 
-	if err := wg.Wait(); err != nil {
-		return nil, err
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	frs := make([]fetchResult, 0, len(p.Urls))
+	for res := range results {
+		frs = append(frs, res)
 	}
 
-	close(artworksChan)
+	sort.SliceStable(frs, func(i, j int) bool {
+		return frs[i].index < frs[j].index
+	})
 
-	res := &fetchResult{
-		Artworks: make([]artworks.Artwork, 0),
-		Reposts:  make([]*repost.Repost, 0),
-		Matched:  len(matched),
-	}
+	var (
+		artworks = make([]artworks.Artwork, 0)
+		reposts  = make([]*repost.Repost, 0)
+		errs     = make([]error, 0)
+	)
 
-	for art := range artworksChan {
-		switch art := art.(type) {
-		case *repost.Repost:
-			res.Reposts = append(res.Reposts, art)
-		case artworks.Artwork:
-			res.Artworks = append(res.Artworks, art)
+	for _, res := range frs {
+		switch {
+		case res.artwork != nil:
+			artworks = append(artworks, res.artwork)
+		case res.repost != nil:
+			reposts = append(reposts, res.repost)
+		case res.err != nil:
+			errs = append(errs, res.err)
 		}
 	}
 
-	return res, nil
+	return fetchResults{
+		artworks: artworks,
+		reposts:  reposts,
+		matched:  len(matched),
+	}, errors.Join(errs...)
 }
 
-func (p *Post) handleReposts(guild *store.Guild, res *fetchResult) {
+func (p *Post) handleReposts(guild *store.Guild, reposts []*repost.Repost, matched int) {
 	log := p.Bot.Log.With(
 		"guild_id", guild.ID,
 		"user_id", p.Ctx.Event.Author.ID,
 	)
 
-	if len(res.Reposts) == 0 {
+	if len(reposts) == 0 {
 		return
 	}
 
@@ -386,7 +410,7 @@ func (p *Post) handleReposts(guild *store.Guild, res *fetchResult) {
 			log.With("error", err).Warn("failed to check delete message perms")
 		}
 
-		if perm && res.Matched == len(res.Reposts) {
+		if perm && matched == len(reposts) {
 			var (
 				channelID = p.Ctx.Event.ChannelID
 				messageID = p.Ctx.Event.ID
@@ -405,7 +429,7 @@ func (p *Post) handleReposts(guild *store.Guild, res *fetchResult) {
 
 	eb := embeds.NewBuilder()
 	eb.Title(locale.Title)
-	for ind, rep := range res.Reposts {
+	for ind, rep := range reposts {
 		eb.AddField(
 			fmt.Sprintf("#%v | %v", ind+1, rep.ID),
 			fmt.Sprintf(
@@ -428,13 +452,13 @@ func (p *Post) handleReposts(guild *store.Guild, res *fetchResult) {
 	dgoutils.ExpireMessage(p.Bot, p.Ctx.Session, repostMessage)
 }
 
-func (p *Post) sendMessages(guild *store.Guild, channelID string, res *fetchResult) ([]*cache.MessageInfo, error) {
+func (p *Post) sendMessages(guild *store.Guild, channelID string, artworks []artworks.Artwork) ([]*cache.MessageInfo, error) {
 	sent := make([]*cache.MessageInfo, 0)
-	if len(res.Artworks) == 0 {
+	if len(artworks) == 0 {
 		return sent, nil
 	}
 
-	allMessages, err := p.generateMessages(guild, res.Artworks)
+	allMessages, err := p.generateMessages(guild, artworks)
 	if err != nil {
 		return nil, err
 	}
@@ -444,7 +468,7 @@ func (p *Post) sendMessages(guild *store.Guild, channelID string, res *fetchResu
 	}
 
 	mediaCount := 0
-	for _, artwork := range res.Artworks {
+	for _, artwork := range artworks {
 		mediaCount += artwork.Len()
 	}
 
@@ -495,7 +519,7 @@ func (p *Post) sendMessages(guild *store.Guild, channelID string, res *fetchResu
 
 	for i, messages := range allMessages {
 		for _, message := range messages {
-			err := sendMessage(message, res.Artworks[i].ID())
+			err := sendMessage(message, artworks[i].ID())
 			if err != nil {
 				log.With(err).Warn("failed to send artwork message")
 			}
