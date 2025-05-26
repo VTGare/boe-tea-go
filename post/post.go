@@ -306,7 +306,7 @@ func (p *Post) fetch(ctx context.Context, guild *store.Guild, channelID string) 
 					}
 				}
 
-				_, isTwitter := provider.(*twitter.Twitter)
+				isTwitter := provider.Name() == "twitter"
 
 				// Only post the artwork any of the following is true:
 				// - The provider is enabled in guild settings.

@@ -19,6 +19,8 @@ import (
 )
 
 type Pixiv struct {
+	artworks.ProviderBase
+
 	app       *pixiv.AppPixivAPI
 	proxyHost string
 	regex     *regexp.Regexp
@@ -60,6 +62,8 @@ func New(proxyHost string) artworks.Provider {
 	}
 
 	return &Pixiv{
+		ProviderBase: artworks.NewProviderBase("pixiv"),
+
 		app:       pixiv.NewApp(),
 		proxyHost: proxyHost,
 		regex:     regexp.MustCompile(`(?i)https?://(?:www\.)?pixiv\.net/(?:en/)?(?:artworks/|member_illust\.php\?)(?:mode=medium&)?(?:illust_id=)?([0-9]+)`),
@@ -157,10 +161,6 @@ func (p *Pixiv) Find(id string) (artworks.Artwork, error) {
 
 		return artwork, nil
 	})
-}
-
-func (*Pixiv) Enabled(g *store.Guild) bool {
-	return g.Pixiv
 }
 
 func (a *Artwork) StoreArtwork() *store.Artwork {

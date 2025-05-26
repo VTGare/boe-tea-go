@@ -63,9 +63,11 @@ func (b *bookmarkStore) CountBookmarks(ctx context.Context, userID string) (int6
 }
 
 func (b *bookmarkStore) AddBookmark(ctx context.Context, bookmark *store.Bookmark) (bool, error) {
-	wc := writeconcern.New(writeconcern.WMajority())
-	rc := readconcern.Snapshot()
-	txnOpts := options.Transaction().SetWriteConcern(wc).SetReadConcern(rc)
+	var (
+		wc      = writeconcern.Majority()
+		rc      = readconcern.Snapshot()
+		txnOpts = options.Transaction().SetWriteConcern(wc).SetReadConcern(rc)
+	)
 
 	session, err := b.client.StartSession()
 	if err != nil {
@@ -109,9 +111,11 @@ func (b *bookmarkStore) AddBookmark(ctx context.Context, bookmark *store.Bookmar
 }
 
 func (b *bookmarkStore) DeleteBookmark(ctx context.Context, bookmark *store.Bookmark) (bool, error) {
-	wc := writeconcern.New(writeconcern.WMajority())
-	rc := readconcern.Snapshot()
-	txnOpts := options.Transaction().SetWriteConcern(wc).SetReadConcern(rc)
+	var (
+		wc      = writeconcern.Majority()
+		rc      = readconcern.Snapshot()
+		txnOpts = options.Transaction().SetWriteConcern(wc).SetReadConcern(rc)
+	)
 
 	session, err := b.client.StartSession()
 	if err != nil {
@@ -128,10 +132,6 @@ func (b *bookmarkStore) DeleteBookmark(ctx context.Context, bookmark *store.Book
 
 		if res.DeletedCount == 0 {
 			return false, nil
-		}
-
-		if err != nil {
-			return false, fmt.Errorf("failed to update artwork favorite count: %w", err)
 		}
 
 		_, err = b.artworks().UpdateOne(

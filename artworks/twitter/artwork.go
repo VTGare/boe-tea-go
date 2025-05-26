@@ -2,12 +2,10 @@ package twitter
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -20,26 +18,15 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
-// Common Twitter errors
-var (
-	ErrTweetNotFound  = errors.New("tweet not found")
-	ErrPrivateAccount = errors.New("unable to view this tweet because account is private")
-)
-
-type Twitter struct {
-	twitterMatcher
-	providers []artworks.Provider
-}
-
 type Artwork struct {
 	Videos      []Video
 	Photos      []string
+	Timestamp   time.Time
 	id          string
 	FullName    string
 	Username    string
 	Content     string
 	Permalink   string
-	Timestamp   time.Time
 	Likes       int
 	Replies     int
 	Retweets    int
@@ -50,41 +37,6 @@ type Artwork struct {
 type Video struct {
 	URL     string
 	Preview string
-}
-
-func New() artworks.Provider {
-	return &Twitter{
-		providers: []artworks.Provider{newFxTwitter()},
-		twitterMatcher: twitterMatcher{
-			regex: regexp.MustCompile(`^(?:mobile\.)?(?:(?:fix(?:up|v))?x|(?:[fv]x)?twitter)\.com$`),
-		},
-	}
-}
-
-func (t *Twitter) Find(id string) (artworks.Artwork, error) {
-	return artworks.WrapError(t, func() (artworks.Artwork, error) {
-		var (
-			artwork artworks.Artwork
-			errs    []error
-		)
-
-		for _, provider := range t.providers {
-			var err error
-			artwork, err = provider.Find(id)
-			if errors.Is(err, ErrTweetNotFound) || errors.Is(err, ErrPrivateAccount) {
-				return nil, err
-			}
-
-			if err != nil {
-				errs = append(errs, err)
-				continue
-			}
-
-			return artwork, nil
-		}
-
-		return &Artwork{}, errors.Join(errs...)
-	})
 }
 
 func (a *Artwork) StoreArtwork() *store.Artwork {
