@@ -2,6 +2,7 @@ package config
 
 import (
 	"encoding/json"
+	"fmt"
 	"math/rand"
 	"os"
 	"path/filepath"
@@ -55,15 +56,14 @@ type Quote struct {
 	NSFW    bool   `json:"nsfw"`
 }
 
-func FromFile(fileName string) (*Config, error) {
-	exe, err := os.Executable()
+func FromFile(path string) (*Config, error) {
+	file, err := os.ReadFile(path)
 	if err != nil {
-		return nil, err
-	}
-
-	file, err := os.ReadFile(filepath.Dir(exe) + "/" + fileName)
-	if err != nil {
-		return nil, err
+		exePath, _ := os.Executable()
+		file, err = os.ReadFile(fmt.Sprintf("%s/%s", filepath.Dir(exePath), path))
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	var cfg Config
