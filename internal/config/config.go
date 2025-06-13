@@ -2,8 +2,10 @@ package config
 
 import (
 	"encoding/json"
+	"fmt"
 	"math/rand"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/julien040/go-ternary"
@@ -57,7 +59,11 @@ type Quote struct {
 func FromFile(path string) (*Config, error) {
 	file, err := os.ReadFile(path)
 	if err != nil {
-		return nil, err
+		exePath, _ := os.Executable()
+		file, err = os.ReadFile(fmt.Sprintf("%s/%s", filepath.Dir(exePath), path))
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	var cfg Config
