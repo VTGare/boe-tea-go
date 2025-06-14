@@ -7,7 +7,7 @@ require (
 	github.com/VTGare/embeds v0.1.1
 	github.com/VTGare/gumi v0.4.3
 	github.com/VTGare/sengoku v0.1.7
-	github.com/bwmarrin/discordgo v0.28.1
+	github.com/bwmarrin/discordgo v0.29.0
 	github.com/everpcpc/pixiv v0.1.2
 	github.com/getsentry/sentry-go v0.27.0
 	github.com/go-redis/redis/v8 v8.11.5
@@ -18,7 +18,6 @@ require (
 	go.mongodb.org/mongo-driver v1.15.0
 	go.uber.org/atomic v1.11.0
 	go.uber.org/zap v1.27.0
-	golang.org/x/sync v0.8.0
 	golang.org/x/text v0.19.0
 	mvdan.cc/xurls/v2 v2.5.0
 )
@@ -49,6 +48,7 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/crypto v0.28.0 // indirect
 	golang.org/x/net v0.30.0 // indirect
+	golang.org/x/sync v0.8.0 // indirect
 	golang.org/x/sys v0.26.0 // indirect
 	golang.org/x/tools v0.26.0 // indirect
 	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 // indirect
