@@ -1,6 +1,8 @@
 package artworks
 
 import (
+	"fmt"
+	"mvdan.cc/xurls/v2"
 	"strings"
 
 	"github.com/VTGare/boe-tea-go/store"
@@ -22,20 +24,25 @@ type Artwork interface {
 }
 
 func EscapeMarkdown(content string) string {
-	contents := strings.Split(content, "\n")
-	escape := []string{
-		".", "-", "_", "|", "#",
-		"~", "<", ">", "*",
-	}
+	replaced := xurls.Strict().ReplaceAllString(content, "%s")
+	contents := strings.Split(replaced, "\n")
 
 	for i, line := range contents {
 		newLine := line
-		for _, s := range escape {
-			newLine = strings.ReplaceAll(newLine, s, "\\"+s)
+		for _, ch := range ".-_|#~<>*" {
+			str := string(ch)
+			newLine = strings.ReplaceAll(newLine, str, "\\"+str)
 		}
 		contents[i] = newLine
 	}
-	return strings.Join(contents, "\n")
+
+	urls := xurls.Strict().FindAllString(content, -1)
+	var anyUrls []any
+	for _, url := range urls {
+		anyUrls = append(anyUrls, url)
+	}
+
+	return fmt.Sprintf(strings.Join(contents, "\n"), anyUrls...)
 }
 
 func IsAIGenerated(contents ...string) bool {
