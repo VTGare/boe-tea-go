@@ -672,7 +672,8 @@ func onArtworkError(b *bot.Bot, gctx *gumi.Ctx, err *artworks.Error) *embeds.Bui
 		eb.Description("Unable to view this tweet because this account owner limits who can view their tweets.")
 
 	default:
-		return onDefaultError(b, gctx, err)
+		onDefaultError(b, gctx, err)
+		return nil
 	}
 
 	return eb
@@ -716,11 +717,12 @@ func onDefaultError(b *bot.Bot, gctx *gumi.Ctx, err error) *embeds.Builder {
 		b.Log.With("error", err).Error("an unexpected error occured")
 	}
 
-	eb := embeds.NewBuilder().FailureTemplate("An unexpected error occured. Please try again later.\n" +
-		"If error persists, please let the developer know about it with `bt!feedback` command.",
-	)
+	// TODO: breaks sometimes and starts spamming chat. turn on when fixed.
+	// eb := embeds.NewBuilder().FailureTemplate("An unexpected error occured. Please try again later.\n" +
+	// 	"If error persists, please let the developer know about it with `bt!feedback` command.",
+	// )
 
-	return eb
+	return nil
 }
 
 // OnRateLimit creates a response for users who use bot's command too frequently
