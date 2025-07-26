@@ -120,3 +120,12 @@ func (b *Bot) Start(ctx context.Context) error {
 		return ctx.Err()
 	}
 }
+
+func (b *Bot) Match(url string) (string, artworks.Provider) {
+	for _, provider := range b.ArtworkProviders {
+		if id, ok := provider.Match(url); ok {
+			return id, provider
+		}
+	}
+	return "", nil
+}

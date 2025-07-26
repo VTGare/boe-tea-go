@@ -248,107 +248,95 @@ func (p *Post) fetch(ctx context.Context, guild *store.Guild, channelID string) 
 
 	var wg sync.WaitGroup
 	for index, url := range p.Urls {
-		for _, provider := range p.Bot.ArtworkProviders {
-			id, ok := provider.Match(url)
-			if !ok {
-				continue
-			}
+		id, provider := p.Bot.Match(url)
 
-			// If this artwork ID was matched before, skip it.
-			if _, ok := matched[id]; ok {
-				break
-			}
+		// If this artwork ID was matched before, skip it.
+		if _, ok := matched[id]; ok {
+			continue
+		}
 
-			matched[id] = struct{}{}
+		matched[id] = struct{}{}
 
-			var (
-				provider = provider
-				url      = url
+		wg.Add(1)
+		go func(ctx context.Context, index int) {
+			defer wg.Done()
+
+			log := log.With(
+				"provider", reflect.TypeOf(provider),
+				"url", url,
 			)
 
-			wg.Add(1)
-			go func(ctx context.Context, index int) {
-				defer wg.Done()
+			log.Debug("matched a url")
 
-				log := log.With(
-					"provider", reflect.TypeOf(provider),
-					"url", url,
+			if guild.Repost != store.GuildRepostDisabled {
+				rep, err := p.Bot.RepostDetector.Find(ctx, channelID, id)
+				if err != nil && !errors.Is(err, repost.ErrNotFound) {
+					log.Error("failed to find a repost")
+				}
+
+				if rep != nil {
+					results <- fetchResult{repost: rep, index: index}
+					if p.CrosspostMode || guild.Repost == store.GuildRepostStrict {
+						return
+					}
+				} else {
+					err := p.Bot.RepostDetector.Create(
+						ctx,
+						&repost.Repost{
+							ID:        id,
+							URL:       url,
+							GuildID:   guild.ID,
+							ChannelID: channelID,
+							MessageID: p.Ctx.Event.ID,
+						},
+						guild.RepostExpiration,
+					)
+					if err != nil {
+						log.With("error", err).Error("error creating a repost")
+					}
+				}
+			}
+
+			_, isTwitter := provider.(*twitter.Twitter)
+
+			// Only post the artwork any of the following is true:
+			// - The provider is enabled in guild settings.
+			// - The function is called from a command
+			// - Crossposting a Twitter artwork. Bypasses Guild settings by design.
+			if provider.Enabled(guild) || p.Ctx.Command != nil || (p.CrosspostMode && isTwitter) {
+				var (
+					artwork artworks.Artwork
+					key     = fmt.Sprintf("%T:%v", provider, id)
 				)
 
-				log.Debug("matched a url")
-
-				if guild.Repost != store.GuildRepostDisabled {
-					rep, err := p.Bot.RepostDetector.Find(ctx, channelID, id)
-					if err != nil && !errors.Is(err, repost.ErrNotFound) {
-						log.Error("failed to find a repost")
+				if i, ok := p.Bot.ArtworkCache.Get(key); ok {
+					artwork = i.(artworks.Artwork)
+				} else {
+					var err error
+					artwork, err = provider.Find(id)
+					if err != nil {
+						results <- fetchResult{err: err}
+						return
 					}
 
-					if rep != nil {
-						results <- fetchResult{repost: rep, index: index}
-						if p.CrosspostMode || guild.Repost == store.GuildRepostStrict {
-							return
-						}
-					} else {
-						err := p.Bot.RepostDetector.Create(
-							ctx,
-							&repost.Repost{
-								ID:        id,
-								URL:       url,
-								GuildID:   guild.ID,
-								ChannelID: channelID,
-								MessageID: p.Ctx.Event.ID,
-							},
-							guild.RepostExpiration,
-						)
-						if err != nil {
-							log.With("error", err).Error("error creating a repost")
-						}
+					p.Bot.ArtworkCache.Set(key, artwork, 0)
+				}
+
+				// Only add reactions to the original message for Twitter links.
+				if guild.Reactions && p.Ctx.Command == nil && isTwitter && artwork != nil && artwork.Len() > 0 && !p.CrosspostMode {
+					err := p.addBookmarkReactions(p.Ctx.Event.Message)
+					if err != nil {
+						log.With("error", err).Debug("failed to add bookmark reactions")
 					}
 				}
 
-				_, isTwitter := provider.(*twitter.Twitter)
+				go func() {
+					p.Bot.Stats.IncrementArtwork(provider)
+				}()
 
-				// Only post the artwork any of the following is true:
-				// - The provider is enabled in guild settings.
-				// - The function is called from a command
-				// - Crossposting a Twitter artwork. Bypasses Guild settings by design.
-				if provider.Enabled(guild) || p.Ctx.Command != nil || (p.CrosspostMode && isTwitter) {
-					var (
-						artwork artworks.Artwork
-						key     = fmt.Sprintf("%T:%v", provider, id)
-					)
-
-					if i, ok := p.Bot.ArtworkCache.Get(key); ok {
-						artwork = i.(artworks.Artwork)
-					} else {
-						var err error
-						artwork, err = provider.Find(id)
-						if err != nil {
-							results <- fetchResult{err: err}
-							return
-						}
-
-						p.Bot.ArtworkCache.Set(key, artwork, 0)
-					}
-
-					// Only add reactions to the original message for Twitter links.
-					if guild.Reactions && p.Ctx.Command == nil && isTwitter && artwork != nil && artwork.Len() > 0 && !p.CrosspostMode {
-						err := p.addBookmarkReactions(p.Ctx.Event.Message)
-						if err != nil {
-							log.With("error", err).Debug("failed to add bookmark reactions")
-						}
-					}
-
-					go func() {
-						p.Bot.Stats.IncrementArtwork(provider)
-					}()
-
-					results <- fetchResult{artwork: artwork, index: index}
-				}
-			}(ctx, index)
-
-			break
-		}
+				results <- fetchResult{artwork: artwork, index: index}
+			}
+		}(ctx, index)
 	}
 
 	go func() {
