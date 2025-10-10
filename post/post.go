@@ -438,6 +438,7 @@ func (p *Post) handleReposts(guild *store.Guild, reposts []*repost.Repost, match
 	repostMessage, err := p.Ctx.Session.ChannelMessageSendEmbed(p.Ctx.Event.ChannelID, eb.Finalize())
 	if err != nil {
 		log.With("error", err).Warn("failed to send repost message")
+		return
 	}
 
 	dgoutils.ExpireMessage(p.Bot, p.Ctx.Session, repostMessage)

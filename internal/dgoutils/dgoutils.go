@@ -38,9 +38,18 @@ func TrimmerRaw(arg string) string {
 }
 
 // ExpireMessage deletes a specified message after a certain time
-func ExpireMessage(b *bot.Bot, s *discordgo.Session, msg *discordgo.Message) {
+func ExpireMessage(b *bot.Bot, s *discordgo.Session, msg *discordgo.Message, duration ...time.Duration) {
+	expireDuration := time.Second * 15
+	if len(duration) > 0 {
+		expireDuration = duration[0]
+	}
+
+	if msg == nil {
+		return
+	}
+
 	go func() {
-		time.Sleep(15 * time.Second)
+		time.Sleep(expireDuration)
 		err := s.ChannelMessageDelete(msg.ChannelID, msg.ID)
 		if err != nil {
 			log := b.Log.With(

@@ -108,17 +108,15 @@ func (b *Bot) Start(ctx context.Context) error {
 		return err
 	}
 
-	select {
-	case <-ctx.Done():
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
+	<-ctx.Done()
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 
-		b.Store.Close(shutdownCtx)
-		b.RepostDetector.Close()
-		b.ShardManager.Shutdown()
+	b.Store.Close(shutdownCtx)
+	b.RepostDetector.Close()
+	b.ShardManager.Shutdown()
 
-		return ctx.Err()
-	}
+	return ctx.Err()
 }
 
 func (b *Bot) Match(url string) (string, artworks.Provider) {
