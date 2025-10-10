@@ -195,9 +195,13 @@ func cake(*bot.Bot) func(*gumi.Ctx) error {
 }
 
 var frenzyImages = []string{
+	"https://imgpx.com/en/dPGoDCuvghEO.png",
+	"https://imgpx.com/en/jDTFDfxEslG0.png",
+	"https://imgpx.com/en/l7Ie7kYbEVmc.png",
 	"https://media.tenor.com/wLs85BqnUJUAAAAC/eminence-in-shadow-shadow.gif",
-	"https://media.tenor.com/otI2t29q9RYAAAAC/the-eminence-in-shadow-the-eminence-of-shadow.gif",
+	"https://media.tenor.com/1Smw4gr6c3kAAAAC/eminence-in-shadow-cid-kagenou.gif",
 	"https://media.tenor.com/YmcBY9nlAwsAAAAC/cid-kagenou-eminence-in-shadow.gif",
+	"https://media.tenor.com/rZGFguPbNkIAAAAC/cid.gif",
 	"https://static.wikia.nocookie.net/to-be-a-power-in-the-shadows/images/9/9f/Red_Moon-_Anime.png",
 }
 
