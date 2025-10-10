@@ -249,6 +249,9 @@ func (p *Post) fetch(ctx context.Context, guild *store.Guild, channelID string) 
 	var wg sync.WaitGroup
 	for index, url := range p.Urls {
 		id, provider := p.Bot.Match(url)
+		if provider == nil {
+			continue
+		}
 
 		// If this artwork ID was matched before, skip it.
 		if _, ok := matched[id]; ok {
