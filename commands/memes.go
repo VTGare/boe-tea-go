@@ -110,6 +110,16 @@ func memesGroup(b *bot.Bot) {
 		Example:     "bt!frenzy",
 		Exec:        frenzy(b),
 	})
+
+	b.Router.RegisterCmd(&gumi.Command{
+		Name:        "kaiki",
+		Group:       group,
+		Description: "Introduce yourself as a guy who always lies",
+		Aliases:     []string{"lie", "trick"},
+		Usage:       "bt!kaiki",
+		Example:     "bt!kaiki",
+		Exec:        kaiki(b),
+	})
 }
 
 func brainPower(*bot.Bot) func(*gumi.Ctx) error {
@@ -216,5 +226,11 @@ func frenzy(*bot.Bot) func(*gumi.Ctx) error {
 			Image(*image)
 
 		return gctx.ReplyEmbed(eb.Finalize())
+	}
+}
+
+func kaiki(*bot.Bot) func(*gumi.Ctx) error {
+	return func(gctx *gumi.Ctx) error {
+		return gctx.Reply("https://imgpx.com/en/3EUv19fdWN78.png")
 	}
 }
