@@ -2,15 +2,12 @@ package mongo
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/VTGare/boe-tea-go/store"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
-	"go.mongodb.org/mongo-driver/v2/mongo/readconcern"
-	"go.mongodb.org/mongo-driver/v2/mongo/writeconcern"
 )
 
 type bookmarkStore struct {
@@ -30,17 +27,24 @@ func BookmarksStore(client *mongo.Client, database, collection string) store.Boo
 	}
 }
 
-func (b *bookmarkStore) ListBookmarks(ctx context.Context, userID string, filter store.BookmarkFilter, order store.Order) ([]*store.Bookmark, error) {
+func (b *bookmarkStore) ListBookmarks(ctx context.Context, userID string, filter store.BookmarkFilter, order store.Order, opts ...store.BookmarkListOptions) ([]*store.Bookmark, error) {
 	f := bson.M{"user_id": userID}
 	if filter != store.BookmarkFilterAll {
 		f["nsfw"] = filter == store.BookmarkFilterUnsafe
 	}
 
-	cur, err := b.col.Find(
-		ctx,
-		f,
-		options.Find().SetSort(bson.M{"created_at": order}),
-	)
+	findOpts := options.Find().SetSort(bson.M{"created_at": order})
+	if len(opts) != 0 {
+		if opts[0].Limit > 0 {
+			findOpts.SetLimit(opts[0].Limit)
+		}
+
+		if opts[0].Skip > 0 {
+			findOpts.SetSkip(opts[0].Skip)
+		}
+	}
+
+	cur, err := b.col.Find(ctx, f, findOpts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find bookmarks: %w", err)
 	}
@@ -63,95 +67,48 @@ func (b *bookmarkStore) CountBookmarks(ctx context.Context, userID string) (int6
 }
 
 func (b *bookmarkStore) AddBookmark(ctx context.Context, bookmark *store.Bookmark) (bool, error) {
-	wc := writeconcern.Majority()
-	rc := readconcern.Snapshot()
-	txnOpts := options.Transaction().SetWriteConcern(wc).SetReadConcern(rc)
-
-	session, err := b.client.StartSession()
-	if err != nil {
-		return false, fmt.Errorf("failed to start a session: %w", err)
-	}
-
-	defer session.EndSession(ctx)
-
-	callback := func(sessionCtx context.Context) (any, error) {
-		err := b.col.FindOne(ctx, bson.M{"user_id": bookmark.UserID, "artwork_id": bookmark.ArtworkID}).Err()
-		if err == nil {
+	if _, err := b.col.InsertOne(ctx, bookmark); err != nil {
+		if mongo.IsDuplicateKeyError(err) {
 			return false, nil
 		}
 
-		if !errors.Is(err, mongo.ErrNoDocuments) {
-			return false, fmt.Errorf("failed to find an artwork: %w", err)
-		}
-
-		if _, err := b.col.InsertOne(ctx, bookmark); err != nil {
-			return false, fmt.Errorf("failed to insert bookmark: %w", err)
-		}
-
-		_, err = b.artworks().UpdateOne(
-			sessionCtx,
-			bson.M{"artwork_id": bookmark.ArtworkID},
-			bson.M{"$inc": bson.M{"favourites": 1}},
-		)
-		if err != nil {
-			return false, fmt.Errorf("failed to increment artwork favorite count: %w", err)
-		}
-
-		return true, nil
+		return false, fmt.Errorf("failed to insert bookmark: %w", err)
 	}
 
-	added, err := session.WithTransaction(ctx, callback, txnOpts)
-	if err != nil {
-		return false, err
+	if _, err := b.artworks().UpdateOne(
+		ctx,
+		bson.M{"artwork_id": bookmark.ArtworkID},
+		bson.M{"$inc": bson.M{"favourites": 1}},
+	); err != nil {
+		// Best-effort rollback so the favourites counter doesn't drift.
+		_, _ = b.col.DeleteOne(ctx, bson.M{"user_id": bookmark.UserID, "artwork_id": bookmark.ArtworkID})
+
+		return false, fmt.Errorf("failed to increment artwork favorite count: %w", err)
 	}
 
-	return added.(bool), nil
+	return true, nil
 }
 
 func (b *bookmarkStore) DeleteBookmark(ctx context.Context, bookmark *store.Bookmark) (bool, error) {
-	wc := writeconcern.Majority()
-	rc := readconcern.Snapshot()
-	txnOpts := options.Transaction().SetWriteConcern(wc).SetReadConcern(rc)
-
-	session, err := b.client.StartSession()
+	res, err := b.col.DeleteOne(ctx, bson.M{"user_id": bookmark.UserID, "artwork_id": bookmark.ArtworkID})
 	if err != nil {
-		return false, fmt.Errorf("failed to start a session: %w", err)
+		return false, fmt.Errorf("failed to delete bookmark: %w", err)
 	}
 
-	defer session.EndSession(ctx)
-
-	callback := func(sessionCtx context.Context) (any, error) {
-		res, err := b.col.DeleteOne(ctx, bson.M{"user_id": bookmark.UserID, "artwork_id": bookmark.ArtworkID})
-		if err != nil {
-			return false, fmt.Errorf("failed to delete bookmark: %w", err)
-		}
-
-		if res.DeletedCount == 0 {
-			return false, nil
-		}
-
-		if err != nil {
-			return false, fmt.Errorf("failed to update artwork favorite count: %w", err)
-		}
-
-		_, err = b.artworks().UpdateOne(
-			sessionCtx,
-			bson.M{"artwork_id": bookmark.ArtworkID},
-			bson.M{"$inc": bson.M{"favourites": -1}},
-		)
-		if err != nil {
-			return false, fmt.Errorf("failed to increment artwork favorite count: %w", err)
-		}
-
-		return true, nil
+	if res.DeletedCount == 0 {
+		return false, nil
 	}
 
-	deleted, err := session.WithTransaction(ctx, callback, txnOpts)
-	if err != nil {
-		return false, err
+	// Guard against the counter drifting below zero under concurrency.
+	if _, err := b.artworks().UpdateOne(
+		ctx,
+		bson.M{"artwork_id": bookmark.ArtworkID, "favourites": bson.M{"$gt": 0}},
+		bson.M{"$inc": bson.M{"favourites": -1}},
+	); err != nil {
+		return false, fmt.Errorf("failed to decrement artwork favorite count: %w", err)
 	}
 
-	return deleted.(bool), nil
+	return true, nil
 }
 
 func (b *bookmarkStore) artworks() *mongo.Collection {

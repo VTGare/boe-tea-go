@@ -6,7 +6,7 @@ import (
 )
 
 type BookmarkStore interface {
-	ListBookmarks(ctx context.Context, userID string, filter BookmarkFilter, order Order) ([]*Bookmark, error)
+	ListBookmarks(ctx context.Context, userID string, filter BookmarkFilter, order Order, opts ...BookmarkListOptions) ([]*Bookmark, error)
 	CountBookmarks(ctx context.Context, userID string) (int64, error)
 	AddBookmark(ctx context.Context, fav *Bookmark) (bool, error)
 	DeleteBookmark(ctx context.Context, fav *Bookmark) (bool, error)
@@ -17,6 +17,11 @@ type Bookmark struct {
 	ArtworkID int       `json:"artwork_id,omitempty" bson:"artwork_id"`
 	NSFW      bool      `json:"nsfw,omitempty" bson:"nsfw"`
 	CreatedAt time.Time `json:"created_at,omitempty" bson:"created_at"`
+}
+
+type BookmarkListOptions struct {
+	Limit int64
+	Skip  int64
 }
 
 type BookmarkFilter int

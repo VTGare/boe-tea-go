@@ -18,7 +18,6 @@ type Language int
 
 const (
 	English Language = iota
-	Russian
 	Japanese
 )
 
@@ -55,13 +54,13 @@ type Sauce struct {
 }
 
 type SetCommand struct {
-	CurrentSettings    string
-	General            *General
-	Features           *Features
-	PixivSettings      *PixivSettings
-	TwitterSettings    *ProviderSettings
-	DeviantSettings    *ProviderSettings
-	ArtChannels        string
+	CurrentSettings string
+	General         *General
+	Features        *Features
+	PixivSettings   *PixivSettings
+	TwitterSettings *ProviderSettings
+	DeviantSettings *ProviderSettings
+	ArtChannels     string
 }
 
 type General struct {
