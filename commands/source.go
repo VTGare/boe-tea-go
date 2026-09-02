@@ -9,11 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"golang.org/x/text/cases"
-	"golang.org/x/text/language"
-
 	"github.com/VTGare/boe-tea-go/bot"
-	nh "github.com/VTGare/boe-tea-go/internal/apis/nhentai"
 	"github.com/VTGare/boe-tea-go/internal/dgoutils"
 	"github.com/VTGare/boe-tea-go/messages"
 	"github.com/VTGare/embeds"
@@ -26,6 +22,7 @@ import (
 var (
 	imageRegex      = regexp.MustCompile(`(?i)^https?://(?:[a-z0-9\-]+\.)+[a-z]{2,6}(?:/[^/#?]+)+\.(?:jpe?g|gif|png|webp)`)
 	messageRefRegex = regexp.MustCompile(`(?i)http(?:s)?:\/\/(?:www\.)?discord(?:app)?.com\/channels\/\d+\/(\d+)\/(\d+)`)
+	pximgRegex = regexp.MustCompile(`(?i)https?://i\.pximg\.net/.+?/(\d+)(?:_p\d+)?(?:\.[a-z]+)?(?:$|[?#])`)
 )
 
 func sourceGroup(b *bot.Bot) {
@@ -42,93 +39,6 @@ func sourceGroup(b *bot.Bot) {
 		RateLimiter: gumi.NewRateLimiter(15 * time.Second),
 		Exec:        sauce(b),
 	})
-
-	b.Router.RegisterCmd(&gumi.Command{
-		Name:        "nhentai",
-		Group:       group,
-		Aliases:     []string{"nh"},
-		Description: "Displays more info about an nhentai doujin",
-		Usage:       "bt!nhentai <nuke code>",
-		Example:     "bt!nhentai 177013",
-		NSFW:        true,
-		RateLimiter: gumi.NewRateLimiter(15 * time.Second),
-		Exec:        nhentai(b),
-	})
-}
-
-func nhentai(b *bot.Bot) func(*gumi.Ctx) error {
-	return func(gctx *gumi.Ctx) error {
-		if err := dgoutils.ValidateArgs(gctx, 1); err != nil {
-			return err
-		}
-
-		id := gctx.Args.Get(0).Raw
-		hentai, err := b.NHentai.FindHentai(id)
-		if err != nil {
-			switch {
-			case errors.Is(err, nh.ErrNotFound):
-				return messages.DoujinNotFound(id)
-			case errors.Is(err, nh.ErrCloudflareProtection):
-				return messages.CloudflareError()
-			}
-
-			return err
-		}
-
-		eb := embeds.NewBuilder()
-
-		eb.Title(ternary.If(hentai.Titles != nil,
-			hentai.Titles.Pretty,
-			"No title",
-		))
-
-		eb.URL(hentai.URL)
-		eb.Image(hentai.Cover)
-		eb.Timestamp(hentai.UploadedAt)
-
-		tagsToString := func(tags []*nh.Tag) string {
-			ss := make([]string, 0, len(tags))
-			for _, tag := range tags {
-				ss = append(ss, tag.Name)
-			}
-
-			return strings.Join(ss, " • ")
-		}
-
-		tagsToNamedLinks := func(tags []*nh.Tag) string {
-			ss := make([]string, 0, len(tags))
-			for _, tag := range tags {
-				ss = append(ss, messages.NamedLink(tag.Name, tag.URL))
-			}
-
-			return strings.Join(ss, " • ")
-		}
-
-		eb.AddField("Pages", strconv.Itoa(hentai.Pages), true).
-			AddField("Favorites", strconv.Itoa(hentai.Favorites), true)
-
-		if artists := hentai.Artists(); len(artists) > 0 {
-			eb.AddField("Artists", tagsToNamedLinks(artists), true)
-		}
-
-		if characters := hentai.Characters(); len(characters) > 0 {
-			eb.AddField("Characters", tagsToNamedLinks(characters), true)
-		}
-
-		if padories := hentai.Parodies(); len(padories) > 0 {
-			eb.AddField("Parodies", tagsToNamedLinks(padories), true)
-		}
-
-		if lang, ok := hentai.Language(); ok {
-			eb.AddField("Language", cases.Title(language.English).String(lang.String()), true)
-		}
-
-		if genres := hentai.Genres(); len(genres) > 0 {
-			eb.AddField("Tags", tagsToString(genres))
-		}
-
-		return gctx.ReplyEmbed(eb.Finalize())
-	}
 }
 
 func sauce(b *bot.Bot) func(*gumi.Ctx) error {
@@ -181,7 +91,8 @@ func sauceNAOEmbeds(sauces []*sengoku.Sauce) []*discordgo.MessageEmbed {
 			titleBuilder.WriteString(fmt.Sprintf("[%v/%v] ", index+1, l))
 		}
 
-		titleBuilder.WriteString(ternary.If(source.Title == "",
+		titleBuilder.WriteString(ternary.If(
+			source.Title == "",
 			"No title",
 			source.Title,
 		))
@@ -210,7 +121,12 @@ func sauceNAOEmbeds(sauces []*sengoku.Sauce) []*discordgo.MessageEmbed {
 }
 
 func handleURLs(source *sengoku.Sauce, eb *embeds.Builder) {
-	if uri, err := url.ParseRequestURI(source.URLs.Source); err == nil {
+	sourceURL := source.URLs.Source
+	if pixivURL, ok := pixivArtworkURL(sourceURL); ok {
+		sourceURL = pixivURL
+	}
+
+	if uri, err := url.ParseRequestURI(sourceURL); err == nil {
 		eb.URL(uri.String())
 		eb.AddField("URL", uri.String())
 	}
@@ -251,6 +167,15 @@ func handleURLs(source *sengoku.Sauce, eb *embeds.Builder) {
 	}
 
 	eb.AddField("External links", sb.String())
+}
+
+func pixivArtworkURL(raw string) (string, bool) {
+	matches := pximgRegex.FindStringSubmatch(raw)
+	if len(matches) < 2 {
+		return raw, false
+	}
+
+	return fmt.Sprintf("https://pixiv.net/artworks/%s", matches[1]), true
 }
 
 func findImage(s *discordgo.Session, m *discordgo.MessageCreate, args []string) (string, bool) {

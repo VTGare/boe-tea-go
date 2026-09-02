@@ -42,11 +42,3 @@ func SauceError(err error) error {
 	msg := fmt.Sprintf("SauceNAO returned an error. Please report it to the developer using with `bt!feedback command`.\n```\n%v\n```", err)
 	return newUserError(msg, err)
 }
-
-func DoujinNotFound(id string) error {
-	return newUserError(fmt.Sprintf("Couldn't find a doujin with the following ID: `%v`.", id))
-}
-
-func CloudflareError() error {
-	return newUserError("Failed to bypass Cloudflare protection.")
-}

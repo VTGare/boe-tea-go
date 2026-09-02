@@ -18,9 +18,10 @@ require (
 	go.mongodb.org/mongo-driver v1.15.0
 	go.uber.org/atomic v1.11.0
 	go.uber.org/zap v1.27.0
-	golang.org/x/text v0.19.0
 	mvdan.cc/xurls/v2 v2.5.0
 )
+
+require golang.org/x/text v0.19.0 // indirect
 
 require (
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect

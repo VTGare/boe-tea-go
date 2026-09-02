@@ -7,7 +7,6 @@ import (
 
 	"github.com/ReneKroon/ttlcache"
 	"github.com/VTGare/boe-tea-go/artworks"
-	"github.com/VTGare/boe-tea-go/internal/apis/nhentai"
 	"github.com/VTGare/boe-tea-go/internal/cache"
 	"github.com/VTGare/boe-tea-go/internal/config"
 	"github.com/VTGare/boe-tea-go/repost"
@@ -37,7 +36,6 @@ type Bot struct {
 
 	// services
 	Sengoku          *sengoku.Sengoku
-	NHentai          *nhentai.API
 	ArtworkProviders []artworks.Provider
 	RepostDetector   repost.Detector
 
@@ -65,11 +63,6 @@ func New(
 		Results: 10,
 	})
 
-	nh, err := nhentai.New()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create nhentai api client: %w", err)
-	}
-
 	return &Bot{
 		Log:            logger,
 		Config:         config,
@@ -77,7 +70,6 @@ func New(
 		BannedUsers:    banned,
 		EmbedCache:     cache.NewEmbedCache(),
 		ArtworkCache:   goCache.New(60*time.Minute, 90*time.Minute),
-		NHentai:        nh,
 		Sengoku:        sg,
 		ShardManager:   mgr,
 		Store:          store,
