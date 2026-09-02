@@ -5,5 +5,6 @@ vendor
 __debug_bin
 config.json
 boetea.exe
+/boetea
 docs/agents
 AGENTS.md
