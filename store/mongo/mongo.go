@@ -64,7 +64,8 @@ func isNamespaceExistsError(err error) bool {
 }
 
 // ensureIndexes creates the indexes backing the store's hot-path queries.
-// Creating an index with an identical spec is a no-op, so it is safe to run on every boot.
+// Creating an index with an identical spec is a no-op, so it is safe to run
+// on every boot.
 func ensureIndexes(ctx context.Context, db *mongo.Database) error {
 	indexes := map[string][]mongo.IndexModel{
 		"guilds": {
