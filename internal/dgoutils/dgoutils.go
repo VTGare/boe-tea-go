@@ -21,7 +21,8 @@ var (
 )
 
 func ValidateArgs(gctx *gumi.Ctx, argsLen int) error {
-	return ternary.If(gctx.Args.Len() < argsLen,
+	return ternary.If(
+		gctx.Args.Len() < argsLen,
 		messages.ErrIncorrectCmd(gctx.Command),
 		nil,
 	)
@@ -101,12 +102,13 @@ type Range struct {
 }
 
 func NewRange(s string) (*Range, error) {
-	hyphen := strings.IndexByte(s, '-')
-	if hyphen == -1 {
+	before, after, ok := strings.Cut(s, "-")
+	if !ok {
 		return nil, ErrNotRange
 	}
-	lowStr := s[:hyphen]
-	highStr := s[hyphen+1:]
+
+	lowStr := before
+	highStr := after
 
 	low, err := strconv.Atoi(lowStr)
 	if err != nil {

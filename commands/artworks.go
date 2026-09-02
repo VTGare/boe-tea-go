@@ -17,7 +17,7 @@ import (
 	"github.com/VTGare/embeds"
 	"github.com/VTGare/gumi"
 	"github.com/bwmarrin/discordgo"
-	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
 func artworksGroup(b *bot.Bot) {

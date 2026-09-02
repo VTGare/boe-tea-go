@@ -7,11 +7,11 @@ import (
 	"time"
 
 	"github.com/VTGare/boe-tea-go/store"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
-	"go.mongodb.org/mongo-driver/mongo/readconcern"
-	"go.mongodb.org/mongo-driver/mongo/writeconcern"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/mongo/readconcern"
+	"go.mongodb.org/mongo-driver/v2/mongo/writeconcern"
 )
 
 type artworkStore struct {
@@ -76,7 +76,7 @@ func (a *artworkStore) SearchArtworks(ctx context.Context, filter store.ArtworkF
 }
 
 func (a *artworkStore) CreateArtwork(ctx context.Context, artwork *store.Artwork) (*store.Artwork, error) {
-	wc := writeconcern.New(writeconcern.WMajority())
+	wc := writeconcern.Majority()
 	rc := readconcern.Snapshot()
 	opts := options.Transaction().SetWriteConcern(wc).SetReadConcern(rc)
 
@@ -87,7 +87,7 @@ func (a *artworkStore) CreateArtwork(ctx context.Context, artwork *store.Artwork
 
 	defer session.EndSession(ctx)
 
-	callback := func(sessionContext mongo.SessionContext) (any, error) {
+	callback := func(sessionContext context.Context) (any, error) {
 		sres := a.db.Collection("counters").FindOneAndUpdate(
 			sessionContext,
 			bson.M{"_id": "artworks"},
@@ -124,7 +124,7 @@ func (a *artworkStore) CreateArtwork(ctx context.Context, artwork *store.Artwork
 	return res.(*store.Artwork), nil
 }
 
-func findOptions(a store.ArtworkSearchOptions) *options.FindOptions {
+func findOptions(a store.ArtworkSearchOptions) *options.FindOptionsBuilder {
 	sort := bson.M{a.Sort.String(): a.Order}
 
 	return options.Find().SetLimit(a.Limit).SetSkip(a.Skip).SetSort(sort)

@@ -1,8 +1,8 @@
 package arrays
 
 import (
-	"math/rand"
-	"time"
+	"math/rand/v2"
+	"slices"
 )
 
 func Filter[T any](slice []T, f func(T) bool) []T {
@@ -33,36 +33,25 @@ func Map[T any](slice []T, f func(T) T) []T {
 
 func Find[T any](slice []T, f func(T) bool) T {
 	var n T
-	if len(slice) == 0 {
-		return n
-	}
-
-	for _, val := range slice {
-		if f(val) {
-			return val
-		}
+	if i := slices.IndexFunc(slice, f); i >= 0 {
+		return slice[i]
 	}
 
 	return n
 }
 
 func Remove[T comparable](ss []T, match T) []T {
-	for i, s := range ss {
-		if s == match {
-			return append(ss[:i], ss[i+1:]...)
-		}
+	i := slices.Index(ss, match)
+	if i < 0 {
+		return ss
 	}
-	return ss
+	return slices.Delete(ss, i, i+1)
 }
 
 func RandomElement[T any](slice []T) *T {
-	l := len(slice)
-	if l == 0 {
+	if len(slice) == 0 {
 		return nil
 	}
 
-	s := rand.NewSource(time.Now().Unix())
-	r := rand.New(s)
-
-	return &slice[r.Intn(l)]
+	return &slice[rand.IntN(len(slice))]
 }

@@ -18,7 +18,7 @@ import (
 	"github.com/VTGare/gumi"
 	"github.com/bwmarrin/discordgo"
 	"github.com/julien040/go-ternary"
-	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
 func settingsGroup(b *bot.Bot) {

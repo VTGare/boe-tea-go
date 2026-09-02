@@ -6,11 +6,11 @@ import (
 	"fmt"
 
 	"github.com/VTGare/boe-tea-go/store"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
-	"go.mongodb.org/mongo-driver/mongo/readconcern"
-	"go.mongodb.org/mongo-driver/mongo/writeconcern"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/mongo/readconcern"
+	"go.mongodb.org/mongo-driver/v2/mongo/writeconcern"
 )
 
 type bookmarkStore struct {
@@ -63,7 +63,7 @@ func (b *bookmarkStore) CountBookmarks(ctx context.Context, userID string) (int6
 }
 
 func (b *bookmarkStore) AddBookmark(ctx context.Context, bookmark *store.Bookmark) (bool, error) {
-	wc := writeconcern.New(writeconcern.WMajority())
+	wc := writeconcern.Majority()
 	rc := readconcern.Snapshot()
 	txnOpts := options.Transaction().SetWriteConcern(wc).SetReadConcern(rc)
 
@@ -74,7 +74,7 @@ func (b *bookmarkStore) AddBookmark(ctx context.Context, bookmark *store.Bookmar
 
 	defer session.EndSession(ctx)
 
-	callback := func(sessionCtx mongo.SessionContext) (any, error) {
+	callback := func(sessionCtx context.Context) (any, error) {
 		err := b.col.FindOne(ctx, bson.M{"user_id": bookmark.UserID, "artwork_id": bookmark.ArtworkID}).Err()
 		if err == nil {
 			return false, nil
@@ -109,7 +109,7 @@ func (b *bookmarkStore) AddBookmark(ctx context.Context, bookmark *store.Bookmar
 }
 
 func (b *bookmarkStore) DeleteBookmark(ctx context.Context, bookmark *store.Bookmark) (bool, error) {
-	wc := writeconcern.New(writeconcern.WMajority())
+	wc := writeconcern.Majority()
 	rc := readconcern.Snapshot()
 	txnOpts := options.Transaction().SetWriteConcern(wc).SetReadConcern(rc)
 
@@ -120,7 +120,7 @@ func (b *bookmarkStore) DeleteBookmark(ctx context.Context, bookmark *store.Book
 
 	defer session.EndSession(ctx)
 
-	callback := func(sessionCtx mongo.SessionContext) (any, error) {
+	callback := func(sessionCtx context.Context) (any, error) {
 		res, err := b.col.DeleteOne(ctx, bson.M{"user_id": bookmark.UserID, "artwork_id": bookmark.ArtworkID})
 		if err != nil {
 			return false, fmt.Errorf("failed to delete bookmark: %w", err)

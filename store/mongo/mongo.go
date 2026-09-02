@@ -6,9 +6,9 @@ import (
 	"fmt"
 
 	"github.com/VTGare/boe-tea-go/store"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
-	"go.mongodb.org/mongo-driver/mongo/readpref"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/mongo/readpref"
 )
 
 type mongoStore struct {
@@ -22,7 +22,7 @@ type mongoStore struct {
 }
 
 func New(ctx context.Context, uri string, db string) (store.Store, error) {
-	client, err := mongo.Connect(ctx, options.Client().ApplyURI(uri))
+	client, err := mongo.Connect(options.Client().ApplyURI(uri))
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to mongo: %w", err)
 	}

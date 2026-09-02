@@ -23,11 +23,7 @@ func Sentry(dsn string) (zap.Option, error) {
 					Timestamp: entry.Time,
 					Logger:    entry.LoggerName,
 					Message:   entry.Message,
-					Extra: map[string]any{
-						"Stack":  entry.Stack,
-						"Caller": entry.Caller.String(),
-					},
-					Level: SentryLevel(entry.Level),
+					Level:     SentryLevel(entry.Level),
 				})
 			}
 
