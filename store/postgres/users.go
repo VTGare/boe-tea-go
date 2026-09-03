@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/VTGare/boe-tea-go/store"
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -162,30 +161,46 @@ func (u *userStore) EditCrosspostParent(ctx context.Context, userID, group, pare
 }
 
 func (u *userStore) loadUser(ctx context.Context, userID string) (*store.User, error) {
-	row := u.pool.QueryRow(ctx, `SELECT id, dm, crosspost, ignore, created_at, updated_at FROM users WHERE id=$1`, userID)
-
-	user := &store.User{}
-	if err := row.Scan(&user.ID, &user.DM, &user.Crosspost, &user.Ignore, &user.CreatedAt, &user.UpdatedAt); err != nil {
-		if err == pgx.ErrNoRows {
-			return nil, fmt.Errorf("user not found")
-		}
-
-		return nil, fmt.Errorf("failed to scan user: %w", err)
-	}
-
-	rows, err := u.pool.Query(ctx, `SELECT name, parent, is_pair, children FROM user_groups WHERE user_id=$1 ORDER BY name`, userID)
+	rows, err := u.pool.Query(ctx, `SELECT u.id, u.dm, u.crosspost, u.ignore, u.created_at, u.updated_at,
+		g.name, g.parent, g.is_pair, g.children
+		FROM users u LEFT JOIN user_groups g ON g.user_id = u.id
+		WHERE u.id = $1 ORDER BY g.name`, userID,
+	)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	user.Groups = make([]*store.Group, 0)
+	user := &store.User{Groups: make([]*store.Group, 0)}
+
 	for rows.Next() {
-		group := &store.Group{}
-		if err := rows.Scan(&group.Name, &group.Parent, &group.IsPair, &group.Children); err != nil {
-			return nil, err
+		var (
+			groupName *string
+			parent    *string
+			isPair    *bool
+			children  []string
+		)
+
+		if err := rows.Scan(&user.ID, &user.DM, &user.Crosspost, &user.Ignore, &user.CreatedAt, &user.UpdatedAt,
+			&groupName, &parent, &isPair, &children,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan user: %w", err)
 		}
 
+		if groupName == nil {
+			continue
+		}
+
+		group := &store.Group{Name: *groupName}
+		if parent != nil {
+			group.Parent = *parent
+		}
+
+		if isPair != nil {
+			group.IsPair = *isPair
+		}
+
+		group.Children = children
 		if group.Children == nil {
 			group.Children = make([]string, 0)
 		}
@@ -195,6 +210,10 @@ func (u *userStore) loadUser(ctx context.Context, userID string) (*store.User, e
 
 	if err := rows.Err(); err != nil {
 		return nil, err
+	}
+
+	if user.ID == "" {
+		return nil, fmt.Errorf("user not found")
 	}
 
 	return user, nil

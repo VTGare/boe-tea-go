@@ -18,10 +18,13 @@ jobs:
       with:
         go-version-file: 'go.mod'
 
+    - name: Set up Task
+      uses: go-task/setup-task@v2
+
     - name: Build
       run: |
-        make vendor
-        make build
+        task vendor
+        task build
 
     - name: Test
-      run: make coverage
+      run: task coverage

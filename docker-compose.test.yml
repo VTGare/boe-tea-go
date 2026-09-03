@@ -1,0 +1,19 @@
+services:
+  testpg:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: boetea
+      POSTGRES_PASSWORD: test
+      POSTGRES_DB: boetea_test
+    ports:
+      - "5433:5432"
+    command:
+      - -c
+      - shared_buffers=256MB
+      - -c
+      - work_mem=4MB
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U boetea -d boetea_test"]
+      interval: 2s
+      timeout: 2s
+      retries: 30

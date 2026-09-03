@@ -6,5 +6,5 @@ __debug_bin
 config.json
 boetea.exe
 /boetea
-docs/agents
+docs/
 AGENTS.md

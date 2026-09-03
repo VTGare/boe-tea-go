@@ -1,0 +1,68 @@
+version: "3"
+
+vars:
+  BINARY_NAME: boetea
+  EXPORT_RESULT: '{{.EXPORT_RESULT | default "false"}}'
+  POSTGRES_DSN: '{{.POSTGRES_DSN | default "postgres://boetea:test@127.0.0.1:5433/boetea_test?sslmode=disable"}}'
+
+tasks:
+  default:
+    desc: Show available tasks
+    cmds:
+      - task --list
+
+  build:
+    desc: Build the project and put the output binary in out/bin/
+    cmds:
+      - mkdir -p out/bin
+      - CGO_ENABLED=0 GO111MODULE=on go build -mod vendor -o out/bin/{{.BINARY_NAME}} ./cmd/boetea
+
+  clean:
+    desc: Remove build related files
+    cmds:
+      - rm -fr ./bin ./out junit-report.xml checkstyle-report.xml ./coverage.xml ./profile.cov yamllint-checkstyle.xml
+
+  vendor:
+    desc: Copy all packages needed to support builds and tests into the vendor directory
+    cmds:
+      - go mod vendor
+
+  test:
+    desc: Run the tests of the project (EXPORT_RESULT=true for CI-style JUnit output)
+    cmds:
+      - |
+        if [ "{{.EXPORT_RESULT}}" = "true" ]; then
+          GO111MODULE=off go get -u github.com/jstemmer/go-junit-report
+          go test -v -race ./... 2>&1 | tee /dev/tty | go-junit-report -set-exit-code > junit-report.xml
+        else
+          go test -v -race ./...
+        fi
+
+  coverage:
+    desc: Run the tests and export the coverage (EXPORT_RESULT=true for Cobertura XML)
+    cmds:
+      - go test -cover -covermode=count -coverprofile=profile.cov ./...
+      - go tool cover -func profile.cov
+      - |
+        if [ "{{.EXPORT_RESULT}}" = "true" ]; then
+          GO111MODULE=off go get -u github.com/AlekSi/gocov-xml
+          GO111MODULE=off go get -u github.com/axw/gocov/gocov
+          gocov convert profile.cov | gocov-xml > coverage.xml
+        fi
+
+  docker-build:
+    desc: Use the dockerfile to build the container
+    cmds:
+      - docker build --rm --tag {{.BINARY_NAME}} .
+
+  test:integration:
+    desc: Run all tests with the integration build tag (spins up docker-compose.test.yml)
+    cmds:
+      - docker compose -f docker-compose.test.yml up -d testpg
+      - defer: docker compose -f docker-compose.test.yml down -v
+      - |
+        for i in $(seq 1 60); do
+          docker compose -f docker-compose.test.yml exec testpg pg_isready -U boetea -d boetea_test && break
+          sleep 2
+        done
+      - POSTGRES_DSN='{{.POSTGRES_DSN}}' go test -race -mod vendor -tags integration ./...
