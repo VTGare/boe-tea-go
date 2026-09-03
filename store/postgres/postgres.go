@@ -80,7 +80,7 @@ func schemaDDL() []string {
 			crosspost BOOLEAN NOT NULL DEFAULT TRUE,
 			reactions BOOLEAN NOT NULL DEFAULT FALSE,
 			skip_first BOOLEAN NOT NULL DEFAULT FALSE,
-			"limit" INTEGER NOT NULL DEFAULT 10,
+			"limit" BIGINT NOT NULL DEFAULT 10,
 			repost TEXT NOT NULL DEFAULT 'enabled',
 			repost_expiration BIGINT NOT NULL DEFAULT 86400000000000,
 			art_channels TEXT[] NOT NULL DEFAULT '{}',
@@ -116,7 +116,7 @@ func schemaDDL() []string {
 		)`,
 		`CREATE TABLE IF NOT EXISTS bookmarks (
 			user_id TEXT NOT NULL,
-			artwork_id INTEGER NOT NULL REFERENCES artworks(id) ON DELETE CASCADE,
+			artwork_id INTEGER NOT NULL,
 			nsfw BOOLEAN NOT NULL DEFAULT FALSE,
 			created_at TIMESTAMPTZ NOT NULL,
 			PRIMARY KEY (user_id, artwork_id)
@@ -126,13 +126,13 @@ func schemaDDL() []string {
 		`CREATE INDEX IF NOT EXISTS artworks_title_trgm_idx ON artworks USING gin (title gin_trgm_ops)`,
 		`CREATE INDEX IF NOT EXISTS artworks_author_trgm_idx ON artworks USING gin (author gin_trgm_ops)`,
 		`CREATE INDEX IF NOT EXISTS bookmarks_user_created_idx ON bookmarks (user_id, created_at)`,
+		`CREATE INDEX IF NOT EXISTS bookmarks_artwork_idx ON bookmarks (artwork_id)`,
 		`CREATE INDEX IF NOT EXISTS user_groups_user_idx ON user_groups (user_id)`,
 	}
 }
 
 func isUniqueViolation(err error) bool {
-	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) {
+	if pgErr, ok := errors.AsType[*pgconn.PgError](err); ok {
 		return pgErr.Code == "23505"
 	}
 
