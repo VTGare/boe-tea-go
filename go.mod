@@ -11,6 +11,7 @@ require (
 	github.com/everpcpc/pixiv v0.1.2
 	github.com/getsentry/sentry-go v0.49.0
 	github.com/go-redis/redis/v8 v8.11.5
+	github.com/jackc/pgx/v5 v5.10.0
 	github.com/julien040/go-ternary v1.0.2
 	github.com/onsi/ginkgo/v2 v2.21.0
 	github.com/onsi/gomega v1.34.2
@@ -31,6 +32,9 @@ require (
 	github.com/google/go-querystring v1.2.0 // indirect
 	github.com/google/pprof v0.0.0-20241029153458-d1b30febd7db // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
+	github.com/jackc/pgpassfile v1.0.0 // indirect
+	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
+	github.com/jackc/puddle/v2 v2.2.2 // indirect
 	github.com/klauspost/compress v1.20.0 // indirect
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/pkg/errors v0.9.1 // indirect

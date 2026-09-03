@@ -20,6 +20,7 @@ import (
 	"github.com/VTGare/boe-tea-go/repost"
 	"github.com/VTGare/boe-tea-go/store"
 	"github.com/VTGare/boe-tea-go/store/mongo"
+	"github.com/VTGare/boe-tea-go/store/postgres"
 	"github.com/VTGare/gumi"
 
 	"github.com/getsentry/sentry-go"
@@ -27,20 +28,35 @@ import (
 	"go.uber.org/zap"
 )
 
-func initStore(ctx context.Context, mongoURI, database string) (store.Store, error) {
+func initStore(ctx context.Context, cfg *config.Config) (store.Store, error) {
 	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
 
-	mongo, err := mongo.New(ctx, mongoURI, database)
+	resolved, err := cfg.StoreBackend()
 	if err != nil {
 		return nil, err
 	}
 
-	if err := mongo.Init(ctx); err != nil {
+	var backend store.Store
+
+	switch resolved.Backend {
+	case "postgres":
+		backend, err = postgres.New(ctx, resolved.Postgres.DSN)
+		if err != nil {
+			return nil, err
+		}
+	default:
+		backend, err = mongo.New(ctx, resolved.Mongo.URI, resolved.Mongo.Database)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if err := backend.Init(ctx); err != nil {
 		return nil, err
 	}
 
-	store := store.NewStatefulStore(mongo, cache.New(30*time.Minute, 1*time.Hour))
+	store := store.NewStatefulStore(backend, cache.New(30*time.Minute, 1*time.Hour))
 	return store, nil
 }
 
@@ -73,7 +89,7 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
 	defer cancel()
 
-	store, err := initStore(ctx, cfg.Mongo.URI, cfg.Mongo.Database)
+	store, err := initStore(ctx, cfg)
 	if err != nil {
 		log.Fatal(err)
 	}
