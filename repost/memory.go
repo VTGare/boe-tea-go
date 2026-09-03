@@ -38,7 +38,12 @@ func (rd inMemory) Find(_ context.Context, channelID, artworkID string) (*Repost
 		return nil, ErrNotFound
 	}
 
-	return rep.(*Repost), nil
+	typed, ok := rep.(*Repost)
+	if !ok || typed == nil {
+		return nil, ErrNotFound
+	}
+
+	return typed, nil
 }
 
 func (inMemory) key(rep *Repost) string {

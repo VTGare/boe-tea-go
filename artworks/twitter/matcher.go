@@ -32,8 +32,12 @@ func (tm twitterMatcher) Match(s string) (string, bool) {
 	}
 
 	parts = parts[2:]
-	if parts[0] == "status" {
+	if len(parts) > 0 && parts[0] == "status" {
 		parts = parts[1:]
+	}
+
+	if len(parts) == 0 {
+		return "", false
 	}
 
 	snowflake := parts[0]
@@ -45,5 +49,5 @@ func (tm twitterMatcher) Match(s string) (string, bool) {
 }
 
 func (twitterMatcher) Enabled(g *store.Guild) bool {
-	return g.Twitter
+	return g != nil && g.Twitter
 }

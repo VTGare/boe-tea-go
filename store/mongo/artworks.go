@@ -121,7 +121,12 @@ func (a *artworkStore) CreateArtwork(ctx context.Context, artwork *store.Artwork
 		return nil, err
 	}
 
-	return res.(*store.Artwork), nil
+	created, ok := res.(*store.Artwork)
+	if !ok || created == nil {
+		return nil, fmt.Errorf("failed to create artwork: unexpected transaction result")
+	}
+
+	return created, nil
 }
 
 func findOptions(a store.ArtworkSearchOptions) *options.FindOptionsBuilder {

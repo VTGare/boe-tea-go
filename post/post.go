@@ -76,9 +76,17 @@ func (p *Post) Send(ctx context.Context) error {
 		return fmt.Errorf("failed to get a guild: %w", err)
 	}
 
+	if guild == nil {
+		return fmt.Errorf("failed to get a guild: not found")
+	}
+
 	user, err := p.Bot.Store.User(ctx, p.Ctx.Event.Author.ID)
 	if err != nil {
 		return fmt.Errorf("failed to get a user: %w", err)
+	}
+
+	if user == nil {
+		return fmt.Errorf("failed to get a user: not found")
 	}
 
 	if user.Ignore && p.Ctx.Command == nil {
@@ -313,7 +321,19 @@ func (p *Post) fetch(ctx context.Context, guild *store.Guild, channelID string) 
 				)
 
 				if i, ok := p.Bot.ArtworkCache.Get(key); ok {
-					artwork = i.(artworks.Artwork)
+					a, ok := i.(artworks.Artwork)
+					if !ok || a == nil {
+						var err error
+						artwork, err = provider.Find(id)
+						if err != nil {
+							results <- fetchResult{err: err}
+							return
+						}
+
+						p.Bot.ArtworkCache.Set(key, artwork, 0)
+					} else {
+						artwork = a
+					}
 				} else {
 					var err error
 					artwork, err = provider.Find(id)
@@ -461,20 +481,43 @@ func (p *Post) sendMessages(guild *store.Guild, channelID string, artworks []art
 
 	mediaCount := 0
 	for _, artwork := range artworks {
+		if artwork == nil {
+			continue
+		}
+
 		mediaCount += artwork.Len()
 	}
 
 	// It only happens from commands so only first artwork should be affected.
-	allMessages[0] = p.skipArtworks(allMessages[0])
+	if len(allMessages) > 0 {
+		allMessages[0] = p.skipArtworks(allMessages[0])
+	}
+
 	sendMessage := func(message *discordgo.MessageSend, artworkID string) error {
+		if message == nil {
+			return fmt.Errorf("nil message")
+		}
+
 		s := p.Ctx.Session
+
 		if p.CrosspostMode {
 			guildID, err := strconv.ParseInt(guild.ID, 10, 64)
 			if err != nil {
 				return fmt.Errorf("failed to parse guild id: %w", err)
 			}
 
+			if p.Bot.ShardManager == nil {
+				return fmt.Errorf("shard manager not ready")
+			}
+
 			s = p.Bot.ShardManager.SessionForGuild(guildID)
+			if s == nil {
+				return fmt.Errorf("no session for guild")
+			}
+		}
+
+		if s == nil {
+			return fmt.Errorf("discord session not ready")
 		}
 
 		msg, err := s.ChannelMessageSendComplex(channelID, message)
@@ -486,7 +529,7 @@ func (p *Post) sendMessages(guild *store.Guild, channelID string, artworks []art
 
 		// If URL isn't set then it's an error embed.
 		// If media count equals 0, it's most likely a Tweet without images and can't be bookmarked.
-		if guild.Reactions && len(message.Embeds) > 0 && message.Embeds[0].URL != "" && mediaCount != 0 {
+		if guild.Reactions && len(message.Embeds) > 0 && message.Embeds[0] != nil && message.Embeds[0].URL != "" && mediaCount != 0 {
 			err := p.addBookmarkReactions(msg)
 			if err != nil && !strings.Contains(err.Error(), "403") {
 				return fmt.Errorf("failed to add reactions: %w", err)
@@ -497,10 +540,12 @@ func (p *Post) sendMessages(guild *store.Guild, channelID string, artworks []art
 	}
 
 	allMessages = p.handleLimit(allMessages, guild.Limit)
-	if p.CrosspostMode {
-		first := allMessages[0][0]
 
-		first.Content = first.Embeds[0].URL + "\n" + first.Content
+	if p.CrosspostMode && len(allMessages) > 0 && len(allMessages[0]) > 0 {
+		first := allMessages[0][0]
+		if first != nil && len(first.Embeds) > 0 && first.Embeds[0] != nil {
+			first.Content = first.Embeds[0].URL + "\n" + first.Content
+		}
 	}
 
 	log := p.Bot.Log.With(
@@ -510,7 +555,15 @@ func (p *Post) sendMessages(guild *store.Guild, channelID string, artworks []art
 	)
 
 	for i, messages := range allMessages {
+		if i >= len(artworks) || artworks[i] == nil {
+			continue
+		}
+
 		for _, message := range messages {
+			if message == nil {
+				continue
+			}
+
 			err := sendMessage(message, artworks[i].ID())
 			if err != nil {
 				log.With(err).Warn("failed to send artwork message")
@@ -535,19 +588,21 @@ func (p *Post) generateMessages(guild *store.Guild, artworks []artworks.Artwork)
 				return nil, err
 			}
 
-			if p.skipFirst(guild, artwork) {
+			if p.skipFirst(guild, artwork) && len(sends) > 0 {
 				sends = sends[1:]
 			}
 
 			for _, msg := range sends {
-				if len(msg.Embeds) == 0 {
+				if msg == nil || len(msg.Embeds) == 0 || msg.Embeds[0] == nil {
 					continue
 				}
 
 				if p.CrosspostMode {
-					msg.Embeds[0].Author = &discordgo.MessageEmbedAuthor{
-						Name:    messages.CrosspostBy(p.Ctx.Event.Author.Username),
-						IconURL: p.Ctx.Event.Author.AvatarURL(""),
+					if p.Ctx != nil && p.Ctx.Event != nil && p.Ctx.Event.Author != nil {
+						msg.Embeds[0].Author = &discordgo.MessageEmbedAuthor{
+							Name:    messages.CrosspostBy(p.Ctx.Event.Author.Username),
+							IconURL: p.Ctx.Event.Author.AvatarURL(""),
+						}
 					}
 				} else {
 					msg.AllowedMentions = &discordgo.MessageAllowedMentions{} // disable reference ping.
@@ -627,9 +682,19 @@ func (*Post) handleLimit(allMessages [][]*discordgo.MessageSend, limit int) [][]
 		return allMessages
 	}
 
+	if len(allMessages) == 0 || len(allMessages[0]) == 0 || allMessages[0][0] == nil {
+		return allMessages
+	}
+
+	if limit < 0 {
+		limit = 0
+	}
+
 	allMessages[0][0].Content = messages.LimitExceeded(limit, len(allMessages), count)
 	if len(allMessages) == 1 {
-		allMessages[0] = allMessages[0][:limit]
+		if limit < len(allMessages[0]) {
+			allMessages[0] = allMessages[0][:limit]
+		}
 		return allMessages
 	}
 

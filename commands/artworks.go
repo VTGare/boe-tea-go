@@ -112,7 +112,7 @@ func artwork(b *bot.Bot) func(*gumi.Ctx) error {
 		if err := dgoutils.ValidateArgs(gctx, 1); err != nil {
 			return err
 		}
-	
+
 		arg := gctx.Args.Get(0).Raw
 		id, url, ok := parseArtworkArgument(arg)
 		if !ok {
@@ -130,6 +130,10 @@ func artwork(b *bot.Bot) func(*gumi.Ctx) error {
 			default:
 				return err
 			}
+		}
+
+		if artwork == nil {
+			return messages.ErrArtworkNotFound(arg)
 		}
 
 		embeds := make([]*discordgo.MessageEmbed, 0, len(artwork.Images))
@@ -235,9 +239,14 @@ func leaderboard(b *bot.Bot) func(*gumi.Ctx) error {
 		for key, val := range flagsMap {
 			switch key {
 			case flags.FlagTypeDuring:
-				filter.Time = val.(time.Duration)
+				if d, ok := val.(time.Duration); ok {
+					filter.Time = d
+				}
 			case flags.FlagTypeLimit:
-				limit = val.(int64)
+				if l, ok := val.(int64); ok {
+					limit = l
+				}
+
 				if limit > 100 {
 					return messages.ErrLimitTooHigh(limit)
 				}
@@ -274,7 +283,11 @@ func leaderboard(b *bot.Bot) func(*gumi.Ctx) error {
 		}
 
 		for ind, artwork := range artworks {
-			artworkEmbeds = append(artworkEmbeds, artworkToEmbed(artwork, artwork.Images[0], ind, len(artworks)))
+			if artwork == nil {
+				continue
+			}
+
+			artworkEmbeds = append(artworkEmbeds, artworkToEmbed(artwork, firstArtworkImage(artwork), ind, len(artworks)))
 		}
 
 		wg := dgoutils.NewWidget(gctx.Session, gctx.Event.Author.ID, artworkEmbeds)
@@ -315,16 +328,25 @@ func search(b *bot.Bot) func(*gumi.Ctx) error {
 		for key, val := range flagsMap {
 			switch key {
 			case flags.FlagTypeDuring:
-				filter.Time = val.(time.Duration)
+				if d, ok := val.(time.Duration); ok {
+					filter.Time = d
+				}
 			case flags.FlagTypeLimit:
-				limit = val.(int64)
+				if l, ok := val.(int64); ok {
+					limit = l
+				}
+
 				if limit > 100 {
 					return messages.ErrLimitTooHigh(limit)
 				}
 			case flags.FlagTypeOrder:
-				order = val.(store.Order)
+				if o, ok := val.(store.Order); ok {
+					order = o
+				}
 			case flags.FlagTypeSort:
-				sort = val.(store.ArtworkSort)
+				if s, ok := val.(store.ArtworkSort); ok {
+					sort = s
+				}
 			}
 		}
 
@@ -362,7 +384,11 @@ func search(b *bot.Bot) func(*gumi.Ctx) error {
 		}
 
 		for ind, artwork := range artworks {
-			artworkEmbeds = append(artworkEmbeds, artworkToEmbed(artwork, artwork.Images[0], ind, len(artworks)))
+			if artwork == nil {
+				continue
+			}
+
+			artworkEmbeds = append(artworkEmbeds, artworkToEmbed(artwork, firstArtworkImage(artwork), ind, len(artworks)))
 		}
 
 		wg := dgoutils.NewWidget(gctx.Session, gctx.Event.Author.ID, artworkEmbeds)

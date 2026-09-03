@@ -23,8 +23,12 @@ func NewStatefulStore(store Store, c *cache.Cache) Store {
 
 func (s *StatefulStore) Guild(ctx context.Context, guildID string) (*Guild, error) {
 	if g, ok := s.cache.Get("guilds:" + guildID); ok {
-		guild := g.(*Guild)
-		return guild, nil
+		guild, ok := g.(*Guild)
+		if !ok || guild == nil {
+			s.cache.Delete("guilds:" + guildID)
+		} else {
+			return guild, nil
+		}
 	}
 
 	guild, err := s.Store.Guild(ctx, guildID)
@@ -78,8 +82,12 @@ func (s *StatefulStore) DeleteArtChannels(ctx context.Context, guildID string, c
 
 func (s *StatefulStore) Artwork(ctx context.Context, id int, url string) (*Artwork, error) {
 	if a, ok := s.cache.Get("artworks:" + strconv.Itoa(id)); ok {
-		artwork := a.(*Artwork)
-		return artwork, nil
+		artwork, ok := a.(*Artwork)
+		if !ok || artwork == nil {
+			s.cache.Delete("artworks:" + strconv.Itoa(id))
+		} else {
+			return artwork, nil
+		}
 	}
 
 	artwork, err := s.Store.Artwork(ctx, id, url)
@@ -124,7 +132,14 @@ func (s *StatefulStore) SearchArtworks(ctx context.Context, filter ArtworkFilter
 			continue
 		}
 
-		artworks = append(artworks, i.(*Artwork))
+		cached, ok := i.(*Artwork)
+		if !ok || cached == nil {
+			s.cache.Delete("artworks:" + strconv.Itoa(id))
+			newIDs = append(newIDs, id)
+			continue
+		}
+
+		artworks = append(artworks, cached)
 	}
 
 	if len(newIDs) != 0 {

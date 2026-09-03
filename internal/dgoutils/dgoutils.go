@@ -30,7 +30,16 @@ func ValidateArgs(gctx *gumi.Ctx, argsLen int) error {
 
 // Trimmer trims <> in case someone wraps the link in it, and characters '!', '@', '#', and '&' for channels and user mentions.
 func Trimmer(gctx *gumi.Ctx, n int) string {
-	return strings.Trim(gctx.Args.Get(n).Raw, "<!@#&>")
+	if gctx == nil || gctx.Args == nil {
+		return ""
+	}
+
+	arg := gctx.Args.Get(n)
+	if arg == nil {
+		return ""
+	}
+
+	return strings.Trim(arg.Raw, "<!@#&>")
 }
 
 // TrimmerRaw is the same as Trimmer but directly on a Raw string.
@@ -45,12 +54,16 @@ func ExpireMessage(b *bot.Bot, s *discordgo.Session, msg *discordgo.Message, dur
 		expireDuration = duration[0]
 	}
 
-	if msg == nil {
+	if msg == nil || s == nil {
 		return
 	}
 
 	go func() {
 		time.Sleep(expireDuration)
+		if s == nil {
+			return
+		}
+
 		err := s.ChannelMessageDelete(msg.ChannelID, msg.ID)
 		if err != nil {
 			log := b.Log.With(
@@ -66,6 +79,10 @@ func ExpireMessage(b *bot.Bot, s *discordgo.Session, msg *discordgo.Message, dur
 }
 
 func MemberHasPermission(s *discordgo.Session, guildID string, userID string, permission int64) (bool, error) {
+	if s == nil || s.State == nil {
+		return false, fmt.Errorf("discord session not ready")
+	}
+
 	member, err := s.State.Member(guildID, userID)
 	if err != nil {
 		if member, err = s.GuildMember(guildID, userID); err != nil {
@@ -73,10 +90,18 @@ func MemberHasPermission(s *discordgo.Session, guildID string, userID string, pe
 		}
 	}
 
+	if member == nil {
+		return false, fmt.Errorf("failed to get member")
+	}
+
 	for _, roleID := range member.Roles {
 		role, err := s.State.Role(guildID, roleID)
 		if err != nil {
 			return false, err
+		}
+
+		if role == nil {
+			continue
 		}
 
 		if role.Permissions&permission != 0 {
@@ -87,6 +112,10 @@ func MemberHasPermission(s *discordgo.Session, guildID string, userID string, pe
 	g, err := s.Guild(guildID)
 	if err != nil {
 		return false, fmt.Errorf("failed to get guild: %w", err)
+	}
+
+	if g == nil {
+		return false, nil
 	}
 
 	if g.OwnerID == userID {
@@ -181,7 +210,12 @@ var actionMap = map[string]WidgetAction{
 }
 
 func (a WidgetAction) String() string {
-	return []string{"⏮", "⏪", "◀", "⏹", "▶", "⏩", "⏭"}[a]
+	icons := []string{"⏮", "⏪", "◀", "⏹", "▶", "⏩", "⏭"}
+	if int(a) < 0 || int(a) >= len(icons) {
+		return ""
+	}
+
+	return icons[a]
 }
 
 func NewWidget(s *discordgo.Session, author string, embeds []*discordgo.MessageEmbed) *EmbedWidget {
@@ -197,10 +231,15 @@ func (w *EmbedWidget) Start(channelID string) error {
 		return nil
 	}
 
+	if w.s == nil {
+		return fmt.Errorf("discord session not ready")
+	}
+
 	m, err := w.s.ChannelMessageSendEmbed(channelID, w.Pages[0])
 	if err != nil {
 		return err
 	}
+
 	w.m = m
 
 	if w.len() == 1 {
@@ -236,7 +275,7 @@ func (w *EmbedWidget) Start(channelID string) error {
 			continue
 		}
 
-		if reaction.MessageID != w.m.ID || w.s.State.User.ID == reaction.UserID || reaction.UserID != w.author {
+		if reaction.MessageID != w.m.ID || w.s.State == nil || w.s.State.User == nil || w.s.State.User.ID == reaction.UserID || reaction.UserID != w.author {
 			continue
 		}
 
@@ -259,10 +298,19 @@ func (w *EmbedWidget) Start(channelID string) error {
 		}
 
 		if w.callback != nil {
-			err := w.callback(actionMap[reaction.Emoji.APIName()], w.currentPage)
+			action, ok := actionMap[reaction.Emoji.APIName()]
+			if !ok {
+				continue
+			}
+
+			err := w.callback(action, w.currentPage)
 			if err != nil {
 				return err
 			}
+		}
+
+		if w.currentPage < 0 || w.currentPage >= len(w.Pages) || w.Pages[w.currentPage] == nil {
+			continue
 		}
 
 		_, err := w.s.ChannelMessageEditEmbed(w.m.ChannelID, w.m.ID, w.Pages[w.currentPage])

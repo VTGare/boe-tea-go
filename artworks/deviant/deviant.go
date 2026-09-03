@@ -120,13 +120,18 @@ func (d *DeviantArt) Match(s string) (string, bool) {
 }
 
 func (*DeviantArt) Enabled(g *store.Guild) bool {
-	return g.Deviant
+	return g != nil && g.Deviant
 }
 
 func (a *Artwork) MessageSends(footer string, tagsEnabled bool) ([]*discordgo.MessageSend, error) {
 	eb := embeds.NewBuilder()
 
-	eb.Title(fmt.Sprintf("%v by %v", a.Title, a.Author.Name)).
+	author := ""
+	if a.Author != nil {
+		author = a.Author.Name
+	}
+
+	eb.Title(fmt.Sprintf("%v by %v", a.Title, author)).
 		Image(a.ImageURL).
 		URL(a.url).
 		Timestamp(a.CreatedAt).
@@ -157,9 +162,14 @@ func (a *Artwork) MessageSends(footer string, tagsEnabled bool) ([]*discordgo.Me
 }
 
 func (a *Artwork) StoreArtwork() *store.Artwork {
+	author := ""
+	if a.Author != nil {
+		author = a.Author.Name
+	}
+
 	return &store.Artwork{
 		Title:  a.Title,
-		Author: a.Author.Name,
+		Author: author,
 		URL:    a.url,
 		Images: []string{a.ImageURL},
 	}

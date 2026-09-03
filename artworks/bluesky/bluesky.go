@@ -95,7 +95,7 @@ func New() *Bluesky {
 
 // Enabled implements artworks.Provider.
 func (*Bluesky) Enabled(g *store.Guild) bool {
-	return g.Bluesky
+	return g != nil && g.Bluesky
 }
 
 // Find implements artworks.Provider.
@@ -125,6 +125,10 @@ func (b *Bluesky) Find(id string) (artworks.Artwork, error) {
 		decoded := &Response{}
 		if err := json.NewDecoder(resp.Body).Decode(decoded); err != nil {
 			return nil, fmt.Errorf("decode: %w", err)
+		}
+
+		if decoded.Thread.Post == nil {
+			return nil, artworks.ErrArtworkNotFound
 		}
 
 		tags := make([]string, 0)

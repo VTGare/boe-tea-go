@@ -146,6 +146,10 @@ func (p *Pixiv) Find(id string) (artworks.Artwork, error) {
 			proxy: p.proxyHost,
 		}
 
+		if len(images) == 0 {
+			return nil, artworks.ErrArtworkNotFound
+		}
+
 		imgFile := path.Base(artwork.Images[0].Original)
 		if strings.Contains(imgFile, "limit") {
 			return nil, artworks.ErrRateLimited
@@ -160,7 +164,7 @@ func (p *Pixiv) Find(id string) (artworks.Artwork, error) {
 }
 
 func (*Pixiv) Enabled(g *store.Guild) bool {
-	return g.Pixiv
+	return g != nil && g.Pixiv
 }
 
 func (a *Artwork) StoreArtwork() *store.Artwork {
@@ -173,6 +177,10 @@ func (a *Artwork) StoreArtwork() *store.Artwork {
 }
 
 func (a *Artwork) MessageSends(footer string, tagsEnabled bool) ([]*discordgo.MessageSend, error) {
+	if len(a.Images) == 0 {
+		return nil, artworks.ErrArtworkNotFound
+	}
+
 	var (
 		length = len(a.Images)
 		pages  = make([]*discordgo.MessageSend, 0, length)

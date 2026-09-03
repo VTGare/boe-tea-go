@@ -215,7 +215,7 @@ func set(b *bot.Bot) func(*gumi.Ctx) error {
 
 			switch settingName.Raw {
 			case "prefix":
-				if unicode.IsLetter(rune(newSetting.Raw[len(newSetting.Raw)-1])) {
+				if len(newSetting.Raw) > 0 && unicode.IsLetter(rune(newSetting.Raw[len(newSetting.Raw)-1])) {
 					newSetting.Raw += " "
 				}
 
@@ -223,14 +223,16 @@ func set(b *bot.Bot) func(*gumi.Ctx) error {
 					return messages.ErrPrefixTooLong(newSetting.Raw)
 				}
 
-				guild.Prefix = applySetting(guild.Prefix, newSetting.Raw).(string)
+				applySetting(guild.Prefix, newSetting.Raw)
+				guild.Prefix = newSetting.Raw
 			case "limit":
 				limit, err := strconv.Atoi(newSetting.Raw)
 				if err != nil {
 					return messages.ErrParseInt(newSetting.Raw)
 				}
 
-				guild.Limit = applySetting(guild.Limit, limit).(int)
+				applySetting(guild.Limit, limit)
+				guild.Limit = limit
 			case "repost":
 				if newSetting.Raw != string(store.GuildRepostEnabled) &&
 					newSetting.Raw != string(store.GuildRepostDisabled) &&
@@ -238,7 +240,8 @@ func set(b *bot.Bot) func(*gumi.Ctx) error {
 					return messages.ErrUnknownRepostOption(newSetting.Raw)
 				}
 
-				guild.Repost = store.GuildRepost(applySetting(guild.Repost, newSetting.Raw).(string))
+				applySetting(guild.Repost, newSetting.Raw)
+				guild.Repost = store.GuildRepost(newSetting.Raw)
 
 			case "repost.expiration":
 				dur, err := time.ParseDuration(newSetting.Raw)
@@ -250,7 +253,8 @@ func set(b *bot.Bot) func(*gumi.Ctx) error {
 					return messages.ErrExpirationOutOfRange(newSetting.Raw)
 				}
 
-				guild.RepostExpiration = applySetting(guild.RepostExpiration, dur).(time.Duration)
+				applySetting(guild.RepostExpiration, dur)
+				guild.RepostExpiration = dur
 
 			case "nsfw":
 				enable, err := parseBool(newSetting.Raw)
@@ -258,7 +262,8 @@ func set(b *bot.Bot) func(*gumi.Ctx) error {
 					return err
 				}
 
-				guild.NSFW = applySetting(guild.NSFW, enable).(bool)
+				applySetting(guild.NSFW, enable)
+				guild.NSFW = enable
 
 			case "crosspost":
 				enable, err := parseBool(newSetting.Raw)
@@ -266,7 +271,8 @@ func set(b *bot.Bot) func(*gumi.Ctx) error {
 					return err
 				}
 
-				guild.Crosspost = applySetting(guild.Crosspost, enable).(bool)
+				applySetting(guild.Crosspost, enable)
+				guild.Crosspost = enable
 
 			case "reactions":
 				enable, err := parseBool(newSetting.Raw)
@@ -274,7 +280,8 @@ func set(b *bot.Bot) func(*gumi.Ctx) error {
 					return err
 				}
 
-				guild.Reactions = applySetting(guild.Reactions, enable).(bool)
+				applySetting(guild.Reactions, enable)
+				guild.Reactions = enable
 
 			case "pixiv":
 				enable, err := parseBool(newSetting.Raw)
@@ -282,7 +289,8 @@ func set(b *bot.Bot) func(*gumi.Ctx) error {
 					return err
 				}
 
-				guild.Pixiv = applySetting(guild.Pixiv, enable).(bool)
+				applySetting(guild.Pixiv, enable)
+				guild.Pixiv = enable
 
 			case "bluesky":
 				enable, err := parseBool(newSetting.Raw)
@@ -290,7 +298,8 @@ func set(b *bot.Bot) func(*gumi.Ctx) error {
 					return err
 				}
 
-				guild.Bluesky = applySetting(guild.Bluesky, enable).(bool)
+				applySetting(guild.Bluesky, enable)
+				guild.Bluesky = enable
 
 			case "twitter":
 				enable, err := parseBool(newSetting.Raw)
@@ -298,7 +307,8 @@ func set(b *bot.Bot) func(*gumi.Ctx) error {
 					return err
 				}
 
-				guild.Twitter = applySetting(guild.Twitter, enable).(bool)
+				applySetting(guild.Twitter, enable)
+				guild.Twitter = enable
 
 			case "deviant":
 				enable, err := parseBool(newSetting.Raw)
@@ -306,7 +316,8 @@ func set(b *bot.Bot) func(*gumi.Ctx) error {
 					return err
 				}
 
-				guild.Deviant = applySetting(guild.Deviant, enable).(bool)
+				applySetting(guild.Deviant, enable)
+				guild.Deviant = enable
 
 			case "tags":
 				enable, err := parseBool(newSetting.Raw)
@@ -314,7 +325,8 @@ func set(b *bot.Bot) func(*gumi.Ctx) error {
 					return err
 				}
 
-				guild.Tags = applySetting(guild.Tags, enable).(bool)
+				applySetting(guild.Tags, enable)
+				guild.Tags = enable
 
 			case "footer":
 				enable, err := parseBool(newSetting.Raw)
@@ -322,7 +334,8 @@ func set(b *bot.Bot) func(*gumi.Ctx) error {
 					return err
 				}
 
-				guild.FlavorText = applySetting(guild.FlavorText, enable).(bool)
+				applySetting(guild.FlavorText, enable)
+				guild.FlavorText = enable
 
 			case "twitter.skip":
 				enable, err := parseBool(newSetting.Raw)
@@ -330,7 +343,8 @@ func set(b *bot.Bot) func(*gumi.Ctx) error {
 					return err
 				}
 
-				guild.SkipFirst = applySetting(guild.SkipFirst, enable).(bool)
+				applySetting(guild.SkipFirst, enable)
+				guild.SkipFirst = enable
 
 			default:
 				return messages.ErrUnknownSetting(settingName.Raw)

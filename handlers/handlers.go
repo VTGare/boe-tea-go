@@ -41,6 +41,11 @@ func RegisterHandlers(b *bot.Bot) {
 // PrefixResolver returns an array of guild's prefixes and bot mentions.
 func PrefixResolver(b *bot.Bot) func(s *discordgo.Session, m *discordgo.MessageCreate) []string {
 	return func(s *discordgo.Session, m *discordgo.MessageCreate) []string {
+		defaults := []string{"bt!", "bt ", "bt.", "bt?"}
+		if s == nil || s.State == nil || s.State.User == nil {
+			return defaults
+		}
+
 		ctx, cancel := context.WithTimeout(b.Context, 5*time.Second)
 		defer cancel()
 
@@ -73,6 +78,10 @@ func OnMessage(b *bot.Bot) func(*gumi.Ctx) error {
 			return err
 		}
 
+		if guild == nil {
+			return nil
+		}
+
 		if !(len(guild.ArtChannels) == 0 || slices.Contains(guild.ArtChannels, gctx.Event.ChannelID)) {
 			return nil
 		}
@@ -90,6 +99,12 @@ func OnMessage(b *bot.Bot) func(*gumi.Ctx) error {
 // OnReady logs that bot's up.
 func OnReady(b *bot.Bot) func(*discordgo.Session, *discordgo.Ready) {
 	return func(s *discordgo.Session, r *discordgo.Ready) {
+		if r == nil || r.User == nil {
+			b.Log.Info("shard is connected")
+
+			return
+		}
+
 		b.Log.With("user", r.User.String(), "session_id", r.SessionID, "guilds", len(r.Guilds)).Info("shard is connected")
 	}
 }
@@ -121,7 +136,8 @@ func OnGuildDelete(b *bot.Bot) func(*discordgo.Session, *discordgo.GuildDelete) 
 			"guild_id", g.ID,
 		)
 
-		log.Info(ternary.If(g.Unavailable,
+		log.Info(ternary.If(
+			g.Unavailable,
 			"guild outage",
 			"bot kicked/banned from guild",
 		))
@@ -132,17 +148,29 @@ func OnGuildDelete(b *bot.Bot) func(*discordgo.Session, *discordgo.GuildDelete) 
 // on that server due to Discord removing all reactions of banned users.
 func OnGuildBanAdd(b *bot.Bot) func(*discordgo.Session, *discordgo.GuildBanAdd) {
 	return func(s *discordgo.Session, gb *discordgo.GuildBanAdd) {
+		if gb == nil || gb.User == nil {
+			return
+		}
+
 		b.BannedUsers.Set(gb.User.ID, struct{}{})
 	}
 }
 
 func OnChannelDelete(b *bot.Bot) func(*discordgo.Session, *discordgo.ChannelDelete) {
 	return func(s *discordgo.Session, ch *discordgo.ChannelDelete) {
+		if ch == nil {
+			return
+		}
+
 		log := b.Log.With("channel_id", ch.ID, "guild_id", ch.GuildID)
 
 		guild, err := b.Store.Guild(b.Context, ch.GuildID)
 		if err != nil {
 			log.With("error", err).Warn("failed to find guild")
+			return
+		}
+
+		if guild == nil {
 			return
 		}
 
@@ -205,6 +233,10 @@ func OnMessageRemove(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageDele
 
 func OnReactionAdd(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageReactionAdd) {
 	return func(s *discordgo.Session, r *discordgo.MessageReactionAdd) {
+		if r == nil || s == nil || s.State == nil || s.State.User == nil {
+			return
+		}
+
 		// Do nothing for bot's own reactions
 		if r.UserID == s.State.User.ID {
 			return
@@ -286,7 +318,7 @@ func OnReactionAdd(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageReacti
 			}
 
 			var url string
-			if len(msg.Embeds) > 0 {
+			if len(msg.Embeds) > 0 && msg.Embeds[0] != nil {
 				url = msg.Embeds[0].URL
 			}
 
@@ -344,7 +376,7 @@ func OnReactionAdd(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageReacti
 			}
 
 			urls := make([]string, 0, 2)
-			if len(msg.Embeds) > 0 {
+			if len(msg.Embeds) > 0 && msg.Embeds[0] != nil {
 				embed := msg.Embeds[0]
 				urls = append(urls, embed.URL)
 			}
@@ -389,6 +421,10 @@ func OnReactionAdd(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageReacti
 				return fmt.Errorf("failed to find or create an artwork: %w", err)
 			}
 
+			if artworkDB == nil {
+				return fmt.Errorf("failed to find or create an artwork: not found")
+			}
+
 			var (
 				nsfw = r.Emoji.APIName() == "🤤"
 				fav  = &store.Bookmark{
@@ -419,11 +455,23 @@ func OnReactionAdd(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageReacti
 				return fmt.Errorf("failed to find or create a user: %w", err)
 			}
 
+			if user == nil {
+				return fmt.Errorf("failed to find or create a user: not found")
+			}
+
 			if !user.DM {
 				return nil
 			}
 
+			if b.ShardManager == nil {
+				return fmt.Errorf("shard manager not ready")
+			}
+
 			dmSession := b.ShardManager.SessionForDM()
+			if dmSession == nil {
+				return fmt.Errorf("no DM session available")
+			}
+
 			ch, err := dmSession.UserChannelCreate(user.ID)
 			if err != nil {
 				return fmt.Errorf("failed to create private channel: %w", err)
@@ -465,6 +513,10 @@ func OnReactionAdd(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageReacti
 
 func OnReactionRemove(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageReactionRemove) {
 	return func(s *discordgo.Session, r *discordgo.MessageReactionRemove) {
+		if r == nil || s == nil || s.State == nil || s.State.User == nil {
+			return
+		}
+
 		// Do nothing for bot's own reactions
 		if r.UserID == s.State.User.ID {
 			return
@@ -507,14 +559,17 @@ func OnReactionRemove(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageRea
 		}
 
 		urls := make([]string, 0, 2)
-		if len(msg.Embeds) > 0 {
+		if len(msg.Embeds) > 0 && msg.Embeds[0] != nil {
 			embed := msg.Embeds[0]
 			urls = append(urls, embed.URL)
 		}
 
 		regex := xurls.Strict()
-		if url := regex.FindString(msg.Content); url != "" {
-			urls = append(urls, url)
+
+		if msg != nil {
+			if url := regex.FindString(msg.Content); url != "" {
+				urls = append(urls, url)
+			}
 		}
 
 		var artwork artworks.Artwork
@@ -549,7 +604,12 @@ func OnReactionRemove(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageRea
 			return
 		}
 
+		if artworkDB == nil {
+			return
+		}
+
 		log.With("user_id", r.UserID, "artwork_id", artworkDB.ID).Info("removing a bookmark")
+
 		deleted, err := b.Store.DeleteBookmark(ctx, &store.Bookmark{UserID: r.UserID, ArtworkID: artworkDB.ID})
 		if err != nil {
 			log.With("error", err).Error("failed to remove a bookmark")
@@ -566,11 +626,23 @@ func OnReactionRemove(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageRea
 			return
 		}
 
+		if user == nil {
+			return
+		}
+
 		if !user.DM {
 			return
 		}
 
+		if b.ShardManager == nil {
+			return
+		}
+
 		dmSession := b.ShardManager.SessionForDM()
+		if dmSession == nil {
+			return
+		}
+
 		ch, err := dmSession.UserChannelCreate(user.ID)
 		if err != nil {
 			log.With("error", err, "user_id", user.ID).Error("failed to create private channel")
@@ -594,6 +666,12 @@ func OnReactionRemove(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageRea
 // OnError creates an error response, logs them and sends the response on Discord.
 func OnError(b *bot.Bot) func(*gumi.Ctx, error) {
 	return func(gctx *gumi.Ctx, err error) {
+		if gctx == nil || gctx.Event == nil || gctx.Session == nil {
+			b.Log.With("error", err).Error("error with nil context")
+
+			return
+		}
+
 		var (
 			eb         = embeds.NewBuilder()
 			cmdErr     *messages.IncorrectCmd
@@ -728,6 +806,10 @@ func onDefaultError(b *bot.Bot, gctx *gumi.Ctx, err error) *embeds.Builder {
 // OnRateLimit creates a response for users who use bot's command too frequently
 func OnRateLimit(*bot.Bot) func(*gumi.Ctx) error {
 	return func(gctx *gumi.Ctx) error {
+		if gctx == nil || gctx.Command == nil || gctx.Command.RateLimiter == nil || gctx.Event == nil || gctx.Event.Author == nil {
+			return nil
+		}
+
 		duration, err := gctx.Command.RateLimiter.Expires(gctx.Event.Author.ID)
 		if err != nil {
 			return err
@@ -753,6 +835,10 @@ func OnNoPerms(*bot.Bot) func(*gumi.Ctx) error {
 // OnNSFW creates a response for users who used a NSFW command in a SFW channel
 func OnNSFW(*bot.Bot) func(*gumi.Ctx) error {
 	return func(gctx *gumi.Ctx) error {
+		if gctx == nil || gctx.Command == nil {
+			return nil
+		}
+
 		eb := embeds.NewBuilder()
 
 		eb.FailureTemplate(messages.NSFWCommand(gctx.Command.Name))

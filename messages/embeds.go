@@ -180,26 +180,45 @@ var embeds = map[Language]map[EmbedType]any{
 	},
 }
 
+func embedByType[T any](lang Language, typ EmbedType) *T {
+	byLang, ok := embeds[lang]
+	if !ok {
+		byLang = embeds[English]
+	}
+
+	v, ok := byLang[typ]
+	if !ok {
+		return new(T)
+	}
+
+	typed, ok := v.(*T)
+	if !ok || typed == nil {
+		return new(T)
+	}
+
+	return typed
+}
+
 func SearchWarningEmbed() *BaseEmbed {
-	return embeds[English][artworkSearchWarning].(*BaseEmbed)
+	return embedByType[BaseEmbed](English, artworkSearchWarning)
 }
 
 func AboutEmbed() *About {
-	return embeds[English][about].(*About)
+	return embedByType[About](English, about)
 }
 
 func RepostEmbed() *Repost {
-	return embeds[English][repost].(*Repost)
+	return embedByType[Repost](English, repost)
 }
 
 func SetEmbed() *SetCommand {
-	return embeds[English][set].(*SetCommand)
+	return embedByType[SetCommand](English, set)
 }
 
 func BookmarkAddedEmbed() *BaseEmbed {
-	return embeds[English][bookmarkAdded].(*BaseEmbed)
+	return embedByType[BaseEmbed](English, bookmarkAdded)
 }
 
 func BookmarkRemovedEmbed() *BaseEmbed {
-	return embeds[English][bookmarkRemoved].(*BaseEmbed)
+	return embedByType[BaseEmbed](English, bookmarkRemoved)
 }

@@ -637,9 +637,13 @@ func bookmarks(b *bot.Bot) func(*gumi.Ctx) error {
 		for key, val := range flagsMap {
 			switch key {
 			case flags.FlagTypeOrder:
-				order = val.(store.Order)
+				if o, ok := val.(store.Order); ok {
+					order = o
+				}
 			case flags.FlagTypeMode:
-				mode = val.(store.BookmarkFilter)
+				if m, ok := val.(store.BookmarkFilter); ok {
+					mode = m
+				}
 			}
 		}
 
@@ -679,7 +683,7 @@ func bookmarks(b *bot.Bot) func(*gumi.Ctx) error {
 				break
 			}
 
-			page := artworkToEmbed(artwork, artwork.Images[0], ind, len(bookmarks))
+			page := artworkToEmbed(artwork, firstArtworkImage(artwork), ind, len(bookmarks))
 			page.Fields = append(page.Fields, &discordgo.MessageEmbedField{
 				Name:   "NSFW",
 				Value:  strconv.FormatBool(bookmark.NSFW),
@@ -716,7 +720,11 @@ func bookmarks(b *bot.Bot) func(*gumi.Ctx) error {
 				return err
 			}
 
-			page := artworkToEmbed(artwork, artwork.Images[0], i, len(bookmarks))
+			if artwork == nil {
+				return messages.ErrArtworkNotFound(strconv.Itoa(bookmarks[i].ArtworkID))
+			}
+
+			page := artworkToEmbed(artwork, firstArtworkImage(artwork), i, len(bookmarks))
 			page.Fields = append(page.Fields, &discordgo.MessageEmbedField{
 				Name:   "NSFW",
 				Value:  strconv.FormatBool(bookmarks[i].NSFW),
@@ -875,6 +883,10 @@ func unfav(b *bot.Bot) func(*gumi.Ctx) error {
 				return messages.ErrArtworkNotFound(query)
 			}
 
+			if artwork == nil {
+				return messages.ErrArtworkNotFound(query)
+			}
+
 			id = artwork.ID
 		}
 
@@ -885,6 +897,20 @@ func unfav(b *bot.Bot) func(*gumi.Ctx) error {
 
 		if !deleted {
 			return messages.ErrArtworkNotFound(query)
+		}
+
+		if artwork == nil {
+			artwork, err = b.Store.Artwork(ctx, id, "")
+			if err != nil || artwork == nil {
+				eb := embeds.NewBuilder()
+				locale := messages.BookmarkRemovedEmbed()
+
+				eb.Title(locale.Title).
+					Description(locale.Description).
+					AddField("ID", strconv.Itoa(id), true)
+
+				return gctx.ReplyEmbed(eb.Finalize())
+			}
 		}
 
 		eb := embeds.NewBuilder()
@@ -901,6 +927,14 @@ func unfav(b *bot.Bot) func(*gumi.Ctx) error {
 
 		return gctx.ReplyEmbed(eb.Finalize())
 	}
+}
+
+func firstArtworkImage(artwork *store.Artwork) string {
+	if artwork == nil || len(artwork.Images) == 0 {
+		return ""
+	}
+
+	return artwork.Images[0]
 }
 
 func artworkToEmbed(artwork *store.Artwork, image string, ind, length int) *discordgo.MessageEmbed {
