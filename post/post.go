@@ -7,7 +7,6 @@ import (
 	"reflect"
 	"slices"
 	"sort"
-	"strconv"
 	"strings"
 	"sync"
 
@@ -17,7 +16,7 @@ import (
 	"github.com/VTGare/boe-tea-go/internal/arrays"
 	"github.com/VTGare/boe-tea-go/internal/cache"
 	"github.com/VTGare/boe-tea-go/internal/dgoutils"
-	"github.com/VTGare/boe-tea-go/internal/spool"
+	"github.com/VTGare/boe-tea-go/internal/sender"
 	"github.com/VTGare/boe-tea-go/messages"
 	"github.com/VTGare/boe-tea-go/repost"
 	"github.com/VTGare/boe-tea-go/store"
@@ -39,6 +38,7 @@ const (
 type Post struct {
 	Bot            *bot.Bot
 	Ctx            *gumi.Ctx
+	Sender         sender.Sender
 	Urls           []string
 	Indices        map[int]struct{}
 	SkipMode       SkipMode
@@ -59,10 +59,11 @@ type fetchResults struct {
 	matched  int
 }
 
-func New(bot *bot.Bot, gctx *gumi.Ctx, skip SkipMode, urls ...string) *Post {
+func New(bot *bot.Bot, gctx *gumi.Ctx, s sender.Sender, skip SkipMode, urls ...string) *Post {
 	return &Post{
 		Bot:            bot,
 		Ctx:            gctx,
+		Sender:         s,
 		Urls:           urls,
 		Indices:        make(map[int]struct{}),
 		SkipMode:       skip,
@@ -255,12 +256,7 @@ func (p *Post) fetch(ctx context.Context, guild *store.Guild, channelID string) 
 		results = make(chan fetchResult)
 	)
 
-	var session *discordgo.Session
-	if p.Ctx != nil {
-		session = p.Ctx.Session
-	}
-
-	if ok, err := dgoutils.CanPost(session, channelID, dgoutils.SendPermissions); !ok {
+	if ok, err := p.Sender.HasChannelPerms(guild.ID, channelID, sender.SendPermissions); !ok {
 		log.Warn("skipping fetch, missing send permissions")
 		return fetchResults{}, nil
 	} else if err != nil {
@@ -424,10 +420,8 @@ func (p *Post) handleReposts(guild *store.Guild, reposts []*repost.Repost, match
 	}
 
 	if guild.Repost == store.GuildRepostStrict {
-		perm, err := dgoutils.MemberHasPermission(
-			p.Ctx.Session,
+		perm, err := p.Sender.BotHasGuildPerms(
 			guild.ID,
-			p.Ctx.Session.State.User.ID,
 			discordgo.PermissionAdministrator|discordgo.PermissionManageMessages,
 		)
 		if err != nil {
@@ -440,7 +434,7 @@ func (p *Post) handleReposts(guild *store.Guild, reposts []*repost.Repost, match
 				messageID = p.Ctx.Event.ID
 			)
 
-			if err = p.Ctx.Session.ChannelMessageDelete(channelID, messageID); err != nil {
+			if err := p.Sender.DeleteMessage(guild.ID, channelID, messageID); err != nil {
 				log.With(
 					"channel_id", channelID,
 					"message_id", messageID,
@@ -468,20 +462,20 @@ func (p *Post) handleReposts(guild *store.Guild, reposts []*repost.Repost, match
 		)
 	}
 
-	if ok, err := dgoutils.CanPost(p.Ctx.Session, p.Ctx.Event.ChannelID, dgoutils.SendPermissions); !ok {
+	if ok, err := p.Sender.HasChannelPerms(guild.ID, p.Ctx.Event.ChannelID, sender.SendPermissions); !ok {
 		log.Warn("skipping repost message, missing send permissions")
 		return
 	} else if err != nil {
 		log.With("error", err).Debug("permission lookup failed, attempting send")
 	}
 
-	repostMessage, err := p.Ctx.Session.ChannelMessageSendEmbed(p.Ctx.Event.ChannelID, eb.Finalize())
+	repostMessage, err := p.Sender.SendEmbed(guild.ID, p.Ctx.Event.ChannelID, eb.Finalize())
 	if err != nil {
 		log.With("error", err).Warn("failed to send repost message")
 		return
 	}
 
-	dgoutils.ExpireMessage(p.Bot, p.Ctx.Session, repostMessage)
+	p.Sender.Expire(repostMessage)
 }
 
 func (p *Post) sendMessages(guild *store.Guild, channelID string, artworks []artworks.Artwork) ([]*cache.MessageInfo, error) {
@@ -518,43 +512,13 @@ func (p *Post) sendMessages(guild *store.Guild, channelID string, artworks []art
 			return fmt.Errorf("nil message")
 		}
 
-		s := p.Ctx.Session
-
-		if p.CrosspostMode {
-			guildID, err := strconv.ParseInt(guild.ID, 10, 64)
-			if err != nil {
-				return fmt.Errorf("failed to parse guild id: %w", err)
-			}
-
-			if p.Bot.ShardManager == nil {
-				return fmt.Errorf("shard manager not ready")
-			}
-
-			s = p.Bot.ShardManager.SessionForGuild(guildID)
-			if s == nil {
-				return fmt.Errorf("no session for guild")
-			}
-		}
-
-		if s == nil {
-			return fmt.Errorf("discord session not ready")
-		}
-
-		required := dgoutils.SendPermissions
-		if len(message.Files) > 0 {
-			required |= discordgo.PermissionAttachFiles
-		}
-
-		if ok, err := dgoutils.CanPost(s, channelID, required); !ok {
-			p.Bot.Log.With("guild_id", guild.ID, "channel_id", channelID).Warn("skipping send, missing permissions")
-			return nil
-		} else if err != nil {
-			p.Bot.Log.With("error", err).Debug("permission lookup failed, attempting send")
-		}
-
-		msg, err := s.ChannelMessageSendComplex(channelID, message)
+		msg, err := p.Sender.SendComplex(guild.ID, channelID, message)
 		if err != nil {
-			return fmt.Errorf("failed to send message: %w", err)
+			if errors.Is(err, sender.ErrSkipped) {
+				return nil
+			}
+
+			return err
 		}
 
 		sent = append(sent, &cache.MessageInfo{MessageID: msg.ID, ChannelID: msg.ChannelID, ArtworkID: artworkID})
@@ -596,21 +560,9 @@ func (p *Post) sendMessages(guild *store.Guild, channelID string, artworks []art
 				continue
 			}
 
-			if len(message.Files) > 0 {
-				spool.Acquire()
-			}
-
-			err := sendMessage(message, artworks[i].ID())
-
-			if len(message.Files) > 0 {
-				spool.Release()
-			}
-
-			if err != nil {
+			if err := sendMessage(message, artworks[i].ID()); err != nil {
 				log.With(err).Warn("failed to send artwork message")
 			}
-
-			spool.RemoveFiles(message.Files)
 		}
 	}
 
@@ -754,8 +706,7 @@ func (*Post) handleLimit(allMessages [][]*discordgo.MessageSend, limit int) [][]
 func (p *Post) addBookmarkReactions(msg *discordgo.Message) error {
 	reactions := []string{"💖", "🤤"}
 	for _, reaction := range reactions {
-		err := p.Ctx.Session.MessageReactionAdd(msg.ChannelID, msg.ID, reaction)
-		if err != nil {
+		if err := p.Sender.AddReaction(msg.GuildID, msg.ChannelID, msg.ID, reaction); err != nil {
 			return err
 		}
 	}

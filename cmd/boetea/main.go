@@ -17,6 +17,7 @@ import (
 	"github.com/VTGare/boe-tea-go/handlers"
 	"github.com/VTGare/boe-tea-go/internal/config"
 	"github.com/VTGare/boe-tea-go/internal/logger"
+	"github.com/VTGare/boe-tea-go/internal/sender"
 	"github.com/VTGare/boe-tea-go/internal/spool"
 	"github.com/VTGare/boe-tea-go/repost"
 	"github.com/VTGare/boe-tea-go/store"
@@ -110,6 +111,8 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	b.Sender = sender.NewDiscordSender(b.ShardManager, log, nil)
 
 	b.AddProvider(twitter.New())
 	b.AddProvider(deviant.New())

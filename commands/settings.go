@@ -12,6 +12,7 @@ import (
 	"github.com/VTGare/boe-tea-go/bot"
 	"github.com/VTGare/boe-tea-go/internal/arrays"
 	"github.com/VTGare/boe-tea-go/internal/dgoutils"
+	"github.com/VTGare/boe-tea-go/internal/sender"
 	"github.com/VTGare/boe-tea-go/messages"
 	"github.com/VTGare/boe-tea-go/store"
 	"github.com/VTGare/embeds"
@@ -161,7 +162,8 @@ func set(b *bot.Bot) func(*gumi.Ctx) error {
 				),
 			)
 
-			channels := ternary.If(len(guild.ArtChannels) > 5,
+			channels := ternary.If(
+				len(guild.ArtChannels) > 5,
 				[]string{"There are more than 5 art channels, use `bt!artchannels` command to see them."},
 				arrays.Map(guild.ArtChannels, func(s string) string {
 					return fmt.Sprintf("<#%v> | `%v`", s, s)
@@ -177,11 +179,11 @@ func set(b *bot.Bot) func(*gumi.Ctx) error {
 		}
 
 		changeSetting := func() error {
-			perms, err := dgoutils.MemberHasPermission(
+			perms, err := sender.CheckGuildPerms(
 				gctx.Session,
 				gctx.Event.GuildID,
 				gctx.Event.Author.ID,
-				discordgo.PermissionAdministrator|discordgo.PermissionManageServer,
+				discordgo.PermissionAdministrator|discordgo.PermissionManageGuild,
 			)
 			if err != nil {
 				return err
@@ -436,11 +438,11 @@ func artChannels(b *bot.Bot) func(*gumi.Ctx) error {
 			return wg.Start(gctx.Event.ChannelID)
 
 		case gctx.Args.Len() >= 2:
-			perms, err := dgoutils.MemberHasPermission(
+			perms, err := sender.CheckGuildPerms(
 				gctx.Session,
 				gctx.Event.GuildID,
 				gctx.Event.Author.ID,
-				discordgo.PermissionAdministrator|discordgo.PermissionManageServer,
+				discordgo.PermissionAdministrator|discordgo.PermissionManageGuild,
 			)
 			if err != nil {
 				return err

@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/VTGare/boe-tea-go/bot"
 	"github.com/VTGare/boe-tea-go/messages"
 	"github.com/VTGare/gumi"
 	"github.com/bwmarrin/discordgo"
@@ -45,104 +44,6 @@ func Trimmer(gctx *gumi.Ctx, n int) string {
 // TrimmerRaw is the same as Trimmer but directly on a Raw string.
 func TrimmerRaw(arg string) string {
 	return strings.Trim(arg, "<!@#&>")
-}
-
-// ExpireMessage deletes a specified message after a certain time
-func ExpireMessage(b *bot.Bot, s *discordgo.Session, msg *discordgo.Message, duration ...time.Duration) {
-	expireDuration := time.Second * 15
-	if len(duration) > 0 {
-		expireDuration = duration[0]
-	}
-
-	if msg == nil || s == nil {
-		return
-	}
-
-	go func() {
-		time.Sleep(expireDuration)
-		if s == nil {
-			return
-		}
-
-		err := s.ChannelMessageDelete(msg.ChannelID, msg.ID)
-		if err != nil {
-			log := b.Log.With(
-				"guild_id", msg.GuildID,
-				"channel_id", msg.ChannelID,
-				"message_id", msg.ID,
-				"error", err,
-			)
-
-			log.Warn("failed to expire message")
-		}
-	}()
-}
-
-func MemberHasPermission(s *discordgo.Session, guildID string, userID string, permission int64) (bool, error) {
-	if s == nil || s.State == nil {
-		return false, fmt.Errorf("discord session not ready")
-	}
-
-	member, err := s.State.Member(guildID, userID)
-	if err != nil {
-		if member, err = s.GuildMember(guildID, userID); err != nil {
-			return false, err
-		}
-	}
-
-	if member == nil {
-		return false, fmt.Errorf("failed to get member")
-	}
-
-	for _, roleID := range member.Roles {
-		role, err := s.State.Role(guildID, roleID)
-		if err != nil {
-			return false, err
-		}
-
-		if role == nil {
-			continue
-		}
-
-		if role.Permissions&permission != 0 {
-			return true, nil
-		}
-	}
-
-	g, err := s.Guild(guildID)
-	if err != nil {
-		return false, fmt.Errorf("failed to get guild: %w", err)
-	}
-
-	if g == nil {
-		return false, nil
-	}
-
-	if g.OwnerID == userID {
-		return true, nil
-	}
-
-	return false, nil
-}
-
-const SendPermissions int64 = discordgo.PermissionSendMessages | discordgo.PermissionEmbedLinks
-
-func BotChannelPermissions(s *discordgo.Session, channelID string) (int64, error) {
-	if s == nil || s.State == nil || s.State.User == nil {
-		return 0, fmt.Errorf("discord session not ready")
-	}
-
-	return s.State.UserChannelPermissions(s.State.User.ID, channelID)
-}
-
-// CanPost reports whether the bot holds the given permissions in a channel.
-func CanPost(s *discordgo.Session, channelID string, permissions int64) (bool, error) {
-	perms, err := BotChannelPermissions(s, channelID)
-	if err != nil {
-		return true, err
-	}
-
-	return perms&permissions == permissions, nil
 }
 
 type Range struct {

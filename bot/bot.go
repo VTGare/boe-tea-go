@@ -9,6 +9,7 @@ import (
 	"github.com/VTGare/boe-tea-go/artworks"
 	"github.com/VTGare/boe-tea-go/internal/cache"
 	"github.com/VTGare/boe-tea-go/internal/config"
+	"github.com/VTGare/boe-tea-go/internal/sender"
 	"github.com/VTGare/boe-tea-go/repost"
 	"github.com/VTGare/boe-tea-go/stats"
 	"github.com/VTGare/boe-tea-go/store"
@@ -38,6 +39,7 @@ type Bot struct {
 	Sengoku          *sengoku.Sengoku
 	ArtworkProviders []artworks.Provider
 	RepostDetector   repost.Detector
+	Sender           sender.Sender
 
 	ShardManager *shards.Manager
 	Store        store.Store

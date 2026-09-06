@@ -1,0 +1,174 @@
+package sender
+
+import (
+	"fmt"
+	"sync"
+	"time"
+
+	"github.com/bwmarrin/discordgo"
+)
+
+// SentComplex records one SendComplex call.
+type SentComplex struct {
+	GuildID   string
+	ChannelID string
+	Message   *discordgo.MessageSend
+}
+
+// SentEmbed records one SendEmbed call.
+type SentEmbed struct {
+	GuildID   string
+	ChannelID string
+	Embed     *discordgo.MessageEmbed
+}
+
+// DeletedMessage records one DeleteMessage call.
+type DeletedMessage struct {
+	GuildID   string
+	ChannelID string
+	MessageID string
+}
+
+// AddedReaction records one AddReaction call.
+type AddedReaction struct {
+	GuildID   string
+	ChannelID string
+	MessageID string
+	Emoji     string
+}
+
+// FakeSender is the test Sender adapter. It records every call behind
+// a mutex and answers from its configurable fields. Use NewFake so
+// permission checks default to allowed.
+type FakeSender struct {
+	mu sync.Mutex
+
+	Complex   []SentComplex
+	Embeds    []SentEmbed
+	Deleted   []DeletedMessage
+	Reactions []AddedReaction
+	Expired   []*discordgo.Message
+
+	ChannelPerms    bool
+	ChannelPermsErr error
+	GuildPerms      bool
+	GuildPermsErr   error
+
+	SendErr   error
+	DeleteErr error
+	ReactErr  error
+
+	// Skip makes sends fail with ErrSkipped, exercising the
+	// permission-skip path without touching permission flags.
+	Skip bool
+
+	counter int
+}
+
+// NewFake returns a FakeSender that allows every permission check.
+func NewFake() *FakeSender {
+	return &FakeSender{
+		ChannelPerms: true,
+		GuildPerms:   true,
+	}
+}
+
+func (f *FakeSender) nextMessage(guildID, channelID string) *discordgo.Message {
+	f.counter++
+
+	return &discordgo.Message{
+		ID:        fmt.Sprintf("fake-%d", f.counter),
+		ChannelID: channelID,
+		GuildID:   guildID,
+	}
+}
+
+func (f *FakeSender) SendComplex(guildID, channelID string, message *discordgo.MessageSend) (*discordgo.Message, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	if f.SendErr != nil {
+		return nil, f.SendErr
+	}
+
+	if f.Skip {
+		return nil, ErrSkipped
+	}
+
+	f.Complex = append(f.Complex, SentComplex{
+		GuildID:   guildID,
+		ChannelID: channelID,
+		Message:   message,
+	})
+
+	return f.nextMessage(guildID, channelID), nil
+}
+
+func (f *FakeSender) SendEmbed(guildID, channelID string, embed *discordgo.MessageEmbed) (*discordgo.Message, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	if f.SendErr != nil {
+		return nil, f.SendErr
+	}
+
+	if f.Skip {
+		return nil, ErrSkipped
+	}
+
+	f.Embeds = append(f.Embeds, SentEmbed{
+		GuildID:   guildID,
+		ChannelID: channelID,
+		Embed:     embed,
+	})
+
+	return f.nextMessage(guildID, channelID), nil
+}
+
+func (f *FakeSender) DeleteMessage(guildID, channelID, messageID string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	f.Deleted = append(f.Deleted, DeletedMessage{
+		GuildID:   guildID,
+		ChannelID: channelID,
+		MessageID: messageID,
+	})
+
+	return f.DeleteErr
+}
+
+func (f *FakeSender) AddReaction(guildID, channelID, messageID, emoji string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	f.Reactions = append(f.Reactions, AddedReaction{
+		GuildID:   guildID,
+		ChannelID: channelID,
+		MessageID: messageID,
+		Emoji:     emoji,
+	})
+
+	return f.ReactErr
+}
+
+func (f *FakeSender) HasChannelPerms(_, _ string, _ int64) (bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	return f.ChannelPerms, f.ChannelPermsErr
+}
+
+func (f *FakeSender) BotHasGuildPerms(_ string, _ int64) (bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	return f.GuildPerms, f.GuildPermsErr
+}
+
+func (f *FakeSender) Expire(message *discordgo.Message, _ ...time.Duration) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	f.Expired = append(f.Expired, message)
+}

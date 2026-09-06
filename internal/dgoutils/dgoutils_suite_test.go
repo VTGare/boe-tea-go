@@ -3,6 +3,7 @@ package dgoutils
 import (
 	"testing"
 
+	"github.com/VTGare/boe-tea-go/internal/sender"
 	"github.com/bwmarrin/discordgo"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -41,7 +42,7 @@ var _ = Describe("CanPost", func() {
 	}
 
 	It("allows posting with send and embed permissions", func() {
-		ok, err := CanPost(newSession(nil), channelID, SendPermissions)
+		ok, err := sender.CheckChannelPerms(newSession(nil), channelID, sender.SendPermissions)
 
 		Expect(err).NotTo(HaveOccurred())
 		Expect(ok).To(BeTrue())
@@ -52,7 +53,7 @@ var _ = Describe("CanPost", func() {
 			{ID: guildID, Type: discordgo.PermissionOverwriteTypeRole, Deny: discordgo.PermissionSendMessages},
 		})
 
-		ok, err := CanPost(session, channelID, SendPermissions)
+		ok, err := sender.CheckChannelPerms(session, channelID, sender.SendPermissions)
 
 		Expect(err).NotTo(HaveOccurred())
 		Expect(ok).To(BeFalse())
@@ -63,21 +64,21 @@ var _ = Describe("CanPost", func() {
 			{ID: guildID, Type: discordgo.PermissionOverwriteTypeRole, Deny: discordgo.PermissionAttachFiles},
 		})
 
-		ok, err := CanPost(session, channelID, SendPermissions|discordgo.PermissionAttachFiles)
+		ok, err := sender.CheckChannelPerms(session, channelID, sender.SendPermissions|discordgo.PermissionAttachFiles)
 
 		Expect(err).NotTo(HaveOccurred())
 		Expect(ok).To(BeFalse())
 	})
 
 	It("fails open on unknown channels", func() {
-		ok, err := CanPost(newSession(nil), "missing", SendPermissions)
+		ok, err := sender.CheckChannelPerms(newSession(nil), "missing", sender.SendPermissions)
 
 		Expect(err).To(HaveOccurred())
 		Expect(ok).To(BeTrue())
 	})
 
 	It("fails open without a session", func() {
-		ok, err := CanPost(nil, channelID, SendPermissions)
+		ok, err := sender.CheckChannelPerms(nil, channelID, sender.SendPermissions)
 
 		Expect(err).To(HaveOccurred())
 		Expect(ok).To(BeTrue())

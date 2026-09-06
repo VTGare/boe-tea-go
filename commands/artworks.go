@@ -187,7 +187,7 @@ func share(b *bot.Bot, skip post.SkipMode) func(*gumi.Ctx) error {
 			}
 		}
 
-		p := post.New(b, gctx, skip, url)
+		p := post.New(b, gctx, b.Sender, skip, url)
 		if len(indices) > 0 {
 			p.Indices = indices
 		}
@@ -208,7 +208,7 @@ func crosspostExclude(b *bot.Bot) func(*gumi.Ctx) error {
 		url := dgoutils.Trimmer(gctx, 0)
 		gctx.Args.Remove(0)
 
-		p := post.New(b, gctx, post.SkipModeNone, url)
+		p := post.New(b, gctx, b.Sender, post.SkipModeNone, url)
 		p.ExcludeChannel = true
 
 		ctx, cancel := context.WithTimeout(b.Context, 30*time.Second)

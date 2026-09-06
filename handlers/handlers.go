@@ -14,7 +14,7 @@ import (
 	"github.com/VTGare/boe-tea-go/artworks/twitter"
 	"github.com/VTGare/boe-tea-go/bot"
 	"github.com/VTGare/boe-tea-go/internal/cache"
-	"github.com/VTGare/boe-tea-go/internal/dgoutils"
+	"github.com/VTGare/boe-tea-go/internal/sender"
 	"github.com/VTGare/boe-tea-go/messages"
 	"github.com/VTGare/boe-tea-go/post"
 	"github.com/VTGare/boe-tea-go/repost"
@@ -70,7 +70,8 @@ func OnPanic(b *bot.Bot) func(*gumi.Ctx, any) {
 		fields := []any{"panic", r, "stacktrace", string(debug.Stack())}
 
 		if gctx != nil && gctx.Event != nil && gctx.Event.Message != nil {
-			fields = append(fields,
+			fields = append(
+				fields,
 				"guild_id", gctx.Event.GuildID,
 				"channel_id", gctx.Event.ChannelID,
 				"message_id", gctx.Event.ID,
@@ -119,7 +120,7 @@ func OnMessage(b *bot.Bot) func(*gumi.Ctx) error {
 			return nil
 		}
 
-		p := post.New(b, gctx, post.SkipModeNone, urls...)
+		p := post.New(b, gctx, b.Sender, post.SkipModeNone, urls...)
 		return p.Send(ctx)
 	}
 }
@@ -379,7 +380,7 @@ func OnReactionAdd(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageReacti
 				Router: b.Router,
 			}
 
-			p := post.New(b, gumiCtx, post.SkipModeNone, url)
+			p := post.New(b, gumiCtx, b.Sender, post.SkipModeNone, url)
 			sent := make([]*cache.MessageInfo, 0)
 
 			if user, _ := b.Store.User(ctx, r.UserID); user != nil {
@@ -747,7 +748,7 @@ func OnError(b *bot.Bot) func(*gumi.Ctx, error) {
 		}
 
 		if expiry {
-			dgoutils.ExpireMessage(b, gctx.Session, msg)
+			sender.ExpireMessage(b.Log, gctx.Session, msg)
 		}
 	}
 }
