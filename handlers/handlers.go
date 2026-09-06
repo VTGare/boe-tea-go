@@ -96,15 +96,13 @@ func OnMessage(b *bot.Bot) func(*gumi.Ctx) error {
 		ctx, cancel := context.WithTimeout(b.Context, 30*time.Second)
 		defer cancel()
 
-		guild, err := b.Store.Guild(ctx, gctx.Event.GuildID)
-		if errors.Is(err, store.ErrGuildNotFound) {
-			b.Log.With("guild_id", gctx.Event.GuildID).Info("guild missing from store, creating it")
-
-			guild, err = b.Store.CreateGuild(ctx, gctx.Event.GuildID)
-		}
-
+		guild, created, err := store.GetOrCreateGuild(ctx, b.Store, gctx.Event.GuildID)
 		if err != nil {
 			return err
+		}
+
+		if created {
+			b.Log.With("guild_id", gctx.Event.GuildID).Info("guild missing from store, creating it")
 		}
 
 		if guild == nil {
@@ -148,16 +146,18 @@ func OnGuildCreate(b *bot.Bot) func(*discordgo.Session, *discordgo.GuildCreate) 
 		ctx, cancel := context.WithTimeout(b.Context, 5*time.Second)
 		defer cancel()
 
-		_, err := b.Store.Guild(ctx, g.ID)
-		if errors.Is(err, store.ErrGuildNotFound) {
+		_, created, err := store.GetOrCreateGuild(ctx, b.Store, g.ID)
+		if err != nil {
+			b.Log.With(
+				"error", err,
+				"guild_id", g.ID,
+			).Error("failed to ensure a new guild")
+
+			return
+		}
+
+		if created {
 			b.Log.With("guild", g.Name, "guild_id", g.ID).Info("invited to a new server")
-			_, err := b.Store.CreateGuild(ctx, g.ID)
-			if err != nil {
-				b.Log.With(
-					"error", err,
-					"guild_id", g.ID,
-				).Error("failed to create a new guild")
-			}
 		}
 	}
 }

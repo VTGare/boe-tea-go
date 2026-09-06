@@ -54,9 +54,14 @@ func (g *guildStore) CreateGuild(ctx context.Context, id string) (*store.Guild, 
 
 func (g *guildStore) UpdateGuild(ctx context.Context, guild *store.Guild) (*store.Guild, error) {
 	guild.UpdatedAt = time.Now()
-	_, err := g.col.ReplaceOne(ctx, bson.M{"guild_id": guild.ID}, guild, options.Replace().SetUpsert(false))
+
+	res, err := g.col.ReplaceOne(ctx, bson.M{"guild_id": guild.ID}, guild, options.Replace().SetUpsert(false))
 	if err != nil {
 		return nil, err
+	}
+
+	if res.MatchedCount == 0 {
+		return nil, store.ErrGuildNotFound
 	}
 
 	return guild, nil
@@ -72,6 +77,10 @@ func (g *guildStore) AddArtChannels(ctx context.Context, guildID string, channel
 
 	var guild store.Guild
 	err := res.Decode(&guild)
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return g.Guild(ctx, guildID)
+	}
+
 	if err != nil {
 		return nil, err
 	}
@@ -89,6 +98,10 @@ func (g *guildStore) DeleteArtChannels(ctx context.Context, guildID string, chan
 
 	var guild store.Guild
 	err := res.Decode(&guild)
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return g.Guild(ctx, guildID)
+	}
+
 	if err != nil {
 		return nil, err
 	}

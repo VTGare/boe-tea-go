@@ -4,6 +4,7 @@ vars:
   BINARY_NAME: boetea
   EXPORT_RESULT: '{{.EXPORT_RESULT | default "false"}}'
   POSTGRES_DSN: '{{.POSTGRES_DSN | default "postgres://boetea:test@127.0.0.1:5433/boetea_test?sslmode=disable"}}'
+  MONGO_URI: '{{.MONGO_URI | default "mongodb://127.0.0.1:27018"}}'
 
 tasks:
   default:
@@ -58,11 +59,16 @@ tasks:
   test:integration:
     desc: Run all tests with the integration build tag (spins up docker-compose.test.yml)
     cmds:
-      - docker compose -f docker-compose.test.yml up -d testpg
+      - docker compose -f docker-compose.test.yml up -d testpg testmongo
       - defer: docker compose -f docker-compose.test.yml down -v
       - |
         for i in $(seq 1 60); do
           docker compose -f docker-compose.test.yml exec testpg pg_isready -U boetea -d boetea_test && break
           sleep 2
         done
-      - POSTGRES_DSN='{{.POSTGRES_DSN}}' go test -race -mod vendor -tags integration ./...
+      - |
+        for i in $(seq 1 60); do
+          docker compose -f docker-compose.test.yml exec testmongo mongosh --quiet --eval "db.runCommand({ping: 1})" && break
+          sleep 2
+        done
+      - POSTGRES_DSN='{{.POSTGRES_DSN}}' MONGO_URI='{{.MONGO_URI}}' go test -race -mod vendor -tags integration ./...

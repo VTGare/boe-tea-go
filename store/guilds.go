@@ -2,14 +2,28 @@ package store
 
 import (
 	"context"
+	"errors"
 	"time"
 )
 
 type GuildStore interface {
+	// Guild returns the guild. A miss reports ErrGuildNotFound. An
+	// empty ID returns the DM guild and never misses.
 	Guild(ctx context.Context, guildID string) (*Guild, error)
+
+	// CreateGuild creates the guild with defaults.
 	CreateGuild(ctx context.Context, guildID string) (*Guild, error)
+
+	// UpdateGuild replaces the guild. A missing guild reports
+	// ErrGuildNotFound.
 	UpdateGuild(ctx context.Context, guild *Guild) (*Guild, error)
+
+	// AddArtChannels adds channels, ignoring ones already present. A
+	// missing guild reports ErrGuildNotFound.
 	AddArtChannels(ctx context.Context, guildID string, channels []string) (*Guild, error)
+
+	// DeleteArtChannels removes channels, ignoring ones not present. A
+	// missing guild reports ErrGuildNotFound.
 	DeleteArtChannels(ctx context.Context, guildID string, channels []string) (*Guild, error)
 }
 
@@ -46,6 +60,26 @@ const (
 	GuildRepostDisabled GuildRepost = "disabled"
 	GuildRepostStrict   GuildRepost = "strict"
 )
+
+// GetOrCreateGuild returns the guild, creating it with defaults on
+// ErrGuildNotFound.
+func GetOrCreateGuild(ctx context.Context, s Store, guildID string) (*Guild, bool, error) {
+	guild, err := s.Guild(ctx, guildID)
+	if err == nil {
+		return guild, false, nil
+	}
+
+	if !errors.Is(err, ErrGuildNotFound) {
+		return nil, false, err
+	}
+
+	guild, err = s.CreateGuild(ctx, guildID)
+	if err != nil {
+		return nil, false, err
+	}
+
+	return guild, true, nil
+}
 
 func DefaultGuild(id string) *Guild {
 	return &Guild{

@@ -9,12 +9,17 @@ import (
 	"time"
 
 	"github.com/VTGare/boe-tea-go/store"
+	"github.com/VTGare/boe-tea-go/store/conformance"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
 var testStore store.Store
+
+func init() {
+	conformance.Specs(func() store.Store { return testStore })
+}
 
 func dsn() string {
 	if dsn := os.Getenv("POSTGRES_DSN"); dsn != "" {
