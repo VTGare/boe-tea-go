@@ -4,3 +4,4 @@ services:
         build: .
         network_mode: host
         restart: on-failure
+        mem_limit: 1.5g
