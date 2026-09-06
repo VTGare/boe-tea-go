@@ -125,6 +125,26 @@ func MemberHasPermission(s *discordgo.Session, guildID string, userID string, pe
 	return false, nil
 }
 
+const SendPermissions int64 = discordgo.PermissionSendMessages | discordgo.PermissionEmbedLinks
+
+func BotChannelPermissions(s *discordgo.Session, channelID string) (int64, error) {
+	if s == nil || s.State == nil || s.State.User == nil {
+		return 0, fmt.Errorf("discord session not ready")
+	}
+
+	return s.State.UserChannelPermissions(s.State.User.ID, channelID)
+}
+
+// CanPost reports whether the bot holds the given permissions in a channel.
+func CanPost(s *discordgo.Session, channelID string, permissions int64) (bool, error) {
+	perms, err := BotChannelPermissions(s, channelID)
+	if err != nil {
+		return true, err
+	}
+
+	return perms&permissions == permissions, nil
+}
+
 type Range struct {
 	Low  int
 	High int

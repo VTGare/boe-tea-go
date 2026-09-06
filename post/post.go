@@ -255,6 +255,18 @@ func (p *Post) fetch(ctx context.Context, guild *store.Guild, channelID string) 
 		results = make(chan fetchResult)
 	)
 
+	var session *discordgo.Session
+	if p.Ctx != nil {
+		session = p.Ctx.Session
+	}
+
+	if ok, err := dgoutils.CanPost(session, channelID, dgoutils.SendPermissions); !ok {
+		log.Warn("skipping fetch, missing send permissions")
+		return fetchResults{}, nil
+	} else if err != nil {
+		log.With("error", err).Debug("permission lookup failed, attempting fetch")
+	}
+
 	var wg sync.WaitGroup
 	for index, url := range p.Urls {
 		id, provider := p.Bot.Match(url)
@@ -456,6 +468,13 @@ func (p *Post) handleReposts(guild *store.Guild, reposts []*repost.Repost, match
 		)
 	}
 
+	if ok, err := dgoutils.CanPost(p.Ctx.Session, p.Ctx.Event.ChannelID, dgoutils.SendPermissions); !ok {
+		log.Warn("skipping repost message, missing send permissions")
+		return
+	} else if err != nil {
+		log.With("error", err).Debug("permission lookup failed, attempting send")
+	}
+
 	repostMessage, err := p.Ctx.Session.ChannelMessageSendEmbed(p.Ctx.Event.ChannelID, eb.Finalize())
 	if err != nil {
 		log.With("error", err).Warn("failed to send repost message")
@@ -519,6 +538,18 @@ func (p *Post) sendMessages(guild *store.Guild, channelID string, artworks []art
 
 		if s == nil {
 			return fmt.Errorf("discord session not ready")
+		}
+
+		required := dgoutils.SendPermissions
+		if len(message.Files) > 0 {
+			required |= discordgo.PermissionAttachFiles
+		}
+
+		if ok, err := dgoutils.CanPost(s, channelID, required); !ok {
+			p.Bot.Log.With("guild_id", guild.ID, "channel_id", channelID).Warn("skipping send, missing permissions")
+			return nil
+		} else if err != nil {
+			p.Bot.Log.With("error", err).Debug("permission lookup failed, attempting send")
 		}
 
 		msg, err := s.ChannelMessageSendComplex(channelID, message)
