@@ -74,7 +74,17 @@ func OnMessage(b *bot.Bot) func(*gumi.Ctx) error {
 		defer cancel()
 
 		guild, err := b.Store.Guild(ctx, gctx.Event.GuildID)
-		if err != nil {
+		if errors.Is(err, store.ErrGuildNotFound) {
+			b.Log.With("guild_id", gctx.Event.GuildID).Info("guild missing from store, creating it")
+
+			guild, err = b.Store.CreateGuild(ctx, gctx.Event.GuildID)
+			if err != nil {
+				guild, err = b.Store.Guild(ctx, gctx.Event.GuildID)
+				if err != nil {
+					return err
+				}
+			}
+		} else if err != nil {
 			return err
 		}
 
@@ -116,7 +126,7 @@ func OnGuildCreate(b *bot.Bot) func(*discordgo.Session, *discordgo.GuildCreate) 
 		defer cancel()
 
 		_, err := b.Store.Guild(ctx, g.ID)
-		if errors.Is(err, mongo.ErrNoDocuments) {
+		if errors.Is(err, store.ErrGuildNotFound) {
 			b.Log.With("guild", g.Name, "guild_id", g.ID).Info("invited to a new server")
 			_, err := b.Store.CreateGuild(ctx, g.ID)
 			if err != nil {
@@ -790,9 +800,9 @@ func onDefaultError(b *bot.Bot, gctx *gumi.Ctx, err error) *embeds.Builder {
 			"error", err,
 			"command", gctx.Command.Name,
 			"arguments", gctx.Args.Raw,
-		).Error("failed to execute command due to an unexpected error")
+		).Warn("failed to execute command due to an unexpected error")
 	} else {
-		b.Log.With("error", err).Error("an unexpected error occured")
+		b.Log.With("error", err).Warn("an unexpected error occured")
 	}
 
 	// TODO: breaks sometimes and starts spamming chat. turn on when fixed.

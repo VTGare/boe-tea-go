@@ -15,3 +15,5 @@ type Store interface {
 }
 
 var ErrArtworkNotFound = errors.New("artwork not found")
+
+var ErrGuildNotFound = errors.New("guild not found")

@@ -170,7 +170,9 @@ var _ = Describe("scanGuild", func() {
 		Expect(g.RepostExpiration).To(Equal(24 * time.Hour))
 	})
 
-	It("maps no rows to an error", func() {
-		Expect(scanGuild(&fakeRow{err: pgx.ErrNoRows}, &store.Guild{})).To(HaveOccurred())
+	It("maps no rows to ErrGuildNotFound", func() {
+		err := scanGuild(&fakeRow{err: pgx.ErrNoRows}, &store.Guild{})
+
+		Expect(err).To(MatchError(store.ErrGuildNotFound))
 	})
 })

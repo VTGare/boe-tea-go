@@ -120,7 +120,7 @@ func scanGuild(row guildRow, guild *store.Guild) error {
 		&repost, &repostExpiration, &guild.ArtChannels, &guild.NSFW, &guild.CreatedAt, &guild.UpdatedAt,
 	); err != nil {
 		if err == pgx.ErrNoRows {
-			return fmt.Errorf("guild not found")
+			return store.ErrGuildNotFound
 		}
 
 		return fmt.Errorf("failed to scan guild: %w", err)

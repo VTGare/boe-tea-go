@@ -2,6 +2,7 @@ package mongo
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/VTGare/boe-tea-go/store"
@@ -29,6 +30,9 @@ func (g guildStore) Guild(ctx context.Context, id string) (*store.Guild, error) 
 
 	var guild store.Guild
 	err := res.Decode(&guild)
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return nil, store.ErrGuildNotFound
+	}
 
 	return &guild, err
 }
