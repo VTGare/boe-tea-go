@@ -9,11 +9,7 @@ import (
 	"time"
 
 	"github.com/VTGare/boe-tea-go/artworks"
-	"github.com/VTGare/boe-tea-go/internal/arrays"
-	"github.com/VTGare/boe-tea-go/messages"
 	"github.com/VTGare/boe-tea-go/store"
-	"github.com/VTGare/embeds"
-	"github.com/bwmarrin/discordgo"
 	"github.com/everpcpc/pixiv"
 	"github.com/julien040/go-ternary"
 )
@@ -91,7 +87,8 @@ func (p *Pixiv) Find(id string) (artworks.Artwork, error) {
 			return nil, artworks.ErrArtworkNotFound
 		}
 
-		author := ternary.If(illust.User != nil,
+		author := ternary.If(
+			illust.User != nil,
 			illust.User.Name,
 			"Unknown",
 		)
@@ -103,7 +100,8 @@ func (p *Pixiv) Find(id string) (artworks.Artwork, error) {
 				nsfw = true
 			}
 
-			tags = ternary.If(tag.TranslatedName != "",
+			tags = ternary.If(
+				tag.TranslatedName != "",
 				append(tags, tag.TranslatedName),
 				append(tags, tag.Name),
 			)
@@ -176,65 +174,31 @@ func (a *Artwork) StoreArtwork() *store.Artwork {
 	}
 }
 
-func (a *Artwork) MessageSends(footer string, tagsEnabled bool) ([]*discordgo.MessageSend, error) {
+func (a *Artwork) Render() (artworks.Rendered, error) {
 	if len(a.Images) == 0 {
-		return nil, artworks.ErrArtworkNotFound
+		return artworks.Rendered{}, artworks.ErrArtworkNotFound
 	}
 
-	var (
-		length = len(a.Images)
-		pages  = make([]*discordgo.MessageSend, 0, length)
-		eb     = embeds.NewBuilder()
-	)
+	rendered := artworks.Rendered{
+		Title:           fmt.Sprintf("%v by %v", a.Title, a.Author),
+		URL:             a.url,
+		Timestamp:       a.CreatedAt,
+		Tags:            a.Tags,
+		TagLinkTemplate: "[%v](https://pixiv.net/en/tags/%v/artworks)",
+		Fields: []artworks.RenderedField{
+			{Name: "Likes", Value: strconv.Itoa(a.Likes), Inline: true},
+		},
+		AIGenerated: a.AIGenerated,
+	}
 
-	eb.Title(ternary.If(length > 1,
-		fmt.Sprintf("%v by %v | Page %v / %v", a.Title, a.Author, 1, length),
-		fmt.Sprintf("%v by %v", a.Title, a.Author),
-	))
-
-	if tagsEnabled && len(a.Tags) > 0 {
-		tags := arrays.Map(a.Tags, func(s string) string {
-			return fmt.Sprintf("[%v](https://pixiv.net/en/tags/%v/artworks)", s, s)
+	for _, image := range a.Images {
+		rendered.Images = append(rendered.Images, artworks.RenderedImage{
+			Preview:  image.previewProxy(a.proxy),
+			Original: image.originalProxy(a.proxy),
 		})
-
-		eb.Description(fmt.Sprintf("**Tags**\n%v", strings.Join(tags, " • ")))
 	}
 
-	eb.URL(a.url).
-		AddField("Likes", strconv.Itoa(a.Likes), true).
-		AddField("Original quality", messages.ClickHere(a.Images[0].originalProxy(a.proxy)), true).
-		Timestamp(a.CreatedAt)
-
-	if footer != "" {
-		eb.Footer(footer, "")
-	}
-
-	if a.AIGenerated {
-		eb.AddField("⚠️ Disclaimer", "This artwork is AI-generated.")
-	}
-
-	eb.Image(a.Images[0].previewProxy(a.proxy))
-	pages = append(pages, &discordgo.MessageSend{Embeds: []*discordgo.MessageEmbed{eb.Finalize()}})
-	if length > 1 {
-		for ind, image := range a.Images[1:] {
-			eb := embeds.NewBuilder()
-
-			eb.Title(fmt.Sprintf("%v by %v | Page %v / %v", a.Title, a.Author, ind+2, length))
-			eb.Image(image.previewProxy(a.proxy))
-			eb.URL(a.url).Timestamp(a.CreatedAt)
-
-			if footer != "" {
-				eb.Footer(footer, "")
-			}
-
-			eb.AddField("Likes", strconv.Itoa(a.Likes), true)
-			eb.AddField("Original quality", messages.ClickHere(image.originalProxy(a.proxy)), true)
-
-			pages = append(pages, &discordgo.MessageSend{Embeds: []*discordgo.MessageEmbed{eb.Finalize()}})
-		}
-	}
-
-	return pages, nil
+	return rendered, nil
 }
 
 func (a *Artwork) URL() string {

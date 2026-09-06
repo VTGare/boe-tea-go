@@ -13,8 +13,6 @@ import (
 	"github.com/VTGare/boe-tea-go/artworks"
 	"github.com/VTGare/boe-tea-go/internal/spool"
 	"github.com/VTGare/boe-tea-go/store"
-	"github.com/VTGare/embeds"
-	"github.com/julien040/go-ternary"
 
 	"github.com/bwmarrin/discordgo"
 )
@@ -101,97 +99,66 @@ func (a *Artwork) StoreArtwork() *store.Artwork {
 	}
 }
 
-// MessageSends transforms an artwork to discordgo embeds.
-func (a *Artwork) MessageSends(footer string, _ bool) ([]*discordgo.MessageSend, error) {
-	eb := embeds.NewBuilder()
+// Render returns the artwork as data for the render module.
+func (a *Artwork) Render() (artworks.Rendered, error) {
 	if a.FullName == "" && a.Len() == 0 {
-		eb.Title("❎ Tweet doesn't exist.")
-		eb.Description("The tweet is NSFW or doesn't exist.\n\nUnsafe tweets can't be embedded due to API changes.")
-		eb.Footer(footer, "")
-
-		return []*discordgo.MessageSend{
-			{Embeds: []*discordgo.MessageEmbed{eb.Finalize()}},
+		return artworks.Rendered{
+			Title:       "❎ Tweet doesn't exist.",
+			Description: "The tweet is NSFW or doesn't exist.\n\nUnsafe tweets can't be embedded due to API changes.",
 		}, nil
 	}
 
-	eb.URL(a.Permalink).Description(artworks.EscapeMarkdown(a.Content)).Timestamp(a.Timestamp)
+	rendered := artworks.Rendered{
+		Title:       fmt.Sprintf("%v (%v)", a.FullName, a.Username),
+		URL:         a.Permalink,
+		Timestamp:   a.Timestamp,
+		Description: artworks.EscapeMarkdown(a.Content),
+		AIGenerated: a.AIGenerated,
+	}
 
 	if a.Retweets > 0 {
-		eb.AddField("Retweets", strconv.Itoa(a.Retweets), true)
+		rendered.Fields = append(rendered.Fields, artworks.RenderedField{
+			Name:   "Retweets",
+			Value:  strconv.Itoa(a.Retweets),
+			Inline: true,
+		})
 	}
 
 	if a.Likes > 0 {
-		eb.AddField("Likes", strconv.Itoa(a.Likes), true)
-	}
-
-	if footer != "" {
-		eb.Footer(footer, "")
-	}
-
-	if a.AIGenerated {
-		eb.AddField("⚠️ Disclaimer", "This artwork is AI-generated.")
+		rendered.Fields = append(rendered.Fields, artworks.RenderedField{
+			Name:   "Likes",
+			Value:  strconv.Itoa(a.Likes),
+			Inline: true,
+		})
 	}
 
 	if len(a.Videos) > 0 {
-		return a.videoEmbed(eb)
-	}
+		files := make([]*discordgo.File, 0, len(a.Videos))
+		for _, video := range a.Videos {
+			file, err := downloadVideo(video.URL)
+			if err != nil {
+				spool.RemoveFiles(files)
 
-	length := len(a.Photos)
-	tweets := make([]*discordgo.MessageSend, 0, length)
-	eb.Title(ternary.If(length > 1,
-		fmt.Sprintf("%v (%v) | Page %v / %v", a.FullName, a.Username, 1, length),
-		fmt.Sprintf("%v (%v)", a.FullName, a.Username),
-	))
-
-	if length > 0 {
-		eb.Image(a.Photos[0])
-	}
-
-	tweets = append(tweets, &discordgo.MessageSend{
-		Embeds: []*discordgo.MessageEmbed{eb.Finalize()},
-	})
-
-	if len(a.Photos) > 1 {
-		for ind, photo := range a.Photos[1:] {
-			eb := embeds.NewBuilder()
-
-			eb.Title(fmt.Sprintf("%v (%v) | Page %v / %v", a.FullName, a.Username, ind+2, length)).URL(a.Permalink)
-			eb.Image(photo).Timestamp(a.Timestamp)
-
-			if footer != "" {
-				eb.Footer(footer, "")
+				return artworks.Rendered{}, err
 			}
 
-			tweets = append(tweets, &discordgo.MessageSend{Embeds: []*discordgo.MessageEmbed{eb.Finalize()}})
+			files = append(files, file)
 		}
+
+		rendered.Files = files
+
+		return rendered, nil
 	}
 
-	return tweets, nil
+	for _, photo := range a.Photos {
+		rendered.Images = append(rendered.Images, artworks.RenderedImage{Preview: photo})
+	}
+
+	return rendered, nil
 }
 
 func (a *Artwork) ID() string {
 	return a.id
-}
-
-func (a *Artwork) videoEmbed(eb *embeds.Builder) ([]*discordgo.MessageSend, error) {
-	files := make([]*discordgo.File, 0, len(a.Videos))
-	for _, video := range a.Videos {
-		file, err := downloadVideo(video.URL)
-		if err != nil {
-			spool.RemoveFiles(files)
-			return nil, err
-		}
-
-		files = append(files, file)
-	}
-
-	eb.Title(fmt.Sprintf("%v (%v)", a.FullName, a.Username))
-	msg := &discordgo.MessageSend{
-		Embeds: []*discordgo.MessageEmbed{eb.Finalize()},
-		Files:  files,
-	}
-
-	return []*discordgo.MessageSend{msg}, nil
 }
 
 func downloadVideo(fileURL string) (*discordgo.File, error) {

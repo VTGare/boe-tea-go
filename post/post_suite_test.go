@@ -1,9 +1,11 @@
 package post
 
 import (
+	"strconv"
 	"testing"
 
 	"github.com/VTGare/boe-tea-go/artworks/pixiv"
+	"github.com/VTGare/boe-tea-go/artworks/render"
 	"github.com/VTGare/boe-tea-go/artworks/twitter"
 	"github.com/VTGare/boe-tea-go/store"
 	"github.com/VTGare/gumi"
@@ -22,8 +24,13 @@ func TestPost(t *testing.T) {
 var _ = Describe("Generate Messages Tests", func() {
 	var post Post
 
-	It("", func() {
-		post.generateMessages(nil, nil)
+	It("returns no bundles without artworks", func() {
+		post = Post{Ctx: &gumi.Ctx{Event: &discordgo.MessageCreate{Message: &discordgo.Message{}}}}
+
+		bundles, err := post.generateMessages(&store.Guild{}, nil)
+
+		Expect(err).NotTo(HaveOccurred())
+		Expect(bundles).To(BeEmpty())
 	})
 })
 
@@ -86,36 +93,50 @@ var _ = Describe("Limit Handler Tests", func() {
 		artwork = []*discordgo.MessageSend{{Content: "1"}, {Content: "2"}, {Content: "3"}, {Content: "4"}}
 	)
 
+	bundles := func(sends ...[]*discordgo.MessageSend) []render.Bundle {
+		out := make([]render.Bundle, 0, len(sends))
+		for ind, s := range sends {
+			out = append(out, render.Bundle{ID: strconv.Itoa(ind), Sends: s})
+		}
+
+		return out
+	}
+
 	It("should return the same array if limit not exceeded", func() {
-		result := post.handleLimit([][]*discordgo.MessageSend{artwork}, 4)
-		Expect(result[0]).To(HaveLen(4))
+		result := post.handleLimit(bundles(artwork), 4)
+		Expect(result[0].Sends).To(HaveLen(4))
 	})
 
 	It("should cut over limit if one artwork", func() {
-		result := post.handleLimit([][]*discordgo.MessageSend{artwork}, 2)
-		Expect(result[0]).To(HaveLen(2))
-		Expect(result[0][0].Content).To(
+		result := post.handleLimit(bundles(artwork), 2)
+		Expect(result[0].Sends).To(HaveLen(2))
+		Expect(result[0].Sends[0].Content).To(
 			Equal("Album size `(4)` exceeds the server's limit `(2)`, album has been cut."),
 		)
 	})
 
 	It("should cut all except first page if two artworks", func() {
-		result := post.handleLimit([][]*discordgo.MessageSend{artwork, artwork}, 2)
-		Expect(result).Should(HaveEach(HaveLen(1)))
-		Expect(result[0][0].Content).To(
+		result := post.handleLimit(bundles(artwork, artwork), 2)
+		Expect(result).To(HaveLen(2))
+		Expect(result[0].Sends).To(HaveLen(1))
+		Expect(result[1].Sends).To(HaveLen(1))
+		Expect(result[0].Sends[0].Content).To(
 			Equal("Album size `(8)` exceeds the server's limit `(2)`, only the first image of every artwork has been sent."),
 		)
 	})
 
 	It("should cut all except first page ignoring limit if more than one artwork", func() {
-		result := post.handleLimit([][]*discordgo.MessageSend{artwork, artwork, artwork}, 2)
-		Expect(result).Should(And(
-			HaveEach(HaveLen(1)),
-			HaveLen(3),
-		))
-		Expect(result[0][0].Content).To(
+		result := post.handleLimit(bundles(artwork, artwork, artwork), 2)
+		Expect(result).Should(HaveLen(3))
+		Expect(result[0].Sends[0].Content).To(
 			Equal("Album size `(12)` exceeds the server's limit `(2)`, only the first image of every artwork has been sent."),
 		)
+	})
+
+	It("should keep each bundle ID with its first page", func() {
+		result := post.handleLimit(bundles(artwork, artwork), 2)
+		Expect(result[0].ID).To(Equal("0"))
+		Expect(result[1].ID).To(Equal("1"))
 	})
 })
 

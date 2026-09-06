@@ -11,9 +11,6 @@ import (
 
 	"github.com/VTGare/boe-tea-go/artworks"
 	"github.com/VTGare/boe-tea-go/store"
-	"github.com/VTGare/embeds"
-	"github.com/bwmarrin/discordgo"
-	"github.com/julien040/go-ternary"
 )
 
 type Bluesky struct {
@@ -183,65 +180,39 @@ func (b *Bluesky) Match(url string) (string, bool) {
 	return res[1] + ":" + res[2], true
 }
 
-// MessageSends implements artworks.Artwork.
-func (a *Artwork) MessageSends(footer string, tagsEnabled bool) ([]*discordgo.MessageSend, error) {
-	eb := embeds.NewBuilder()
-	eb.URL(a.url).Timestamp(a.CreatedAt)
+// Render implements artworks.Artwork.
+func (a *Artwork) Render() (artworks.Rendered, error) {
+	rendered := artworks.Rendered{
+		Title:           fmt.Sprintf("%v (%v)", a.AuthorDisplayName, a.AuthorHandle),
+		URL:             a.url,
+		Timestamp:       a.CreatedAt,
+		Description:     artworks.EscapeMarkdown(a.Text),
+		Tags:            a.Tags,
+		TagLinkTemplate: "[%v](https://bsky.app/hashtag/%v)",
+		AIGenerated:     a.AIGenerated,
+	}
 
 	if a.Reposts > 0 {
-		eb.AddField("Reposts", strconv.Itoa(a.Reposts), true)
+		rendered.Fields = append(rendered.Fields, artworks.RenderedField{
+			Name:   "Reposts",
+			Value:  strconv.Itoa(a.Reposts),
+			Inline: true,
+		})
 	}
 
 	if a.Likes > 0 {
-		eb.AddField("Likes", strconv.Itoa(a.Likes), true)
+		rendered.Fields = append(rendered.Fields, artworks.RenderedField{
+			Name:   "Likes",
+			Value:  strconv.Itoa(a.Likes),
+			Inline: true,
+		})
 	}
 
-	if footer != "" {
-		eb.Footer(footer, "")
+	for _, image := range a.Images {
+		rendered.Images = append(rendered.Images, artworks.RenderedImage{Preview: image})
 	}
 
-	if a.AIGenerated {
-		eb.AddField("⚠️ Disclaimer", "This artwork is AI-generated.")
-	}
-
-	length := len(a.Images)
-	posts := make([]*discordgo.MessageSend, 0, length)
-	eb.Title(ternary.If(length > 1,
-		fmt.Sprintf("%v (%v) | Page %v / %v", a.AuthorDisplayName, a.AuthorHandle, 1, length),
-		fmt.Sprintf("%v (%v)", a.AuthorDisplayName, a.AuthorHandle),
-	))
-
-	if length > 0 {
-		eb.Image(a.Images[0])
-	}
-
-	desc := a.Text
-	if tagsEnabled && len(a.Tags) > 0 {
-		desc = fmt.Sprintf("%v\n\n**Tags**\n%v", desc, strings.Join(a.Tags, " • "))
-	}
-
-	eb.Description(desc)
-
-	posts = append(posts, &discordgo.MessageSend{
-		Embeds: []*discordgo.MessageEmbed{eb.Finalize()},
-	})
-
-	if len(a.Images) > 1 {
-		for ind, photo := range a.Images[1:] {
-			eb := embeds.NewBuilder()
-
-			eb.Title(fmt.Sprintf("%v (%v) | Page %v / %v", a.AuthorDisplayName, a.AuthorHandle, ind+2, length)).URL(a.url)
-			eb.Image(photo).Timestamp(a.CreatedAt)
-
-			if footer != "" {
-				eb.Footer(footer, "")
-			}
-
-			posts = append(posts, &discordgo.MessageSend{Embeds: []*discordgo.MessageEmbed{eb.Finalize()}})
-		}
-	}
-
-	return posts, nil
+	return rendered, nil
 }
 
 // ID implements artworks.Artwork.

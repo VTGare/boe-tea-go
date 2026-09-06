@@ -11,6 +11,7 @@ import (
 	"sync"
 
 	"github.com/VTGare/boe-tea-go/artworks"
+	"github.com/VTGare/boe-tea-go/artworks/render"
 	"github.com/VTGare/boe-tea-go/artworks/twitter"
 	"github.com/VTGare/boe-tea-go/bot"
 	"github.com/VTGare/boe-tea-go/internal/arrays"
@@ -484,12 +485,12 @@ func (p *Post) sendMessages(guild *store.Guild, channelID string, artworks []art
 		return sent, nil
 	}
 
-	allMessages, err := p.generateMessages(guild, artworks)
+	bundles, err := p.generateMessages(guild, artworks)
 	if err != nil {
 		return nil, err
 	}
 
-	if len(allMessages) == 0 {
+	if len(bundles) == 0 {
 		return sent, nil
 	}
 
@@ -503,8 +504,8 @@ func (p *Post) sendMessages(guild *store.Guild, channelID string, artworks []art
 	}
 
 	// It only happens from commands so only first artwork should be affected.
-	if len(allMessages) > 0 {
-		allMessages[0] = p.skipArtworks(allMessages[0])
+	if len(bundles) > 0 {
+		bundles[0].Sends = p.skipArtworks(bundles[0].Sends)
 	}
 
 	sendMessage := func(message *discordgo.MessageSend, artworkID string) error {
@@ -535,10 +536,10 @@ func (p *Post) sendMessages(guild *store.Guild, channelID string, artworks []art
 		return nil
 	}
 
-	allMessages = p.handleLimit(allMessages, guild.Limit)
+	bundles = p.handleLimit(bundles, guild.Limit)
 
-	if p.CrosspostMode && len(allMessages) > 0 && len(allMessages[0]) > 0 {
-		first := allMessages[0][0]
+	if p.CrosspostMode && len(bundles) > 0 && len(bundles[0].Sends) > 0 {
+		first := bundles[0].Sends[0]
 		if first != nil && len(first.Embeds) > 0 && first.Embeds[0] != nil {
 			first.Content = first.Embeds[0].URL + "\n" + first.Content
 		}
@@ -550,17 +551,13 @@ func (p *Post) sendMessages(guild *store.Guild, channelID string, artworks []art
 		"crosspost", p.CrosspostMode,
 	)
 
-	for i, messages := range allMessages {
-		if i >= len(artworks) || artworks[i] == nil {
-			continue
-		}
-
-		for _, message := range messages {
+	for _, bundle := range bundles {
+		for _, message := range bundle.Sends {
 			if message == nil {
 				continue
 			}
 
-			if err := sendMessage(message, artworks[i].ID()); err != nil {
+			if err := sendMessage(message, bundle.ID); err != nil {
 				log.With(err).Warn("failed to send artwork message")
 			}
 		}
@@ -569,53 +566,54 @@ func (p *Post) sendMessages(guild *store.Guild, channelID string, artworks []art
 	return sent, nil
 }
 
-func (p *Post) generateMessages(guild *store.Guild, artworks []artworks.Artwork) ([][]*discordgo.MessageSend, error) {
-	messageSends := make([][]*discordgo.MessageSend, 0, len(artworks))
+func (p *Post) generateMessages(guild *store.Guild, artworks []artworks.Artwork) ([]render.Bundle, error) {
+	inputs := make([]render.Input, 0, len(artworks))
 	for _, artwork := range artworks {
-		if artwork != nil {
-			var quote string
-			if guild.FlavorText {
-				quote = p.Bot.Config.RandomQuote(guild.NSFW)
-			}
+		if artwork == nil {
+			continue
+		}
 
-			sends, err := artwork.MessageSends(quote, guild.Tags)
-			if err != nil {
-				return nil, err
-			}
+		var quote string
+		if guild.FlavorText {
+			quote = p.Bot.Config.RandomQuote(guild.NSFW)
+		}
 
-			if p.skipFirst(guild, artwork) && len(sends) > 0 {
-				sends = sends[1:]
-			}
+		rendered, err := artwork.Render()
+		if err != nil {
+			return nil, err
+		}
 
-			for _, msg := range sends {
-				if msg == nil || len(msg.Embeds) == 0 || msg.Embeds[0] == nil {
-					continue
-				}
+		inputs = append(inputs, render.Input{
+			ID:            artwork.ID(),
+			Footer:        quote,
+			Rendered:      rendered,
+			SkipFirstPage: p.skipFirst(guild, artwork),
+		})
+	}
 
-				if p.CrosspostMode {
-					if p.Ctx != nil && p.Ctx.Event != nil && p.Ctx.Event.Author != nil {
-						msg.Embeds[0].Author = &discordgo.MessageEmbedAuthor{
-							Name:    messages.CrosspostBy(p.Ctx.Event.Author.Username),
-							IconURL: p.Ctx.Event.Author.AvatarURL(""),
-						}
-					}
-				} else {
-					msg.AllowedMentions = &discordgo.MessageAllowedMentions{} // disable reference ping.
-					msg.Reference = &discordgo.MessageReference{
-						GuildID:   p.Ctx.Event.GuildID,
-						ChannelID: p.Ctx.Event.ChannelID,
-						MessageID: p.Ctx.Event.ID,
-					}
-				}
-			}
+	return render.Build(inputs, p.renderOptions(guild)), nil
+}
 
-			if len(sends) > 0 {
-				messageSends = append(messageSends, sends)
-			}
+func (p *Post) renderOptions(guild *store.Guild) render.Options {
+	opts := render.Options{
+		TagsEnabled: guild.Tags,
+		Crosspost:   p.CrosspostMode,
+	}
+
+	if p.CrosspostMode {
+		if p.Ctx != nil && p.Ctx.Event != nil && p.Ctx.Event.Author != nil {
+			opts.AuthorName = messages.CrosspostBy(p.Ctx.Event.Author.Username)
+			opts.AuthorIconURL = p.Ctx.Event.Author.AvatarURL("")
+		}
+	} else {
+		opts.Reference = &discordgo.MessageReference{
+			GuildID:   p.Ctx.Event.GuildID,
+			ChannelID: p.Ctx.Event.ChannelID,
+			MessageID: p.Ctx.Event.ID,
 		}
 	}
 
-	return messageSends, nil
+	return opts
 }
 
 func (p *Post) skipArtworks(embeds []*discordgo.MessageSend) []*discordgo.MessageSend {
@@ -667,36 +665,37 @@ func (p *Post) skipFirst(guild *store.Guild, a artworks.Artwork) bool {
 	return true
 }
 
-func (*Post) handleLimit(allMessages [][]*discordgo.MessageSend, limit int) [][]*discordgo.MessageSend {
+func (*Post) handleLimit(bundles []render.Bundle, limit int) []render.Bundle {
 	count := 0
-	for _, messages := range allMessages {
-		count += len(messages)
+	for _, bundle := range bundles {
+		count += len(bundle.Sends)
 	}
 
 	if count <= limit {
-		return allMessages
+		return bundles
 	}
 
-	if len(allMessages) == 0 || len(allMessages[0]) == 0 || allMessages[0][0] == nil {
-		return allMessages
+	if len(bundles) == 0 || len(bundles[0].Sends) == 0 || bundles[0].Sends[0] == nil {
+		return bundles
 	}
 
 	if limit < 0 {
 		limit = 0
 	}
 
-	allMessages[0][0].Content = messages.LimitExceeded(limit, len(allMessages), count)
-	if len(allMessages) == 1 {
-		if limit < len(allMessages[0]) {
-			allMessages[0] = allMessages[0][:limit]
+	bundles[0].Sends[0].Content = messages.LimitExceeded(limit, len(bundles), count)
+	if len(bundles) == 1 {
+		if limit < len(bundles[0].Sends) {
+			bundles[0].Sends = bundles[0].Sends[:limit]
 		}
-		return allMessages
+
+		return bundles
 	}
 
-	filtered := make([][]*discordgo.MessageSend, 0, limit)
-	for _, messages := range allMessages {
-		if len(messages) > 0 {
-			filtered = append(filtered, []*discordgo.MessageSend{messages[0]})
+	filtered := make([]render.Bundle, 0, limit)
+	for _, bundle := range bundles {
+		if len(bundle.Sends) > 0 {
+			filtered = append(filtered, render.Bundle{ID: bundle.ID, Sends: []*discordgo.MessageSend{bundle.Sends[0]}})
 		}
 	}
 

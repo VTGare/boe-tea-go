@@ -18,16 +18,27 @@ import (
 )
 
 type stubArtwork struct {
-	id    string
-	sends []*discordgo.MessageSend
+	id     string
+	images int
 }
 
 func (*stubArtwork) StoreArtwork() *store.Artwork {
 	return &store.Artwork{}
 }
 
-func (s *stubArtwork) MessageSends(_ string, _ bool) ([]*discordgo.MessageSend, error) {
-	return s.sends, nil
+func (s *stubArtwork) Render() (artworks.Rendered, error) {
+	rendered := artworks.Rendered{
+		Title: "Art " + s.id,
+		URL:   "https://example.com/" + s.id,
+	}
+
+	for i := 0; i < s.images; i++ {
+		rendered.Images = append(rendered.Images, artworks.RenderedImage{
+			Preview: "https://example.com/img.png",
+		})
+	}
+
+	return rendered, nil
 }
 
 func (s *stubArtwork) ID() string {
@@ -39,7 +50,7 @@ func (s *stubArtwork) URL() string {
 }
 
 func (s *stubArtwork) Len() int {
-	return len(s.sends)
+	return s.images
 }
 
 func newSenderPost(s sender.Sender) *Post {
@@ -96,26 +107,20 @@ var _ = Describe("SendMessages through Sender", func() {
 		fake = sender.NewFake()
 	})
 
-	artwork := func(id string) artworks.Artwork {
-		return &stubArtwork{
-			id: id,
-			sends: []*discordgo.MessageSend{{
-				Content: "art " + id,
-				Embeds:  []*discordgo.MessageEmbed{{URL: "https://example.com/" + id}},
-			}},
-		}
-	}
-
-	It("records one send per artwork with its artwork ID", func() {
+	It("records one bundle per artwork with its artwork ID", func() {
 		p := newSenderPost(fake)
 
-		sent, err := p.sendMessages(guild, "channel-1", []artworks.Artwork{artwork("a"), artwork("b")})
+		sent, err := p.sendMessages(guild, "channel-1", []artworks.Artwork{
+			&stubArtwork{id: "a", images: 1},
+			&stubArtwork{id: "b", images: 2},
+		})
 
 		Expect(err).NotTo(HaveOccurred())
-		Expect(sent).To(HaveLen(2))
+		Expect(sent).To(HaveLen(3))
 		Expect(sent[0].ArtworkID).To(Equal("a"))
 		Expect(sent[1].ArtworkID).To(Equal("b"))
-		Expect(fake.Complex).To(HaveLen(2))
+		Expect(sent[2].ArtworkID).To(Equal("b"))
+		Expect(fake.Complex).To(HaveLen(3))
 		Expect(fake.Complex[0].ChannelID).To(Equal("channel-1"))
 	})
 
@@ -123,7 +128,9 @@ var _ = Describe("SendMessages through Sender", func() {
 		fake.Skip = true
 		p := newSenderPost(fake)
 
-		sent, err := p.sendMessages(guild, "channel-1", []artworks.Artwork{artwork("a")})
+		sent, err := p.sendMessages(guild, "channel-1", []artworks.Artwork{
+			&stubArtwork{id: "a", images: 1},
+		})
 
 		Expect(err).NotTo(HaveOccurred())
 		Expect(sent).To(BeEmpty())
@@ -135,10 +142,24 @@ var _ = Describe("SendMessages through Sender", func() {
 		guild.Reactions = true
 		defer func() { guild.Reactions = false }()
 
-		_, err := p.sendMessages(guild, "channel-1", []artworks.Artwork{artwork("a")})
+		_, err := p.sendMessages(guild, "channel-1", []artworks.Artwork{
+			&stubArtwork{id: "a", images: 1},
+		})
 
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fake.Reactions).To(HaveLen(2))
+	})
+
+	It("references the triggering message on every page", func() {
+		p := newSenderPost(fake)
+
+		_, err := p.sendMessages(guild, "channel-1", []artworks.Artwork{
+			&stubArtwork{id: "a", images: 1},
+		})
+
+		Expect(err).NotTo(HaveOccurred())
+		Expect(fake.Complex).To(HaveLen(1))
+		Expect(fake.Complex[0].Message.Reference.MessageID).To(Equal("event-1"))
 	})
 })
 
@@ -180,5 +201,24 @@ var _ = Describe("HandleReposts through Sender", func() {
 		Expect(fake.Deleted).To(BeEmpty())
 		Expect(fake.Embeds).To(BeEmpty())
 		Expect(fake.Expired).To(BeEmpty())
+	})
+})
+
+var _ = Describe("GenerateMessages correlation", func() {
+	It("keeps each ID with its own pages without positional coupling", func() {
+		p := newSenderPost(sender.NewFake())
+		guild := &store.Guild{ID: "guild-1"}
+
+		bundles, err := p.generateMessages(guild, []artworks.Artwork{
+			&stubArtwork{id: "a", images: 1},
+			&stubArtwork{id: "b", images: 2},
+		})
+
+		Expect(err).NotTo(HaveOccurred())
+		Expect(bundles).To(HaveLen(2))
+		Expect(bundles[0].ID).To(Equal("a"))
+		Expect(bundles[0].Sends).To(HaveLen(1))
+		Expect(bundles[1].ID).To(Equal("b"))
+		Expect(bundles[1].Sends).To(HaveLen(2))
 	})
 })

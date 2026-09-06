@@ -2,8 +2,10 @@ package artworks
 
 import (
 	"fmt"
-	"mvdan.cc/xurls/v2"
 	"strings"
+	"time"
+
+	"mvdan.cc/xurls/v2"
 
 	"github.com/VTGare/boe-tea-go/store"
 	"github.com/bwmarrin/discordgo"
@@ -17,10 +19,38 @@ type Provider interface {
 
 type Artwork interface {
 	StoreArtwork() *store.Artwork
-	MessageSends(footer string, tags bool) ([]*discordgo.MessageSend, error)
+	Render() (Rendered, error)
 	ID() string
 	URL() string
 	Len() int
+}
+
+// RenderedImage is one page of artwork. A non-empty Original gains an
+// "Original quality" field on its page when rendered.
+type RenderedImage struct {
+	Preview  string
+	Original string
+}
+
+// RenderedField is one stat line on an embed.
+type RenderedField struct {
+	Name   string
+	Value  string
+	Inline bool
+}
+
+// Rendered is the data a Provider hands to the render module.
+type Rendered struct {
+	Title           string
+	URL             string
+	Timestamp       time.Time
+	Images          []RenderedImage
+	Description     string
+	Tags            []string
+	TagLinkTemplate string
+	Fields          []RenderedField
+	Files           []*discordgo.File
+	AIGenerated     bool
 }
 
 func EscapeMarkdown(content string) string {
