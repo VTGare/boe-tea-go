@@ -88,8 +88,23 @@ func (b *Bot) AddHandler(handler any) {
 	b.ShardManager.AddHandler(handler)
 }
 
+// guardedRouterHandler drops malformed gateway events before the router
+// touches them
+func (b *Bot) guardedRouterHandler() func(*discordgo.Session, *discordgo.MessageCreate) {
+	handler := b.Router.Handler()
+
+	return func(s *discordgo.Session, e *discordgo.MessageCreate) {
+		if e == nil || e.Message == nil || e.Message.Author == nil {
+			b.Log.Warn("dropping malformed message event")
+			return
+		}
+
+		handler(s, e)
+	}
+}
+
 func (b *Bot) Start(ctx context.Context) error {
-	b.ShardManager.AddHandler(b.Router.Handler())
+	b.ShardManager.AddHandler(b.guardedRouterHandler())
 
 	b.StartTime = time.Now()
 	b.Stats = stats.New(b.Router, b.ArtworkProviders)

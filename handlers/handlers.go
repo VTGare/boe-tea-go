@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"runtime/debug"
 	"slices"
 	"strconv"
 	"strings"
@@ -45,6 +46,10 @@ func PrefixResolver(b *bot.Bot) func(s *discordgo.Session, m *discordgo.MessageC
 			return defaults
 		}
 
+		if m == nil || m.Message == nil {
+			return defaults
+		}
+
 		ctx, cancel := context.WithTimeout(b.Context, 5*time.Second)
 		defer cancel()
 
@@ -62,13 +67,31 @@ func PrefixResolver(b *bot.Bot) func(s *discordgo.Session, m *discordgo.MessageC
 
 func OnPanic(b *bot.Bot) func(*gumi.Ctx, any) {
 	return func(gctx *gumi.Ctx, r any) {
-		b.Log.Errorf("%v", r)
+		fields := []any{"panic", r, "stacktrace", string(debug.Stack())}
+
+		if gctx != nil && gctx.Event != nil && gctx.Event.Message != nil {
+			fields = append(fields,
+				"guild_id", gctx.Event.GuildID,
+				"channel_id", gctx.Event.ChannelID,
+				"message_id", gctx.Event.ID,
+			)
+		}
+
+		if gctx != nil && gctx.Command != nil {
+			fields = append(fields, "command", gctx.Command.Name)
+		}
+
+		b.Log.With(fields...).Error("recovered from a panic in handler")
 	}
 }
 
 // OnMessage is executed on every message that isn't a command.
 func OnMessage(b *bot.Bot) func(*gumi.Ctx) error {
 	return func(gctx *gumi.Ctx) error {
+		if gctx == nil || gctx.Event == nil || gctx.Event.Message == nil {
+			return nil
+		}
+
 		ctx, cancel := context.WithTimeout(b.Context, 30*time.Second)
 		defer cancel()
 
@@ -117,6 +140,10 @@ func OnReady(b *bot.Bot) func(*discordgo.Session, *discordgo.Ready) {
 // OnGuildCreate loads server configuration on launch and creates new database entries when joining a new server.
 func OnGuildCreate(b *bot.Bot) func(*discordgo.Session, *discordgo.GuildCreate) {
 	return func(s *discordgo.Session, g *discordgo.GuildCreate) {
+		if g == nil || g.Guild == nil {
+			return
+		}
+
 		ctx, cancel := context.WithTimeout(b.Context, 5*time.Second)
 		defer cancel()
 
@@ -137,6 +164,10 @@ func OnGuildCreate(b *bot.Bot) func(*discordgo.Session, *discordgo.GuildCreate) 
 // OnGuildDelete logs guild outages and guilds that kicked the bot out.
 func OnGuildDelete(b *bot.Bot) func(*discordgo.Session, *discordgo.GuildDelete) {
 	return func(s *discordgo.Session, g *discordgo.GuildDelete) {
+		if g == nil || g.Guild == nil {
+			return
+		}
+
 		log := b.Log.With(
 			"guild_id", g.ID,
 		)
@@ -163,7 +194,7 @@ func OnGuildBanAdd(b *bot.Bot) func(*discordgo.Session, *discordgo.GuildBanAdd) 
 
 func OnChannelDelete(b *bot.Bot) func(*discordgo.Session, *discordgo.ChannelDelete) {
 	return func(s *discordgo.Session, ch *discordgo.ChannelDelete) {
-		if ch == nil {
+		if ch == nil || ch.Channel == nil {
 			return
 		}
 
@@ -198,6 +229,10 @@ func OnChannelDelete(b *bot.Bot) func(*discordgo.Session, *discordgo.ChannelDele
 
 func OnMessageRemove(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageDelete) {
 	return func(s *discordgo.Session, m *discordgo.MessageDelete) {
+		if m == nil || m.Message == nil {
+			return
+		}
+
 		log := b.Log.With("channel_id", m.ChannelID, "parent_id", m.ID)
 		msg, ok := b.EmbedCache.Get(
 			m.ChannelID, m.ID,
@@ -855,6 +890,10 @@ func OnNSFW(*bot.Bot) func(*gumi.Ctx) error {
 // OnExecute logs every executed command.
 func OnExecute(b *bot.Bot) func(*gumi.Ctx) error {
 	return func(gctx *gumi.Ctx) error {
+		if gctx == nil || gctx.Command == nil || gctx.Event == nil {
+			return nil
+		}
+
 		b.Log.With("command", gctx.Command.Name, "arguments", gctx.Args.Raw, "guild_id", gctx.Event.GuildID, "channel_id", gctx.Event.ChannelID).Info("executing command")
 
 		b.Stats.IncrementCommand(gctx.Command.Name)
