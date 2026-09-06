@@ -23,7 +23,6 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/julien040/go-ternary"
-	"go.mongodb.org/mongo-driver/v2/mongo"
 	"mvdan.cc/xurls/v2"
 )
 
@@ -78,13 +77,9 @@ func OnMessage(b *bot.Bot) func(*gumi.Ctx) error {
 			b.Log.With("guild_id", gctx.Event.GuildID).Info("guild missing from store, creating it")
 
 			guild, err = b.Store.CreateGuild(ctx, gctx.Event.GuildID)
-			if err != nil {
-				guild, err = b.Store.Guild(ctx, gctx.Event.GuildID)
-				if err != nil {
-					return err
-				}
-			}
-		} else if err != nil {
+		}
+
+		if err != nil {
 			return err
 		}
 
@@ -607,7 +602,7 @@ func OnReactionRemove(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageRea
 
 		artworkDB, err := b.Store.Artwork(ctx, 0, artwork.URL())
 		if err != nil {
-			if !errors.Is(err, mongo.ErrNoDocuments) {
+			if !errors.Is(err, store.ErrArtworkNotFound) {
 				log.With("error", err).Error("failed to find an artwork")
 			}
 

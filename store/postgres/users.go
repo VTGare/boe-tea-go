@@ -213,7 +213,7 @@ func (u *userStore) loadUser(ctx context.Context, userID string) (*store.User, e
 	}
 
 	if user.ID == "" {
-		return nil, fmt.Errorf("user not found")
+		return nil, store.ErrUserNotFound
 	}
 
 	return user, nil

@@ -36,7 +36,8 @@ func (g *guildStore) CreateGuild(ctx context.Context, id string) (*store.Guild, 
 
 	_, err := g.pool.Exec(ctx, `INSERT INTO guilds (id, prefix, pixiv, twitter, deviant, bluesky, tags, flavour_text,
 		crosspost, reactions, skip_first, "limit", repost, repost_expiration, art_channels, nsfw, created_at, updated_at)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)`,
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
+		ON CONFLICT (id) DO NOTHING`,
 		guild.ID, guild.Prefix, guild.Pixiv, guild.Twitter, guild.Deviant, guild.Bluesky, guild.Tags, guild.FlavorText,
 		guild.Crosspost, guild.Reactions, guild.SkipFirst, guild.Limit, string(guild.Repost), int64(guild.RepostExpiration),
 		guild.ArtChannels, guild.NSFW, guild.CreatedAt, guild.UpdatedAt,
@@ -45,7 +46,16 @@ func (g *guildStore) CreateGuild(ctx context.Context, id string) (*store.Guild, 
 		return nil, err
 	}
 
-	return guild, nil
+	row := g.pool.QueryRow(ctx, `SELECT id, prefix, pixiv, twitter, deviant, bluesky, tags, flavour_text,
+		crosspost, reactions, skip_first, "limit", repost, repost_expiration, art_channels, nsfw, created_at, updated_at
+		FROM guilds WHERE id = $1`, id)
+
+	created := &store.Guild{}
+	if err := scanGuild(row, created); err != nil {
+		return nil, err
+	}
+
+	return created, nil
 }
 
 func (g *guildStore) UpdateGuild(ctx context.Context, guild *store.Guild) (*store.Guild, error) {

@@ -20,7 +20,6 @@ import (
 	"github.com/VTGare/gumi"
 	"github.com/bwmarrin/discordgo"
 	"github.com/julien040/go-ternary"
-	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
 // userGroup registers user group commands.
@@ -987,7 +986,7 @@ func handleStoreError(err error, message ...error) error {
 	}
 
 	switch {
-	case errors.Is(err, mongo.ErrNoDocuments):
+	case errors.Is(err, store.ErrUserNotFound):
 		if message != nil {
 			return message[0]
 		}

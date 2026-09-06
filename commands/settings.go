@@ -18,7 +18,6 @@ import (
 	"github.com/VTGare/gumi"
 	"github.com/bwmarrin/discordgo"
 	"github.com/julien040/go-ternary"
-	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
 func settingsGroup(b *bot.Bot) {
@@ -94,7 +93,7 @@ func set(b *bot.Bot) func(*gumi.Ctx) error {
 			guild, err := b.Store.Guild(ctx, gd.ID)
 			if err != nil {
 				switch {
-				case errors.Is(err, mongo.ErrNoDocuments):
+				case errors.Is(err, store.ErrGuildNotFound):
 					return messages.ErrGuildNotFound(err, gctx.Event.GuildID)
 				default:
 					return err
@@ -711,7 +710,7 @@ func removeChannel(b *bot.Bot) func(*gumi.Ctx) error {
 			channels,
 		)
 		if err != nil {
-			if errors.Is(err, mongo.ErrNoDocuments) {
+			if errors.Is(err, store.ErrGuildNotFound) {
 				return messages.RemoveArtChannelFail(channels)
 			}
 

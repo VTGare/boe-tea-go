@@ -2,6 +2,7 @@ package mongo
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/VTGare/boe-tea-go/store"
@@ -147,6 +148,10 @@ func (u *userStore) UpdateUser(ctx context.Context, user *store.User) (*store.Us
 func resDecoder(res *mongo.SingleResult) (*store.User, error) {
 	var user store.User
 	err := res.Decode(&user)
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return nil, store.ErrUserNotFound
+	}
+
 	if err != nil {
 		return nil, err
 	}

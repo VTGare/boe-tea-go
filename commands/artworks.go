@@ -17,7 +17,6 @@ import (
 	"github.com/VTGare/embeds"
 	"github.com/VTGare/gumi"
 	"github.com/bwmarrin/discordgo"
-	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
 func artworksGroup(b *bot.Bot) {
@@ -125,7 +124,7 @@ func artwork(b *bot.Bot) func(*gumi.Ctx) error {
 		artwork, err := b.Store.Artwork(ctx, id, url)
 		if err != nil {
 			switch {
-			case errors.Is(err, mongo.ErrNoDocuments):
+			case errors.Is(err, store.ErrArtworkNotFound):
 				return messages.ErrArtworkNotFound(arg)
 			default:
 				return err

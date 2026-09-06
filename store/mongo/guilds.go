@@ -42,6 +42,10 @@ func (g *guildStore) CreateGuild(ctx context.Context, id string) (*store.Guild, 
 
 	_, err := g.col.InsertOne(ctx, guild)
 	if err != nil {
+		if mongo.IsDuplicateKeyError(err) {
+			return g.Guild(ctx, id)
+		}
+
 		return nil, err
 	}
 
