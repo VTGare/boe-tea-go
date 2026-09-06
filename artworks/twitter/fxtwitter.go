@@ -5,12 +5,16 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"slices"
+	"sort"
 	"strings"
 	"time"
 
 	"github.com/VTGare/boe-tea-go/artworks"
 	"github.com/VTGare/boe-tea-go/internal/arrays"
 )
+
+const maxVideoBytes = 10 * 1024 * 1024
 
 var nonAlphanumericRegex = regexp.MustCompile(`[^\p{L}\p{N} -]+`)
 
@@ -40,18 +44,22 @@ type fxTwitterResponse struct {
 				Type string `json:"type,omitempty"`
 				URL  string `json:"url,omitempty"`
 			} `json:"photos,omitempty"`
-			Videos []struct {
-				Type         string `json:"type,omitempty"`
-				URL          string `json:"url,omitempty"`
-				ThumbnailURL string `json:"thumbnail_url,omitempty"`
-				Variants     []struct {
-					Bitrate     int    `json:"bitrate,omitempty"`
-					ContentType string `json:"content_type,omitempty"`
-					URL         string `json:"url,omitempty"`
-				}
-			} `json:"videos,omitempty"`
+			Videos []fxVideo `json:"videos,omitempty"`
 		} `json:"media,omitempty"`
 	} `json:"tweet,omitempty"`
+}
+
+type fxVideo struct {
+	Type         string           `json:"type,omitempty"`
+	URL          string           `json:"url,omitempty"`
+	ThumbnailURL string           `json:"thumbnail_url,omitempty"`
+	Variants     []fxVideoVariant `json:"variants,omitempty"`
+}
+
+type fxVideoVariant struct {
+	Bitrate     int    `json:"bitrate,omitempty"`
+	ContentType string `json:"content_type,omitempty"`
+	URL         string `json:"url,omitempty"`
 }
 
 func newFxTwitter() artworks.Provider {
@@ -59,6 +67,48 @@ func newFxTwitter() artworks.Provider {
 		twitterMatcher: twitterMatcher{},
 		client:         &http.Client{},
 	}
+}
+
+// pickVariant returns the highest bitrate mp4 variant that fits into
+// maxVideoBytes, verified with a HEAD request. It falls back to the
+// smallest mp4 variant when nothing fits or sizes are unknown, and to
+// the default URL when there are no mp4 variants at all.
+func (fxt *fxTwitter) pickVariant(fallback string, variants []fxVideoVariant) string {
+	mp4 := make([]fxVideoVariant, 0, len(variants))
+	for _, variant := range variants {
+		if variant.ContentType == "video/mp4" {
+			mp4 = append(mp4, variant)
+		}
+	}
+
+	sort.Slice(mp4, func(i, j int) bool { return mp4[i].Bitrate < mp4[j].Bitrate })
+
+	for _, m := range slices.Backward(mp4) {
+		size, err := fxt.contentLength(m.URL)
+		if err != nil || size <= 0 {
+			continue
+		}
+
+		if size <= maxVideoBytes {
+			return m.URL
+		}
+	}
+
+	if len(mp4) > 0 {
+		return mp4[0].URL
+	}
+
+	return fallback
+}
+
+func (fxt *fxTwitter) contentLength(url string) (int64, error) {
+	resp, err := fxt.client.Head(url)
+	if err != nil {
+		return 0, err
+	}
+	defer resp.Body.Close()
+
+	return resp.ContentLength, nil
 }
 
 func (fxt *fxTwitter) Find(id string) (artworks.Artwork, error) {
@@ -86,18 +136,9 @@ func (fxt *fxTwitter) Find(id string) (artworks.Artwork, error) {
 
 	videos := make([]Video, 0, len(fxArtwork.Tweet.Media.Videos))
 	for _, v := range fxArtwork.Tweet.Media.Videos {
-		videoURL := v.URL // default to highest quality url
-
-		// if at least 3 variants exist, pick second best quality to save bandwidth. the slice is sorted by bitrate by default.
-		// first variant is always in m3u streaming format, so we need at least 3 variants to get this.
-		if len(v.Variants) > 2 {
-			secondBest := v.Variants[len(v.Variants)-2]
-			videoURL = secondBest.URL
-		}
-
 		videos = append(videos, Video{
 			Preview: v.ThumbnailURL,
-			URL:     videoURL,
+			URL:     fxt.pickVariant(v.URL, v.Variants),
 		})
 	}
 

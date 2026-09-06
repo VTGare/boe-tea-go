@@ -1,9 +1,8 @@
-package twitter_test
+package twitter
 
 import (
 	"testing"
 
-	"github.com/VTGare/boe-tea-go/artworks/twitter"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -16,7 +15,7 @@ func TestTwitter(t *testing.T) {
 var _ = DescribeTable(
 	"Match Twitter URL",
 	func(url string, expectedID string, expectedResult bool) {
-		provider := twitter.New()
+		provider := New()
 
 		id, ok := provider.Match(url)
 		Expect(id).To(BeEquivalentTo(expectedID))
