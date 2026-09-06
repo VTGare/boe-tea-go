@@ -17,6 +17,7 @@ import (
 	"github.com/VTGare/boe-tea-go/internal/arrays"
 	"github.com/VTGare/boe-tea-go/internal/cache"
 	"github.com/VTGare/boe-tea-go/internal/dgoutils"
+	"github.com/VTGare/boe-tea-go/internal/spool"
 	"github.com/VTGare/boe-tea-go/messages"
 	"github.com/VTGare/boe-tea-go/repost"
 	"github.com/VTGare/boe-tea-go/store"
@@ -564,10 +565,21 @@ func (p *Post) sendMessages(guild *store.Guild, channelID string, artworks []art
 				continue
 			}
 
+			if len(message.Files) > 0 {
+				spool.Acquire()
+			}
+
 			err := sendMessage(message, artworks[i].ID())
+
+			if len(message.Files) > 0 {
+				spool.Release()
+			}
+
 			if err != nil {
 				log.With(err).Warn("failed to send artwork message")
 			}
+
+			spool.RemoveFiles(message.Files)
 		}
 	}
 

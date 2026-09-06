@@ -17,6 +17,7 @@ import (
 	"github.com/VTGare/boe-tea-go/handlers"
 	"github.com/VTGare/boe-tea-go/internal/config"
 	"github.com/VTGare/boe-tea-go/internal/logger"
+	"github.com/VTGare/boe-tea-go/internal/spool"
 	"github.com/VTGare/boe-tea-go/repost"
 	"github.com/VTGare/boe-tea-go/store"
 	"github.com/VTGare/boe-tea-go/store/mongo"
@@ -113,6 +114,8 @@ func main() {
 	b.AddProvider(twitter.New())
 	b.AddProvider(deviant.New())
 	b.AddProvider(bluesky.New())
+
+	spool.Configure(cfg.Media.SpoolConfig())
 
 	if err := pixiv.LoadAuth(cfg.Pixiv.AuthToken, cfg.Pixiv.RefreshToken); err == nil {
 		log.Info("Successfully logged into Pixiv.")

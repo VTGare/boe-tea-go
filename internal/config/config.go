@@ -8,19 +8,22 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/VTGare/boe-tea-go/internal/spool"
 	"github.com/julien040/go-ternary"
 )
 
 // Config is an application configuration struct.
 type Config struct {
-	Discord  *Discord     `json:"discord"`
-	Mongo    *Mongo       `json:"mongo"`
-	Store    *StoreConfig `json:"store"`
-	Repost   *Repost      `json:"repost"`
-	Pixiv    *Pixiv       `json:"pixiv"`
-	SauceNAO string       `json:"saucenao"`
-	Sentry   string       `json:"sentry"`
-	Quotes   []*Quote     `json:"quotes"`
+	Discord    *Discord     `json:"discord"`
+	Mongo      *Mongo       `json:"mongo"`
+	Store      *StoreConfig `json:"store"`
+	Repost     *Repost      `json:"repost"`
+	Pixiv      *Pixiv       `json:"pixiv"`
+	SauceNAO   string       `json:"saucenao"`
+	Encryption string       `json:"encryption"`
+	Sentry     string       `json:"sentry"`
+	Media      *Media       `json:"media"`
+	Quotes     []*Quote     `json:"quotes"`
 
 	safeQuotes []*Quote
 }
@@ -64,6 +67,26 @@ type StoreConfig struct {
 type Repost struct {
 	Type     string `json:"type"`
 	RedisURI string `json:"redis_uri"`
+}
+
+// Media stores media download limits. Every field is optional;
+// zero values select built-in defaults, so the block can be omitted entirely.
+type Media struct {
+	MaxConcurrent int    `json:"max_concurrent"`
+	SpoolDir      string `json:"spool_dir"`
+}
+
+// SpoolConfig converts media limits to a spool config. A nil Media
+// yields a zero config, which selects built-in defaults downstream.
+func (m *Media) SpoolConfig() spool.Config {
+	if m == nil {
+		return spool.Config{}
+	}
+
+	return spool.Config{
+		MaxConcurrent: m.MaxConcurrent,
+		Dir:           m.SpoolDir,
+	}
 }
 
 // Quote is a message shown in Boe Tea's embeds, selected randomly. If empty, footer will always be empty.

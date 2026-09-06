@@ -1,10 +1,8 @@
 package twitter
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -13,6 +11,7 @@ import (
 	"time"
 
 	"github.com/VTGare/boe-tea-go/artworks"
+	"github.com/VTGare/boe-tea-go/internal/spool"
 	"github.com/VTGare/boe-tea-go/store"
 	"github.com/VTGare/embeds"
 	"github.com/julien040/go-ternary"
@@ -179,6 +178,7 @@ func (a *Artwork) videoEmbed(eb *embeds.Builder) ([]*discordgo.MessageSend, erro
 	for _, video := range a.Videos {
 		file, err := downloadVideo(video.URL)
 		if err != nil {
+			spool.RemoveFiles(files)
 			return nil, err
 		}
 
@@ -195,17 +195,14 @@ func (a *Artwork) videoEmbed(eb *embeds.Builder) ([]*discordgo.MessageSend, erro
 }
 
 func downloadVideo(fileURL string) (*discordgo.File, error) {
+	spool.Acquire()
+	defer spool.Release()
+
 	resp, err := http.Get(fileURL)
 	if err != nil {
 		return nil, fmt.Errorf("error downloading twitter video: %w", err)
 	}
-
 	defer resp.Body.Close()
-
-	b, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("error reading twitter video: %w", err)
-	}
 
 	uri, err := url.Parse(fileURL)
 	if err != nil {
@@ -214,9 +211,14 @@ func downloadVideo(fileURL string) (*discordgo.File, error) {
 
 	splits := strings.Split(uri.Path, "/")
 
+	tmp, err := spool.Download("bt-video-*.mp4", resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("error spooling twitter video: %w", err)
+	}
+
 	return &discordgo.File{
 		Name:   splits[len(splits)-1],
-		Reader: bytes.NewReader(b),
+		Reader: tmp,
 	}, nil
 }
 
