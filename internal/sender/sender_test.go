@@ -2,6 +2,7 @@ package sender
 
 import (
 	"errors"
+	"net/http"
 
 	"github.com/bwmarrin/discordgo"
 	. "github.com/onsi/ginkgo/v2"
@@ -10,6 +11,10 @@ import (
 )
 
 var errTestBoom = errors.New("boom")
+
+func restError(status int) error {
+	return &discordgo.RESTError{Response: &http.Response{StatusCode: status}}
+}
 
 const (
 	testGuildID   = "g"
@@ -126,6 +131,51 @@ var _ = Describe("ExpireMessage", func() {
 	It("ignores nil messages and sessions without blocking", func() {
 		ExpireMessage(zap.NewNop().Sugar(), nil, nil)
 		ExpireMessage(zap.NewNop().Sugar(), newTestSession(nil), nil)
+	})
+})
+
+var _ = Describe("isNotFound", func() {
+	It("matches Discord 404s only", func() {
+		Expect(isNotFound(restError(404))).To(BeTrue())
+		Expect(isNotFound(restError(403))).To(BeFalse())
+		Expect(isNotFound(errTestBoom)).To(BeFalse())
+	})
+})
+
+var _ = Describe("FakeSender routing reads", func() {
+	It("answers channel guilds and membership from its maps", func() {
+		fake := NewFake()
+		fake.ChannelGuilds = map[string]string{"c": "g"}
+		fake.Members = map[MemberKey]bool{{GuildID: "g", UserID: "u"}: true}
+
+		guildID, err := fake.ChannelGuildID("hint", "c")
+
+		Expect(err).NotTo(HaveOccurred())
+		Expect(guildID).To(Equal("g"))
+
+		member, err := fake.IsMember("g", "u")
+
+		Expect(err).NotTo(HaveOccurred())
+		Expect(member).To(BeTrue())
+
+		member, err = fake.IsMember("g", "stranger")
+
+		Expect(err).NotTo(HaveOccurred())
+		Expect(member).To(BeFalse())
+	})
+
+	It("errors unknown channels and surfaces read errors", func() {
+		fake := NewFake()
+
+		_, err := fake.ChannelGuildID("hint", "missing")
+
+		Expect(err).To(HaveOccurred())
+
+		fake.MemberErr = errTestBoom
+
+		_, err = fake.IsMember("g", "u")
+
+		Expect(err).To(MatchError(errTestBoom))
 	})
 })
 
@@ -271,5 +321,17 @@ var _ = Describe("DiscordSender", func() {
 	It("ignores nil expiry messages", func() {
 		d := NewDiscordSender(nil, nopLog, nil)
 		d.Expire(nil)
+	})
+
+	It("errors routing reads without any session to resolve", func() {
+		d := NewDiscordSender(nil, nopLog, nil)
+
+		_, err := d.ChannelGuildID("1", "c")
+
+		Expect(err).To(HaveOccurred())
+
+		_, err = d.IsMember("1", "u")
+
+		Expect(err).To(HaveOccurred())
 	})
 })

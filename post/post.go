@@ -176,6 +176,8 @@ func (p *Post) Crosspost(ctx context.Context, userID string, group *store.Group)
 		group.Children = arrays.Remove(group.Children, p.Ctx.Event.Message.ChannelID)
 	}
 
+	p.CrosspostMode = true
+
 	var (
 		wg      = sync.WaitGroup{}
 		msgChan = make(chan []*cache.MessageInfo, len(group.Children))
@@ -191,13 +193,20 @@ func (p *Post) Crosspost(ctx context.Context, userID string, group *store.Group)
 
 		go func(channelID string) {
 			defer wg.Done()
-			ch, err := p.Ctx.Session.Channel(channelID)
+
+			guildID, err := p.Sender.ChannelGuildID(p.Ctx.Event.GuildID, channelID)
 			if err != nil {
 				log.With("error", err).Info("failed to crosspost")
 				return
 			}
 
-			if _, err := p.Ctx.Session.GuildMember(ch.GuildID, userID); err != nil {
+			member, err := p.Sender.IsMember(guildID, userID)
+			if err != nil {
+				log.With("error", err).Info("failed to check membership, keeping crosspost channel")
+				return
+			}
+
+			if !member {
 				log.Debug("member left the server, removing crosspost channel")
 				if _, err := p.Bot.Store.DeleteCrosspostChannel(ctx, userID, group.Name, channelID); err != nil {
 					log.With("error", err).Error("failed to remove a channel from user's group")
@@ -206,15 +215,14 @@ func (p *Post) Crosspost(ctx context.Context, userID string, group *store.Group)
 				return
 			}
 
-			guild, err := p.Bot.Store.Guild(ctx, ch.GuildID)
+			guild, err := p.Bot.Store.Guild(ctx, guildID)
 			if err != nil {
 				log.With("error", err).Info("failed to find guild")
 				return
 			}
 
 			if guild.Crosspost {
-				if len(guild.ArtChannels) == 0 || slices.Contains(guild.ArtChannels, ch.ID) {
-					p.CrosspostMode = true
+				if len(guild.ArtChannels) == 0 || slices.Contains(guild.ArtChannels, channelID) {
 					res, err := p.fetch(ctx, guild, channelID)
 					if err != nil {
 						log.With("error", err).Error("failed to fetch artworks")

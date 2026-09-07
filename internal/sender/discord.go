@@ -188,6 +188,37 @@ func (d *DiscordSender) RemoveAllReactions(guildID, channelID, messageID string)
 	return nil
 }
 
+func (d *DiscordSender) ChannelGuildID(hintGuildID, channelID string) (string, error) {
+	s, err := d.sessionFor(hintGuildID)
+	if err != nil {
+		return "", err
+	}
+
+	channel, err := s.Channel(channelID)
+	if err != nil {
+		return "", fmt.Errorf("failed to get channel: %w", err)
+	}
+
+	return channel.GuildID, nil
+}
+
+func (d *DiscordSender) IsMember(guildID, userID string) (bool, error) {
+	s, err := d.sessionFor(guildID)
+	if err != nil {
+		return false, err
+	}
+
+	if _, err := s.GuildMember(guildID, userID); err != nil {
+		if isNotFound(err) {
+			return false, nil
+		}
+
+		return false, fmt.Errorf("failed to get member: %w", err)
+	}
+
+	return true, nil
+}
+
 func (d *DiscordSender) HasChannelPerms(guildID, channelID string, permissions int64) (bool, error) {
 	s, err := d.sessionFor(guildID)
 	if err != nil {

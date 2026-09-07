@@ -2,6 +2,8 @@ package post
 
 import (
 	"context"
+	"errors"
+	"sync"
 
 	"github.com/VTGare/boe-tea-go/artworks"
 	"github.com/VTGare/boe-tea-go/bot"
@@ -220,5 +222,112 @@ var _ = Describe("GenerateMessages correlation", func() {
 		Expect(bundles[0].Sends).To(HaveLen(1))
 		Expect(bundles[1].ID).To(Equal("b"))
 		Expect(bundles[1].Sends).To(HaveLen(2))
+	})
+})
+
+type deletedChannel struct {
+	user    string
+	group   string
+	channel string
+}
+
+type crosspostStub struct {
+	store.Store
+
+	mu      sync.Mutex
+	user    *store.User
+	deleted []deletedChannel
+}
+
+func (s *crosspostStub) User(_ context.Context, _ string) (*store.User, error) {
+	return s.user, nil
+}
+
+func (*crosspostStub) Guild(_ context.Context, guildID string) (*store.Guild, error) {
+	return &store.Guild{ID: guildID, Crosspost: true}, nil
+}
+
+func (s *crosspostStub) DeleteCrosspostChannel(_ context.Context, userID, group, channel string) (*store.User, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.deleted = append(s.deleted, deletedChannel{user: userID, group: group, channel: channel})
+
+	return s.user, nil
+}
+
+func (s *crosspostStub) deletions() []deletedChannel {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	return append([]deletedChannel(nil), s.deleted...)
+}
+
+func newCrosspostPost(s sender.Sender, backend *crosspostStub) *Post {
+	p := newSenderPost(s)
+	p.Bot.Store = backend
+
+	return p
+}
+
+func crosspostGroup(children ...string) *store.Group {
+	return &store.Group{Name: "g", Parent: "parent", Children: children}
+}
+
+var _ = Describe("Crosspost fan-out", func() {
+	var (
+		fake    *sender.FakeSender
+		backend *crosspostStub
+	)
+
+	BeforeEach(func() {
+		fake = sender.NewFake()
+		fake.ChannelGuilds = map[string]string{"ch1": "g1", "ch2": "g1"}
+		fake.Members = map[sender.MemberKey]bool{{GuildID: "g1", UserID: "u1"}: true}
+
+		backend = &crosspostStub{
+			user: &store.User{ID: "u1"},
+		}
+	})
+
+	It("sends to member channels without touching the group", func() {
+		p := newCrosspostPost(fake, backend)
+
+		sent, err := p.Crosspost(context.Background(), "u1", crosspostGroup("ch1", "ch2"))
+
+		Expect(err).NotTo(HaveOccurred())
+		Expect(sent).To(BeEmpty())
+		Expect(backend.deletions()).To(BeEmpty())
+	})
+
+	It("removes channels the member left", func() {
+		delete(fake.Members, sender.MemberKey{GuildID: "g1", UserID: "u1"})
+		p := newCrosspostPost(fake, backend)
+
+		_, err := p.Crosspost(context.Background(), "u1", crosspostGroup("ch1"))
+
+		Expect(err).NotTo(HaveOccurred())
+		Expect(backend.deletions()).To(HaveLen(1))
+		Expect(backend.deletions()[0].channel).To(Equal("ch1"))
+	})
+
+	It("keeps channels on membership lookup failures", func() {
+		fake.MemberErr = errors.New("boom")
+		p := newCrosspostPost(fake, backend)
+
+		_, err := p.Crosspost(context.Background(), "u1", crosspostGroup("ch1"))
+
+		Expect(err).NotTo(HaveOccurred())
+		Expect(backend.deletions()).To(BeEmpty())
+	})
+
+	It("skips unresolvable channels", func() {
+		fake.ChannelErr = errors.New("boom")
+		p := newCrosspostPost(fake, backend)
+
+		_, err := p.Crosspost(context.Background(), "u1", crosspostGroup("ch1"))
+
+		Expect(err).NotTo(HaveOccurred())
+		Expect(backend.deletions()).To(BeEmpty())
 	})
 })

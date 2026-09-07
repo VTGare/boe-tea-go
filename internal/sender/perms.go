@@ -1,7 +1,9 @@
 package sender
 
 import (
+	"errors"
 	"fmt"
+	"net/http"
 
 	"github.com/bwmarrin/discordgo"
 )
@@ -76,4 +78,13 @@ func CheckGuildPerms(s *discordgo.Session, guildID string, userID string, permis
 	}
 
 	return false, nil
+}
+
+func isNotFound(err error) bool {
+	var restErr *discordgo.RESTError
+	if !errors.As(err, &restErr) {
+		return false
+	}
+
+	return restErr.Response != nil && restErr.Response.StatusCode == http.StatusNotFound
 }

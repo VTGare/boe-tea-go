@@ -43,6 +43,12 @@ type Sender interface {
 	// reaction pagination widget's stop control.
 	RemoveAllReactions(guildID, channelID, messageID string) error
 
+	// ChannelGuildID resolves which guild a channel belongs to.
+	ChannelGuildID(hintGuildID, channelID string) (string, error)
+
+	// IsMember reports whether a user is in a guild.
+	IsMember(guildID, userID string) (bool, error)
+
 	// HasChannelPerms reports whether the bot holds permissions in a
 	// channel.
 	HasChannelPerms(guildID, channelID string, permissions int64) (bool, error)

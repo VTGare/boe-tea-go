@@ -39,6 +39,12 @@ type AddedReaction struct {
 	Emoji     string
 }
 
+// MemberKey identifies one guild membership.
+type MemberKey struct {
+	GuildID string
+	UserID  string
+}
+
 // EditedEmbed records one EditEmbed call.
 type EditedEmbed struct {
 	GuildID   string
@@ -75,6 +81,15 @@ type FakeSender struct {
 	ChannelPermsErr error
 	GuildPerms      bool
 	GuildPermsErr   error
+
+	// ChannelGuilds answers ChannelGuildID lookups. Missing channels
+	// report an error unless ChannelErr is set.
+	ChannelGuilds map[string]string
+	ChannelErr    error
+
+	// Members answers IsMember lookups. Absent keys report non-members.
+	Members   map[MemberKey]bool
+	MemberErr error
 
 	SendErr   error
 	DeleteErr error
@@ -227,6 +242,33 @@ func (f *FakeSender) HasChannelPerms(_, _ string, _ int64) (bool, error) {
 	defer f.mu.Unlock()
 
 	return f.ChannelPerms, f.ChannelPermsErr
+}
+
+func (f *FakeSender) ChannelGuildID(_, channelID string) (string, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	if f.ChannelErr != nil {
+		return "", f.ChannelErr
+	}
+
+	guildID, ok := f.ChannelGuilds[channelID]
+	if !ok {
+		return "", fmt.Errorf("sender: unknown test channel %v", channelID)
+	}
+
+	return guildID, nil
+}
+
+func (f *FakeSender) IsMember(guildID, userID string) (bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	if f.MemberErr != nil {
+		return false, f.MemberErr
+	}
+
+	return f.Members[MemberKey{GuildID: guildID, UserID: userID}], nil
 }
 
 func (f *FakeSender) BotHasGuildPerms(_ string, _ int64) (bool, error) {
