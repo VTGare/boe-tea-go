@@ -31,6 +31,18 @@ type Sender interface {
 	// AddReaction adds a bookmark reaction to a message.
 	AddReaction(guildID, channelID, messageID, emoji string) error
 
+	// EditEmbed replaces a message's embeds, used by the reaction
+	// pagination widget.
+	EditEmbed(guildID, channelID, messageID string, embed *discordgo.MessageEmbed) (*discordgo.Message, error)
+
+	// RemoveReaction removes one user's reaction, used by the reaction
+	// pagination widget.
+	RemoveReaction(guildID, channelID, messageID, emoji, userID string) error
+
+	// RemoveAllReactions clears a message's reactions, used by the
+	// reaction pagination widget's stop control.
+	RemoveAllReactions(guildID, channelID, messageID string) error
+
 	// HasChannelPerms reports whether the bot holds permissions in a
 	// channel.
 	HasChannelPerms(guildID, channelID string, permissions int64) (bool, error)

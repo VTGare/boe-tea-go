@@ -14,6 +14,7 @@ import (
 	"github.com/VTGare/boe-tea-go/commands/flags"
 	"github.com/VTGare/boe-tea-go/internal/arrays"
 	"github.com/VTGare/boe-tea-go/internal/dgoutils"
+	"github.com/VTGare/boe-tea-go/internal/widget"
 	"github.com/VTGare/boe-tea-go/messages"
 	"github.com/VTGare/boe-tea-go/store"
 	"github.com/VTGare/embeds"
@@ -692,8 +693,8 @@ func bookmarks(b *bot.Bot) func(*gumi.Ctx) error {
 			pages[ind] = page
 		}
 
-		wg := dgoutils.NewWidget(gctx.Session, gctx.Event.Author.ID, pages)
-		wg.WithCallback(func(_ dgoutils.WidgetAction, i int) error {
+		wg := widget.New(b.Sender, widget.NewSessionSource(gctx.Session), gctx.Event.GuildID, gctx.Event.Author.ID, pages)
+		wg.WithCallback(func(_ widget.Action, i int) error {
 			ctx := context.WithoutCancel(ctx)
 			if wg.Pages[i] != nil {
 				return nil
@@ -734,7 +735,7 @@ func bookmarks(b *bot.Bot) func(*gumi.Ctx) error {
 			return nil
 		})
 
-		return wg.Start(gctx.Event.ChannelID)
+		return wg.Start(b.Context, gctx.Event.ChannelID)
 	}
 }
 

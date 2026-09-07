@@ -13,6 +13,7 @@ import (
 	"github.com/VTGare/boe-tea-go/internal/arrays"
 	"github.com/VTGare/boe-tea-go/internal/dgoutils"
 	"github.com/VTGare/boe-tea-go/internal/sender"
+	"github.com/VTGare/boe-tea-go/internal/widget"
 	"github.com/VTGare/boe-tea-go/messages"
 	"github.com/VTGare/boe-tea-go/store"
 	"github.com/VTGare/embeds"
@@ -434,8 +435,8 @@ func artChannels(b *bot.Bot) func(*gumi.Ctx) error {
 				channelEmbeds = append(channelEmbeds, eb.Finalize())
 			}
 
-			wg := dgoutils.NewWidget(gctx.Session, gctx.Event.Author.ID, channelEmbeds)
-			return wg.Start(gctx.Event.ChannelID)
+			wg := widget.New(b.Sender, widget.NewSessionSource(gctx.Session), gctx.Event.GuildID, gctx.Event.Author.ID, channelEmbeds)
+			return wg.Start(b.Context, gctx.Event.ChannelID)
 
 		case gctx.Args.Len() >= 2:
 			perms, err := sender.CheckGuildPerms(

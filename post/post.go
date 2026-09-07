@@ -519,7 +519,7 @@ func (p *Post) sendMessages(guild *store.Guild, channelID string, artworks []art
 				return nil
 			}
 
-			return err
+			return &Error{Kind: classify(err), Cause: err}
 		}
 
 		sent = append(sent, &cache.MessageInfo{MessageID: msg.ID, ChannelID: msg.ChannelID, ArtworkID: artworkID})
@@ -529,7 +529,9 @@ func (p *Post) sendMessages(guild *store.Guild, channelID string, artworks []art
 		if guild.Reactions && len(message.Embeds) > 0 && message.Embeds[0] != nil && message.Embeds[0].URL != "" && mediaCount != 0 {
 			err := p.addBookmarkReactions(msg)
 			if err != nil && !strings.Contains(err.Error(), "403") {
-				return fmt.Errorf("failed to add reactions: %w", err)
+				wrapped := fmt.Errorf("failed to add reactions: %w", err)
+
+				return &Error{Kind: classify(wrapped), Cause: wrapped}
 			}
 		}
 
@@ -558,6 +560,12 @@ func (p *Post) sendMessages(guild *store.Guild, channelID string, artworks []art
 			}
 
 			if err := sendMessage(message, bundle.ID); err != nil {
+				if postErr, ok := errors.AsType[*Error](err); ok && postErr.Kind == KindNoPerms {
+					log.With("channel_id", channelID).Debug("skipping send, missing permissions")
+
+					continue
+				}
+
 				log.With(err).Warn("failed to send artwork message")
 			}
 		}

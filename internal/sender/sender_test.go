@@ -198,6 +198,22 @@ var _ = Describe("FakeSender", func() {
 		Expect(fake.Reactions[0].Emoji).To(Equal("💖"))
 		Expect(fake.Expired).To(HaveLen(1))
 	})
+
+	It("records embed edits and reaction removals", func() {
+		edited, err := fake.EditEmbed("g", "c", "m", &discordgo.MessageEmbed{Title: "two"})
+
+		Expect(err).NotTo(HaveOccurred())
+		Expect(edited).NotTo(BeNil())
+		Expect(fake.Edited).To(HaveLen(1))
+		Expect(fake.Edited[0].Embed.Title).To(Equal("two"))
+
+		Expect(fake.RemoveReaction("g", "c", "m", "▶", "u")).To(Succeed())
+		Expect(fake.Unreacted).To(HaveLen(1))
+		Expect(fake.Unreacted[0].UserID).To(Equal("u"))
+
+		Expect(fake.RemoveAllReactions("g", "c", "m")).To(Succeed())
+		Expect(fake.Cleared).To(HaveLen(1))
+	})
 })
 
 var _ = Describe("DiscordSender", func() {
@@ -215,6 +231,12 @@ var _ = Describe("DiscordSender", func() {
 		Expect(err).To(HaveOccurred())
 		Expect(d.DeleteMessage("1", "c", "m")).NotTo(Succeed())
 		Expect(d.AddReaction("1", "c", "m", "💖")).NotTo(Succeed())
+
+		_, err = d.EditEmbed("1", "c", "m", &discordgo.MessageEmbed{})
+
+		Expect(err).To(HaveOccurred())
+		Expect(d.RemoveReaction("1", "c", "m", "▶", "u")).NotTo(Succeed())
+		Expect(d.RemoveAllReactions("1", "c", "m")).NotTo(Succeed())
 	})
 
 	It("fails open on channel permission checks without a session", func() {

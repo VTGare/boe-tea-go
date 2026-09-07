@@ -144,6 +144,50 @@ func (d *DiscordSender) AddReaction(guildID, channelID, messageID, emoji string)
 	return nil
 }
 
+func (d *DiscordSender) EditEmbed(guildID, channelID, messageID string, embed *discordgo.MessageEmbed) (*discordgo.Message, error) {
+	s, err := d.sessionFor(guildID)
+	if err != nil {
+		return nil, err
+	}
+
+	msg, err := s.ChannelMessageEditEmbed(channelID, messageID, embed)
+	if err != nil {
+		return nil, fmt.Errorf("failed to edit message: %w", err)
+	}
+
+	if msg.GuildID == "" {
+		msg.GuildID = guildID
+	}
+
+	return msg, nil
+}
+
+func (d *DiscordSender) RemoveReaction(guildID, channelID, messageID, emoji, userID string) error {
+	s, err := d.sessionFor(guildID)
+	if err != nil {
+		return err
+	}
+
+	if err := s.MessageReactionRemove(channelID, messageID, emoji, userID); err != nil {
+		return fmt.Errorf("failed to remove reaction: %w", err)
+	}
+
+	return nil
+}
+
+func (d *DiscordSender) RemoveAllReactions(guildID, channelID, messageID string) error {
+	s, err := d.sessionFor(guildID)
+	if err != nil {
+		return err
+	}
+
+	if err := s.MessageReactionsRemoveAll(channelID, messageID); err != nil {
+		return fmt.Errorf("failed to remove reactions: %w", err)
+	}
+
+	return nil
+}
+
 func (d *DiscordSender) HasChannelPerms(guildID, channelID string, permissions int64) (bool, error) {
 	s, err := d.sessionFor(guildID)
 	if err != nil {

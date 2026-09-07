@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/VTGare/boe-tea-go/bot"
-	"github.com/VTGare/boe-tea-go/internal/dgoutils"
+	"github.com/VTGare/boe-tea-go/internal/widget"
 	"github.com/VTGare/boe-tea-go/messages"
 	"github.com/VTGare/embeds"
 	"github.com/VTGare/gumi"
@@ -22,7 +22,7 @@ import (
 var (
 	imageRegex      = regexp.MustCompile(`(?i)^https?://(?:[a-z0-9\-]+\.)+[a-z]{2,6}(?:/[^/#?]+)+\.(?:jpe?g|gif|png|webp)`)
 	messageRefRegex = regexp.MustCompile(`(?i)http(?:s)?:\/\/(?:www\.)?discord(?:app)?.com\/channels\/\d+\/(\d+)\/(\d+)`)
-	pximgRegex = regexp.MustCompile(`(?i)https?://i\.pximg\.net/.+?/(\d+)(?:_p\d+)?(?:\.[a-z]+)?(?:$|[?#])`)
+	pximgRegex      = regexp.MustCompile(`(?i)https?://i\.pximg\.net/.+?/(\d+)(?:_p\d+)?(?:\.[a-z]+)?(?:$|[?#])`)
 )
 
 func sourceGroup(b *bot.Bot) {
@@ -75,8 +75,8 @@ func sauce(b *bot.Bot) func(*gumi.Ctx) error {
 		}
 
 		sauceEmbeds := sauceNAOEmbeds(filtered)
-		widget := dgoutils.NewWidget(gctx.Session, gctx.Event.Author.ID, sauceEmbeds)
-		return widget.Start(gctx.Event.ChannelID)
+		wg := widget.New(b.Sender, widget.NewSessionSource(gctx.Session), gctx.Event.GuildID, gctx.Event.Author.ID, sauceEmbeds)
+		return wg.Start(b.Context, gctx.Event.ChannelID)
 	}
 }
 

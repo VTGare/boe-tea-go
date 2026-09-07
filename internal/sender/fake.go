@@ -13,6 +13,7 @@ type SentComplex struct {
 	GuildID   string
 	ChannelID string
 	Message   *discordgo.MessageSend
+	Sent      *discordgo.Message
 }
 
 // SentEmbed records one SendEmbed call.
@@ -20,6 +21,7 @@ type SentEmbed struct {
 	GuildID   string
 	ChannelID string
 	Embed     *discordgo.MessageEmbed
+	Sent      *discordgo.Message
 }
 
 // DeletedMessage records one DeleteMessage call.
@@ -37,6 +39,23 @@ type AddedReaction struct {
 	Emoji     string
 }
 
+// EditedEmbed records one EditEmbed call.
+type EditedEmbed struct {
+	GuildID   string
+	ChannelID string
+	MessageID string
+	Embed     *discordgo.MessageEmbed
+}
+
+// RemovedReaction records one RemoveReaction call.
+type RemovedReaction struct {
+	GuildID   string
+	ChannelID string
+	MessageID string
+	Emoji     string
+	UserID    string
+}
+
 // FakeSender is the test Sender adapter. It records every call behind
 // a mutex and answers from its configurable fields. Use NewFake so
 // permission checks default to allowed.
@@ -47,6 +66,9 @@ type FakeSender struct {
 	Embeds    []SentEmbed
 	Deleted   []DeletedMessage
 	Reactions []AddedReaction
+	Edited    []EditedEmbed
+	Unreacted []RemovedReaction
+	Cleared   []DeletedMessage
 	Expired   []*discordgo.Message
 
 	ChannelPerms    bool
@@ -99,9 +121,10 @@ func (f *FakeSender) SendComplex(guildID, channelID string, message *discordgo.M
 		GuildID:   guildID,
 		ChannelID: channelID,
 		Message:   message,
+		Sent:      f.nextMessage(guildID, channelID),
 	})
 
-	return f.nextMessage(guildID, channelID), nil
+	return f.Complex[len(f.Complex)-1].Sent, nil
 }
 
 func (f *FakeSender) SendEmbed(guildID, channelID string, embed *discordgo.MessageEmbed) (*discordgo.Message, error) {
@@ -120,9 +143,10 @@ func (f *FakeSender) SendEmbed(guildID, channelID string, embed *discordgo.Messa
 		GuildID:   guildID,
 		ChannelID: channelID,
 		Embed:     embed,
+		Sent:      f.nextMessage(guildID, channelID),
 	})
 
-	return f.nextMessage(guildID, channelID), nil
+	return f.Embeds[len(f.Embeds)-1].Sent, nil
 }
 
 func (f *FakeSender) DeleteMessage(guildID, channelID, messageID string) error {
@@ -152,6 +176,52 @@ func (f *FakeSender) AddReaction(guildID, channelID, messageID, emoji string) er
 	return f.ReactErr
 }
 
+func (f *FakeSender) EditEmbed(guildID, channelID, messageID string, embed *discordgo.MessageEmbed) (*discordgo.Message, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	if f.SendErr != nil {
+		return nil, f.SendErr
+	}
+
+	f.Edited = append(f.Edited, EditedEmbed{
+		GuildID:   guildID,
+		ChannelID: channelID,
+		MessageID: messageID,
+		Embed:     embed,
+	})
+
+	return f.nextMessage(guildID, channelID), nil
+}
+
+func (f *FakeSender) RemoveReaction(guildID, channelID, messageID, emoji, userID string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	f.Unreacted = append(f.Unreacted, RemovedReaction{
+		GuildID:   guildID,
+		ChannelID: channelID,
+		MessageID: messageID,
+		Emoji:     emoji,
+		UserID:    userID,
+	})
+
+	return f.ReactErr
+}
+
+func (f *FakeSender) RemoveAllReactions(guildID, channelID, messageID string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	f.Cleared = append(f.Cleared, DeletedMessage{
+		GuildID:   guildID,
+		ChannelID: channelID,
+		MessageID: messageID,
+	})
+
+	return f.ReactErr
+}
+
 func (f *FakeSender) HasChannelPerms(_, _ string, _ int64) (bool, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -171,4 +241,52 @@ func (f *FakeSender) Expire(message *discordgo.Message, _ ...time.Duration) {
 	defer f.mu.Unlock()
 
 	f.Expired = append(f.Expired, message)
+}
+
+// ReactionsAdded returns a copy of the recorded AddReaction calls.
+func (f *FakeSender) ReactionsAdded() []AddedReaction {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	return append([]AddedReaction(nil), f.Reactions...)
+}
+
+// EmbedsSent returns a copy of the recorded SendEmbed calls.
+func (f *FakeSender) EmbedsSent() []SentEmbed {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	return append([]SentEmbed(nil), f.Embeds...)
+}
+
+// ComplexSent returns a copy of the recorded SendComplex calls.
+func (f *FakeSender) ComplexSent() []SentComplex {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	return append([]SentComplex(nil), f.Complex...)
+}
+
+// EmbedsEdited returns a copy of the recorded EditEmbed calls.
+func (f *FakeSender) EmbedsEdited() []EditedEmbed {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	return append([]EditedEmbed(nil), f.Edited...)
+}
+
+// ReactionsRemoved returns a copy of the recorded RemoveReaction calls.
+func (f *FakeSender) ReactionsRemoved() []RemovedReaction {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	return append([]RemovedReaction(nil), f.Unreacted...)
+}
+
+// ReactionsCleared returns a copy of the recorded RemoveAllReactions calls.
+func (f *FakeSender) ReactionsCleared() []DeletedMessage {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	return append([]DeletedMessage(nil), f.Cleared...)
 }

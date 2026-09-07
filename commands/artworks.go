@@ -11,6 +11,7 @@ import (
 	"github.com/VTGare/boe-tea-go/bot"
 	"github.com/VTGare/boe-tea-go/commands/flags"
 	"github.com/VTGare/boe-tea-go/internal/dgoutils"
+	"github.com/VTGare/boe-tea-go/internal/widget"
 	"github.com/VTGare/boe-tea-go/messages"
 	"github.com/VTGare/boe-tea-go/post"
 	"github.com/VTGare/boe-tea-go/store"
@@ -142,8 +143,8 @@ func artwork(b *bot.Bot) func(*gumi.Ctx) error {
 			embeds = append(embeds, embed)
 		}
 
-		widget := dgoutils.NewWidget(gctx.Session, gctx.Event.Author.ID, embeds)
-		return widget.Start(gctx.Event.ChannelID)
+		wg := widget.New(b.Sender, widget.NewSessionSource(gctx.Session), gctx.Event.GuildID, gctx.Event.Author.ID, embeds)
+		return wg.Start(b.Context, gctx.Event.ChannelID)
 	}
 }
 
@@ -289,8 +290,8 @@ func leaderboard(b *bot.Bot) func(*gumi.Ctx) error {
 			artworkEmbeds = append(artworkEmbeds, artworkToEmbed(artwork, firstArtworkImage(artwork), ind, len(artworks)))
 		}
 
-		wg := dgoutils.NewWidget(gctx.Session, gctx.Event.Author.ID, artworkEmbeds)
-		return wg.Start(gctx.Event.ChannelID)
+		wg := widget.New(b.Sender, widget.NewSessionSource(gctx.Session), gctx.Event.GuildID, gctx.Event.Author.ID, artworkEmbeds)
+		return wg.Start(b.Context, gctx.Event.ChannelID)
 	}
 }
 
@@ -390,7 +391,7 @@ func search(b *bot.Bot) func(*gumi.Ctx) error {
 			artworkEmbeds = append(artworkEmbeds, artworkToEmbed(artwork, firstArtworkImage(artwork), ind, len(artworks)))
 		}
 
-		wg := dgoutils.NewWidget(gctx.Session, gctx.Event.Author.ID, artworkEmbeds)
-		return wg.Start(gctx.Event.ChannelID)
+		wg := widget.New(b.Sender, widget.NewSessionSource(gctx.Session), gctx.Event.GuildID, gctx.Event.Author.ID, artworkEmbeds)
+		return wg.Start(b.Context, gctx.Event.ChannelID)
 	}
 }
