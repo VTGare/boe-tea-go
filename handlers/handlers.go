@@ -13,7 +13,6 @@ import (
 	"github.com/VTGare/boe-tea-go/artworks"
 	"github.com/VTGare/boe-tea-go/artworks/twitter"
 	"github.com/VTGare/boe-tea-go/bot"
-	"github.com/VTGare/boe-tea-go/internal/cache"
 	"github.com/VTGare/boe-tea-go/internal/sender"
 	"github.com/VTGare/boe-tea-go/messages"
 	"github.com/VTGare/boe-tea-go/post"
@@ -118,8 +117,17 @@ func OnMessage(b *bot.Bot) func(*gumi.Ctx) error {
 			return nil
 		}
 
-		p := post.New(b, gctx, b.Sender, post.SkipModeNone, urls...)
-		return p.Send(ctx)
+		p := post.NewPoster(post.DepsFromBot(b))
+		run := post.RunFromEvent(gctx, urls)
+
+		sent, err := p.Send(ctx, run)
+		if err != nil {
+			return err
+		}
+
+		post.CacheResult(b.EmbedCache, run.AuthorID, run.ChannelID, run.MessageID, sent)
+
+		return nil
 	}
 }
 
@@ -380,21 +388,17 @@ func OnReactionAdd(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageReacti
 				Router: b.Router,
 			}
 
-			p := post.New(b, gumiCtx, b.Sender, post.SkipModeNone, url)
-			sent := make([]*cache.MessageInfo, 0)
+			p := post.NewPoster(post.DepsFromBot(b))
+			run := post.RunFromEvent(gumiCtx, []string{url})
 
 			if user, _ := b.Store.User(ctx, r.UserID); user != nil {
 				if group, ok := user.FindGroup(r.ChannelID); ok {
-					if sent, err = p.Crosspost(ctx, user.ID, group); err != nil {
+					sent, err := p.Crosspost(ctx, run, user.ID, group)
+					if err != nil {
 						return err
 					}
-				}
-			}
 
-			if len(sent) > 0 {
-				b.EmbedCache.Set(r.UserID, r.ChannelID, r.MessageID, true, sent...)
-				for _, msg := range sent {
-					b.EmbedCache.Set(r.UserID, msg.ChannelID, msg.MessageID, false)
+					post.CacheResult(b.EmbedCache, r.UserID, r.ChannelID, r.MessageID, sent)
 				}
 			}
 

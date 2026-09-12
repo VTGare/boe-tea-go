@@ -13,9 +13,7 @@ type Kind int
 const (
 	KindUnknown Kind = iota
 
-	// KindNoPerms marks failures from missing channel permissions.
 	KindNoPerms
-	// KindTransient marks network and remote failures.
 	KindTransient
 )
 
@@ -30,6 +28,20 @@ func (e *Error) Error() string {
 
 func (e *Error) Unwrap() error {
 	return e.Cause
+}
+
+// renderError marks a fatal artwork-render failure. Unlike per-message
+// send failures it aborts the run instead of joining and continuing.
+type renderError struct {
+	err error
+}
+
+func (e *renderError) Error() string {
+	return e.err.Error()
+}
+
+func (e *renderError) Unwrap() error {
+	return e.err
 }
 
 func classify(err error) Kind {

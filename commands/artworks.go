@@ -188,15 +188,21 @@ func share(b *bot.Bot, skip post.SkipMode) func(*gumi.Ctx) error {
 			}
 		}
 
-		p := post.New(b, gctx, b.Sender, skip, url)
-		if len(indices) > 0 {
-			p.Indices = indices
-		}
+		p := post.NewPoster(post.DepsFromBot(b))
+		run := post.RunFromEvent(gctx, []string{url})
+		run.Skip = post.SkipFilter{Mode: skip, Indices: indices}
 
 		ctx, cancel := context.WithTimeout(b.Context, 30*time.Second)
 		defer cancel()
 
-		return p.Send(ctx)
+		sent, err := p.Send(ctx, run)
+		if err != nil {
+			return err
+		}
+
+		post.CacheResult(b.EmbedCache, run.AuthorID, run.ChannelID, run.MessageID, sent)
+
+		return nil
 	}
 }
 
@@ -209,13 +215,24 @@ func crosspostExclude(b *bot.Bot) func(*gumi.Ctx) error {
 		url := dgoutils.Trimmer(gctx, 0)
 		gctx.Args.Remove(0)
 
-		p := post.New(b, gctx, b.Sender, post.SkipModeNone, url)
-		p.ExcludeChannel = true
+		p := post.NewPoster(post.DepsFromBot(b))
+		run := post.RunFromEvent(gctx, []string{url})
+
+		for arg := range strings.FieldsSeq(gctx.Args.Raw) {
+			run.ExcludedChannels = append(run.ExcludedChannels, dgoutils.TrimmerRaw(arg))
+		}
 
 		ctx, cancel := context.WithTimeout(b.Context, 30*time.Second)
 		defer cancel()
 
-		return p.Send(ctx)
+		sent, err := p.Send(ctx, run)
+		if err != nil {
+			return err
+		}
+
+		post.CacheResult(b.EmbedCache, run.AuthorID, run.ChannelID, run.MessageID, sent)
+
+		return nil
 	}
 }
 
