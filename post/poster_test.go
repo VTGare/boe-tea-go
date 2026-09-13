@@ -196,6 +196,48 @@ var _ = Describe("Skip Pages Tests", func() {
 	})
 })
 
+var _ = Describe("Imageless tweet gating", func() {
+	var (
+		poster   *Poster
+		deps     *testDeps
+		provider *twitterStubProvider
+	)
+
+	BeforeEach(func() {
+		poster, deps = newTestPoster()
+		provider = &twitterStubProvider{art: &twitter.Artwork{}}
+		deps.match = matchProvider(provider)
+	})
+
+	It("drops imageless tweets outside commands", func() {
+		sent, err := poster.Send(context.Background(), newTestRun("https://example.com/t"))
+
+		Expect(err).NotTo(HaveOccurred())
+		Expect(sent).To(BeEmpty())
+		Expect(deps.fake.Complex).To(BeEmpty())
+		Expect(deps.detector.created()).To(BeEmpty())
+	})
+
+	It("serves imageless tweets from commands", func() {
+		run := newTestRun("https://example.com/t")
+		run.IsCommand = true
+
+		sent, err := poster.Send(context.Background(), run)
+
+		Expect(err).NotTo(HaveOccurred())
+		Expect(sent).To(HaveLen(1))
+	})
+
+	It("still serves photo tweets outside commands", func() {
+		provider.art = &twitter.Artwork{FullName: "smth", Photos: []string{"https://example.com/1.png"}}
+
+		sent, err := poster.Send(context.Background(), newTestRun("https://example.com/t"))
+
+		Expect(err).NotTo(HaveOccurred())
+		Expect(sent).To(HaveLen(1))
+	})
+})
+
 func restError(status int) error {
 	return &discordgo.RESTError{Response: &http.Response{StatusCode: status}}
 }

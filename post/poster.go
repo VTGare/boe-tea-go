@@ -118,9 +118,8 @@ func (r *Poster) Send(ctx context.Context, run Post) ([]*cache.MessageInfo, erro
 		errs = append(errs, err)
 	}
 
-	if err := r.notifyReposts(guild, run, fetched.reposts, fetched.matched); err != nil {
-		errs = append(errs, err)
-	}
+	// Repost notices are auxiliary. Failures stay in the logs, never fail the run.
+	_ = r.notifyReposts(guild, run, fetched.reposts, fetched.matched)
 
 	sent := pagesToInfos(pages)
 

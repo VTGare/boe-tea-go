@@ -185,6 +185,15 @@ func (r *Poster) doFetch(ctx context.Context, guild *store.Guild, channelID stri
 		return slot
 	}
 
+	// Auto-posts should drop imageless tweets.
+	if !opts.isCommand {
+		if tweet, ok := artwork.(*twitter.Artwork); ok && tweet.Len() == 0 {
+			log.Debug("skipping imageless tweet outside commands")
+
+			return slot
+		}
+	}
+
 	slot.artwork = artwork
 	slot.provider = job.provider
 

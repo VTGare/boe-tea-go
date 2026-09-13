@@ -196,11 +196,11 @@ func share(b *bot.Bot, skip post.SkipMode) func(*gumi.Ctx) error {
 		defer cancel()
 
 		sent, err := p.Send(ctx, run)
+		post.CacheResult(b.EmbedCache, run.AuthorID, run.ChannelID, run.MessageID, sent)
+
 		if err != nil {
 			return err
 		}
-
-		post.CacheResult(b.EmbedCache, run.AuthorID, run.ChannelID, run.MessageID, sent)
 
 		return nil
 	}
@@ -226,11 +226,11 @@ func crosspostExclude(b *bot.Bot) func(*gumi.Ctx) error {
 		defer cancel()
 
 		sent, err := p.Send(ctx, run)
+		post.CacheResult(b.EmbedCache, run.AuthorID, run.ChannelID, run.MessageID, sent)
+
 		if err != nil {
 			return err
 		}
-
-		post.CacheResult(b.EmbedCache, run.AuthorID, run.ChannelID, run.MessageID, sent)
 
 		return nil
 	}

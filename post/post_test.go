@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/VTGare/boe-tea-go/artworks"
+	"github.com/VTGare/boe-tea-go/artworks/twitter"
 	"github.com/VTGare/boe-tea-go/internal/sender"
 	"github.com/VTGare/boe-tea-go/repost"
 	"github.com/VTGare/boe-tea-go/store"
@@ -109,6 +110,22 @@ func (p *stubProvider) Find(id string) (artworks.Artwork, error) {
 
 func (p *stubProvider) Enabled(*store.Guild) bool {
 	return p.enabled
+}
+
+type twitterStubProvider struct {
+	art *twitter.Artwork
+}
+
+func (*twitterStubProvider) Match(string) (string, bool) {
+	return "tweet", true
+}
+
+func (p *twitterStubProvider) Find(string) (artworks.Artwork, error) {
+	return p.art, nil
+}
+
+func (*twitterStubProvider) Enabled(*store.Guild) bool {
+	return true
 }
 
 func (p *stubProvider) findCalls() []string {

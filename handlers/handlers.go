@@ -121,11 +121,11 @@ func OnMessage(b *bot.Bot) func(*gumi.Ctx) error {
 		run := post.RunFromEvent(gctx, urls)
 
 		sent, err := p.Send(ctx, run)
+		post.CacheResult(b.EmbedCache, run.AuthorID, run.ChannelID, run.MessageID, sent)
+
 		if err != nil {
 			return err
 		}
-
-		post.CacheResult(b.EmbedCache, run.AuthorID, run.ChannelID, run.MessageID, sent)
 
 		return nil
 	}
@@ -394,11 +394,11 @@ func OnReactionAdd(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageReacti
 			if user, _ := b.Store.User(ctx, r.UserID); user != nil {
 				if group, ok := user.FindGroup(r.ChannelID); ok {
 					sent, err := p.Crosspost(ctx, run, user.ID, group)
+					post.CacheResult(b.EmbedCache, r.UserID, r.ChannelID, r.MessageID, sent)
+
 					if err != nil {
 						return err
 					}
-
-					post.CacheResult(b.EmbedCache, r.UserID, r.ChannelID, r.MessageID, sent)
 				}
 			}
 
