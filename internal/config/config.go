@@ -23,6 +23,7 @@ type Config struct {
 	Encryption string       `json:"encryption"`
 	Sentry     string       `json:"sentry"`
 	Media      *Media       `json:"media"`
+	Debug      *Debug       `json:"debug"`
 	Quotes     []*Quote     `json:"quotes"`
 
 	safeQuotes []*Quote
@@ -87,6 +88,13 @@ func (m *Media) SpoolConfig() spool.Config {
 		MaxConcurrent: m.MaxConcurrent,
 		Dir:           m.SpoolDir,
 	}
+}
+
+// Debug stores temporary diagnostic switches for the ongoing OOM
+// investigation. Slated for removal once the leak is diagnosed.
+// A zero PprofPort disables all diagnostics.
+type Debug struct {
+	PprofPort int `json:"pprof_port"`
 }
 
 // Quote is a message shown in Boe Tea's embeds, selected randomly. If empty, footer will always be empty.

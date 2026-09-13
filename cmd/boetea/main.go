@@ -16,6 +16,7 @@ import (
 	"github.com/VTGare/boe-tea-go/commands"
 	"github.com/VTGare/boe-tea-go/handlers"
 	"github.com/VTGare/boe-tea-go/internal/config"
+	"github.com/VTGare/boe-tea-go/internal/diag"
 	"github.com/VTGare/boe-tea-go/internal/logger"
 	"github.com/VTGare/boe-tea-go/internal/sender"
 	"github.com/VTGare/boe-tea-go/internal/spool"
@@ -118,7 +119,11 @@ func main() {
 	b.AddProvider(deviant.New())
 	b.AddProvider(bluesky.New())
 
-	spool.Configure(cfg.Media.SpoolConfig())
+	spoolCfg := spool.Configure(cfg.Media.SpoolConfig())
+
+	if cfg.Debug != nil && cfg.Debug.PprofPort > 0 {
+		diag.Start(ctx, log, cfg.Debug.PprofPort, spoolCfg.Dir)
+	}
 
 	if err := pixiv.LoadAuth(cfg.Pixiv.AuthToken, cfg.Pixiv.RefreshToken); err == nil {
 		log.Info("Successfully logged into Pixiv.")
