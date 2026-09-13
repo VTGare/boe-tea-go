@@ -19,7 +19,7 @@ var _ = Describe("Render", func() {
 		}
 	}
 
-	It("returns photo data with escaped content", func() {
+	It("shows photos with escaped text", func() {
 		rendered, err := artwork().Render()
 
 		Expect(err).NotTo(HaveOccurred())
@@ -31,7 +31,7 @@ var _ = Describe("Render", func() {
 		Expect(rendered.Files).To(BeEmpty())
 	})
 
-	It("omits zero stat fields", func() {
+	It("hides empty stats", func() {
 		a := artwork()
 		a.Likes = 0
 		a.Retweets = 0
@@ -42,7 +42,7 @@ var _ = Describe("Render", func() {
 		Expect(rendered.Fields).To(BeEmpty())
 	})
 
-	It("returns the missing-tweet notice unescaped", func() {
+	It("says when a tweet is gone", func() {
 		rendered, err := (&Artwork{}).Render()
 
 		Expect(err).NotTo(HaveOccurred())

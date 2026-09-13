@@ -53,7 +53,7 @@ var _ = BeforeEach(func() {
 var _ = Describe("Guilds", func() {
 	ctx := context.Background()
 
-	It("creates, reads, updates and mutates art channels per channel", func() {
+	It("creates, reads, updates and changes art channels", func() {
 		g, err := testStore.CreateGuild(ctx, "g-it")
 		Expect(err).NotTo(HaveOccurred())
 		Expect(g.ID).To(Equal("g-it"))
@@ -99,7 +99,7 @@ var _ = Describe("Users and crossposts", func() {
 		Expect(err).To(HaveOccurred())
 	})
 
-	It("manages crosspost groups with unique-name semantics", func() {
+	It("manages crosspost groups from creation to deletion", func() {
 		_, err := testStore.User(ctx, "u-it")
 		Expect(err).NotTo(HaveOccurred())
 
@@ -179,7 +179,7 @@ var _ = Describe("Artworks", func() {
 var _ = Describe("Bookmarks", func() {
 	ctx := context.Background()
 
-	It("adds, dedups, counts, lists and deletes with favourites accounting", func() {
+	It("adds, lists, counts and deletes bookmarks and keeps favourite counts in sync", func() {
 		art, err := testStore.CreateArtwork(ctx, &store.Artwork{
 			Title: "BM", Author: "BM",
 			URL: fmt.Sprintf("https://example.com/b%d", time.Now().UnixNano()),

@@ -17,7 +17,7 @@ func TestSpool(t *testing.T) {
 	RunSpecs(t, "Spool Suite")
 }
 
-var _ = Describe("TempFile and Remove", func() {
+var _ = Describe("Temp files", func() {
 	It("creates files inside the configured directory", func() {
 		dir := GinkgoT().TempDir()
 		Configure(Config{Dir: dir})

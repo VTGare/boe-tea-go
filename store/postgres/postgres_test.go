@@ -114,7 +114,7 @@ var _ = Describe("isUniqueViolation", func() {
 		Expect(isUniqueViolation(err)).To(BeTrue())
 	})
 
-	It("rejects other pg errors and plain errors", func() {
+	It("returns false for other errors", func() {
 		Expect(isUniqueViolation(&pgconn.PgError{Code: "23503"})).To(BeFalse())
 		Expect(isUniqueViolation(errors.New("boom"))).To(BeFalse())
 		Expect(isUniqueViolation(nil)).To(BeFalse())
@@ -141,7 +141,7 @@ var _ = Describe("scanArtwork", func() {
 		Expect(err).To(MatchError(store.ErrArtworkNotFound))
 	})
 
-	It("coerces nil images to empty", func() {
+	It("treats missing images as empty", func() {
 		a := &store.Artwork{}
 
 		err := scanArtwork(&fakeRow{vals: []any{7, "t", "a", "u", []string(nil), 0, now, now}}, a)

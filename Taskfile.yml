@@ -1,5 +1,7 @@
 version: "3"
 
+dotenv: ['.env']
+
 vars:
   BINARY_NAME: boetea
   EXPORT_RESULT: '{{.EXPORT_RESULT | default "false"}}'
@@ -72,3 +74,15 @@ tasks:
           sleep 2
         done
       - POSTGRES_DSN='{{.POSTGRES_DSN}}' MONGO_URI='{{.MONGO_URI}}' go test -race -mod vendor -tags integration ./...
+
+  test:e2e:
+    desc: Run the real-Discord E2E suite (needs E2E_DISCORD_TOKEN, E2E_GUILD_ID, E2E_CHANNEL_ID; spins up testpg)
+    cmds:
+      - docker compose -f docker-compose.test.yml up -d testpg
+      - defer: docker compose -f docker-compose.test.yml down -v
+      - |
+        for i in $(seq 1 60); do
+          docker compose -f docker-compose.test.yml exec testpg pg_isready -U boetea -d boetea_test && break
+          sleep 2
+        done
+      - E2E_POSTGRES_DSN='{{.POSTGRES_DSN}}' go test -race -mod vendor -tags e2e ./e2e/...

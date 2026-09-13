@@ -23,7 +23,7 @@ var _ = Describe("Render", func() {
 		}
 	}
 
-	It("returns paged data with linked tags", func() {
+	It("shows pages with linked tags", func() {
 		rendered, err := artwork().Render()
 
 		Expect(err).NotTo(HaveOccurred())
@@ -35,7 +35,7 @@ var _ = Describe("Render", func() {
 		Expect(rendered.Images[0].Original).To(Equal("https://proxy/o1.png"))
 	})
 
-	It("fails imageless artwork as not found", func() {
+	It("treats imageless artwork as missing", func() {
 		a := artwork()
 		a.Images = nil
 

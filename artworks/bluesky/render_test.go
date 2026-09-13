@@ -8,7 +8,7 @@ import (
 )
 
 var _ = Describe("Render", func() {
-	It("returns escaped text and linked tags", func() {
+	It("shows escaped text with linked tags", func() {
 		a := &Artwork{
 			AuthorHandle:      "user",
 			AuthorDisplayName: "Name",

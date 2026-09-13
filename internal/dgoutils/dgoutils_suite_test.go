@@ -14,7 +14,7 @@ func TestDgoutils(t *testing.T) {
 	RunSpecs(t, "Dgoutils Suite")
 }
 
-var _ = Describe("CanPost", func() {
+var _ = Describe("Send permissions", func() {
 	const (
 		guildID   = "g"
 		channelID = "c"

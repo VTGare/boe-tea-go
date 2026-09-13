@@ -28,7 +28,7 @@ func (s *guildStub) CreateGuild(_ context.Context, _ string) (*Guild, error) {
 var _ = Describe("GetOrCreateGuild", func() {
 	ctx := context.Background()
 
-	It("returns the guild without creating on a hit", func() {
+	It("returns the existing guild without creating one", func() {
 		guild := DefaultGuild("g")
 		stub := &guildStub{guild: guild}
 
@@ -39,7 +39,7 @@ var _ = Describe("GetOrCreateGuild", func() {
 		Expect(got).To(Equal(guild))
 	})
 
-	It("creates the guild on a miss", func() {
+	It("creates the guild when it does not exist", func() {
 		created := DefaultGuild("g")
 		stub := &guildStub{guildErr: ErrGuildNotFound, created: created}
 
@@ -50,7 +50,7 @@ var _ = Describe("GetOrCreateGuild", func() {
 		Expect(got).To(Equal(created))
 	})
 
-	It("propagates read errors other than a miss", func() {
+	It("returns lookup errors instead of creating", func() {
 		stub := &guildStub{guildErr: errors.New("boom")}
 
 		_, _, err := GetOrCreateGuild(ctx, stub, "g")
@@ -58,7 +58,7 @@ var _ = Describe("GetOrCreateGuild", func() {
 		Expect(err).To(HaveOccurred())
 	})
 
-	It("propagates create errors", func() {
+	It("returns errors when creating fails", func() {
 		stub := &guildStub{guildErr: ErrGuildNotFound, createErr: errors.New("boom")}
 
 		_, _, err := GetOrCreateGuild(ctx, stub, "g")

@@ -20,7 +20,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Generate Messages Tests", func() {
+var _ = Describe("Generating messages", func() {
 	It("returns no bundles without artworks", func() {
 		poster := &Poster{}
 
@@ -31,7 +31,7 @@ var _ = Describe("Generate Messages Tests", func() {
 	})
 })
 
-var _ = Describe("Skip First Tests", func() {
+var _ = Describe("Skipping the first page", func() {
 	var (
 		twitterArtwork *twitter.Artwork
 		pixivArtwork   = &pixiv.Artwork{}
@@ -80,7 +80,7 @@ var _ = Describe("Skip First Tests", func() {
 	})
 })
 
-var _ = Describe("Limit Handler Tests", func() {
+var _ = Describe("Album limits", func() {
 	artwork := []*discordgo.MessageSend{{Content: "1"}, {Content: "2"}, {Content: "3"}, {Content: "4"}}
 
 	bundles := func(sends ...[]*discordgo.MessageSend) []render.Bundle {
@@ -130,7 +130,7 @@ var _ = Describe("Limit Handler Tests", func() {
 	})
 })
 
-var _ = Describe("Skip Pages Tests", func() {
+var _ = Describe("Skipping pages", func() {
 	artworks := []*discordgo.MessageSend{
 		{Content: "1"}, {Content: "2"}, {Content: "3"}, {Content: "4"},
 	}
@@ -196,7 +196,7 @@ var _ = Describe("Skip Pages Tests", func() {
 	})
 })
 
-var _ = Describe("Imageless tweet gating", func() {
+var _ = Describe("Imageless tweets", func() {
 	var (
 		poster   *Poster
 		deps     *testDeps
@@ -269,7 +269,7 @@ var _ = Describe("Classify", func() {
 	})
 })
 
-var _ = Describe("Fetch permission gate", func() {
+var _ = Describe("Missing send permissions", func() {
 	var (
 		poster *Poster
 		deps   *testDeps
@@ -299,7 +299,7 @@ var _ = Describe("Fetch permission gate", func() {
 	})
 })
 
-var _ = Describe("Deliver through Sender", func() {
+var _ = Describe("Delivering artwork", func() {
 	var (
 		poster *Poster
 		deps   *testDeps
@@ -378,7 +378,7 @@ var _ = Describe("Deliver through Sender", func() {
 	})
 })
 
-var _ = Describe("NotifyReposts through Sender", func() {
+var _ = Describe("Repost notices", func() {
 	var (
 		poster *Poster
 		deps   *testDeps
@@ -420,7 +420,7 @@ var _ = Describe("NotifyReposts through Sender", func() {
 	})
 })
 
-var _ = Describe("GenerateMessages correlation", func() {
+var _ = Describe("Keeping artwork with its pages", func() {
 	It("keeps each ID with its own pages without positional coupling", func() {
 		poster, _ := newTestPoster()
 		guild := &store.Guild{ID: "guild-1"}
@@ -439,7 +439,7 @@ var _ = Describe("GenerateMessages correlation", func() {
 	})
 })
 
-var _ = Describe("Crosspost fan-out", func() {
+var _ = Describe("Crossposting", func() {
 	var (
 		poster *Poster
 		deps   *testDeps
@@ -513,7 +513,7 @@ var _ = Describe("Crosspost fan-out", func() {
 	})
 })
 
-var _ = Describe("Send orchestration", func() {
+var _ = Describe("Sending posts", func() {
 	var (
 		poster *Poster
 		deps   *testDeps
@@ -585,7 +585,7 @@ var _ = Describe("Send orchestration", func() {
 	})
 })
 
-var _ = Describe("Render failure fail-fast", func() {
+var _ = Describe("Failed renders", func() {
 	var (
 		poster   *Poster
 		deps     *testDeps
@@ -637,7 +637,7 @@ var _ = Describe("Render failure fail-fast", func() {
 	})
 })
 
-var _ = Describe("Repost create-after-success", func() {
+var _ = Describe("Recording reposts", func() {
 	var (
 		poster   *Poster
 		deps     *testDeps
@@ -693,7 +693,7 @@ var _ = Describe("Repost create-after-success", func() {
 	})
 })
 
-var _ = Describe("Crosspost copy-on-write", func() {
+var _ = Describe("Leaving the input group alone", func() {
 	var (
 		poster *Poster
 		deps   *testDeps
@@ -726,7 +726,7 @@ var _ = Describe("Crosspost copy-on-write", func() {
 	})
 })
 
-var _ = Describe("Fetch ordering and dedup", func() {
+var _ = Describe("Fetching in order, once each", func() {
 	var (
 		poster   *Poster
 		deps     *testDeps

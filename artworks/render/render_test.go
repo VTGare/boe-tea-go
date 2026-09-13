@@ -32,8 +32,8 @@ func testOptions() Options {
 	}
 }
 
-var _ = Describe("Build pagination", func() {
-	It("renders one page without a suffix for single images", func() {
+var _ = Describe("Pages", func() {
+	It("leaves single images on one page", func() {
 		bundles := Build([]Input{{ID: "a", Rendered: testRendered()}}, testOptions())
 
 		Expect(bundles).To(HaveLen(1))
@@ -47,7 +47,7 @@ var _ = Describe("Build pagination", func() {
 		Expect(embed.Description).To(Equal("a description"))
 	})
 
-	It("suffixes titles and repeats footers across pages", func() {
+	It("numbers each page and repeats the footer", func() {
 		rendered := testRendered()
 		rendered.Images = append(rendered.Images, artworks.RenderedImage{Preview: "https://example.com/2.png"})
 
@@ -60,7 +60,7 @@ var _ = Describe("Build pagination", func() {
 		Expect(bundles[0].Sends[1].Embeds[0].Footer.Text).To(Equal("quote"))
 	})
 
-	It("renders imageless artwork as one page", func() {
+	It("still sends artwork without images", func() {
 		rendered := testRendered()
 		rendered.Images = nil
 
@@ -71,7 +71,7 @@ var _ = Describe("Build pagination", func() {
 		Expect(bundles[0].Sends[0].Embeds[0].Title).To(Equal("Art by Author"))
 	})
 
-	It("drops the first page when flagged", func() {
+	It("skips the first page when asked", func() {
 		rendered := testRendered()
 		rendered.Images = append(rendered.Images, artworks.RenderedImage{Preview: "https://example.com/2.png"})
 
@@ -81,7 +81,7 @@ var _ = Describe("Build pagination", func() {
 		Expect(bundles[0].Sends[0].Embeds[0].Title).To(Equal("Art by Author | Page 2 / 2"))
 	})
 
-	It("attaches files to the first page only", func() {
+	It("keeps files on the first page", func() {
 		rendered := testRendered()
 		rendered.Images = append(rendered.Images, artworks.RenderedImage{Preview: "https://example.com/2.png"})
 		rendered.Files = []*discordgo.File{{Name: "v.mp4"}}
@@ -93,12 +93,12 @@ var _ = Describe("Build pagination", func() {
 	})
 })
 
-var _ = Describe("Build fields and tags", func() {
+var _ = Describe("Fields and tags", func() {
 	fields := []artworks.RenderedField{
 		{Name: "Likes", Value: "3", Inline: true},
 	}
 
-	It("keeps fields on the first page only by default", func() {
+	It("keeps fields on the first page only", func() {
 		rendered := testRendered()
 		rendered.Images = append(rendered.Images, artworks.RenderedImage{Preview: "https://example.com/2.png"})
 		rendered.Fields = fields
@@ -109,7 +109,7 @@ var _ = Describe("Build fields and tags", func() {
 		Expect(bundles[0].Sends[1].Embeds[0].Fields).To(BeEmpty())
 	})
 
-	It("adds an original-quality field per image with an original", func() {
+	It("links the original-quality image", func() {
 		rendered := testRendered()
 		rendered.Images = []artworks.RenderedImage{
 			{Preview: "https://example.com/p1.png", Original: "https://example.com/o1.png"},
@@ -136,7 +136,7 @@ var _ = Describe("Build fields and tags", func() {
 		Expect(third).To(BeEmpty())
 	})
 
-	It("renders linked tags under the standard header", func() {
+	It("shows linked tags under the tags header", func() {
 		rendered := testRendered()
 		rendered.Description = ""
 		rendered.Tags = []string{"tag1", "tag2"}
@@ -149,7 +149,7 @@ var _ = Describe("Build fields and tags", func() {
 		))
 	})
 
-	It("renders plain tags under the standard header after text", func() {
+	It("shows plain tags after the description", func() {
 		rendered := testRendered()
 		rendered.Tags = []string{"tag1", "tag2"}
 
@@ -160,7 +160,7 @@ var _ = Describe("Build fields and tags", func() {
 		))
 	})
 
-	It("starts the tag block without blank lines on empty text", func() {
+	It("starts with tags when there is no description", func() {
 		rendered := testRendered()
 		rendered.Description = ""
 		rendered.Tags = []string{"tag1"}
@@ -173,7 +173,7 @@ var _ = Describe("Build fields and tags", func() {
 		))
 	})
 
-	It("ignores tags when disabled", func() {
+	It("hides tags when disabled", func() {
 		rendered := testRendered()
 		rendered.Tags = []string{"tag1"}
 
@@ -185,7 +185,7 @@ var _ = Describe("Build fields and tags", func() {
 		Expect(bundles[0].Sends[0].Embeds[0].Description).To(Equal("a description"))
 	})
 
-	It("adds the AI disclaimer when flagged", func() {
+	It("warns about AI-generated artwork", func() {
 		rendered := testRendered()
 		rendered.AIGenerated = true
 
@@ -198,8 +198,8 @@ var _ = Describe("Build fields and tags", func() {
 	})
 })
 
-var _ = Describe("Build correlation and decoration", func() {
-	It("keeps each ID with its own pages", func() {
+var _ = Describe("Replies and crossposts", func() {
+	It("keeps each artwork's pages together", func() {
 		inputs := []Input{
 			{ID: "a", Rendered: testRendered()},
 			{ID: "b", Rendered: testRendered()},
@@ -212,7 +212,7 @@ var _ = Describe("Build correlation and decoration", func() {
 		Expect(bundles[1].ID).To(Equal("b"))
 	})
 
-	It("references the triggering message on every page", func() {
+	It("replies to the original message on every page", func() {
 		rendered := testRendered()
 		rendered.Images = append(rendered.Images, artworks.RenderedImage{Preview: "https://example.com/2.png"})
 
@@ -225,7 +225,7 @@ var _ = Describe("Build correlation and decoration", func() {
 		}
 	})
 
-	It("stamps the crosspost author instead of the reference", func() {
+	It("credits the crosspost author instead of replying", func() {
 		opts := testOptions()
 		opts.Crosspost = true
 		opts.AuthorName = "posted by tester"

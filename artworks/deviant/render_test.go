@@ -6,7 +6,7 @@ import (
 )
 
 var _ = Describe("Render", func() {
-	It("returns single-page data with colon tags header", func() {
+	It("shows one page with linked tags", func() {
 		a := &Artwork{
 			Title:       "Title",
 			Author:      &Author{Name: "Author"},
@@ -27,7 +27,7 @@ var _ = Describe("Render", func() {
 		Expect(rendered.AIGenerated).To(BeTrue())
 	})
 
-	It("tolerates a missing author", func() {
+	It("still sends without an author", func() {
 		rendered, err := (&Artwork{Title: "Title"}).Render()
 
 		Expect(err).NotTo(HaveOccurred())

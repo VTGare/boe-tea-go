@@ -102,7 +102,7 @@ var _ = Describe("CheckGuildPerms", func() {
 		Expect(ok).To(BeFalse())
 	})
 
-	It("grants the owner every permission from the state cache", func() {
+	It("grants the guild owner every permission", func() {
 		state := discordgo.NewState()
 		owner := &discordgo.User{ID: "owner"}
 		state.User = owner
@@ -119,7 +119,7 @@ var _ = Describe("CheckGuildPerms", func() {
 		Expect(ok).To(BeTrue())
 	})
 
-	It("denies without a session", func() {
+	It("denies guild permissions without a session", func() {
 		ok, err := CheckGuildPerms(nil, testGuildID, testBotID, discordgo.PermissionSendMessages)
 
 		Expect(err).To(HaveOccurred())
@@ -134,7 +134,7 @@ var _ = Describe("ExpireMessage", func() {
 	})
 })
 
-var _ = Describe("isNotFound", func() {
+var _ = Describe("Missing members", func() {
 	It("matches Discord 404s only", func() {
 		Expect(isNotFound(restError(404))).To(BeTrue())
 		Expect(isNotFound(restError(403))).To(BeFalse())
@@ -142,8 +142,8 @@ var _ = Describe("isNotFound", func() {
 	})
 })
 
-var _ = Describe("FakeSender routing reads", func() {
-	It("answers channel guilds and membership from its maps", func() {
+var _ = Describe("Channel and member lookups", func() {
+	It("answers channel guilds and membership", func() {
 		fake := NewFake()
 		fake.ChannelGuilds = map[string]string{"c": "g"}
 		fake.Members = map[MemberKey]bool{{GuildID: "g", UserID: "u"}: true}
@@ -164,7 +164,7 @@ var _ = Describe("FakeSender routing reads", func() {
 		Expect(member).To(BeFalse())
 	})
 
-	It("errors unknown channels and surfaces read errors", func() {
+	It("reports unknown channels and surfaces read errors", func() {
 		fake := NewFake()
 
 		_, err := fake.ChannelGuildID("hint", "missing")
@@ -215,7 +215,7 @@ var _ = Describe("FakeSender", func() {
 		Expect(fake.Embeds[0].Embed.Title).To(Equal("two"))
 	})
 
-	It("skips sends with ErrSkipped when configured", func() {
+	It("skips sends when configured to skip", func() {
 		fake.Skip = true
 
 		_, err := fake.SendComplex("g", "c", &discordgo.MessageSend{})
@@ -237,7 +237,7 @@ var _ = Describe("FakeSender", func() {
 		Expect(err).To(MatchError(errTestBoom))
 	})
 
-	It("records deletes, reactions, and expiries", func() {
+	It("records deletes, reactions, and expired messages", func() {
 		Expect(fake.DeleteMessage("g", "c", "m")).To(Succeed())
 		Expect(fake.AddReaction("g", "c", "m", "💖")).To(Succeed())
 
@@ -269,7 +269,7 @@ var _ = Describe("FakeSender", func() {
 var _ = Describe("DiscordSender", func() {
 	nopLog := zap.NewNop().Sugar()
 
-	It("errors sends without any session to resolve", func() {
+	It("fails every operation without a session", func() {
 		d := NewDiscordSender(nil, nopLog, nil)
 
 		_, err := d.SendComplex("1", "c", &discordgo.MessageSend{Content: "hi"})
@@ -307,7 +307,7 @@ var _ = Describe("DiscordSender", func() {
 		Expect(ok).To(BeFalse())
 	})
 
-	It("skips sends through the fallback session without permissions", func() {
+	It("skips sends the bot has no permission for", func() {
 		denied := newTestSession([]*discordgo.PermissionOverwrite{
 			{ID: testGuildID, Type: discordgo.PermissionOverwriteTypeRole, Deny: discordgo.PermissionSendMessages},
 		})
@@ -323,7 +323,7 @@ var _ = Describe("DiscordSender", func() {
 		d.Expire(nil)
 	})
 
-	It("errors routing reads without any session to resolve", func() {
+	It("fails channel and member lookups without a session", func() {
 		d := NewDiscordSender(nil, nopLog, nil)
 
 		_, err := d.ChannelGuildID("1", "c")

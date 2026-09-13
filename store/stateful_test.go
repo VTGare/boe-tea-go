@@ -127,7 +127,7 @@ var _ = Describe("StatefulStore caching", func() {
 		cached = newStatefulStub(backend)
 	})
 
-	It("serves guild reads from cache with owned copies", func() {
+	It("serves repeated guild reads from cache", func() {
 		backend.guilds["g"] = DefaultGuild("g")
 
 		first, err := cached.Guild(ctx, "g")
@@ -142,7 +142,7 @@ var _ = Describe("StatefulStore caching", func() {
 		Expect(second).To(Equal(first))
 	})
 
-	It("isolates callers from cached guilds in both directions", func() {
+	It("keeps cached guilds separate from caller changes", func() {
 		backend.guilds["g"] = DefaultGuild("g")
 
 		read, err := cached.Guild(ctx, "g")
@@ -191,7 +191,7 @@ var _ = Describe("StatefulStore caching", func() {
 		Expect(backend.guildReads).To(Equal(1))
 	})
 
-	It("does not cache misses", func() {
+	It("does not cache lookup failures", func() {
 		backend.guildErr = errors.New("boom")
 
 		_, err := cached.Guild(ctx, "g")
@@ -203,7 +203,7 @@ var _ = Describe("StatefulStore caching", func() {
 		Expect(backend.guildReads).To(Equal(2))
 	})
 
-	It("invalidates artwork on successful bookmark writes only", func() {
+	It("drops cached artwork only after successful bookmark changes", func() {
 		backend.artworks[1] = &Artwork{ID: 1, Favorites: 1}
 		backend.bookmarkWon = true
 
@@ -236,7 +236,7 @@ var _ = Describe("StatefulStore caching", func() {
 	})
 })
 
-var _ = Describe("StatefulStore subset search", func() {
+var _ = Describe("StatefulStore artwork search", func() {
 	var (
 		ctx     = context.Background()
 		backend *stubBackend
@@ -252,7 +252,7 @@ var _ = Describe("StatefulStore subset search", func() {
 		cached = newStatefulStub(backend)
 	})
 
-	It("queries only uncached IDs without mutating the input filter", func() {
+	It("fetches only missing artworks and leaves the filter alone", func() {
 		_, err := cached.Artwork(ctx, 1, "")
 
 		Expect(err).NotTo(HaveOccurred())
