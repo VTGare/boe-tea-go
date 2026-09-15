@@ -33,6 +33,20 @@ func NewDiscordSender(manager *shards.Manager, log *zap.SugaredLogger, fallback 
 }
 
 func (d *DiscordSender) sessionFor(guildID string) (*discordgo.Session, error) {
+	if guildID == "" {
+		if d.manager != nil {
+			if s := d.manager.SessionForDM(); s != nil {
+				return s, nil
+			}
+		}
+
+		if d.fallback != nil {
+			return d.fallback, nil
+		}
+
+		return nil, fmt.Errorf("no session for DM")
+	}
+
 	if d.manager != nil {
 		id, err := strconv.ParseInt(guildID, 10, 64)
 		if err != nil {
@@ -220,6 +234,11 @@ func (d *DiscordSender) IsMember(guildID, userID string) (bool, error) {
 }
 
 func (d *DiscordSender) HasChannelPerms(guildID, channelID string, permissions int64) (bool, error) {
+	// DMs have no guild permissions.
+	if guildID == "" {
+		return true, nil
+	}
+
 	s, err := d.sessionFor(guildID)
 	if err != nil {
 		return true, err
@@ -229,6 +248,11 @@ func (d *DiscordSender) HasChannelPerms(guildID, channelID string, permissions i
 }
 
 func (d *DiscordSender) BotHasGuildPerms(guildID string, permission int64) (bool, error) {
+	// DMs have no guild permissions.
+	if guildID == "" {
+		return false, nil
+	}
+
 	s, err := d.sessionFor(guildID)
 	if err != nil {
 		return false, err

@@ -266,6 +266,46 @@ var _ = Describe("FakeSender", func() {
 	})
 })
 
+var _ = Describe("DiscordSender DM sessions", func() {
+	nopLog := zap.NewNop().Sugar()
+
+	It("resolves empty guild IDs to the fallback session", func() {
+		fallback := &discordgo.Session{}
+		d := NewDiscordSender(nil, nopLog, fallback)
+
+		s, err := d.sessionFor("")
+
+		Expect(err).NotTo(HaveOccurred())
+		Expect(s).To(BeIdenticalTo(fallback))
+	})
+
+	It("reports no DM session without a manager or fallback", func() {
+		d := NewDiscordSender(nil, nopLog, nil)
+
+		_, err := d.sessionFor("")
+
+		Expect(err).To(MatchError(ContainSubstring("no session for DM")))
+	})
+
+	It("allows DM sends without a permission lookup", func() {
+		d := NewDiscordSender(nil, nopLog, nil)
+
+		ok, err := d.HasChannelPerms("", "dm-channel", SendPermissions)
+
+		Expect(err).NotTo(HaveOccurred())
+		Expect(ok).To(BeTrue())
+	})
+
+	It("reports no guild permissions in DMs", func() {
+		d := NewDiscordSender(nil, nopLog, nil)
+
+		ok, err := d.BotHasGuildPerms("", discordgo.PermissionManageMessages)
+
+		Expect(err).NotTo(HaveOccurred())
+		Expect(ok).To(BeFalse())
+	})
+})
+
 var _ = Describe("DiscordSender", func() {
 	nopLog := zap.NewNop().Sugar()
 

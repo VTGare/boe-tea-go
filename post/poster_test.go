@@ -583,6 +583,32 @@ var _ = Describe("Sending posts", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(deps.recorded).To(HaveLen(2))
 	})
+
+	It("delivers DMs through the DM guild without reposts or crossposts", func() {
+		provider := &stubProvider{
+			ids:     map[string]string{"https://example.com/a": "a"},
+			arts:    map[string]*stubArtwork{"a": {id: "a", images: 1}},
+			enabled: true,
+		}
+
+		deps.match = matchProvider(provider)
+		deps.guilds.guild = store.UserGuild()
+		deps.users.user = &store.User{ID: "author-1"}
+
+		run := newTestRun("https://example.com/a")
+		run.GuildID = ""
+		run.ChannelID = "dm-channel"
+
+		sent, err := poster.Send(context.Background(), run)
+
+		Expect(err).NotTo(HaveOccurred())
+		Expect(sent).To(HaveLen(1))
+		Expect(sent[0].ArtworkID).To(Equal("a"))
+		Expect(deps.fake.Complex).To(HaveLen(1))
+		Expect(deps.fake.Complex[0].GuildID).To(BeEmpty())
+		Expect(deps.fake.Complex[0].ChannelID).To(Equal("dm-channel"))
+		Expect(deps.detector.created()).To(BeEmpty())
+	})
 })
 
 var _ = Describe("Failed renders", func() {
