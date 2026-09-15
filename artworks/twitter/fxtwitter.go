@@ -70,18 +70,11 @@ func newFxTwitter() artworks.Provider {
 }
 
 // pickVariant returns the highest bitrate mp4 variant that fits into
-// maxVideoBytes, verified with a HEAD request. It falls back to the
-// smallest mp4 variant when nothing fits or sizes are unknown, and to
-// the default URL when there are no mp4 variants at all.
+// maxVideoBytes, verified with a HEAD request. It returns an empty
+// string when nothing fits: oversized videos are never downloaded,
+// callers fall back to a link instead.
 func (fxt *fxTwitter) pickVariant(fallback string, variants []fxVideoVariant) string {
-	mp4 := make([]fxVideoVariant, 0, len(variants))
-	for _, variant := range variants {
-		if variant.ContentType == "video/mp4" {
-			mp4 = append(mp4, variant)
-		}
-	}
-
-	sort.Slice(mp4, func(i, j int) bool { return mp4[i].Bitrate < mp4[j].Bitrate })
+	mp4 := mp4Variants(variants)
 
 	for _, m := range slices.Backward(mp4) {
 		size, err := fxt.contentLength(m.URL)
@@ -95,10 +88,31 @@ func (fxt *fxTwitter) pickVariant(fallback string, variants []fxVideoVariant) st
 	}
 
 	if len(mp4) > 0 {
-		return mp4[0].URL
+		return ""
 	}
 
 	return fallback
+}
+
+func fallbackLink(variants []fxVideoVariant) string {
+	if mp4 := mp4Variants(variants); len(mp4) > 0 {
+		return mp4[0].URL
+	}
+
+	return ""
+}
+
+func mp4Variants(variants []fxVideoVariant) []fxVideoVariant {
+	mp4 := make([]fxVideoVariant, 0, len(variants))
+	for _, variant := range variants {
+		if variant.ContentType == "video/mp4" {
+			mp4 = append(mp4, variant)
+		}
+	}
+
+	sort.Slice(mp4, func(i, j int) bool { return mp4[i].Bitrate < mp4[j].Bitrate })
+
+	return mp4
 }
 
 func (fxt *fxTwitter) contentLength(url string) (int64, error) {
@@ -136,10 +150,16 @@ func (fxt *fxTwitter) Find(id string) (artworks.Artwork, error) {
 
 	videos := make([]Video, 0, len(fxArtwork.Tweet.Media.Videos))
 	for _, v := range fxArtwork.Tweet.Media.Videos {
-		videos = append(videos, Video{
+		video := Video{
 			Preview: v.ThumbnailURL,
 			URL:     fxt.pickVariant(v.URL, v.Variants),
-		})
+		}
+
+		if video.URL == "" {
+			video.FallbackLink = fallbackLink(v.Variants)
+		}
+
+		videos = append(videos, video)
 	}
 
 	photos := make([]string, 0, len(fxArtwork.Tweet.Media.Photos))

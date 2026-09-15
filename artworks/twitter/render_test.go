@@ -50,4 +50,29 @@ var _ = Describe("Render", func() {
 		Expect(rendered.Description).To(ContainSubstring("doesn't exist."))
 		Expect(rendered.Images).To(BeEmpty())
 	})
+
+	It("links oversized videos instead of downloading them", func() {
+		a := artwork()
+		a.Videos = []Video{{FallbackLink: "https://example.com/high.mp4"}}
+
+		rendered, err := a.Render()
+
+		Expect(err).NotTo(HaveOccurred())
+		Expect(rendered.Files).To(BeEmpty())
+		Expect(rendered.Fields).To(ContainElement(And(
+			HaveField("Name", "Video"),
+			HaveField("Value", "[Click here](https://example.com/high.mp4)"),
+		)))
+	})
+
+	It("skips videos with neither URL nor link", func() {
+		a := artwork()
+		a.Videos = []Video{{}}
+
+		rendered, err := a.Render()
+
+		Expect(err).NotTo(HaveOccurred())
+		Expect(rendered.Files).To(BeEmpty())
+		Expect(rendered.Fields).To(HaveLen(2))
+	})
 })

@@ -23,6 +23,10 @@ const (
 	dumpRingSize       = 3
 )
 
+func DefaultDir() string {
+	return filepath.Join(os.TempDir(), "boe-tea-diag")
+}
+
 func Start(ctx context.Context, log *zap.SugaredLogger, port int, dumpDir string) {
 	if port <= 0 {
 		return

@@ -119,10 +119,10 @@ func main() {
 	b.AddProvider(deviant.New())
 	b.AddProvider(bluesky.New())
 
-	spoolCfg := spool.Configure(cfg.Media.SpoolConfig())
+	spool.Configure(cfg.Media.SpoolConfig())
 
 	if cfg.Debug != nil && cfg.Debug.PprofPort > 0 {
-		diag.Start(ctx, log, cfg.Debug.PprofPort, spoolCfg.Dir)
+		diag.Start(ctx, log, cfg.Debug.PprofPort, diag.DefaultDir())
 	}
 
 	if err := pixiv.LoadAuth(cfg.Pixiv.AuthToken, cfg.Pixiv.RefreshToken); err == nil {

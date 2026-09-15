@@ -45,8 +45,9 @@ type Artwork struct {
 }
 
 type Video struct {
-	URL     string
-	Preview string
+	URL          string
+	Preview      string
+	FallbackLink string
 }
 
 func New() artworks.Provider {
@@ -135,6 +136,18 @@ func (a *Artwork) Render() (artworks.Rendered, error) {
 	if len(a.Videos) > 0 {
 		files := make([]*discordgo.File, 0, len(a.Videos))
 		for _, video := range a.Videos {
+			if video.URL == "" {
+				if video.FallbackLink != "" {
+					rendered.Fields = append(rendered.Fields, artworks.RenderedField{
+						Name:   "Video",
+						Value:  fmt.Sprintf("[Click here](%v)", video.FallbackLink),
+						Inline: true,
+					})
+				}
+
+				continue
+			}
+
 			file, err := downloadVideo(video.URL)
 			if err != nil {
 				spool.RemoveFiles(files)

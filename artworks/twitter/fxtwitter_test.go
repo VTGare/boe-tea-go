@@ -50,12 +50,20 @@ var _ = Describe("pickVariant", func() {
 		Expect(fxt.pickVariant("fallback", variants())).To(Equal(srv.URL + "/mid.mp4"))
 	})
 
-	It("falls back to the smallest variant when nothing fits", func() {
+	It("returns empty when nothing fits so callers fall back to a link", func() {
 		onlyHuge := []fxVideoVariant{
 			{Bitrate: 10368000, ContentType: "video/mp4", URL: srv.URL + "/high.mp4"},
 		}
 
-		Expect(fxt.pickVariant("fallback", onlyHuge)).To(Equal(srv.URL + "/high.mp4"))
+		Expect(fxt.pickVariant("fallback", onlyHuge)).To(BeEmpty())
+	})
+
+	It("returns empty when variant sizes are unknown", func() {
+		unknown := []fxVideoVariant{
+			{Bitrate: 256000, ContentType: "video/mp4", URL: srv.URL + "/no-length"},
+		}
+
+		Expect(fxt.pickVariant("fallback", unknown)).To(BeEmpty())
 	})
 
 	It("falls back to the default URL without mp4 variants", func() {
@@ -64,5 +72,25 @@ var _ = Describe("pickVariant", func() {
 		}
 
 		Expect(fxt.pickVariant("fallback", playlist)).To(Equal("fallback"))
+	})
+})
+
+var _ = Describe("fallbackLink", func() {
+	It("returns the smallest mp4 variant", func() {
+		variants := []fxVideoVariant{
+			{Bitrate: 10368000, ContentType: "video/mp4", URL: "https://example.com/high.mp4"},
+			{Bitrate: 256000, ContentType: "video/mp4", URL: "https://example.com/low.mp4"},
+			{Bitrate: 0, ContentType: "application/x-mpegURL", URL: "https://example.com/list.m3u8"},
+		}
+
+		Expect(fallbackLink(variants)).To(Equal("https://example.com/low.mp4"))
+	})
+
+	It("returns empty without mp4 variants", func() {
+		variants := []fxVideoVariant{
+			{Bitrate: 0, ContentType: "application/x-mpegURL", URL: "https://example.com/list.m3u8"},
+		}
+
+		Expect(fallbackLink(variants)).To(BeEmpty())
 	})
 })
