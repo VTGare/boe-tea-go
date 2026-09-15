@@ -77,7 +77,7 @@ func artworksGroup(b *bot.Bot) {
 		Description: "Shares an artwork from a URL, optionally includes some images.",
 		Usage:       "bt!share <artwork url> [indices to include]",
 		Example:     "bt!share https://pixiv.net/artworks/86341538 1-3 5",
-		GuildOnly:   true,
+		GuildOnly:   false,
 		RateLimiter: gumi.NewRateLimiter(5 * time.Second),
 		Exec:        share(b, post.SkipModeInclude),
 	})
@@ -89,7 +89,7 @@ func artworksGroup(b *bot.Bot) {
 		Description: "Shares an artwork from a URL, optionally excludes some images.",
 		Usage:       "bt!ex <artwork url> [indices to exclude]",
 		Example:     "bt!ex https://pixiv.net/artworks/86341538 1",
-		GuildOnly:   true,
+		GuildOnly:   false,
 		RateLimiter: gumi.NewRateLimiter(5 * time.Second),
 		Exec:        share(b, post.SkipModeExclude),
 	})
@@ -172,7 +172,7 @@ func share(b *bot.Bot, skip post.SkipMode) func(*gumi.Ctx) error {
 		gctx.Args.Remove(0)
 
 		indices := make(map[int]struct{})
-		for _, arg := range strings.Fields(gctx.Args.Raw) {
+		for arg := range strings.FieldsSeq(gctx.Args.Raw) {
 			index, err := strconv.Atoi(arg)
 			if err != nil {
 				ran, err := dgoutils.NewRange(arg)

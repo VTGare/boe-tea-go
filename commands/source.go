@@ -35,7 +35,7 @@ func sourceGroup(b *bot.Bot) {
 		Description: "Search sauce on SauceNAO",
 		Example:     "bt!sauce https://imagehosting.com/animegirl.png",
 		Usage:       "bt!sauce <image url, attachment, message url>",
-		GuildOnly:   true,
+		GuildOnly:   false,
 		RateLimiter: gumi.NewRateLimiter(15 * time.Second),
 		Exec:        sauce(b),
 	})

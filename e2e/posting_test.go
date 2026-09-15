@@ -41,15 +41,47 @@ func newCommandBot(h *harness, stub *stubProvider, captured *error) *bot.Bot {
 }
 
 func invokeCommand(b *bot.Bot, h *harness, authorID, channelID, messageID, content string) {
+	invokeCommandIn(b, h, h.cfg.guildID, authorID, channelID, messageID, content)
+}
+
+func invokeCommandIn(b *bot.Bot, h *harness, guildID, authorID, channelID, messageID, content string) {
 	event := &discordgo.MessageCreate{Message: &discordgo.Message{
 		ID:        messageID,
 		ChannelID: channelID,
-		GuildID:   h.cfg.guildID,
+		GuildID:   guildID,
 		Content:   content,
 		Author:    &discordgo.User{ID: authorID, Username: "e2e-cmd", Bot: false},
 	}}
 
 	b.Router.Handler()(h.session, event)
+}
+
+// dmChannel opens a DM channel with the configured test user, reusing an
+// existing one when the suite runs without E2E_TEST_USER_ID.
+func dmChannel(h *harness) string {
+	if h.cfg.userID != "" {
+		ch, err := h.session.UserChannelCreate(h.cfg.userID)
+		Expect(err).NotTo(HaveOccurred())
+
+		return ch.ID
+	}
+
+	h.session.State.RLock()
+	defer h.session.State.RUnlock()
+
+	for _, ch := range h.session.State.PrivateChannels {
+		if ch != nil && ch.Type == discordgo.ChannelTypeDM {
+			return ch.ID
+		}
+	}
+
+	Skip("no DM channel available: set E2E_TEST_USER_ID or open a DM with the test bot")
+
+	return ""
+}
+
+func dmAuthor() string {
+	return fmt.Sprintf("e2e-dm-%d", time.Now().UnixNano())
 }
 
 func embedImagesAfter(h *harness, channelID, seedID string) []string {
@@ -611,6 +643,101 @@ var _ = Describe("Message handler", func() {
 		cached, ok := b.EmbedCache.Get(h.cfg.channelID, seed.ID)
 		Expect(ok).To(BeTrue())
 		Expect(cached.IsParent).To(BeTrue())
+	})
+})
+
+var _ = Describe("DMs", func() {
+	var h *harness
+
+	BeforeEach(func() {
+		h = e2eHarness
+	})
+
+	It("posts links from plain DM messages", func() {
+		dm := dmChannel(h)
+		stub := newStubProvider()
+		artURL := uniqueURL("dm-handler")
+
+		stub.add(artURL, "dmhdl", &stubArtwork{previews: []string{"https://example.com/dm.png"}})
+
+		seed := seedChannel(h, dm, "dm-handler")
+		b := newTestBot(h, stub, newDetector())
+
+		event := &discordgo.MessageCreate{Message: &discordgo.Message{
+			ID:        seed.ID,
+			ChannelID: dm,
+			GuildID:   "",
+			Content:   artURL,
+			Author:    &discordgo.User{ID: dmAuthor(), Username: "e2e-dm", Bot: false},
+		}}
+
+		gctx := &gumi.Ctx{Session: h.session, Event: event, Router: gumi.Create(&gumi.Router{})}
+		Expect(handlers.OnMessage(b)(gctx)).To(Succeed())
+
+		after, err := h.session.ChannelMessages(dm, 10, "", seed.ID, "")
+		Expect(err).NotTo(HaveOccurred())
+		cleanupAfter(h, dm, seed.ID)
+
+		found := false
+
+		for _, m := range after {
+			for _, e := range m.Embeds {
+				if e != nil && e.URL == artURL {
+					found = true
+				}
+			}
+		}
+
+		Expect(found).To(BeTrue())
+	})
+
+	It("answers share commands in DMs", func() {
+		dm := dmChannel(h)
+		stub := newStubProvider()
+		artURL := uniqueURL("dm-share")
+
+		stub.add(artURL, "dmsh", &stubArtwork{previews: []string{
+			"https://example.com/dm1.png",
+			"https://example.com/dm2.png",
+		}})
+
+		var captured error
+		b := newCommandBot(h, stub, &captured)
+		seed := seedChannel(h, dm, "dm-share")
+
+		invokeCommandIn(b, h, "", dmAuthor(), dm, seed.ID, "bt!share "+artURL)
+
+		Expect(captured).NotTo(HaveOccurred())
+		Expect(embedImagesAfter(h, dm, seed.ID)).To(And(
+			HaveLen(2),
+			ContainElements("https://example.com/dm1.png", "https://example.com/dm2.png"),
+		))
+		cleanupAfter(h, dm, seed.ID)
+	})
+
+	It("answers exclude commands in DMs", func() {
+		dm := dmChannel(h)
+		stub := newStubProvider()
+		artURL := uniqueURL("dm-exclude")
+
+		stub.add(artURL, "dmex", &stubArtwork{previews: []string{
+			"https://example.com/dm1.png",
+			"https://example.com/dm2.png",
+			"https://example.com/dm3.png",
+		}})
+
+		var captured error
+		b := newCommandBot(h, stub, &captured)
+		seed := seedChannel(h, dm, "dm-exclude")
+
+		invokeCommandIn(b, h, "", dmAuthor(), dm, seed.ID, "bt!ex "+artURL+" 2")
+
+		Expect(captured).NotTo(HaveOccurred())
+		Expect(embedImagesAfter(h, dm, seed.ID)).To(And(
+			HaveLen(2),
+			ContainElements("https://example.com/dm1.png", "https://example.com/dm3.png"),
+		))
+		cleanupAfter(h, dm, seed.ID)
 	})
 })
 

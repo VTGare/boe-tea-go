@@ -7,6 +7,7 @@ import (
 	"github.com/bwmarrin/discordgo"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/servusdei2018/shards/v2"
 	"go.uber.org/zap"
 )
 
@@ -285,6 +286,18 @@ var _ = Describe("DiscordSender DM sessions", func() {
 		_, err := d.sessionFor("")
 
 		Expect(err).To(MatchError(ContainSubstring("no session for DM")))
+	})
+
+	It("falls back when the manager has no DM shard yet", func() {
+		mgr := &shards.Manager{}
+
+		fallback := &discordgo.Session{}
+		d := NewDiscordSender(mgr, nopLog, fallback)
+
+		s, err := d.sessionFor("")
+
+		Expect(err).NotTo(HaveOccurred())
+		Expect(s).To(BeIdenticalTo(fallback))
 	})
 
 	It("allows DM sends without a permission lookup", func() {
