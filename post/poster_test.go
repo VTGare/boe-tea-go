@@ -717,6 +717,34 @@ var _ = Describe("Recording reposts", func() {
 		Expect(results.reposts).To(HaveLen(1))
 		Expect(deps.detector.created()).To(BeEmpty())
 	})
+
+	It("records reposts for disabled providers without fetching", func() {
+		provider.enabled = false
+
+		results, err := poster.fetch(context.Background(), guild, "channel-1",
+			[]string{"https://example.com/good"}, runOpts{messageID: "event-1"})
+
+		Expect(err).NotTo(HaveOccurred())
+		Expect(results.items).To(BeEmpty())
+		Expect(results.reposts).To(BeEmpty())
+		Expect(provider.findCalls()).To(BeEmpty())
+		Expect(deps.detector.created()).To(HaveLen(1))
+		Expect(deps.detector.created()[0].ID).To(Equal("good"))
+	})
+
+	It("reports known reposts for disabled providers without fetching", func() {
+		provider.enabled = false
+		deps.detector.found["channel-1\x00good"] = &repost.Repost{ID: "good", URL: "https://example.com/good"}
+
+		results, err := poster.fetch(context.Background(), guild, "channel-1",
+			[]string{"https://example.com/good"}, runOpts{messageID: "event-1"})
+
+		Expect(err).NotTo(HaveOccurred())
+		Expect(results.items).To(BeEmpty())
+		Expect(results.reposts).To(HaveLen(1))
+		Expect(provider.findCalls()).To(BeEmpty())
+		Expect(deps.detector.created()).To(BeEmpty())
+	})
 })
 
 var _ = Describe("Leaving the input group alone", func() {

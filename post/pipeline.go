@@ -175,6 +175,12 @@ func (r *Poster) doFetch(ctx context.Context, guild *store.Guild, channelID stri
 
 	// Twitter crossposts bypass guild settings by design.
 	if !job.provider.Enabled(guild) && !opts.isCommand && !(opts.isCrosspost && isTwitter) {
+		// While not ideal because it records fetch failures and imageless tweets, we still want
+		// to record the sighting of a link even if the provider is disabled. 
+		if needsCreate {
+			r.createRepost(ctx, guild, channelID, job, opts.messageID)
+		}
+
 		return slot
 	}
 
@@ -198,20 +204,30 @@ func (r *Poster) doFetch(ctx context.Context, guild *store.Guild, channelID stri
 	slot.provider = job.provider
 
 	if needsCreate {
-		rep := &repost.Repost{
-			ID:        job.id,
-			URL:       job.url,
-			GuildID:   guild.ID,
-			ChannelID: channelID,
-			MessageID: opts.messageID,
-		}
-
-		if err := r.deps.Reposts.Create(ctx, rep, guild.RepostExpiration); err != nil {
-			log.With("error", err).Error("error creating a repost")
-		}
+		r.createRepost(ctx, guild, channelID, job, opts.messageID)
 	}
 
 	return slot
+}
+
+func (r *Poster) createRepost(ctx context.Context, guild *store.Guild, channelID string, job fetchJob, messageID string) {
+	rep := &repost.Repost{
+		ID:        job.id,
+		URL:       job.url,
+		GuildID:   guild.ID,
+		ChannelID: channelID,
+		MessageID: messageID,
+	}
+
+	if err := r.deps.Reposts.Create(ctx, rep, guild.RepostExpiration); err != nil {
+		r.log.With(
+			"guild_id", guild.ID,
+			"channel_id", channelID,
+			"provider", fmt.Sprintf("%T", job.provider),
+			"url", job.url,
+			"error", err,
+		).Error("error creating a repost")
+	}
 }
 
 func (r *Poster) getOrFetch(provider artworks.Provider, id string) (artworks.Artwork, error) {

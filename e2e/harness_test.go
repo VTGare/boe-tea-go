@@ -401,15 +401,17 @@ func (s *stubArtwork) Len() int {
 }
 
 type stubProvider struct {
-	mu   sync.Mutex
-	ids  map[string]string
-	arts map[string]*stubArtwork
+	mu      sync.Mutex
+	ids     map[string]string
+	arts    map[string]*stubArtwork
+	enabled bool
 }
 
 func newStubProvider() *stubProvider {
 	return &stubProvider{
-		ids:  make(map[string]string),
-		arts: make(map[string]*stubArtwork),
+		ids:     make(map[string]string),
+		arts:    make(map[string]*stubArtwork),
+		enabled: true,
 	}
 }
 
@@ -445,7 +447,17 @@ func (p *stubProvider) Find(id string) (artworks.Artwork, error) {
 }
 
 func (p *stubProvider) Enabled(*store.Guild) bool {
-	return true
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	return p.enabled
+}
+
+func (p *stubProvider) setEnabled(enabled bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	p.enabled = enabled
 }
 
 func (p *stubProvider) match(url string) (string, artworks.Provider) {

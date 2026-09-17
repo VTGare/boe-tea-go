@@ -387,6 +387,40 @@ var _ = Describe("Reposts", func() {
 		}
 	})
 
+	It("warns about reposts without sending when the provider is disabled", func() {
+		ctx := context.Background()
+		Expect(h.ensureGuild(ctx, baselineGuild)).To(Succeed())
+
+		stub := newStubProvider()
+		artURL := uniqueURL("repost-disabled")
+
+		stub.add(artURL, "dis", &stubArtwork{previews: []string{"https://example.com/d.png"}})
+		stub.setEnabled(false)
+
+		detector := newDetector()
+
+		seed1 := seedChannel(h, h.cfg.channelID, "disabled-1")
+
+		first, err := h.newPoster(stub, detector, nil).Send(ctx, h.newRun(h.cfg.channelID, seed1.ID, artURL))
+		Expect(err).NotTo(HaveOccurred())
+		Expect(first).To(BeEmpty())
+		Expect(embedImagesAfter(h, h.cfg.channelID, seed1.ID)).To(BeEmpty())
+
+		seed2 := seedChannel(h, h.cfg.channelID, "disabled-2")
+
+		second, err := h.newPoster(stub, detector, nil).Send(ctx, h.newRun(h.cfg.channelID, seed2.ID, artURL))
+		Expect(err).NotTo(HaveOccurred())
+		Expect(second).To(BeEmpty())
+		Expect(embedImagesAfter(h, h.cfg.channelID, seed2.ID)).To(BeEmpty())
+
+		after, err := h.session.ChannelMessages(h.cfg.channelID, 10, "", seed2.ID, "")
+		Expect(err).NotTo(HaveOccurred())
+
+		notice := findEmbedByTitle(after, repostNoticeName)
+		Expect(notice).NotTo(BeNil())
+		DeferCleanup(func() { h.deleteAll(notice.ChannelID, notice.ID) })
+	})
+
 	It("keeps the message when only some links are reposts", func() {
 		ctx := context.Background()
 		Expect(h.ensureGuild(ctx, func(g *store.Guild) {
