@@ -10,10 +10,11 @@ import (
 	"github.com/VTGare/boe-tea-go/internal/cache"
 	"github.com/VTGare/boe-tea-go/internal/config"
 	"github.com/VTGare/boe-tea-go/internal/sender"
+	"github.com/VTGare/boe-tea-go/internal/widget"
 	"github.com/VTGare/boe-tea-go/repost"
+	"github.com/VTGare/boe-tea-go/router"
 	"github.com/VTGare/boe-tea-go/stats"
 	"github.com/VTGare/boe-tea-go/store"
-	"github.com/VTGare/gumi"
 	"github.com/VTGare/sengoku"
 	"github.com/bwmarrin/discordgo"
 	goCache "github.com/patrickmn/go-cache"
@@ -27,7 +28,7 @@ type Bot struct {
 	Config    *config.Config
 	Stats     *stats.Stats
 	StartTime time.Time
-	Router    *gumi.Router
+	Router    *router.Router
 	Context   context.Context
 
 	// caches
@@ -40,6 +41,7 @@ type Bot struct {
 	ArtworkProviders []artworks.Provider
 	RepostDetector   repost.Detector
 	Sender           sender.Sender
+	WidgetDispatcher *widget.Dispatcher
 
 	ShardManager *shards.Manager
 	Store        store.Store
@@ -66,20 +68,21 @@ func New(
 	})
 
 	return &Bot{
-		Log:            logger,
-		Config:         config,
-		RepostDetector: rd,
-		BannedUsers:    banned,
-		EmbedCache:     cache.NewEmbedCache(),
-		ArtworkCache:   goCache.New(60*time.Minute, 90*time.Minute),
-		Sengoku:        sg,
-		ShardManager:   mgr,
-		Store:          store,
+		Log:              logger,
+		Config:           config,
+		RepostDetector:   rd,
+		BannedUsers:      banned,
+		EmbedCache:       cache.NewEmbedCache(),
+		ArtworkCache:     goCache.New(60*time.Minute, 90*time.Minute),
+		Sengoku:          sg,
+		ShardManager:     mgr,
+		Store:            store,
+		WidgetDispatcher: widget.NewDispatcher(),
 	}, nil
 }
 
-func (b *Bot) AddRouter(router *gumi.Router) {
-	b.Router = gumi.Create(router)
+func (b *Bot) AddRouter(r *router.Router) {
+	b.Router = r
 }
 
 func (b *Bot) AddProvider(provider artworks.Provider) {
@@ -90,23 +93,10 @@ func (b *Bot) AddHandler(handler any) {
 	b.ShardManager.AddHandler(handler)
 }
 
-// guardedRouterHandler drops malformed gateway events before the router
-// touches them
-func (b *Bot) guardedRouterHandler() func(*discordgo.Session, *discordgo.MessageCreate) {
-	handler := b.Router.Handler()
-
-	return func(s *discordgo.Session, e *discordgo.MessageCreate) {
-		if e == nil || e.Message == nil || e.Message.Author == nil {
-			b.Log.Warn("dropping malformed message event")
-			return
-		}
-
-		handler(s, e)
-	}
-}
-
 func (b *Bot) Start(ctx context.Context) error {
-	b.ShardManager.AddHandler(b.guardedRouterHandler())
+	b.ShardManager.AddHandler(b.Router.HandleMessage)
+	b.ShardManager.AddHandler(b.Router.HandleInteraction)
+	b.ShardManager.AddHandler(b.WidgetDispatcher.Handle)
 
 	b.StartTime = time.Now()
 	b.Stats = stats.New(b.Router, b.ArtworkProviders)
@@ -115,6 +105,20 @@ func (b *Bot) Start(ctx context.Context) error {
 	b.Log.Debug("starting a bot")
 	if err := b.ShardManager.Start(); err != nil {
 		return err
+	}
+
+	if s := b.ShardManager.SessionForDM(); s != nil {
+		if guildID := b.Router.Config().DevGuildID; guildID != "" {
+			if err := b.Router.ClearCommands(s, guildID); err != nil {
+				b.Log.With("error", err).Error("failed to clear application commands")
+			}
+		}
+
+		if err := b.Router.Sync(s); err != nil {
+			b.Log.With("error", err).Error("failed to sync application commands")
+		}
+	} else {
+		b.Log.Warn("no session available, skipping application command sync")
 	}
 
 	<-ctx.Done()

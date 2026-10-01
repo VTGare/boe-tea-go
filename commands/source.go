@@ -10,10 +10,9 @@ import (
 	"time"
 
 	"github.com/VTGare/boe-tea-go/bot"
-	"github.com/VTGare/boe-tea-go/internal/widget"
 	"github.com/VTGare/boe-tea-go/messages"
+	"github.com/VTGare/boe-tea-go/router"
 	"github.com/VTGare/embeds"
-	"github.com/VTGare/gumi"
 	"github.com/VTGare/sengoku"
 	"github.com/bwmarrin/discordgo"
 	"github.com/julien040/go-ternary"
@@ -25,59 +24,101 @@ var (
 	pximgRegex      = regexp.MustCompile(`(?i)https?://i\.pximg\.net/.+?/(\d+)(?:_p\d+)?(?:\.[a-z]+)?(?:$|[?#])`)
 )
 
-func sourceGroup(b *bot.Bot) {
-	group := "source"
-
-	b.Router.RegisterCmd(&gumi.Command{
-		Name:        "sauce",
-		Group:       group,
-		Aliases:     []string{"saucenao"},
-		Description: "Search sauce on SauceNAO",
-		Example:     "bt!sauce https://imagehosting.com/animegirl.png",
-		Usage:       "bt!sauce <image url, attachment, message url>",
-		GuildOnly:   false,
-		RateLimiter: gumi.NewRateLimiter(15 * time.Second),
-		Exec:        sauce(b),
-	})
+func sourceGroup(b *bot.Bot) []*router.Command {
+	return []*router.Command{
+		{
+			Name:        "sauce",
+			Category:    "Source",
+			Aliases:     []string{"saucenao"},
+			Description: "Search sauce on SauceNAO",
+			Cooldown:    router.NewCooldown(router.CooldownUser, 1, 5*time.Second),
+			Defer:       true,
+			Options: []*router.Option{
+				router.String("url", "Image URL or Discord message link").Greedy(),
+				router.Attachment("image", "Image to look up"),
+			},
+			Examples: []string{"sauce https://imagehosting.com/animegirl.png"},
+			Handler:  sauce(b),
+		},
+		{
+			Name:        "Find Sauce",
+			Category:    "Source",
+			Type:        router.MessageContext,
+			Description: "Find the source of images in a message",
+			Cooldown:    router.NewCooldown(router.CooldownUser, 1, 5*time.Second),
+			Defer:       true,
+			Handler:     sauce(b),
+		},
+	}
 }
 
-func sauce(b *bot.Bot) func(*gumi.Ctx) error {
-	return func(gctx *gumi.Ctx) error {
-		url, ok := findImage(
-			gctx.Session,
-			gctx.Event,
-			strings.Fields(gctx.Args.Raw),
+func sauce(b *bot.Bot) router.Handler {
+	return func(ctx *router.Context) error {
+		if ctx.TargetMessage != nil {
+			url, ok := findImage(ctx.Session, ctx.TargetMessage, nil)
+			if !ok {
+				return messages.SauceNoImage()
+			}
+
+			return searchSauce(ctx, b, url)
+		}
+
+		var (
+			imageURL string
+			url      string
+			ok       bool
 		)
+
+		if att := ctx.Options.Attachment("image"); att != nil {
+			imageURL = att.URL
+		}
+
+		query := ctx.Options.String("url")
+
+		switch {
+		case imageURL != "":
+			url, ok = imageURL, true
+		case ctx.IsMessage():
+			url, ok = findImage(ctx.Session, ctx.Message, strings.Fields(query))
+		case query != "":
+			if imageRegex.MatchString(query) {
+				url, ok = query, true
+			} else if ref, err := findImageMessageReference(ctx.Session, query); err == nil && ref != "" {
+				url, ok = ref, true
+			}
+		}
 
 		if !ok {
 			return messages.SauceNoImage()
 		}
 
-		sauces, err := b.Sengoku.Search(url)
-		if err != nil {
-			switch {
-			case errors.Is(err, sengoku.ErrRateLimitReached):
-				return messages.SauceRateLimit()
-			default:
-				return messages.SauceError(err)
-			}
-		}
-
-		filtered := make([]*sengoku.Sauce, 0)
-		for _, sauce := range sauces {
-			if sauce.Similarity > 70.0 && sauce.Pretty {
-				filtered = append(filtered, sauce)
-			}
-		}
-
-		if len(filtered) == 0 {
-			return messages.SauceNotFound(url)
-		}
-
-		sauceEmbeds := sauceNAOEmbeds(filtered)
-		wg := widget.New(b.Sender, widget.NewSessionSource(gctx.Session), gctx.Event.GuildID, gctx.Event.Author.ID, sauceEmbeds)
-		return wg.Start(b.Context, gctx.Event.ChannelID)
+		return searchSauce(ctx, b, url)
 	}
+}
+
+func searchSauce(ctx *router.Context, b *bot.Bot, url string) error {
+	sauces, err := b.Sengoku.Search(url)
+	if err != nil {
+		switch {
+		case errors.Is(err, sengoku.ErrRateLimitReached):
+			return messages.SauceRateLimit()
+		default:
+			return messages.SauceError(err)
+		}
+	}
+
+	filtered := make([]*sengoku.Sauce, 0)
+	for _, sauce := range sauces {
+		if sauce.Similarity > 70.0 && sauce.Pretty {
+			filtered = append(filtered, sauce)
+		}
+	}
+
+	if len(filtered) == 0 {
+		return messages.SauceNotFound(url)
+	}
+
+	return replyPages(ctx, b, sauceNAOEmbeds(filtered))
 }
 
 func sauceNAOEmbeds(sauces []*sengoku.Sauce) []*discordgo.MessageEmbed {
@@ -88,7 +129,7 @@ func sauceNAOEmbeds(sauces []*sengoku.Sauce) []*discordgo.MessageEmbed {
 
 		titleBuilder := strings.Builder{}
 		if l > 1 {
-			titleBuilder.WriteString(fmt.Sprintf("[%v/%v] ", index+1, l))
+			fmt.Fprintf(&titleBuilder, "[%v/%v] ", index+1, l)
 		}
 
 		titleBuilder.WriteString(ternary.If(
@@ -178,7 +219,7 @@ func pixivArtworkURL(raw string) (string, bool) {
 	return fmt.Sprintf("https://pixiv.net/artworks/%s", matches[1]), true
 }
 
-func findImage(s *discordgo.Session, m *discordgo.MessageCreate, args []string) (string, bool) {
+func findImage(s *discordgo.Session, m *discordgo.Message, args []string) (string, bool) {
 	if len(args) > 0 {
 		if imageRegex.MatchString(args[0]) {
 			return args[0], true

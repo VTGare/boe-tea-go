@@ -12,580 +12,570 @@ import (
 	"github.com/VTGare/boe-tea-go/bot"
 	"github.com/VTGare/boe-tea-go/internal/arrays"
 	"github.com/VTGare/boe-tea-go/internal/dgoutils"
-	"github.com/VTGare/boe-tea-go/internal/sender"
-	"github.com/VTGare/boe-tea-go/internal/widget"
 	"github.com/VTGare/boe-tea-go/messages"
+	"github.com/VTGare/boe-tea-go/router"
 	"github.com/VTGare/boe-tea-go/store"
 	"github.com/VTGare/embeds"
-	"github.com/VTGare/gumi"
 	"github.com/bwmarrin/discordgo"
 	"github.com/julien040/go-ternary"
 )
 
-func settingsGroup(b *bot.Bot) {
-	group := "settings"
+var guildManagePerms int64 = discordgo.PermissionAdministrator | discordgo.PermissionManageGuild
 
-	b.Router.RegisterCmd(&gumi.Command{
-		Name:        "set",
-		Group:       group,
-		Aliases:     []string{"cfg", "config", "settings"},
-		Description: "Shows or edits server settings.",
-		Usage:       "bt!set <setting name> <new setting>",
-		Example:     "bt!set pixiv false",
-		Flags:       make(map[string]string),
-		GuildOnly:   true,
-		NSFW:        false,
-		AuthorOnly:  false,
-		Permissions: 0,
-		RateLimiter: gumi.NewRateLimiter(5 * time.Second),
-		Exec:        set(b),
-	})
+func settingsGroup(b *bot.Bot) []*router.Command {
+	settingChoices := []router.Choice{
+		{Name: "prefix", Value: "prefix"},
+		{Name: "limit", Value: "limit"},
+		{Name: "repost", Value: "repost"},
+		{Name: "repost.expiration", Value: "repost.expiration"},
+		{Name: "nsfw", Value: "nsfw"},
+		{Name: "crosspost", Value: "crosspost"},
+		{Name: "reactions", Value: "reactions"},
+		{Name: "pixiv", Value: "pixiv"},
+		{Name: "bluesky", Value: "bluesky"},
+		{Name: "twitter", Value: "twitter"},
+		{Name: "deviant", Value: "deviant"},
+		{Name: "tags", Value: "tags"},
+		{Name: "footer", Value: "footer"},
+		{Name: "twitter.skip", Value: "twitter.skip"},
+	}
 
-	b.Router.RegisterCmd(&gumi.Command{
-		Name:        "artchannels",
-		Group:       group,
-		Aliases:     []string{"ac", "artchannel"},
-		Description: "List or add/remove artchannels.",
-		Usage:       "bt!artchannels <add/remove> [channel ids/category id...]",
-		Example:     "bt!artchannels add #sfw #nsfw #basement",
-		GuildOnly:   true,
-		Permissions: discordgo.PermissionAdministrator | discordgo.PermissionManageServer,
-		RateLimiter: gumi.NewRateLimiter(5 * time.Second),
-		Exec:        artChannels(b),
-	})
+	manageChecks := []router.Check{router.GuildOnly, router.HasPermissions(guildManagePerms)}
 
-	b.Router.RegisterCmd(&gumi.Command{
-		Name:        "addchannel",
-		Group:       group,
-		Aliases:     []string{},
-		Description: "Adds a new art channel to server settings.",
-		Usage:       "bt!addchannel [channel ids/category id...]",
-		Example:     "bt!addchannel #sfw #nsfw #basement",
-		GuildOnly:   true,
-		Permissions: discordgo.PermissionAdministrator | discordgo.PermissionManageServer,
-		RateLimiter: gumi.NewRateLimiter(5 * time.Second),
-		Exec:        addChannel(b),
-	})
-
-	b.Router.RegisterCmd(&gumi.Command{
-		Name:        "rmchannel",
-		Group:       group,
-		Aliases:     []string{"remchannel", "removechannel"},
-		Description: "Removes an art channel from server settings.",
-		Usage:       "bt!rmchannel [channel ids/category id...]",
-		Example:     "bt!rmchannel #sfw #nsfw #basement",
-		GuildOnly:   true,
-		Permissions: discordgo.PermissionAdministrator | discordgo.PermissionManageServer,
-		RateLimiter: gumi.NewRateLimiter(5 * time.Second),
-		Exec:        removeChannel(b),
-	})
-}
-
-func set(b *bot.Bot) func(*gumi.Ctx) error {
-	return func(gctx *gumi.Ctx) error {
-		showSettings := func() error {
-			gd, err := gctx.Session.Guild(gctx.Event.GuildID)
-			if err != nil {
-				return messages.ErrGuildNotFound(err, gctx.Event.GuildID)
-			}
-
-			ctx, cancel := context.WithTimeout(b.Context, 5*time.Second)
-			defer cancel()
-
-			guild, err := b.Store.Guild(ctx, gd.ID)
-			if err != nil {
-				switch {
-				case errors.Is(err, store.ErrGuildNotFound):
-					return messages.ErrGuildNotFound(err, gctx.Event.GuildID)
-				default:
-					return err
-				}
-			}
-
-			eb := embeds.NewBuilder()
-			eb.Title("Current settings").Description(fmt.Sprintf("**%v**", gd.Name))
-			eb.Thumbnail(gd.IconURL("320"))
-			eb.Footer("To change a setting use either its name or the name in parethesis", "")
-
-			eb.AddField(
-				"General",
-				fmt.Sprintf(
-					"**%v**: %v | **%v**: %v",
-					"Prefix", guild.Prefix,
-					"NSFW", messages.FormatBool(guild.NSFW),
+	return []*router.Command{
+		{
+			Name:        "set",
+			Category:    "Settings",
+			Aliases:     []string{"cfg", "config", "settings"},
+			Description: "Shows or edits server settings.",
+			Checks:      []router.Check{router.GuildOnly},
+			Cooldown:    router.NewCooldown(router.CooldownUser, 1, 5*time.Second),
+			Options: []*router.Option{
+				router.String("setting", "Setting to change").WithChoices(settingChoices...),
+				router.String("value", "New value").Greedy(),
+			},
+			Examples: []string{"set pixiv false"},
+			Handler:  set(b),
+		},
+		{
+			Name:        "artchannels",
+			Category:    "Settings",
+			Aliases:     []string{"ac", "artchannel"},
+			Description: "List or add/remove artchannels.",
+			Checks:      manageChecks,
+			Cooldown:    router.NewCooldown(router.CooldownUser, 1, 5*time.Second),
+			Options: []*router.Option{
+				router.String("action", "What to do").WithChoices(
+					router.Choice{Name: "add", Value: "add"},
+					router.Choice{Name: "remove", Value: "remove"},
 				),
-			)
-
-			eb.AddField(
-				"Features",
-				fmt.Sprintf(
-					"**%v**: %v | **%v**: %v\n**%v**: %v | **%v**: %v\n**%v**: %v | **%v**: %v",
-					"Repost", guild.Repost,
-					"Expiration (repost.expiration)", guild.RepostExpiration,
-					"Crosspost", messages.FormatBool(guild.Crosspost),
-					"Reactions", messages.FormatBool(guild.Reactions),
-					"Tags", messages.FormatBool(guild.Tags),
-					"Footer messages (footer)", messages.FormatBool(guild.FlavorText),
-				),
-			)
-
-			eb.AddField(
-				"Pixiv settings",
-				fmt.Sprintf(
-					"**%v**: %v | **%v**: %v",
-					"Status (pixiv)", messages.FormatBool(guild.Pixiv),
-					"Limit", strconv.Itoa(guild.Limit),
-				),
-			)
-
-			eb.AddField(
-				"Twitter settings",
-				fmt.Sprintf(
-					"**%v**: %v | **%v**: %v",
-					"Status (twitter)", messages.FormatBool(guild.Twitter),
-					"Skip First (twitter.skip)", messages.FormatBool(guild.SkipFirst),
-				),
-			)
-
-			eb.AddField(
-				"DeviantArt settings",
-				fmt.Sprintf(
-					"**%v**: %v",
-					"Status (deviant)", messages.FormatBool(guild.Deviant),
-				),
-			)
-
-			eb.AddField(
-				"Bluesky settings",
-				fmt.Sprintf(
-					"**%v**: %v",
-					"Status (bluesky)", messages.FormatBool(guild.Bluesky),
-				),
-			)
-
-			channels := ternary.If(
-				len(guild.ArtChannels) > 5,
-				[]string{"There are more than 5 art channels, use `bt!artchannels` command to see them."},
-				arrays.Map(guild.ArtChannels, func(s string) string {
-					return fmt.Sprintf("<#%v> | `%v`", s, s)
-				}),
-			)
-
-			eb.AddField(
-				"Art channels",
-				"Use `bt!artchannels` command to list or manage art channels!\n\n"+strings.Join(channels, "\n"),
-			)
-
-			return gctx.ReplyEmbed(eb.Finalize())
-		}
-
-		changeSetting := func() error {
-			perms, err := sender.CheckGuildPerms(
-				gctx.Session,
-				gctx.Event.GuildID,
-				gctx.Event.Author.ID,
-				discordgo.PermissionAdministrator|discordgo.PermissionManageGuild,
-			)
-			if err != nil {
-				return err
-			}
-
-			if !perms {
-				return gctx.Router.OnNoPermissionsCallback(gctx)
-			}
-
-			ctx, cancel := context.WithTimeout(b.Context, 10*time.Second)
-			defer cancel()
-
-			guild, err := b.Store.Guild(ctx, gctx.Event.GuildID)
-			if err != nil {
-				return err
-			}
-
-			var (
-				settingName     = gctx.Args.Get(0)
-				newSetting      = gctx.Args.Get(1)
-				newSettingEmbed any
-				oldSettingEmbed any
-			)
-
-			applySetting := func(guildSet any, newSet any) any {
-				oldSettingEmbed = guildSet
-				newSettingEmbed = newSet
-				return newSet
-			}
-
-			switch settingName.Raw {
-			case "prefix":
-				if len(newSetting.Raw) > 0 && unicode.IsLetter(rune(newSetting.Raw[len(newSetting.Raw)-1])) {
-					newSetting.Raw += " "
-				}
-
-				if len(newSetting.Raw) > 5 {
-					return messages.ErrPrefixTooLong(newSetting.Raw)
-				}
-
-				applySetting(guild.Prefix, newSetting.Raw)
-				guild.Prefix = newSetting.Raw
-			case "limit":
-				limit, err := strconv.Atoi(newSetting.Raw)
-				if err != nil {
-					return messages.ErrParseInt(newSetting.Raw)
-				}
-
-				applySetting(guild.Limit, limit)
-				guild.Limit = limit
-			case "repost":
-				if newSetting.Raw != string(store.GuildRepostEnabled) &&
-					newSetting.Raw != string(store.GuildRepostDisabled) &&
-					newSetting.Raw != string(store.GuildRepostStrict) {
-					return messages.ErrUnknownRepostOption(newSetting.Raw)
-				}
-
-				applySetting(guild.Repost, newSetting.Raw)
-				guild.Repost = store.GuildRepost(newSetting.Raw)
-
-			case "repost.expiration":
-				dur, err := time.ParseDuration(newSetting.Raw)
-				if err != nil {
-					return messages.ErrParseDuration(newSetting.Raw)
-				}
-
-				if dur < 1*time.Minute || dur > 168*time.Hour {
-					return messages.ErrExpirationOutOfRange(newSetting.Raw)
-				}
-
-				applySetting(guild.RepostExpiration, dur)
-				guild.RepostExpiration = dur
-
-			case "nsfw":
-				enable, err := parseBool(newSetting.Raw)
-				if err != nil {
-					return err
-				}
-
-				applySetting(guild.NSFW, enable)
-				guild.NSFW = enable
-
-			case "crosspost":
-				enable, err := parseBool(newSetting.Raw)
-				if err != nil {
-					return err
-				}
-
-				applySetting(guild.Crosspost, enable)
-				guild.Crosspost = enable
-
-			case "reactions":
-				enable, err := parseBool(newSetting.Raw)
-				if err != nil {
-					return err
-				}
-
-				applySetting(guild.Reactions, enable)
-				guild.Reactions = enable
-
-			case "pixiv":
-				enable, err := parseBool(newSetting.Raw)
-				if err != nil {
-					return err
-				}
-
-				applySetting(guild.Pixiv, enable)
-				guild.Pixiv = enable
-
-			case "bluesky":
-				enable, err := parseBool(newSetting.Raw)
-				if err != nil {
-					return err
-				}
-
-				applySetting(guild.Bluesky, enable)
-				guild.Bluesky = enable
-
-			case "twitter":
-				enable, err := parseBool(newSetting.Raw)
-				if err != nil {
-					return err
-				}
-
-				applySetting(guild.Twitter, enable)
-				guild.Twitter = enable
-
-			case "deviant":
-				enable, err := parseBool(newSetting.Raw)
-				if err != nil {
-					return err
-				}
-
-				applySetting(guild.Deviant, enable)
-				guild.Deviant = enable
-
-			case "tags":
-				enable, err := parseBool(newSetting.Raw)
-				if err != nil {
-					return err
-				}
-
-				applySetting(guild.Tags, enable)
-				guild.Tags = enable
-
-			case "footer":
-				enable, err := parseBool(newSetting.Raw)
-				if err != nil {
-					return err
-				}
-
-				applySetting(guild.FlavorText, enable)
-				guild.FlavorText = enable
-
-			case "twitter.skip":
-				enable, err := parseBool(newSetting.Raw)
-				if err != nil {
-					return err
-				}
-
-				applySetting(guild.SkipFirst, enable)
-				guild.SkipFirst = enable
-
-			default:
-				return messages.ErrUnknownSetting(settingName.Raw)
-			}
-
-			_, err = b.Store.UpdateGuild(ctx, guild)
-			if err != nil {
-				return err
-			}
-
-			eb := embeds.NewBuilder()
-			eb.InfoTemplate("Successfully changed setting.")
-			eb.AddField("Setting name", settingName.Raw, true)
-			eb.AddField("Old setting", fmt.Sprintf("%v", oldSettingEmbed), true)
-			eb.AddField("New setting", fmt.Sprintf("%v", newSettingEmbed), true)
-
-			return gctx.ReplyEmbed(eb.Finalize())
-		}
-
-		switch {
-		case gctx.Args.Len() == 0:
-			return showSettings()
-		case gctx.Args.Len() >= 2:
-			return changeSetting()
-		default:
-			return messages.ErrIncorrectCmd(gctx.Command)
-		}
+				router.String("targets", "Channels or categories").Greedy(),
+			},
+			Examples: []string{"artchannels add #sfw #nsfw #basement"},
+			Handler:  artChannels(b),
+		},
+		{
+			Name:        "addchannel",
+			Category:    "Settings",
+			Description: "Adds a new art channel to server settings.",
+			Checks:      manageChecks,
+			Cooldown:    router.NewCooldown(router.CooldownUser, 1, 5*time.Second),
+			Options: []*router.Option{
+				router.String("targets", "Channel IDs, mentions, or categories").Require().Greedy(),
+			},
+			Examples: []string{"addchannel #sfw #nsfw #basement"},
+			Handler:  addChannel(b),
+		},
+		{
+			Name:        "rmchannel",
+			Category:    "Settings",
+			Aliases:     []string{"remchannel", "removechannel"},
+			Description: "Removes an art channel from server settings.",
+			Checks:      manageChecks,
+			Cooldown:    router.NewCooldown(router.CooldownUser, 1, 5*time.Second),
+			Options: []*router.Option{
+				router.String("targets", "Channel IDs, mentions, or categories").Require().Greedy(),
+			},
+			Examples: []string{"rmchannel #sfw #nsfw #basement"},
+			Handler:  removeChannel(b),
+		},
 	}
 }
 
-func artChannels(b *bot.Bot) func(*gumi.Ctx) error {
-	return func(gctx *gumi.Ctx) error {
-		ctx, cancel := context.WithTimeout(b.Context, 10*time.Second)
-		defer cancel()
-
-		switch {
-		case gctx.Args.Len() == 0:
-			guild, err := b.Store.Guild(ctx, gctx.Event.GuildID)
-			if err != nil {
-				return messages.ErrGuildNotFound(err, gctx.Event.GuildID)
-			}
-
-			gd, err := gctx.Session.Guild(gctx.Event.GuildID)
-			if err != nil {
-				return messages.ErrGuildNotFound(err, gctx.Event.GuildID)
-			}
-
-			var (
-				eb = embeds.NewBuilder()
-				sb = &strings.Builder{}
-
-				added int
-			)
-
-			eb.Title("Art channels")
-			eb.Thumbnail(gd.IconURL("320"))
-			if len(guild.ArtChannels) == 0 {
-				eb.Description("You haven't added any art channels yet. Add your first art channel using `bt!artchannels add <channel mention>` command.")
-
-				return gctx.ReplyEmbed(eb.Finalize())
-			}
-
-			eb.Footer("Total: "+strconv.Itoa(len(guild.ArtChannels)), "")
-			channelEmbeds := make([]*discordgo.MessageEmbed, 0)
-			for _, channel := range guild.ArtChannels {
-				sb.WriteString(
-					fmt.Sprintf("%v. <#%v> | `%v`\n", added+1, channel, channel),
-				)
-
-				added++
-				if added%10 == 0 {
-					eb.Description(sb.String())
-					channelEmbeds = append(channelEmbeds, eb.Finalize())
-
-					eb = embeds.NewBuilder()
-					eb.Title("Art channels")
-					eb.Thumbnail(gd.IconURL("320"))
-					eb.Footer("Total: "+strconv.Itoa(len(guild.ArtChannels)), "")
-
-					sb.Reset()
-				}
-			}
-
-			if added%10 > 0 {
-				eb.Description(sb.String())
-				channelEmbeds = append(channelEmbeds, eb.Finalize())
-			}
-
-			wg := widget.New(b.Sender, widget.NewSessionSource(gctx.Session), gctx.Event.GuildID, gctx.Event.Author.ID, channelEmbeds)
-			return wg.Start(b.Context, gctx.Event.ChannelID)
-
-		case gctx.Args.Len() >= 2:
-			perms, err := sender.CheckGuildPerms(
-				gctx.Session,
-				gctx.Event.GuildID,
-				gctx.Event.Author.ID,
-				discordgo.PermissionAdministrator|discordgo.PermissionManageGuild,
-			)
-			if err != nil {
-				return err
-			}
-
-			if !perms {
-				return gctx.Router.OnNoPermissionsCallback(gctx)
-			}
-
-			var (
-				action = gctx.Args.Get(0)
-
-				filter  func(guild *store.Guild, channelID string) error
-				execute func(guildID string, channels []string) error
-			)
-
-			switch action.Raw {
-			case "add":
-				execute = func(guildID string, channels []string) error {
-					if _, err := b.Store.AddArtChannels(ctx, guildID, channels); err != nil {
-						return err
-					}
-
-					eb := embeds.NewBuilder()
-					eb.SuccessTemplate(messages.AddArtChannelSuccess(channels))
-					return gctx.ReplyEmbed(eb.Finalize())
-				}
-
-				filter = func(guild *store.Guild, channelID string) error {
-					exists := false
-					for _, artChannelID := range guild.ArtChannels {
-						if artChannelID == channelID {
-							exists = true
-						}
-					}
-
-					if exists {
-						return messages.ErrAlreadyArtChannel(channelID)
-					}
-
-					return nil
-				}
-			case "remove":
-				execute = func(guildID string, channels []string) error {
-					if _, err := b.Store.DeleteArtChannels(ctx, guildID, channels); err != nil {
-						return err
-					}
-
-					eb := embeds.NewBuilder()
-					eb.SuccessTemplate(messages.RemoveArtChannelSuccess(channels))
-					return gctx.ReplyEmbed(eb.Finalize())
-				}
-
-				filter = func(guild *store.Guild, channelID string) error {
-					exists := false
-					for _, artChannelID := range guild.ArtChannels {
-						if artChannelID == channelID {
-							exists = true
-						}
-					}
-
-					if !exists {
-						return messages.ErrNotArtChannel(channelID)
-					}
-
-					return nil
-				}
-			}
-
-			guild, err := b.Store.Guild(ctx, gctx.Event.GuildID)
-			if err != nil {
-				return messages.ErrGuildNotFound(err, gctx.Event.GuildID)
-			}
-
-			channels := make([]string, 0)
-			for _, arg := range gctx.Args.Arguments[1:] {
-				ch, err := gctx.Session.Channel(dgoutils.TrimmerRaw(arg.Raw))
-				if err != nil {
-					return err
-				}
-
-				if ch.GuildID != guild.ID {
-					return messages.ErrForeignChannel(ch.ID)
-				}
-
-				if ch.Type == discordgo.ChannelTypeGuildVoice {
-					continue
-				}
-
-				switch ch.Type {
-				case discordgo.ChannelTypeGuildCategory:
-					gcs, err := gctx.Session.GuildChannels(guild.ID)
-					if err != nil {
-						return err
-					}
-
-					for _, gc := range gcs {
-						if ch.Type == discordgo.ChannelTypeGuildVoice {
-							continue
-						}
-
-						if gc.ParentID == ch.ID {
-							if err := filter(guild, ch.ID); err != nil {
-								return err
-							}
-
-							channels = append(channels, gc.ID)
-						}
-					}
-				default:
-					if err := filter(guild, ch.ID); err != nil {
-						return err
-					}
-
-					channels = append(channels, ch.ID)
-				}
-			}
-
-			return execute(guild.ID, channels)
-		default:
-			return messages.ErrIncorrectCmd(gctx.Command)
+func set(b *bot.Bot) router.Handler {
+	return func(ctx *router.Context) error {
+		setting := ctx.Options.String("setting")
+		if setting == "" {
+			return showSettings(b, ctx)
 		}
+
+		value := ctx.Options.String("value")
+		if value == "" {
+			return messages.ErrIncorrectCmd(ctx.Command)
+		}
+
+		return changeSetting(b, ctx, setting, value)
 	}
 }
 
-func addChannel(b *bot.Bot) func(*gumi.Ctx) error {
-	return func(gctx *gumi.Ctx) error {
-		if err := dgoutils.ValidateArgs(gctx, 1); err != nil {
+func showSettings(b *bot.Bot, ctx *router.Context) error {
+	gd, err := ctx.Session.Guild(ctx.GuildID())
+	if err != nil {
+		return messages.ErrGuildNotFound(err, ctx.GuildID())
+	}
+
+	reqCtx, cancel := context.WithTimeout(ctx.Context(), 5*time.Second)
+	defer cancel()
+
+	guild, err := b.Store.Guild(reqCtx, gd.ID)
+	if err != nil {
+		switch {
+		case errors.Is(err, store.ErrGuildNotFound):
+			return messages.ErrGuildNotFound(err, ctx.GuildID())
+		default:
+			return err
+		}
+	}
+
+	eb := embeds.NewBuilder()
+	eb.Title("Current settings").Description(fmt.Sprintf("**%v**", gd.Name))
+	eb.Thumbnail(gd.IconURL("320"))
+	eb.Footer("To change a setting use either its name or the name in parethesis", "")
+
+	eb.AddField(
+		"General",
+		fmt.Sprintf(
+			"**%v**: %v | **%v**: %v",
+			"Prefix", guild.Prefix,
+			"NSFW", messages.FormatBool(guild.NSFW),
+		),
+	)
+
+	eb.AddField(
+		"Features",
+		fmt.Sprintf(
+			"**%v**: %v | **%v**: %v\n**%v**: %v | **%v**: %v\n**%v**: %v | **%v**: %v",
+			"Repost", guild.Repost,
+			"Expiration (repost.expiration)", guild.RepostExpiration,
+			"Crosspost", messages.FormatBool(guild.Crosspost),
+			"Reactions", messages.FormatBool(guild.Reactions),
+			"Tags", messages.FormatBool(guild.Tags),
+			"Footer messages (footer)", messages.FormatBool(guild.FlavorText),
+		),
+	)
+
+	eb.AddField(
+		"Pixiv settings",
+		fmt.Sprintf(
+			"**%v**: %v | **%v**: %v",
+			"Status (pixiv)", messages.FormatBool(guild.Pixiv),
+			"Limit", strconv.Itoa(guild.Limit),
+		),
+	)
+
+	eb.AddField(
+		"Twitter settings",
+		fmt.Sprintf(
+			"**%v**: %v | **%v**: %v",
+			"Status (twitter)", messages.FormatBool(guild.Twitter),
+			"Skip First (twitter.skip)", messages.FormatBool(guild.SkipFirst),
+		),
+	)
+
+	eb.AddField(
+		"DeviantArt settings",
+		fmt.Sprintf(
+			"**%v**: %v",
+			"Status (deviant)", messages.FormatBool(guild.Deviant),
+		),
+	)
+
+	eb.AddField(
+		"Bluesky settings",
+		fmt.Sprintf(
+			"**%v**: %v",
+			"Status (bluesky)", messages.FormatBool(guild.Bluesky),
+		),
+	)
+
+	channels := ternary.If(
+		len(guild.ArtChannels) > 5,
+		[]string{"There are more than 5 art channels, use `bt!artchannels` command to see them."},
+		arrays.Map(guild.ArtChannels, func(s string) string {
+			return fmt.Sprintf("<#%v> | `%v`", s, s)
+		}),
+	)
+
+	eb.AddField(
+		"Art channels",
+		"Use `bt!artchannels` command to list or manage art channels!\n\n"+strings.Join(channels, "\n"),
+	)
+
+	return ctx.Reply(router.Embed(eb.Finalize()))
+}
+
+func changeSetting(b *bot.Bot, ctx *router.Context, settingName, newSetting string) error {
+	if err := router.HasPermissions(guildManagePerms)(ctx); err != nil {
+		return err
+	}
+
+	reqCtx, cancel := context.WithTimeout(ctx.Context(), 10*time.Second)
+	defer cancel()
+
+	guild, err := b.Store.Guild(reqCtx, ctx.GuildID())
+	if err != nil {
+		return err
+	}
+
+	var (
+		newSettingEmbed any
+		oldSettingEmbed any
+	)
+
+	applySetting := func(guildSet any, newSet any) any {
+		oldSettingEmbed = guildSet
+		newSettingEmbed = newSet
+		return newSet
+	}
+
+	switch settingName {
+	case "prefix":
+		if len(newSetting) > 0 && unicode.IsLetter(rune(newSetting[len(newSetting)-1])) {
+			newSetting += " "
+		}
+
+		if len(newSetting) > 5 {
+			return messages.ErrPrefixTooLong(newSetting)
+		}
+
+		applySetting(guild.Prefix, newSetting)
+		guild.Prefix = newSetting
+	case "limit":
+		limit, err := strconv.Atoi(newSetting)
+		if err != nil {
+			return messages.ErrParseInt(newSetting)
+		}
+
+		applySetting(guild.Limit, limit)
+		guild.Limit = limit
+	case "repost":
+		if newSetting != string(store.GuildRepostEnabled) &&
+			newSetting != string(store.GuildRepostDisabled) &&
+			newSetting != string(store.GuildRepostStrict) {
+			return messages.ErrUnknownRepostOption(newSetting)
+		}
+
+		applySetting(guild.Repost, newSetting)
+		guild.Repost = store.GuildRepost(newSetting)
+
+	case "repost.expiration":
+		dur, err := time.ParseDuration(newSetting)
+		if err != nil {
+			return messages.ErrParseDuration(newSetting)
+		}
+
+		if dur < 1*time.Minute || dur > 168*time.Hour {
+			return messages.ErrExpirationOutOfRange(newSetting)
+		}
+
+		applySetting(guild.RepostExpiration, dur)
+		guild.RepostExpiration = dur
+
+	case "nsfw":
+		enable, err := parseBool(newSetting)
+		if err != nil {
 			return err
 		}
 
-		ctx, cancel := context.WithTimeout(b.Context, 10*time.Second)
+		applySetting(guild.NSFW, enable)
+		guild.NSFW = enable
+
+	case "crosspost":
+		enable, err := parseBool(newSetting)
+		if err != nil {
+			return err
+		}
+
+		applySetting(guild.Crosspost, enable)
+		guild.Crosspost = enable
+
+	case "reactions":
+		enable, err := parseBool(newSetting)
+		if err != nil {
+			return err
+		}
+
+		applySetting(guild.Reactions, enable)
+		guild.Reactions = enable
+
+	case "pixiv":
+		enable, err := parseBool(newSetting)
+		if err != nil {
+			return err
+		}
+
+		applySetting(guild.Pixiv, enable)
+		guild.Pixiv = enable
+
+	case "bluesky":
+		enable, err := parseBool(newSetting)
+		if err != nil {
+			return err
+		}
+
+		applySetting(guild.Bluesky, enable)
+		guild.Bluesky = enable
+
+	case "twitter":
+		enable, err := parseBool(newSetting)
+		if err != nil {
+			return err
+		}
+
+		applySetting(guild.Twitter, enable)
+		guild.Twitter = enable
+
+	case "deviant":
+		enable, err := parseBool(newSetting)
+		if err != nil {
+			return err
+		}
+
+		applySetting(guild.Deviant, enable)
+		guild.Deviant = enable
+
+	case "tags":
+		enable, err := parseBool(newSetting)
+		if err != nil {
+			return err
+		}
+
+		applySetting(guild.Tags, enable)
+		guild.Tags = enable
+
+	case "footer":
+		enable, err := parseBool(newSetting)
+		if err != nil {
+			return err
+		}
+
+		applySetting(guild.FlavorText, enable)
+		guild.FlavorText = enable
+
+	case "twitter.skip":
+		enable, err := parseBool(newSetting)
+		if err != nil {
+			return err
+		}
+
+		applySetting(guild.SkipFirst, enable)
+		guild.SkipFirst = enable
+
+	default:
+		return messages.ErrUnknownSetting(settingName)
+	}
+
+	_, err = b.Store.UpdateGuild(reqCtx, guild)
+	if err != nil {
+		return err
+	}
+
+	eb := embeds.NewBuilder()
+	eb.InfoTemplate("Successfully changed setting.")
+	eb.AddField("Setting name", settingName, true)
+	eb.AddField("Old setting", fmt.Sprintf("%v", oldSettingEmbed), true)
+	eb.AddField("New setting", fmt.Sprintf("%v", newSettingEmbed), true)
+
+	return ctx.Reply(router.Embed(eb.Finalize()))
+}
+
+func artChannels(b *bot.Bot) router.Handler {
+	return func(ctx *router.Context) error {
+		reqCtx, cancel := context.WithTimeout(ctx.Context(), 10*time.Second)
 		defer cancel()
 
-		guild, err := b.Store.Guild(ctx, gctx.Event.GuildID)
+		action := ctx.Options.String("action")
+		targets := ctx.Options.String("targets")
+
+		if action == "" {
+			return listArtChannels(b, ctx)
+		}
+
+		if targets == "" {
+			return messages.ErrIncorrectCmd(ctx.Command)
+		}
+
+		var execute func(guildID string, channels []string) error
+
+		switch action {
+		case "add":
+			execute = func(guildID string, channels []string) error {
+				if _, err := b.Store.AddArtChannels(reqCtx, guildID, channels); err != nil {
+					return err
+				}
+
+				eb := embeds.NewBuilder()
+				eb.SuccessTemplate(messages.AddArtChannelSuccess(channels))
+				return ctx.Reply(router.Embed(eb.Finalize()))
+			}
+		case "remove":
+			execute = func(guildID string, channels []string) error {
+				if _, err := b.Store.DeleteArtChannels(reqCtx, guildID, channels); err != nil {
+					return err
+				}
+
+				eb := embeds.NewBuilder()
+				eb.SuccessTemplate(messages.RemoveArtChannelSuccess(channels))
+				return ctx.Reply(router.Embed(eb.Finalize()))
+			}
+		default:
+			return messages.ErrIncorrectCmd(ctx.Command)
+		}
+
+		guild, err := b.Store.Guild(reqCtx, ctx.GuildID())
 		if err != nil {
-			return messages.ErrGuildNotFound(err, gctx.Event.GuildID)
+			return messages.ErrGuildNotFound(err, ctx.GuildID())
 		}
 
 		channels := make([]string, 0)
-		for _, arg := range gctx.Args.Arguments {
-			ch, err := gctx.Session.Channel(dgoutils.TrimmerRaw(arg.Raw))
+		for _, arg := range strings.Fields(targets) {
+			ch, err := ctx.Session.Channel(dgoutils.TrimmerRaw(arg))
+			if err != nil {
+				return err
+			}
+
+			if ch.GuildID != guild.ID {
+				return messages.ErrForeignChannel(ch.ID)
+			}
+
+			if ch.Type == discordgo.ChannelTypeGuildVoice {
+				continue
+			}
+
+			switch ch.Type {
+			case discordgo.ChannelTypeGuildCategory:
+				gcs, err := ctx.Session.GuildChannels(guild.ID)
+				if err != nil {
+					return err
+				}
+
+				for _, gc := range gcs {
+					if gc.Type == discordgo.ChannelTypeGuildVoice {
+						continue
+					}
+
+					if gc.ParentID == ch.ID {
+						if err := checkArtChannel(guild, gc.ID, action); err != nil {
+							return err
+						}
+
+						channels = append(channels, gc.ID)
+					}
+				}
+			default:
+				if err := checkArtChannel(guild, ch.ID, action); err != nil {
+					return err
+				}
+
+				channels = append(channels, ch.ID)
+			}
+		}
+
+		return execute(guild.ID, channels)
+	}
+}
+
+func checkArtChannel(guild *store.Guild, channelID, action string) error {
+	exists := false
+	for _, artChannelID := range guild.ArtChannels {
+		if artChannelID == channelID {
+			exists = true
+		}
+	}
+
+	switch action {
+	case "add":
+		if exists {
+			return messages.ErrAlreadyArtChannel(channelID)
+		}
+	case "remove":
+		if !exists {
+			return messages.ErrNotArtChannel(channelID)
+		}
+	}
+
+	return nil
+}
+
+func listArtChannels(b *bot.Bot, ctx *router.Context) error {
+	reqCtx, cancel := context.WithTimeout(ctx.Context(), 10*time.Second)
+	defer cancel()
+
+	guild, err := b.Store.Guild(reqCtx, ctx.GuildID())
+	if err != nil {
+		return messages.ErrGuildNotFound(err, ctx.GuildID())
+	}
+
+	gd, err := ctx.Session.Guild(ctx.GuildID())
+	if err != nil {
+		return messages.ErrGuildNotFound(err, ctx.GuildID())
+	}
+
+	var (
+		eb = embeds.NewBuilder()
+		sb = &strings.Builder{}
+
+		added int
+	)
+
+	eb.Title("Art channels")
+	eb.Thumbnail(gd.IconURL("320"))
+	if len(guild.ArtChannels) == 0 {
+		eb.Description("You haven't added any art channels yet. Add your first art channel using `bt!artchannels add <channel mention>` command.")
+
+		return ctx.Reply(router.Embed(eb.Finalize()))
+	}
+
+	eb.Footer("Total: "+strconv.Itoa(len(guild.ArtChannels)), "")
+	channelEmbeds := make([]*discordgo.MessageEmbed, 0)
+	for _, channel := range guild.ArtChannels {
+		fmt.Fprintf(sb, "%v. <#%v> | `%v`\n", added+1, channel, channel)
+
+		added++
+		if added%10 == 0 {
+			eb.Description(sb.String())
+			channelEmbeds = append(channelEmbeds, eb.Finalize())
+
+			eb = embeds.NewBuilder()
+			eb.Title("Art channels")
+			eb.Thumbnail(gd.IconURL("320"))
+			eb.Footer("Total: "+strconv.Itoa(len(guild.ArtChannels)), "")
+
+			sb.Reset()
+		}
+	}
+
+	if added%10 > 0 {
+		eb.Description(sb.String())
+		channelEmbeds = append(channelEmbeds, eb.Finalize())
+	}
+
+	return replyPages(ctx, b, channelEmbeds)
+}
+
+func addChannel(b *bot.Bot) router.Handler {
+	return func(ctx *router.Context) error {
+		reqCtx, cancel := context.WithTimeout(ctx.Context(), 10*time.Second)
+		defer cancel()
+
+		guild, err := b.Store.Guild(reqCtx, ctx.GuildID())
+		if err != nil {
+			return messages.ErrGuildNotFound(err, ctx.GuildID())
+		}
+
+		channels := make([]string, 0)
+		for _, arg := range strings.Fields(ctx.Options.String("targets")) {
+			ch, err := ctx.Session.Channel(dgoutils.TrimmerRaw(arg))
 			if err != nil {
 				return err
 			}
@@ -609,7 +599,7 @@ func addChannel(b *bot.Bot) func(*gumi.Ctx) error {
 
 				channels = append(channels, ch.ID)
 			case discordgo.ChannelTypeGuildCategory:
-				gcs, err := gctx.Session.GuildChannels(guild.ID)
+				gcs, err := ctx.Session.GuildChannels(guild.ID)
 				if err != nil {
 					return err
 				}
@@ -640,7 +630,7 @@ func addChannel(b *bot.Bot) func(*gumi.Ctx) error {
 		}
 
 		_, err = b.Store.AddArtChannels(
-			ctx,
+			reqCtx,
 			guild.ID,
 			channels,
 		)
@@ -650,37 +640,33 @@ func addChannel(b *bot.Bot) func(*gumi.Ctx) error {
 
 		eb := embeds.NewBuilder()
 		eb.SuccessTemplate(messages.AddArtChannelSuccess(channels))
-		return gctx.ReplyEmbed(eb.Finalize())
+		return ctx.Reply(router.Embed(eb.Finalize()))
 	}
 }
 
-func removeChannel(b *bot.Bot) func(*gumi.Ctx) error {
-	return func(gctx *gumi.Ctx) error {
-		if err := dgoutils.ValidateArgs(gctx, 1); err != nil {
-			return err
-		}
-
-		ctx, cancel := context.WithTimeout(b.Context, 10*time.Second)
+func removeChannel(b *bot.Bot) router.Handler {
+	return func(ctx *router.Context) error {
+		reqCtx, cancel := context.WithTimeout(ctx.Context(), 10*time.Second)
 		defer cancel()
 
-		guild, err := b.Store.Guild(ctx, gctx.Event.GuildID)
+		guild, err := b.Store.Guild(reqCtx, ctx.GuildID())
 		if err != nil {
-			return messages.ErrGuildNotFound(err, gctx.Event.GuildID)
+			return messages.ErrGuildNotFound(err, ctx.GuildID())
 		}
 
 		channels := make([]string, 0)
-		for _, arg := range gctx.Args.Arguments {
-			ch, err := gctx.Session.Channel(dgoutils.TrimmerRaw(arg.Raw))
+		for _, arg := range strings.Fields(ctx.Options.String("targets")) {
+			ch, err := ctx.Session.Channel(dgoutils.TrimmerRaw(arg))
 			if err != nil {
 				if !strings.Contains(err.Error(), "404") {
-					return messages.ErrChannelNotFound(err, arg.Raw)
+					return messages.ErrChannelNotFound(err, arg)
 				}
 
-				channels = append(channels, dgoutils.TrimmerRaw(arg.Raw))
+				channels = append(channels, dgoutils.TrimmerRaw(arg))
 				continue
 			}
 
-			if ch.GuildID != gctx.Event.GuildID {
+			if ch.GuildID != ctx.GuildID() {
 				return messages.ErrForeignChannel(ch.ID)
 			}
 
@@ -688,7 +674,7 @@ func removeChannel(b *bot.Bot) func(*gumi.Ctx) error {
 			case discordgo.ChannelTypeGuildText:
 				channels = append(channels, ch.ID)
 			case discordgo.ChannelTypeGuildCategory:
-				gcs, err := gctx.Session.GuildChannels(guild.ID)
+				gcs, err := ctx.Session.GuildChannels(guild.ID)
 				if err != nil {
 					return err
 				}
@@ -708,7 +694,7 @@ func removeChannel(b *bot.Bot) func(*gumi.Ctx) error {
 		}
 
 		_, err = b.Store.DeleteArtChannels(
-			ctx,
+			reqCtx,
 			guild.ID,
 			channels,
 		)
@@ -722,7 +708,7 @@ func removeChannel(b *bot.Bot) func(*gumi.Ctx) error {
 
 		eb := embeds.NewBuilder()
 		eb.SuccessTemplate(messages.RemoveArtChannelSuccess(channels))
-		return gctx.ReplyEmbed(eb.Finalize())
+		return ctx.Reply(router.Embed(eb.Finalize()))
 	}
 }
 

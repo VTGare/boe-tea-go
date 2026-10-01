@@ -25,6 +25,10 @@ type Post struct {
 
 	IsCommand bool
 
+	// IsInteraction marks runs triggered by a slash command, where there
+	// is no message to reference or delete.
+	IsInteraction bool
+
 	URLs []string
 	Skip SkipFilter
 

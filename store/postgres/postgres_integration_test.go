@@ -75,6 +75,35 @@ var _ = Describe("Guilds", func() {
 		Expect(err).NotTo(HaveOccurred())
 	})
 
+	It("accepts an empty art channel add on a guild with no channels", func() {
+		_, err := testStore.CreateGuild(ctx, "g-empty")
+		Expect(err).NotTo(HaveOccurred())
+
+		g, err := testStore.AddArtChannels(ctx, "g-empty", []string{})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(g.ArtChannels).To(BeEmpty())
+	})
+
+	It("keeps art channels in insertion order", func() {
+		_, err := testStore.CreateGuild(ctx, "g-order")
+		Expect(err).NotTo(HaveOccurred())
+
+		_, err = testStore.AddArtChannels(ctx, "g-order", []string{"c9", "c1", "c5"})
+		Expect(err).NotTo(HaveOccurred())
+
+		g, err := testStore.AddArtChannels(ctx, "g-order", []string{"c1", "c3"})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(g.ArtChannels).To(Equal([]string{"c9", "c1", "c5", "c3"}))
+
+		g, err = testStore.DeleteArtChannels(ctx, "g-order", []string{"c1"})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(g.ArtChannels).To(Equal([]string{"c9", "c5", "c3"}))
+
+		g, err = testStore.DeleteArtChannels(ctx, "g-order", nil)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(g.ArtChannels).To(Equal([]string{"c9", "c5", "c3"}))
+	})
+
 	It("returns the DM guild for empty IDs and errors on missing guilds", func() {
 		dm, err := testStore.Guild(ctx, "")
 		Expect(err).NotTo(HaveOccurred())
@@ -97,6 +126,28 @@ var _ = Describe("Users and crossposts", func() {
 		Expect(err).NotTo(HaveOccurred())
 		_, err = testStore.CreateUser(ctx, "u-dup")
 		Expect(err).To(HaveOccurred())
+	})
+
+	It("adds crosspost channels once, in order, and removes them", func() {
+		_, err := testStore.User(ctx, "u-ch")
+		Expect(err).NotTo(HaveOccurred())
+
+		_, err = testStore.CreateCrosspostGroup(ctx, "u-ch", &store.Group{Name: "g", Parent: "p"})
+		Expect(err).NotTo(HaveOccurred())
+
+		for _, ch := range []string{"c2", "c1", "c2"} {
+			_, err = testStore.AddCrosspostChannel(ctx, "u-ch", "g", ch)
+			Expect(err).NotTo(HaveOccurred())
+		}
+
+		u, err := testStore.User(ctx, "u-ch")
+		Expect(err).NotTo(HaveOccurred())
+		Expect(u.Groups).To(HaveLen(1))
+		Expect(u.Groups[0].Children).To(Equal([]string{"c2", "c1"}))
+
+		u, err = testStore.DeleteCrosspostChannel(ctx, "u-ch", "g", "c2")
+		Expect(err).NotTo(HaveOccurred())
+		Expect(u.Groups[0].Children).To(Equal([]string{"c1"}))
 	})
 
 	It("manages crosspost groups from creation to deletion", func() {
@@ -154,6 +205,33 @@ var _ = Describe("Artworks", func() {
 
 		_, err = testStore.CreateArtwork(ctx, &store.Artwork{Title: "d", Author: "d", URL: created.URL})
 		Expect(err).To(HaveOccurred())
+	})
+
+	It("pages through tied popularity without overlap or gaps", func() {
+		ids := make(map[int]struct{})
+		for i := range 7 {
+			a, err := testStore.CreateArtwork(ctx, &store.Artwork{
+				Title: "tie", Author: "tie",
+				URL: fmt.Sprintf("https://example.com/tie%d", i),
+			})
+			Expect(err).NotTo(HaveOccurred())
+			ids[a.ID] = struct{}{}
+		}
+
+		seen := make(map[int]struct{})
+		for skip := int64(0); skip < 7; skip += 3 {
+			page, err := testStore.SearchArtworks(ctx, store.ArtworkFilter{}, store.ArtworkSearchOptions{
+				Sort: store.ByPopularity, Order: store.Descending, Limit: 3, Skip: skip,
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			for _, a := range page {
+				Expect(seen).NotTo(HaveKey(a.ID))
+				seen[a.ID] = struct{}{}
+			}
+		}
+
+		Expect(seen).To(Equal(ids))
 	})
 
 	It("searches literal case-insensitive substrings", func() {

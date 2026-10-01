@@ -12,7 +12,7 @@ import (
 	"github.com/VTGare/boe-tea-go/internal/sender"
 	"github.com/VTGare/boe-tea-go/repost"
 	"github.com/VTGare/boe-tea-go/store"
-	"github.com/VTGare/gumi"
+	"github.com/bwmarrin/discordgo"
 	goCache "github.com/patrickmn/go-cache"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
@@ -256,24 +256,24 @@ func DepsFromBot(b *bot.Bot) Deps {
 	return deps
 }
 
-// RunFromEvent builds the immutable run for one triggering message.
+// RunFromMessage builds the immutable run for one triggering message.
 // Skip filters and channel exclusions are set by the caller.
-func RunFromEvent(gctx *gumi.Ctx, urls []string) Post {
+func RunFromMessage(msg *discordgo.Message, urls []string, isCommand bool) Post {
 	run := Post{
 		URLs: append([]string(nil), urls...),
 		Skip: SkipFilter{Indices: make(map[int]struct{})},
 	}
 
-	if gctx == nil || gctx.Event == nil || gctx.Event.Message == nil {
+	if msg == nil {
 		return run
 	}
 
-	run.GuildID = gctx.Event.GuildID
-	run.ChannelID = gctx.Event.ChannelID
-	run.MessageID = gctx.Event.ID
-	run.IsCommand = gctx.Command != nil
+	run.GuildID = msg.GuildID
+	run.ChannelID = msg.ChannelID
+	run.MessageID = msg.ID
+	run.IsCommand = isCommand
 
-	if author := gctx.Event.Message.Author; author != nil {
+	if author := msg.Author; author != nil {
 		run.AuthorID = author.ID
 		run.AuthorName = author.Username
 		run.AuthorAvatar = author.AvatarURL("")

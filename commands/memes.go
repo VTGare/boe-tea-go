@@ -8,9 +8,8 @@ import (
 
 	"github.com/VTGare/boe-tea-go/bot"
 	"github.com/VTGare/boe-tea-go/internal/arrays"
-	"github.com/VTGare/boe-tea-go/internal/dgoutils"
+	"github.com/VTGare/boe-tea-go/router"
 	"github.com/VTGare/embeds"
-	"github.com/VTGare/gumi"
 	"github.com/julien040/go-ternary"
 )
 
@@ -41,147 +40,129 @@ var (
 	))
 )
 
-func memesGroup(b *bot.Bot) {
-	group := "memes"
-
-	b.Router.RegisterCmd(&gumi.Command{
-		Name:        "brainpower",
-		Group:       group,
-		Description: "Adrenaline is pumping.",
-		Usage:       "You know how to use it.",
-		Example:     "catJAM",
-		RateLimiter: gumi.NewRateLimiter(15 * time.Second),
-		Exec:        brainPower(b),
-	})
-
-	b.Router.RegisterCmd(&gumi.Command{
-		Name:        "borgar",
-		Group:       group,
-		Description: "Cute dino girl eats borgar.",
-		Usage:       "You know how to use it.",
-		Example:     "Actually I don't know how to use it.",
-		Exec:        borgar(b),
-	})
-
-	b.Router.RegisterCmd(&gumi.Command{
-		Name:        "nuggets",
-		Group:       group,
-		Description: "Create ships by feeding nuggets.",
-		Usage:       "bt!nuggets <person 1> <person 2>",
-		Example:     "bt!nuggets 2B 9S",
-		Exec:        nuggets(b),
-	})
-
-	b.Router.RegisterCmd(&gumi.Command{
-		Name:        "whois",
-		Group:       group,
-		Description: "Who is Faker?",
-		Usage:       "bt!whois <person 1>",
-		Example:     "bt!whois Faker",
-		Exec:        whoIs(b),
-	})
-
-	b.Router.RegisterCmd(&gumi.Command{
-		Name:        "gamba",
-		Group:       group,
-		Description: "GET IT TWISTED! 🗣️🗣️🗣️",
-		Aliases:     []string{"gacha", "getittwisted"},
-		Usage:       "bt!gamba",
-		Example:     "bt!gamba",
-		Exec:        gamba(b),
-	})
-
-	b.Router.RegisterCmd(&gumi.Command{
-		Name:        "cake",
-		Group:       group,
-		Description: "Local God eats cake",
-		Aliases:     []string{},
-		Usage:       "bt!cake",
-		Example:     "bt!cake",
-		Exec:        cake(b),
-	})
-
-	b.Router.RegisterCmd(&gumi.Command{
-		Name:        "frenzy",
-		Group:       group,
-		Description: "The moon is red.",
-		Aliases:     []string{},
-		Usage:       "bt!frenzy",
-		Example:     "bt!frenzy",
-		Exec:        frenzy(b),
-	})
-
-	b.Router.RegisterCmd(&gumi.Command{
-		Name:        "kaiki",
-		Group:       group,
-		Description: "Introduce yourself as a guy who always lies",
-		Aliases:     []string{"lie", "trick"},
-		Usage:       "bt!kaiki",
-		Example:     "bt!kaiki",
-		Exec:        kaiki(b),
-	})
-}
-
-func brainPower(*bot.Bot) func(*gumi.Ctx) error {
-	return func(gctx *gumi.Ctx) error {
-		return gctx.Reply(
-			"O-oooooooooo AAAAE-A-A-I-A-U- JO-oooooooooooo AAE-O-A-A-U-U-A- " +
-				"E-eee-ee-eee AAAAE-A-E-I-E-A-JO-ooo-oo-oo-oo EEEEO-A-AAA-AAAA",
-		)
+func memesGroup(b *bot.Bot) []*router.Command {
+	return []*router.Command{
+		{
+			Name:        "brainpower",
+			Category:    "Memes",
+			Description: "Adrenaline is pumping.",
+			Cooldown:    router.NewCooldown(router.CooldownUser, 1, 15*time.Second),
+			Examples:    []string{"brainpower"},
+			Handler:     brainPower(b),
+		},
+		{
+			Name:        "borgar",
+			Category:    "Memes",
+			Description: "Cute dino girl eats borgar.",
+			Examples:    []string{"borgar"},
+			Handler:     borgar(b),
+		},
+		{
+			Name:        "nuggets",
+			Category:    "Memes",
+			Description: "Create ships by feeding nuggets.",
+			Options: []*router.Option{
+				router.String("person1", "First person").Require(),
+				router.String("person2", "Second person").Require(),
+			},
+			Examples: []string{"nuggets 2B 9S"},
+			Handler:  nuggets(b),
+		},
+		{
+			Name:        "whois",
+			Category:    "Memes",
+			Description: "Who is Faker?",
+			Options: []*router.Option{
+				router.String("person", "Person to identify").Require(),
+			},
+			Examples: []string{"whois Faker"},
+			Handler:  whoIs(b),
+		},
+		{
+			Name:        "gamba",
+			Category:    "Memes",
+			Description: "GET IT TWISTED! 🗣️🗣️🗣️",
+			Aliases:     []string{"gacha", "getittwisted"},
+			Examples:    []string{"gamba"},
+			Handler:     gamba(b),
+		},
+		{
+			Name:        "cake",
+			Category:    "Memes",
+			Description: "Local God eats cake",
+			Examples:    []string{"cake"},
+			Handler:     cake(b),
+		},
+		{
+			Name:        "frenzy",
+			Category:    "Memes",
+			Description: "The moon is red.",
+			Examples:    []string{"frenzy"},
+			Handler:     frenzy(b),
+		},
+		{
+			Name:        "kaiki",
+			Category:    "Memes",
+			Description: "Introduce yourself as a guy who always lies",
+			Aliases:     []string{"lie", "trick"},
+			Examples:    []string{"kaiki"},
+			Handler:     kaiki(b),
+		},
 	}
 }
 
-func borgar(*bot.Bot) func(*gumi.Ctx) error {
-	return func(gctx *gumi.Ctx) error {
+func brainPower(*bot.Bot) router.Handler {
+	return func(ctx *router.Context) error {
+		return ctx.Reply(router.Text(
+			"O-oooooooooo AAAAE-A-A-I-A-U- JO-oooooooooooo AAE-O-A-A-U-U-A- " +
+				"E-eee-ee-eee AAAAE-A-E-I-E-A-JO-ooo-oo-oo-oo EEEEO-A-AAA-AAAA",
+		))
+	}
+}
+
+func borgar(*bot.Bot) router.Handler {
+	return func(ctx *router.Context) error {
 		eb := embeds.NewBuilder()
 		eb.Title("Cute dino girl enjoys borgar.").
 			Description("🦕🍔").
 			Image("https://i.kym-cdn.com/photos/images/original/001/568/282/ef2.gif")
-		return gctx.ReplyEmbed(eb.Finalize())
+		return ctx.Reply(router.Embed(eb.Finalize()))
 	}
 }
 
-func nuggets(*bot.Bot) func(*gumi.Ctx) error {
-	return func(gctx *gumi.Ctx) error {
-		if err := dgoutils.ValidateArgs(gctx, 2); err != nil {
-			return err
-		}
-
+func nuggets(*bot.Bot) router.Handler {
+	return func(ctx *router.Context) error {
 		n := &struct {
 			Amelia string
 			Ryo    string
-		}{Amelia: gctx.Args.Get(1).Raw, Ryo: gctx.Args.Get(0).Raw}
+		}{Amelia: ctx.Options.String("person2"), Ryo: ctx.Options.String("person1")}
 
 		buf := new(bytes.Buffer)
 		if err := nuggetsTemplatePart1.Execute(buf, n); err != nil {
 			return err
 		}
 
-		return gctx.Reply(buf.String())
+		return ctx.Reply(router.Text(buf.String()))
 	}
 }
 
-func whoIs(*bot.Bot) func(*gumi.Ctx) error {
-	return func(gctx *gumi.Ctx) error {
-		if err := dgoutils.ValidateArgs(gctx, 1); err != nil {
-			return err
-		}
-
+func whoIs(*bot.Bot) router.Handler {
+	return func(ctx *router.Context) error {
 		n := &struct {
 			Faker string
-		}{Faker: gctx.Args.Get(0).Raw}
+		}{Faker: ctx.Options.String("person")}
 
 		buf := new(bytes.Buffer)
 		if err := whoisTemplate.Execute(buf, n); err != nil {
 			return err
 		}
 
-		return gctx.Reply(buf.String())
+		return ctx.Reply(router.Text(buf.String()))
 	}
 }
 
-func gamba(*bot.Bot) func(*gumi.Ctx) error {
-	return func(gctx *gumi.Ctx) error {
+func gamba(*bot.Bot) router.Handler {
+	return func(ctx *router.Context) error {
 		getItTwisted := rand.Intn(10) != 0
 
 		text := ternary.If(getItTwisted,
@@ -189,18 +170,18 @@ func gamba(*bot.Bot) func(*gumi.Ctx) error {
 			`🦍 🗣️ DO NOT GET IT TWISTED 🌪️ , DO NOT GAMBLE 🚫 . DO NOT START GAMBLING ❌ . GAMBLING IS ENTERTAINMENT 🎰 AND ENTERTAINMENT ONLY 👍 . YOU WONT BREAK EVEN 🛑 , YOU WONT WIN ⚠️ ️. YOU WONT DO ANY OF THAT 💯 , YOU UNDERSTAND ⁉️ ️ YOU WILL ONLY GO INTO DEBT 💵 📉 AND RUIN YOUR FUCKING LIFE 😵`,
 		)
 
-		return gctx.Reply(text)
+		return ctx.Reply(router.Text(text))
 	}
 }
 
-func cake(*bot.Bot) func(*gumi.Ctx) error {
-	return func(gctx *gumi.Ctx) error {
+func cake(*bot.Bot) router.Handler {
+	return func(ctx *router.Context) error {
 		eb := embeds.NewBuilder()
 		eb.Title("Local God eats cake").
 			Description("🙏🍰").
 			Image("https://cdn.discordapp.com/attachments/1129829799179853914/1160609012115578970/haruhi-haruhi-suzumiya.gif")
 
-		return gctx.ReplyEmbed(eb.Finalize())
+		return ctx.Reply(router.Embed(eb.Finalize()))
 	}
 }
 
@@ -215,8 +196,8 @@ var frenzyImages = []string{
 	"https://static.wikia.nocookie.net/to-be-a-power-in-the-shadows/images/9/9f/Red_Moon-_Anime.png",
 }
 
-func frenzy(*bot.Bot) func(*gumi.Ctx) error {
-	return func(gctx *gumi.Ctx) error {
+func frenzy(*bot.Bot) router.Handler {
+	return func(ctx *router.Context) error {
 		image := arrays.RandomElement(frenzyImages)
 
 		eb := embeds.NewBuilder()
@@ -225,12 +206,12 @@ func frenzy(*bot.Bot) func(*gumi.Ctx) error {
 			Color(0x880808).
 			Image(*image)
 
-		return gctx.ReplyEmbed(eb.Finalize())
+		return ctx.Reply(router.Embed(eb.Finalize()))
 	}
 }
 
-func kaiki(*bot.Bot) func(*gumi.Ctx) error {
-	return func(gctx *gumi.Ctx) error {
-		return gctx.Reply("https://imgpx.com/en/3EUv19fdWN78.png")
+func kaiki(*bot.Bot) router.Handler {
+	return func(ctx *router.Context) error {
+		return ctx.Reply(router.Text("https://imgpx.com/en/3EUv19fdWN78.png"))
 	}
 }

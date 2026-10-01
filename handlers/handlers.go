@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"runtime/debug"
 	"slices"
 	"strconv"
 	"strings"
@@ -17,9 +16,9 @@ import (
 	"github.com/VTGare/boe-tea-go/messages"
 	"github.com/VTGare/boe-tea-go/post"
 	"github.com/VTGare/boe-tea-go/repost"
+	"github.com/VTGare/boe-tea-go/router"
 	"github.com/VTGare/boe-tea-go/store"
 	"github.com/VTGare/embeds"
-	"github.com/VTGare/gumi"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/julien040/go-ternary"
@@ -37,97 +36,93 @@ func RegisterHandlers(b *bot.Bot) {
 	b.AddHandler(OnMessageRemove(b))
 }
 
-// PrefixResolver returns an array of guild's prefixes and bot mentions.
-func PrefixResolver(b *bot.Bot) func(s *discordgo.Session, m *discordgo.MessageCreate) []string {
-	return func(s *discordgo.Session, m *discordgo.MessageCreate) []string {
+// PrefixResolver returns the guild's command prefixes. Bot mentions are
+// handled by the router itself.
+func PrefixResolver(b *bot.Bot) router.PrefixResolver {
+	return func(s *discordgo.Session, guildID, _ string) []string {
 		defaults := []string{"bt!", "bt ", "bt.", "bt?"}
 		if s == nil || s.State == nil || s.State.User == nil {
-			return defaults
-		}
-
-		if m == nil || m.Message == nil {
 			return defaults
 		}
 
 		ctx, cancel := context.WithTimeout(b.Context, 5*time.Second)
 		defer cancel()
 
-		mention := fmt.Sprintf("<@%v> ", s.State.User.ID)
-		mentionExcl := fmt.Sprintf("<@!%v> ", s.State.User.ID)
-
-		g, _ := b.Store.Guild(ctx, m.GuildID)
+		g, _ := b.Store.Guild(ctx, guildID)
 		if g == nil || g.Prefix == "bt!" {
-			return []string{mention, mentionExcl, "bt!", "bt ", "bt.", "bt?"}
+			return defaults
 		}
 
-		return []string{mention, mentionExcl, g.Prefix}
+		return []string{g.Prefix}
 	}
 }
 
-func OnPanic(b *bot.Bot) func(*gumi.Ctx, any) {
-	return func(gctx *gumi.Ctx, r any) {
-		fields := []any{"panic", r, "stacktrace", string(debug.Stack())}
+// ObserveStats counts every executed command for bt!stats.
+func ObserveStats(b *bot.Bot) router.Middleware {
+	return func(next router.Handler) router.Handler {
+		return func(ctx *router.Context) error {
+			err := next(ctx)
 
-		if gctx != nil && gctx.Event != nil && gctx.Event.Message != nil {
-			fields = append(
-				fields,
-				"guild_id", gctx.Event.GuildID,
-				"channel_id", gctx.Event.ChannelID,
-				"message_id", gctx.Event.ID,
-			)
+			if b.Stats != nil && ctx.Command != nil {
+				b.Stats.IncrementCommand(ctx.Command.QualifiedName())
+			}
+
+			return err
 		}
-
-		if gctx != nil && gctx.Command != nil {
-			fields = append(fields, "command", gctx.Command.Name)
-		}
-
-		b.Log.With(fields...).Error("recovered from a panic in handler")
 	}
 }
 
-// OnMessage is executed on every message that isn't a command.
-func OnMessage(b *bot.Bot) func(*gumi.Ctx) error {
-	return func(gctx *gumi.Ctx) error {
-		if gctx == nil || gctx.Event == nil || gctx.Event.Message == nil {
-			return nil
+// OnMessage runs artwork auto-posting for every message that isn't a command.
+func OnMessage(b *bot.Bot) router.FallbackHandler {
+	return func(s *discordgo.Session, m *discordgo.MessageCreate) {
+		if m == nil || m.Message == nil {
+			return
 		}
 
 		ctx, cancel := context.WithTimeout(b.Context, 30*time.Second)
 		defer cancel()
 
-		guild, created, err := store.GetOrCreateGuild(ctx, b.Store, gctx.Event.GuildID)
+		guild, created, err := store.GetOrCreateGuild(ctx, b.Store, m.GuildID)
 		if err != nil {
-			return err
+			b.Log.With("error", err).Error("fallback message handling failed")
+
+			return
 		}
 
 		if created {
-			b.Log.With("guild_id", gctx.Event.GuildID).Info("guild missing from store, creating it")
+			b.Log.With("guild_id", m.GuildID).Info("guild missing from store, creating it")
 		}
 
 		if guild == nil {
-			return nil
+			return
 		}
 
-		if !(len(guild.ArtChannels) == 0 || slices.Contains(guild.ArtChannels, gctx.Event.ChannelID)) {
-			return nil
+		if !(len(guild.ArtChannels) == 0 || slices.Contains(guild.ArtChannels, m.ChannelID)) {
+			return
 		}
 
-		urls := xurls.Strict().FindAllString(gctx.Event.Content, -1)
+		urls := xurls.Strict().FindAllString(m.Content, -1)
 		if len(urls) == 0 {
-			return nil
+			return
 		}
 
 		p := post.NewPoster(post.DepsFromBot(b))
-		run := post.RunFromEvent(gctx, urls)
+		run := post.RunFromMessage(m.Message, urls, false)
 
 		sent, err := p.Send(ctx, run)
 		post.CacheResult(b.EmbedCache, run.AuthorID, run.ChannelID, run.MessageID, sent)
 
 		if err != nil {
-			return err
-		}
+			var artworkErr *artworks.Error
+			if errors.As(err, &artworkErr) {
+				reactionErr := s.MessageReactionAdd(m.ChannelID, m.ID, "😵‍💫")
+				if reactionErr != nil && !strings.Contains(reactionErr.Error(), "403") {
+					b.Log.With("error", reactionErr).Error("failed to add artwork error reaction")
+				}
+			}
 
-		return nil
+			b.Log.With("error", err).Warn("fallback message handling failed")
+		}
 	}
 }
 
@@ -380,16 +375,9 @@ func OnReactionAdd(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageReacti
 			}
 
 			msg.Author = dgUser
-			gumiCtx := &gumi.Ctx{
-				Session: s,
-				Event: &discordgo.MessageCreate{
-					Message: msg,
-				},
-				Router: b.Router,
-			}
+			run := post.RunFromMessage(msg, []string{url}, false)
 
 			p := post.NewPoster(post.DepsFromBot(b))
-			run := post.RunFromEvent(gumiCtx, []string{url})
 
 			if user, _ := b.Store.User(ctx, r.UserID); user != nil {
 				if group, ok := user.FindGroup(r.ChannelID); ok {
@@ -708,71 +696,166 @@ func OnReactionRemove(b *bot.Bot) func(*discordgo.Session, *discordgo.MessageRea
 	}
 }
 
-// OnError creates an error response, logs them and sends the response on Discord.
-func OnError(b *bot.Bot) func(*gumi.Ctx, error) {
-	return func(gctx *gumi.Ctx, err error) {
-		if gctx == nil || gctx.Event == nil || gctx.Session == nil {
+// OnError replies to command failures and logs the rest.
+func OnError(b *bot.Bot) router.ErrorHandler {
+	return func(ctx *router.Context, err error) {
+		if ctx == nil {
 			b.Log.With("error", err).Error("error with nil context")
 
 			return
 		}
 
 		var (
-			eb         = embeds.NewBuilder()
-			cmdErr     *messages.IncorrectCmd
-			usrErr     *messages.UserErr
-			artworkErr *artworks.Error
-			expiry     = false
+			panicErr    *router.PanicError
+			checkErr    *router.CheckError
+			cooldownErr *router.CooldownError
+			cmdErr      *messages.IncorrectCmd
+			usrErr      *messages.UserErr
+			artworkErr  *artworks.Error
 		)
 
 		switch {
+		case errors.As(err, &panicErr):
+			fields := []any{"panic", panicErr.Value, "stacktrace", string(panicErr.Stack)}
+			if ctx.Command != nil {
+				fields = append(fields, "command", ctx.Command.QualifiedName())
+			}
+
+			b.Log.With(fields...).Error("recovered from a panic in handler")
+		case errors.As(err, &checkErr):
+			onCheckError(b, ctx, checkErr)
+		case errors.As(err, &cooldownErr):
+			replyFailure(b, ctx, messages.RateLimit(cooldownErr.Remaining))
 		case errors.As(err, &cmdErr):
-			eb = onCommandError(b, gctx, cmdErr)
+			onCommandError(b, ctx, cmdErr)
 		case errors.As(err, &usrErr):
-			eb = onUserError(b, gctx, usrErr)
+			onUserError(b, ctx, usrErr)
 		case errors.As(err, &artworkErr):
-			eb = onArtworkError(b, gctx, artworkErr)
-			expiry = true
+			onArtworkError(b, ctx, artworkErr)
 		default:
-			eb = onDefaultError(b, gctx, err)
-		}
+			if msg, ok := router.UserMessageOf(err); ok {
+				replyFailure(b, ctx, msg)
 
-		if eb == nil {
-			return
-		}
+				return
+			}
 
-		msg, err := gctx.Session.ChannelMessageSendEmbedReply(gctx.Event.ChannelID, eb.Finalize(),
-			&discordgo.MessageReference{
-				MessageID: gctx.Event.ID,
-				ChannelID: gctx.Event.ChannelID,
-				GuildID:   gctx.Event.GuildID,
-			})
-		if err != nil {
-			b.Log.With("error", err).Error("failed to reply in error handler")
-		}
+			name := ""
+			if ctx.Command != nil {
+				name = ctx.Command.QualifiedName()
+			}
 
-		if expiry {
-			sender.ExpireMessage(b.Log, gctx.Session, msg)
+			b.Log.With("error", err, "command", name).Warn("failed to execute command due to an unexpected error")
 		}
 	}
 }
 
-func onArtworkError(b *bot.Bot, gctx *gumi.Ctx, err *artworks.Error) *embeds.Builder {
-	b.Log.With(
-		"guild", gctx.Event.GuildID,
-		"channel", gctx.Event.ChannelID,
-		"content", gctx.Event.Content,
-		"err", err,
-	).Info("artwork error occurred")
+func onCheckError(b *bot.Bot, ctx *router.Context, err *router.CheckError) {
+	if err.Silent {
+		return
+	}
 
-	if gctx.Command == nil {
-		reactionErr := gctx.Session.MessageReactionAdd(gctx.Event.ChannelID, gctx.Event.ID, "😵‍💫")
-		if reactionErr != nil && !strings.Contains(reactionErr.Error(), "403") {
-			b.Log.With("err", reactionErr).Error("failed to add artwork error reaction")
+	switch err.Check {
+	case "permissions", "bot_permissions":
+		replyFailure(b, ctx, messages.NoPerms())
+	case "nsfw":
+		name := ""
+		if ctx.Command != nil {
+			name = ctx.Command.QualifiedName()
 		}
 
-		return nil
+		replyFailure(b, ctx, messages.NSFWCommand(name))
+	case "guild_only", "dm_only":
+		return
+	default:
+		replyFailure(b, ctx, err.UserMessage())
 	}
+}
+
+func replyFailure(b *bot.Bot, ctx *router.Context, msg string) {
+	eb := embeds.NewBuilder()
+	eb.FailureTemplate(msg)
+
+	if err := ctx.Reply(router.Embed(eb.Finalize())); err != nil {
+		b.Log.With("error", err).Error("failed to reply in error handler")
+	}
+}
+
+func onCommandError(b *bot.Bot, ctx *router.Context, err *messages.IncorrectCmd) {
+	name := err.Name
+	raw := ""
+
+	if ctx.Command != nil {
+		name = ctx.Command.QualifiedName()
+	}
+
+	if ctx.Message != nil {
+		raw = ctx.Message.Content
+	}
+
+	b.Log.With("error", err, "command", name, "arguments", raw).Debug("failed to execute command due to a command error")
+
+	lead := ctx.DisplayPrefix()
+	if lead == "" {
+		lead = "/"
+	}
+
+	eb := embeds.NewBuilder()
+	eb.FailureTemplate(err.Error() + "\n" + err.Description)
+
+	if ctx.Command != nil {
+		eb.AddField(err.Embed.Usage, fmt.Sprintf("`%v`", ctx.Command.Usage(lead)))
+	}
+
+	if len(err.Examples) > 0 {
+		examples := make([]string, 0, len(err.Examples))
+		for _, ex := range err.Examples {
+			examples = append(examples, "`"+lead+ex+"`")
+		}
+
+		eb.AddField(err.Embed.Example, strings.Join(examples, "\n"))
+	}
+
+	if rerr := ctx.Reply(router.Embed(eb.Finalize())); rerr != nil {
+		b.Log.With("error", rerr).Error("failed to reply in error handler")
+	}
+}
+
+func onUserError(b *bot.Bot, ctx *router.Context, err *messages.UserErr) {
+	if uerr := err.Unwrap(); uerr != nil {
+		name := ""
+		raw := ""
+
+		if ctx.Command != nil {
+			name = ctx.Command.QualifiedName()
+		}
+
+		if ctx.Message != nil {
+			raw = ctx.Message.Content
+		}
+
+		b.Log.With("error", uerr, "command", name, "arguments", raw).Info("failed to execute command due to an user error")
+	}
+
+	eb := embeds.NewBuilder()
+	eb.FailureTemplate(err.Error())
+
+	if rerr := ctx.Reply(router.Embed(eb.Finalize())); rerr != nil {
+		b.Log.With("error", rerr).Error("failed to reply in error handler")
+	}
+}
+
+func onArtworkError(b *bot.Bot, ctx *router.Context, err *artworks.Error) {
+	content := ""
+	if ctx.Message != nil {
+		content = ctx.Message.Content
+	}
+
+	b.Log.With(
+		"guild", ctx.GuildID(),
+		"channel", ctx.ChannelID(),
+		"content", content,
+		"err", err,
+	).Info("artwork error occurred")
 
 	eb := embeds.NewBuilder().FailureTemplate("")
 	eb.Title("❎ Failed to embed artwork")
@@ -786,122 +869,27 @@ func onArtworkError(b *bot.Bot, gctx *gumi.Ctx, err *artworks.Error) *embeds.Bui
 
 	// Twitter errors
 	case errors.Is(err, twitter.ErrTweetNotFound):
-		if gctx.Command == nil {
-			return nil
-		}
-
 		eb.Description("Tweet not found or is NSFW. NSFW tweets can't be embedded due to API changes.")
 	case errors.Is(err, twitter.ErrPrivateAccount):
 		eb.Description("Unable to view this tweet because this account owner limits who can view their tweets.")
 
 	default:
-		onDefaultError(b, gctx, err)
-		return nil
-	}
-
-	return eb
-}
-
-func onCommandError(b *bot.Bot, gctx *gumi.Ctx, err *messages.IncorrectCmd) *embeds.Builder {
-	if gctx.Command != nil {
-		b.Log.With("error", err, "command", gctx.Command.Name, "arguments", gctx.Args.Raw).Debug("failed to execute command due to a command error")
-	} else {
-		b.Log.With("error", err).Debug("a command error occured")
-	}
-
-	eb := embeds.NewBuilder()
-	eb.FailureTemplate(err.Error() + "\n" + err.Description)
-	eb.AddField(err.Embed.Usage, fmt.Sprintf("`%v`", err.Usage))
-	eb.AddField(err.Embed.Example, fmt.Sprintf("`%v`", err.Example))
-	return eb
-}
-
-func onUserError(b *bot.Bot, gctx *gumi.Ctx, err *messages.UserErr) *embeds.Builder {
-	if err := err.Unwrap(); err != nil {
-		if gctx.Command != nil {
-			b.Log.With("error", err, "command", gctx.Command.Name, "arguments", gctx.Args.Raw).Info("failed to execute command due to an user error")
-		} else {
-			b.Log.With("error", err).Info("an user error occured")
-		}
-	}
-
-	eb := embeds.NewBuilder()
-	return eb.FailureTemplate(err.Error())
-}
-
-func onDefaultError(b *bot.Bot, gctx *gumi.Ctx, err error) *embeds.Builder {
-	if gctx.Command != nil {
-		b.Log.With(
-			"error", err,
-			"command", gctx.Command.Name,
-			"arguments", gctx.Args.Raw,
-		).Warn("failed to execute command due to an unexpected error")
-	} else {
-		b.Log.With("error", err).Warn("an unexpected error occured")
-	}
-
-	// TODO: breaks sometimes and starts spamming chat. turn on when fixed.
-	// eb := embeds.NewBuilder().FailureTemplate("An unexpected error occured. Please try again later.\n" +
-	// 	"If error persists, please let the developer know about it with `bt!feedback` command.",
-	// )
-
-	return nil
-}
-
-// OnRateLimit creates a response for users who use bot's command too frequently
-func OnRateLimit(*bot.Bot) func(*gumi.Ctx) error {
-	return func(gctx *gumi.Ctx) error {
-		if gctx == nil || gctx.Command == nil || gctx.Command.RateLimiter == nil || gctx.Event == nil || gctx.Event.Author == nil {
-			return nil
+		name := ""
+		if ctx.Command != nil {
+			name = ctx.Command.QualifiedName()
 		}
 
-		duration, err := gctx.Command.RateLimiter.Expires(gctx.Event.Author.ID)
-		if err != nil {
-			return err
-		}
+		b.Log.With("error", err, "command", name).Warn("failed to execute command due to an unexpected error")
 
-		eb := embeds.NewBuilder()
-		eb.FailureTemplate(messages.RateLimit(duration))
-
-		return gctx.ReplyEmbed(eb.Finalize())
+		return
 	}
-}
 
-// OnNoPerms creates a response for users who used a command without required permissions.
-func OnNoPerms(*bot.Bot) func(*gumi.Ctx) error {
-	return func(gctx *gumi.Ctx) error {
-		eb := embeds.NewBuilder()
-		eb.FailureTemplate(messages.NoPerms())
+	msg, ferr := ctx.Followup(router.Embed(eb.Finalize()))
+	if ferr != nil {
+		b.Log.With("error", ferr).Error("failed to reply in error handler")
 
-		return gctx.ReplyEmbed(eb.Finalize())
+		return
 	}
-}
 
-// OnNSFW creates a response for users who used a NSFW command in a SFW channel
-func OnNSFW(*bot.Bot) func(*gumi.Ctx) error {
-	return func(gctx *gumi.Ctx) error {
-		if gctx == nil || gctx.Command == nil {
-			return nil
-		}
-
-		eb := embeds.NewBuilder()
-
-		eb.FailureTemplate(messages.NSFWCommand(gctx.Command.Name))
-
-		return gctx.ReplyEmbed(eb.Finalize())
-	}
-}
-
-// OnExecute logs every executed command.
-func OnExecute(b *bot.Bot) func(*gumi.Ctx) error {
-	return func(gctx *gumi.Ctx) error {
-		if gctx == nil || gctx.Command == nil || gctx.Event == nil {
-			return nil
-		}
-
-		b.Log.With("command", gctx.Command.Name, "arguments", gctx.Args.Raw, "guild_id", gctx.Event.GuildID, "channel_id", gctx.Event.ChannelID).Info("executing command")
-
-		b.Stats.IncrementCommand(gctx.Command.Name)
-		return nil
-	}
+	sender.ExpireMessage(b.Log, ctx.Session, msg)
 }

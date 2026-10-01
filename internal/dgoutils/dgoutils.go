@@ -4,10 +4,6 @@ import (
 	"errors"
 	"strconv"
 	"strings"
-
-	"github.com/VTGare/boe-tea-go/messages"
-	"github.com/VTGare/gumi"
-	"github.com/julien040/go-ternary"
 )
 
 var (
@@ -15,29 +11,7 @@ var (
 	ErrRangeSyntax = errors.New("range low is higher than range high")
 )
 
-func ValidateArgs(gctx *gumi.Ctx, argsLen int) error {
-	return ternary.If(
-		gctx.Args.Len() < argsLen,
-		messages.ErrIncorrectCmd(gctx.Command),
-		nil,
-	)
-}
-
-// Trimmer trims <> in case someone wraps the link in it, and characters '!', '@', '#', and '&' for channels and user mentions.
-func Trimmer(gctx *gumi.Ctx, n int) string {
-	if gctx == nil || gctx.Args == nil {
-		return ""
-	}
-
-	arg := gctx.Args.Get(n)
-	if arg == nil {
-		return ""
-	}
-
-	return strings.Trim(arg.Raw, "<!@#&>")
-}
-
-// TrimmerRaw is the same as Trimmer but directly on a Raw string.
+// TrimmerRaw trims <> in case someone wraps the link in it, and characters '!', '@', '#', and '&' for channels and user mentions.
 func TrimmerRaw(arg string) string {
 	return strings.Trim(arg, "<!@#&>")
 }

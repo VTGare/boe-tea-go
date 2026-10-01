@@ -1,10 +1,12 @@
 package handlers
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/VTGare/boe-tea-go/bot"
-	"github.com/VTGare/gumi"
+	"github.com/VTGare/boe-tea-go/router"
+	"github.com/VTGare/boe-tea-go/router/middleware"
 	"github.com/bwmarrin/discordgo"
 	"go.uber.org/zap"
 
@@ -17,7 +19,30 @@ func TestHandlers(t *testing.T) {
 	RunSpecs(t, "Handlers Suite")
 }
 
-var _ = Describe("OnPanic", func() {
+var _ = Describe("Recover middleware", func() {
+	It("converts panics into PanicError", func() {
+		mw := middleware.Recover()
+
+		err := mw(func(*router.Context) error {
+			panic("boom")
+		})(&router.Context{})
+
+		var panicErr *router.PanicError
+
+		Expect(errors.As(err, &panicErr)).To(BeTrue())
+		Expect(panicErr.Value).To(Equal("boom"))
+	})
+
+	It("passes handler results through", func() {
+		mw := middleware.Recover()
+
+		Expect(mw(func(*router.Context) error {
+			return nil
+		})(&router.Context{})).To(BeNil())
+	})
+})
+
+var _ = Describe("OnMessage fallback", func() {
 	var b *bot.Bot
 
 	BeforeEach(func() {
@@ -25,30 +50,15 @@ var _ = Describe("OnPanic", func() {
 		b = &bot.Bot{Log: logger}
 	})
 
-	It("survives an empty context", func() {
+	It("drops nil and malformed messages", func() {
 		Expect(func() {
-			OnPanic(b)(&gumi.Ctx{}, "boom")
-		}).NotTo(Panic())
-	})
-
-	It("logs event context when present", func() {
-		gctx := &gumi.Ctx{
-			Event: &discordgo.MessageCreate{
-				Message: &discordgo.Message{
-					ID:        "m",
-					ChannelID: "c",
-					GuildID:   "g",
-				},
-			},
-		}
-
-		Expect(func() {
-			OnPanic(b)(gctx, "boom")
+			OnMessage(b)(nil, nil)
+			OnMessage(b)(nil, &discordgo.MessageCreate{})
 		}).NotTo(Panic())
 	})
 })
 
-var _ = Describe("OnMessage", func() {
+var _ = Describe("OnError", func() {
 	var b *bot.Bot
 
 	BeforeEach(func() {
@@ -56,9 +66,21 @@ var _ = Describe("OnMessage", func() {
 		b = &bot.Bot{Log: logger}
 	})
 
-	It("drops nil contexts and malformed events", func() {
-		Expect(OnMessage(b)(nil)).To(BeNil())
-		Expect(OnMessage(b)(&gumi.Ctx{})).To(BeNil())
-		Expect(OnMessage(b)(&gumi.Ctx{Event: &discordgo.MessageCreate{}})).To(BeNil())
+	It("survives a nil context", func() {
+		Expect(func() {
+			OnError(b)(nil, errors.New("boom"))
+		}).NotTo(Panic())
+	})
+
+	It("logs panics without replying", func() {
+		Expect(func() {
+			OnError(b)(&router.Context{}, &router.PanicError{Value: "boom"})
+		}).NotTo(Panic())
+	})
+
+	It("swallows silent check errors", func() {
+		Expect(func() {
+			OnError(b)(&router.Context{}, &router.CheckError{Check: "owner_only", Silent: true})
+		}).NotTo(Panic())
 	})
 })

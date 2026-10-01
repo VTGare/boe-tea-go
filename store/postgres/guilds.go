@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -9,6 +10,9 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+const guildColumns = `id, prefix, pixiv, twitter, deviant, bluesky, tags, flavour_text,
+	crosspost, reactions, skip_first, "limit", repost, repost_expiration, art_channels, nsfw, created_at, updated_at`
 
 type guildStore struct {
 	pool *pgxpool.Pool
@@ -19,9 +23,7 @@ func (g *guildStore) Guild(ctx context.Context, id string) (*store.Guild, error)
 		return store.UserGuild(), nil
 	}
 
-	row := g.pool.QueryRow(ctx, `SELECT id, prefix, pixiv, twitter, deviant, bluesky, tags, flavour_text,
-		crosspost, reactions, skip_first, "limit", repost, repost_expiration, art_channels, nsfw, created_at, updated_at
-		FROM guilds WHERE id = $1`, id)
+	row := g.pool.QueryRow(ctx, `SELECT `+guildColumns+` FROM guilds WHERE id = $1`, id)
 
 	guild := &store.Guild{}
 	if err := scanGuild(row, guild); err != nil {
@@ -34,8 +36,7 @@ func (g *guildStore) Guild(ctx context.Context, id string) (*store.Guild, error)
 func (g *guildStore) CreateGuild(ctx context.Context, id string) (*store.Guild, error) {
 	guild := store.DefaultGuild(id)
 
-	_, err := g.pool.Exec(ctx, `INSERT INTO guilds (id, prefix, pixiv, twitter, deviant, bluesky, tags, flavour_text,
-		crosspost, reactions, skip_first, "limit", repost, repost_expiration, art_channels, nsfw, created_at, updated_at)
+	_, err := g.pool.Exec(ctx, `INSERT INTO guilds (`+guildColumns+`)
 		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
 		ON CONFLICT (id) DO NOTHING`,
 		guild.ID, guild.Prefix, guild.Pixiv, guild.Twitter, guild.Deviant, guild.Bluesky, guild.Tags, guild.FlavorText,
@@ -46,9 +47,7 @@ func (g *guildStore) CreateGuild(ctx context.Context, id string) (*store.Guild, 
 		return nil, err
 	}
 
-	row := g.pool.QueryRow(ctx, `SELECT id, prefix, pixiv, twitter, deviant, bluesky, tags, flavour_text,
-		crosspost, reactions, skip_first, "limit", repost, repost_expiration, art_channels, nsfw, created_at, updated_at
-		FROM guilds WHERE id = $1`, id)
+	row := g.pool.QueryRow(ctx, `SELECT `+guildColumns+` FROM guilds WHERE id = $1`, id)
 
 	created := &store.Guild{}
 	if err := scanGuild(row, created); err != nil {
@@ -64,8 +63,7 @@ func (g *guildStore) UpdateGuild(ctx context.Context, guild *store.Guild) (*stor
 	row := g.pool.QueryRow(ctx, `UPDATE guilds SET prefix=$2, pixiv=$3, twitter=$4, deviant=$5, bluesky=$6, tags=$7,
 		flavour_text=$8, crosspost=$9, reactions=$10, skip_first=$11, "limit"=$12, repost=$13, repost_expiration=$14,
 		art_channels=$15, nsfw=$16, updated_at=$17 WHERE id = $1
-		RETURNING id, prefix, pixiv, twitter, deviant, bluesky, tags, flavour_text,
-		crosspost, reactions, skip_first, "limit", repost, repost_expiration, art_channels, nsfw, created_at, updated_at`,
+		RETURNING `+guildColumns,
 		guild.ID, guild.Prefix, guild.Pixiv, guild.Twitter, guild.Deviant, guild.Bluesky, guild.Tags, guild.FlavorText,
 		guild.Crosspost, guild.Reactions, guild.SkipFirst, guild.Limit, string(guild.Repost), int64(guild.RepostExpiration),
 		guild.ArtChannels, guild.NSFW, guild.UpdatedAt,
@@ -80,12 +78,12 @@ func (g *guildStore) UpdateGuild(ctx context.Context, guild *store.Guild) (*stor
 }
 
 func (g *guildStore) AddArtChannels(ctx context.Context, guildID string, channels []string) (*store.Guild, error) {
-	row := g.pool.QueryRow(ctx, `UPDATE guilds SET art_channels = (
-			SELECT array_agg(DISTINCT ch) FROM unnest(art_channels || $2) AS ch WHERE ch IS NOT NULL
+	row := g.pool.QueryRow(ctx, `UPDATE guilds SET art_channels = ARRAY(
+			SELECT ch FROM unnest(art_channels || $2::text[]) WITH ORDINALITY AS t(ch, ord)
+			WHERE ch IS NOT NULL GROUP BY ch ORDER BY min(ord)
 		), updated_at = now()
 		WHERE id = $1
-		RETURNING id, prefix, pixiv, twitter, deviant, bluesky, tags, flavour_text,
-		crosspost, reactions, skip_first, "limit", repost, repost_expiration, art_channels, nsfw, created_at, updated_at`,
+		RETURNING `+guildColumns,
 		guildID, channels,
 	)
 
@@ -98,14 +96,17 @@ func (g *guildStore) AddArtChannels(ctx context.Context, guildID string, channel
 }
 
 func (g *guildStore) DeleteArtChannels(ctx context.Context, guildID string, channels []string) (*store.Guild, error) {
-	row := g.pool.QueryRow(ctx, `UPDATE guilds SET art_channels = COALESCE((
-			SELECT array_agg(ch) FROM (
-				SELECT unnest(art_channels) AS ch EXCEPT SELECT unnest($2::text[])
-			) s WHERE ch IS NOT NULL
-		), '{}'), updated_at = now()
+	// A nil slice encodes as NULL, and <> ALL(NULL) would drop every channel.
+	if channels == nil {
+		channels = make([]string, 0)
+	}
+
+	row := g.pool.QueryRow(ctx, `UPDATE guilds SET art_channels = ARRAY(
+			SELECT ch FROM unnest(art_channels) WITH ORDINALITY AS t(ch, ord)
+			WHERE ch <> ALL($2::text[]) ORDER BY ord
+		), updated_at = now()
 		WHERE id = $1
-		RETURNING id, prefix, pixiv, twitter, deviant, bluesky, tags, flavour_text,
-		crosspost, reactions, skip_first, "limit", repost, repost_expiration, art_channels, nsfw, created_at, updated_at`,
+		RETURNING `+guildColumns,
 		guildID, channels,
 	)
 
@@ -129,7 +130,7 @@ func scanGuild(row guildRow, guild *store.Guild) error {
 		&guild.Tags, &guild.FlavorText, &guild.Crosspost, &guild.Reactions, &guild.SkipFirst, &guild.Limit,
 		&repost, &repostExpiration, &guild.ArtChannels, &guild.NSFW, &guild.CreatedAt, &guild.UpdatedAt,
 	); err != nil {
-		if err == pgx.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return store.ErrGuildNotFound
 		}
 

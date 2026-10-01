@@ -52,7 +52,8 @@ Please use `bt!help` command for documentation. Complete documentation is planne
 {
     "discord": {
         "token": "Your Discord bot token. Acquire it on Discord Developer Portal.",
-        "author_id": "Your Discord user ID. Gives access to developer commands."
+        "author_id": "Your Discord user ID. Gives access to developer commands.",
+        "dev_guild_id": "Dev server ID for instant slash-command registration. Empty means global."
     },
     "mongo": {
         "uri": "mongodb://localhost:27017",

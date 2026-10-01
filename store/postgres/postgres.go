@@ -121,13 +121,18 @@ func schemaDDL() []string {
 			created_at TIMESTAMPTZ NOT NULL,
 			PRIMARY KEY (user_id, artwork_id)
 		)`,
-		`CREATE INDEX IF NOT EXISTS artworks_created_at_idx ON artworks (created_at DESC)`,
-		`CREATE INDEX IF NOT EXISTS artworks_favourites_idx ON artworks (favourites DESC)`,
+		`CREATE INDEX IF NOT EXISTS artworks_created_at_id_idx ON artworks (created_at DESC, id DESC)`,
+		`CREATE INDEX IF NOT EXISTS artworks_favourites_id_idx ON artworks (favourites DESC, id DESC)`,
 		`CREATE INDEX IF NOT EXISTS artworks_title_trgm_idx ON artworks USING gin (title gin_trgm_ops)`,
 		`CREATE INDEX IF NOT EXISTS artworks_author_trgm_idx ON artworks USING gin (author gin_trgm_ops)`,
 		`CREATE INDEX IF NOT EXISTS bookmarks_user_created_idx ON bookmarks (user_id, created_at)`,
-		`CREATE INDEX IF NOT EXISTS bookmarks_artwork_idx ON bookmarks (artwork_id)`,
-		`CREATE INDEX IF NOT EXISTS user_groups_user_idx ON user_groups (user_id)`,
+		// Superseded by the id-tiebroken sort indexes above.
+		`DROP INDEX IF EXISTS artworks_created_at_idx`,
+		`DROP INDEX IF EXISTS artworks_favourites_idx`,
+		// Unused: no query filters bookmarks by artwork_id alone.
+		`DROP INDEX IF EXISTS bookmarks_artwork_idx`,
+		// Redundant with the (user_id, name) primary key.
+		`DROP INDEX IF EXISTS user_groups_user_idx`,
 	}
 }
 

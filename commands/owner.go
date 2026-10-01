@@ -5,31 +5,32 @@ import (
 
 	"github.com/VTGare/boe-tea-go/bot"
 	"github.com/VTGare/boe-tea-go/internal/dgoutils"
+	"github.com/VTGare/boe-tea-go/router"
 	"github.com/VTGare/embeds"
-	"github.com/VTGare/gumi"
 )
 
-func ownerGroup(b *bot.Bot) {
-	group := "owner"
-
-	b.Router.RegisterCmd(&gumi.Command{
-		Name:        "reply",
-		Group:       group,
-		Description: "Owner's command to reply to feedback",
-		Usage:       "bt!reply <wall of text>",
-		Example:     "bt!reply You know who else is shit? Yrou'e mom in bed :^)",
-		AuthorOnly:  true,
-		Exec:        reply(b),
-	})
+func ownerGroup(b *bot.Bot) []*router.Command {
+	return []*router.Command{
+		{
+			Name:        "reply",
+			Category:    "Owner",
+			Description: "Owner's command to reply to feedback",
+			Checks:      []router.Check{router.OwnerOnly},
+			Hidden:      true,
+			Options: []*router.Option{
+				router.String("user", "User to reply to").Require(),
+				router.String("message", "Reply text").Require().Greedy(),
+				router.Attachment("image", "Image to attach"),
+			},
+			Examples: []string{"reply 1234567890 Thanks for the feedback!"},
+			Handler:  reply(b),
+		},
+	}
 }
 
-func reply(b *bot.Bot) func(*gumi.Ctx) error {
-	return func(gctx *gumi.Ctx) error {
-		if err := dgoutils.ValidateArgs(gctx, 2); err != nil {
-			return err
-		}
-
-		userID := dgoutils.Trimmer(gctx, 0)
+func reply(b *bot.Bot) router.Handler {
+	return func(ctx *router.Context) error {
+		userID := dgoutils.TrimmerRaw(ctx.Options.String("user"))
 
 		s := b.ShardManager.SessionForDM()
 		ch, err := s.UserChannelCreate(userID)
@@ -38,17 +39,24 @@ func reply(b *bot.Bot) func(*gumi.Ctx) error {
 		}
 
 		eb := embeds.NewBuilder()
-		reply := strings.TrimPrefix(strings.TrimSpace(gctx.Args.Raw), gctx.Args.Get(0).Raw)
+		reply := ctx.Options.String("message")
 
-		eb.Author("Feedback reply", "", gctx.Session.State.User.AvatarURL("")).
+		eb.Author("Feedback reply", "", ctx.Session.State.User.AvatarURL("")).
 			Description(reply)
 
-		if attachments := gctx.Event.Attachments; len(attachments) >= 1 {
-			if strings.HasSuffix(attachments[0].Filename, "png") ||
-				strings.HasSuffix(attachments[0].Filename, "jpg") ||
-				strings.HasSuffix(attachments[0].Filename, "gif") {
-				eb.Image(attachments[0].URL)
-			}
+		var imageURL, imageName string
+		if ctx.IsMessage() && len(ctx.Message.Attachments) > 0 {
+			imageURL = ctx.Message.Attachments[0].URL
+			imageName = ctx.Message.Attachments[0].Filename
+		} else if att := ctx.Options.Attachment("image"); att != nil {
+			imageURL = att.URL
+			imageName = att.Filename
+		}
+
+		if imageURL != "" && (strings.HasSuffix(imageName, "png") ||
+			strings.HasSuffix(imageName, "jpg") ||
+			strings.HasSuffix(imageName, "gif")) {
+			eb.Image(imageURL)
 		}
 
 		_, err = s.ChannelMessageSendEmbed(ch.ID, eb.Finalize())
@@ -57,6 +65,6 @@ func reply(b *bot.Bot) func(*gumi.Ctx) error {
 		}
 
 		eb.Clear()
-		return gctx.ReplyEmbed(eb.SuccessTemplate("Reply has been sent.").Finalize())
+		return ctx.Reply(router.Embed(eb.SuccessTemplate("Reply has been sent.").Finalize()))
 	}
 }

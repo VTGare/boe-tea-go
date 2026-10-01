@@ -32,8 +32,9 @@ type Config struct {
 // Discord stores Discord bot configuration. Acquire bot token on Discord's Developer Portal. Prefixes must be below 5 characters each.
 // AuthorID is required to enable developer commands. Empty AuthorID may lead to undefined behavior.
 type Discord struct {
-	Token    string `json:"token"`
-	AuthorID string `json:"author_id"`
+	Token      string `json:"token"`
+	AuthorID   string `json:"author_id"`
+	DevGuildID string `json:"dev_guild_id"`
 }
 
 // Pixiv stores Pixiv login information. Guide how to acquire auth and refresh tokens: https://gist.github.com/upbit/6edda27cb1644e94183291109b8a5fde
@@ -215,7 +216,8 @@ func (c *Config) StoreBackend() (ResolvedStore, error) {
 }
 
 func (c *Config) RandomQuote(nsfw bool) string {
-	quotes := ternary.If(nsfw,
+	quotes := ternary.If(
+		nsfw,
 		c.Quotes,
 		c.safeQuotes,
 	)

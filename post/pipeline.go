@@ -380,7 +380,7 @@ func renderOptions(guild *store.Guild, run Post, opts runOpts) render.Options {
 	if opts.isCrosspost {
 		renderOpts.AuthorName = messages.CrosspostBy(run.AuthorName)
 		renderOpts.AuthorIconURL = run.AuthorAvatar
-	} else {
+	} else if !run.IsInteraction {
 		renderOpts.Reference = &discordgo.MessageReference{
 			GuildID:   run.GuildID,
 			ChannelID: run.ChannelID,
@@ -494,7 +494,7 @@ func (r *Poster) notifyReposts(guild *store.Guild, run Post, reps []*repost.Repo
 
 	errs := make([]error, 0)
 
-	if guild.Repost == store.GuildRepostStrict {
+	if guild.Repost == store.GuildRepostStrict && !run.IsInteraction {
 		perm, err := r.deps.Sender.BotHasGuildPerms(
 			guild.ID,
 			discordgo.PermissionAdministrator|discordgo.PermissionManageMessages,

@@ -15,6 +15,7 @@ import (
 	"github.com/VTGare/boe-tea-go/internal/cache"
 	"github.com/VTGare/boe-tea-go/internal/sender"
 	"github.com/VTGare/boe-tea-go/internal/spool"
+	"github.com/VTGare/boe-tea-go/internal/widget"
 	"github.com/VTGare/boe-tea-go/post"
 	"github.com/VTGare/boe-tea-go/repost"
 	"github.com/VTGare/boe-tea-go/store"
@@ -276,13 +277,14 @@ func (h *harness) deleteAll(channelID string, ids ...string) {
 
 func newTestBot(h *harness, stub *stubProvider, detector repost.Detector) *bot.Bot {
 	b := &bot.Bot{
-		Log:            zap.NewNop().Sugar(),
-		Store:          h.store,
-		RepostDetector: detector,
-		ArtworkCache:   goCache.New(5*time.Minute, 10*time.Minute),
-		EmbedCache:     cache.NewEmbedCache(),
-		Sender:         h.sender,
-		Context:        context.Background(),
+		Log:              zap.NewNop().Sugar(),
+		Store:            h.store,
+		RepostDetector:   detector,
+		ArtworkCache:     goCache.New(5*time.Minute, 10*time.Minute),
+		EmbedCache:       cache.NewEmbedCache(),
+		Sender:           h.sender,
+		Context:          context.Background(),
+		WidgetDispatcher: widget.NewDispatcher(),
 	}
 	b.AddProvider(stub)
 

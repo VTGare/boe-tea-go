@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -11,29 +12,30 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+const artworkColumns = `id, title, author, url, images, favourites, created_at, updated_at`
+
 type artworkStore struct {
 	pool *pgxpool.Pool
 }
 
 func (a *artworkStore) Artwork(ctx context.Context, id int, url string) (*store.Artwork, error) {
-	if id == 0 && url == "" {
-		return nil, store.ErrArtworkNotFound
-	}
-
-	query := `SELECT id, title, author, url, images, favourites, created_at, updated_at FROM artworks WHERE id = $1 AND url = $2`
-	args := []any{id, url}
+	var (
+		where string
+		args  []any
+	)
 
 	switch {
 	case id != 0 && url != "":
-		// keep both predicates
+		where, args = `id = $1 AND url = $2`, []any{id, url}
 	case id != 0:
-		query = `SELECT id, title, author, url, images, favourites, created_at, updated_at FROM artworks WHERE id = $1`
-		args = []any{id}
+		where, args = `id = $1`, []any{id}
+	case url != "":
+		where, args = `url = $1`, []any{url}
 	default:
-		query = `SELECT id, title, author, url, images, favourites, created_at, updated_at FROM artworks WHERE url = $1`
-		args = []any{url}
+		return nil, store.ErrArtworkNotFound
 	}
 
+	query := `SELECT ` + artworkColumns + ` FROM artworks WHERE ` + where
 	row := a.pool.QueryRow(ctx, query, args...)
 
 	artwork := &store.Artwork{}
@@ -54,7 +56,7 @@ func (a *artworkStore) CreateArtwork(ctx context.Context, artwork *store.Artwork
 
 	row := a.pool.QueryRow(ctx, `INSERT INTO artworks (id, title, author, url, images, favourites, created_at, updated_at)
 		VALUES (nextval('artwork_id_seq'), $1, $2, $3, $4, 0, $5, $6)
-		RETURNING id, title, author, url, images, favourites, created_at, updated_at`,
+		RETURNING `+artworkColumns,
 		artwork.Title, artwork.Author, artwork.URL, images, now, now,
 	)
 
@@ -84,8 +86,9 @@ func (a *artworkStore) SearchArtworks(ctx context.Context, filter store.ArtworkF
 		sortCol = "favourites"
 	}
 
-	query := fmt.Sprintf(`SELECT id, title, author, url, images, favourites, created_at, updated_at FROM artworks %s ORDER BY %s %s LIMIT $%d OFFSET $%d`,
-		where, sortCol, order, len(args)+1, len(args)+2,
+	// id breaks ties so OFFSET pages never overlap or skip rows.
+	query := fmt.Sprintf(`SELECT %s FROM artworks %s ORDER BY %s %s, id %s LIMIT $%d OFFSET $%d`,
+		artworkColumns, where, sortCol, order, order, len(args)+1, len(args)+2,
 	)
 	args = append(args, opt.Limit, opt.Skip)
 
@@ -155,7 +158,7 @@ type artworkRow interface {
 
 func scanArtwork(row artworkRow, a *store.Artwork) error {
 	if err := row.Scan(&a.ID, &a.Title, &a.Author, &a.URL, &a.Images, &a.Favorites, &a.CreatedAt, &a.UpdatedAt); err != nil {
-		if err == pgx.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return store.ErrArtworkNotFound
 		}
 

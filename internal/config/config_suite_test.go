@@ -37,6 +37,22 @@ func writeTempConfig(content string) string {
 	return f.Name()
 }
 
+var _ = Describe("Discord", func() {
+	It("parses the dev guild ID", func() {
+		cfg, err := FromFile(writeTempConfig(`{"discord": {"token": "t", "author_id": "a", "dev_guild_id": "123"}}`))
+
+		Expect(err).NotTo(HaveOccurred())
+		Expect(cfg.Discord.DevGuildID).To(Equal("123"))
+	})
+
+	It("leaves the dev guild ID empty when unset", func() {
+		cfg, err := FromFile(writeTempConfig(`{"discord": {"token": "t", "author_id": "a"}}`))
+
+		Expect(err).NotTo(HaveOccurred())
+		Expect(cfg.Discord.DevGuildID).To(BeEmpty())
+	})
+})
+
 var _ = Describe("StoreBackend", func() {
 	const legacy = `{"mongo": {"uri": "mongodb://legacy:27017", "default_db": "boe"}}`
 

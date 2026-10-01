@@ -7,7 +7,7 @@ import (
 	"sync"
 
 	"github.com/VTGare/boe-tea-go/artworks"
-	"github.com/VTGare/gumi"
+	"github.com/VTGare/boe-tea-go/router"
 	"go.uber.org/atomic"
 )
 
@@ -37,14 +37,20 @@ func providerName(provider artworks.Provider) string {
 	return parts[1]
 }
 
-func New(router *gumi.Router, providers []artworks.Provider) *Stats {
+func New(r *router.Router, providers []artworks.Provider) *Stats {
 	stats := &Stats{
 		Commands: map[string]*atomic.Int64{},
 		Artworks: map[string]*atomic.Int64{},
 	}
 
-	for _, cmd := range router.Commands {
-		stats.Commands[cmd.Name] = atomic.NewInt64(0)
+	for _, cmd := range r.Commands() {
+		cmd.Walk(func(c *router.Command) {
+			if c.IsGroup() {
+				return
+			}
+
+			stats.Commands[c.QualifiedName()] = atomic.NewInt64(0)
+		})
 	}
 
 	for _, provider := range providers {

@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -14,9 +15,15 @@ type userStore struct {
 }
 
 func (u *userStore) User(ctx context.Context, userID string) (*store.User, error) {
+	// Read first: the user almost always exists, so this is one round trip.
+	user, err := u.loadUser(ctx, userID)
+	if !errors.Is(err, store.ErrUserNotFound) {
+		return user, err
+	}
+
 	def := store.DefaultUser(userID)
 
-	_, err := u.pool.Exec(ctx, `INSERT INTO users (id, dm, crosspost, ignore, created_at, updated_at)
+	_, err = u.pool.Exec(ctx, `INSERT INTO users (id, dm, crosspost, ignore, created_at, updated_at)
 		VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT (id) DO NOTHING`,
 		def.ID, def.DM, def.Crosspost, def.Ignore, def.CreatedAt, def.UpdatedAt,
 	)
@@ -24,12 +31,7 @@ func (u *userStore) User(ctx context.Context, userID string) (*store.User, error
 		return nil, err
 	}
 
-	user, err := u.loadUser(ctx, userID)
-	if err != nil {
-		return nil, err
-	}
-
-	return user, nil
+	return u.loadUser(ctx, userID)
 }
 
 func (u *userStore) CreateUser(ctx context.Context, id string) (*store.User, error) {
@@ -126,9 +128,8 @@ func (u *userStore) RenameCrosspostGroup(ctx context.Context, userID, group, ren
 }
 
 func (u *userStore) AddCrosspostChannel(ctx context.Context, userID, group, child string) (*store.User, error) {
-	_, err := u.pool.Exec(ctx, `UPDATE user_groups SET children = (
-			SELECT array_agg(DISTINCT ch) FROM unnest(children || $3) AS ch WHERE ch IS NOT NULL
-		) WHERE user_id=$1 AND name=$2`, userID, group, []string{child},
+	_, err := u.pool.Exec(ctx, `UPDATE user_groups SET children = children || $3::text
+		WHERE user_id=$1 AND name=$2 AND NOT ($3 = ANY(children))`, userID, group, child,
 	)
 	if err != nil {
 		return nil, err
@@ -138,11 +139,8 @@ func (u *userStore) AddCrosspostChannel(ctx context.Context, userID, group, chil
 }
 
 func (u *userStore) DeleteCrosspostChannel(ctx context.Context, userID, group, child string) (*store.User, error) {
-	_, err := u.pool.Exec(ctx, `UPDATE user_groups SET children = COALESCE((
-			SELECT array_agg(ch) FROM (
-				SELECT unnest(children) AS ch EXCEPT SELECT unnest($3::text[])
-			) s WHERE ch IS NOT NULL
-		), '{}') WHERE user_id=$1 AND name=$2`, userID, group, []string{child},
+	_, err := u.pool.Exec(ctx, `UPDATE user_groups SET children = array_remove(children, $3)
+		WHERE user_id=$1 AND name=$2`, userID, group, child,
 	)
 	if err != nil {
 		return nil, err

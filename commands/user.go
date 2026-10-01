@@ -5,168 +5,203 @@ import (
 	"errors"
 	"fmt"
 	"slices"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/VTGare/boe-tea-go/bot"
-	"github.com/VTGare/boe-tea-go/commands/flags"
 	"github.com/VTGare/boe-tea-go/internal/arrays"
 	"github.com/VTGare/boe-tea-go/internal/dgoutils"
 	"github.com/VTGare/boe-tea-go/internal/widget"
 	"github.com/VTGare/boe-tea-go/messages"
+	"github.com/VTGare/boe-tea-go/router"
 	"github.com/VTGare/boe-tea-go/store"
 	"github.com/VTGare/embeds"
-	"github.com/VTGare/gumi"
 	"github.com/bwmarrin/discordgo"
 	"github.com/julien040/go-ternary"
 )
 
 // userGroup registers user group commands.
-func userGroup(b *bot.Bot) {
-	group := "user"
+func userGroup(b *bot.Bot) []*router.Command {
+	userCooldown := func() *router.Cooldown {
+		return router.NewCooldown(router.CooldownUser, 1, 10*time.Second)
+	}
 
-	b.Router.RegisterCmd(&gumi.Command{
-		Name:        "groups",
-		Group:       group,
-		Aliases:     []string{"ls", "list"},
-		Description: "Shows all crosspost groups.",
-		Usage:       "bt!groups",
-		Example:     "bt!groups",
-		RateLimiter: gumi.NewRateLimiter(10 * time.Second),
-		Exec:        groups(b),
-	})
-
-	b.Router.RegisterCmd(&gumi.Command{
-		Name:        "newgroup",
-		Group:       group,
-		Aliases:     []string{"addgroup", "create"},
-		Description: "Creates a new crosspost group.",
-		Usage:       "bt!newgroup <group name> <parent channel>",
-		Example:     "bt!newgroup lewds #nsfw",
-		RateLimiter: gumi.NewRateLimiter(10 * time.Second),
-		Exec:        newGroup(b),
-	})
-
-	b.Router.RegisterCmd(&gumi.Command{
-		Name:        "newpair",
-		Group:       group,
-		Aliases:     []string{"addpair"},
-		Description: "Creates a new crosspost pair.",
-		Usage:       "bt!newpair <pair name> <first channel> <second channel>",
-		Example:     "bt!newpair lewds #nsfw #nsfw-pics",
-		RateLimiter: gumi.NewRateLimiter(10 * time.Second),
-		Exec:        newPair(b),
-	})
-
-	b.Router.RegisterCmd(&gumi.Command{
-		Name:        "delgroup",
-		Group:       group,
-		Description: "Deletes a crosspost group.",
-		Usage:       "bt!delgroup <group name>",
-		Example:     "bt!delgroup schooldays",
-		RateLimiter: gumi.NewRateLimiter(10 * time.Second),
-		Exec:        delGroup(b),
-	})
-
-	b.Router.RegisterCmd(&gumi.Command{
-		Name:        "push",
-		Group:       group,
-		Description: "Adds channels to a crosspost group.",
-		Usage:       "bt!push <group name> [channel ids]",
-		Example:     "bt!push myCoolGroup #coolchannel #coolerchannel",
-		RateLimiter: gumi.NewRateLimiter(10 * time.Second),
-		Exec:        push(b),
-	})
-
-	b.Router.RegisterCmd(&gumi.Command{
-		Name:        "remove",
-		Group:       group,
-		Aliases:     []string{"pop"},
-		Description: "Removes channels from a crosspost group",
-		Usage:       "bt!remove <group name> [channel ids]",
-		Example:     "bt!remove cuteAnimeGirls #nsfw-channel #cat-pics",
-		RateLimiter: gumi.NewRateLimiter(10 * time.Second),
-		Exec:        remove(b),
-	})
-
-	b.Router.RegisterCmd(&gumi.Command{
-		Name:        "editparent",
-		Group:       group,
-		Description: "Changes the parent channel of a crosspost group",
-		Usage:       "bt!editparent <group name> <parent channel>",
-		Example:     "bt!editparent cuteAnimeGirls #anime-pics",
-		RateLimiter: gumi.NewRateLimiter(10 * time.Second),
-		Exec:        editParent(b),
-	})
-
-	b.Router.RegisterCmd(&gumi.Command{
-		Name:        "rename",
-		Group:       group,
-		Description: "Renames a crosspost group",
-		Usage:       "bt!rename <from> <to>",
-		Example:     "bt!rename cuteAnimeGirls AnimeGirls",
-		RateLimiter: gumi.NewRateLimiter(10 * time.Second),
-		Exec:        rename(b),
-	})
-
-	b.Router.RegisterCmd(&gumi.Command{
-		Name:        "copygroup",
-		Group:       group,
-		Description: "Copies a crosspost group with a different parent channel",
-		Usage:       "bt!copygroup <from> <to> <parent channel id>",
-		Example:     "bt!copygroup sfw1 sfw2 #za-warudo",
-		RateLimiter: gumi.NewRateLimiter(10 * time.Second),
-		Exec:        copyGroup(b),
-	})
-
-	b.Router.RegisterCmd(&gumi.Command{
-		Name:        "bookmarks",
-		Group:       group,
-		Aliases:     []string{"favorites", "favourites", "favs"},
-		Description: "Shows your bookmarks. Use help command to learn more about filtering and sorting.",
-		Usage:       "bt!bookmarks [flags]",
-		Example:     "bt!bookmarks during:month sort:time order:asc",
-		Flags: map[string]string{
-			"sort":   "**Options:** `[time, popularity]`. **Default:** time. Changes sort type.",
-			"order":  "**Options:** `[asc, desc]`. **Default:** desc. Changes order of sorted artworks.",
-			"mode":   "**Options:** `[all, sfw, nsfw]`. **Default:** all in nsfw channels and DMs, sfw otherwise.",
-			"during": "**Options:** `[day, week, month]`. **Default:** none. Filters artworks by time.",
+	return []*router.Command{
+		{
+			Name:        "groups",
+			Category:    "User",
+			Aliases:     []string{"ls", "list"},
+			Description: "Shows all crosspost groups.",
+			Cooldown:    userCooldown(),
+			Examples:    []string{"groups"},
+			Handler:     groups(b),
 		},
-		RateLimiter: gumi.NewRateLimiter(10 * time.Second),
-		Exec:        bookmarks(b),
-	})
-
-	b.Router.RegisterCmd(&gumi.Command{
-		Name:        "unbookmark",
-		Group:       group,
-		Aliases:     []string{"unfav", "unfavourite", "unfavorite"},
-		Description: "Remove a bookmark by its ID or URL",
-		Usage:       "bt!unfav <artwork ID or URL>",
-		Example:     "bt!unfav 69",
-		RateLimiter: gumi.NewRateLimiter(15 * time.Second),
-		Exec:        unfav(b),
-	})
-
-	b.Router.RegisterCmd(&gumi.Command{
-		Name:        "userset",
-		Aliases:     []string{"profile"},
-		Group:       group,
-		Description: "Changes user's settings.",
-		Usage:       "bt!userset <setting name> <new setting>",
-		Example:     "bt!userset dm false",
-		Flags: map[string]string{
-			"dm":        "**Options:** `[on, off]`. Switches most direct messages from the bot.",
-			"crosspost": "**Options:** `[on, off]`. Switches crossposting in general.",
+		{
+			Name:        "newgroup",
+			Category:    "User",
+			Aliases:     []string{"addgroup", "create"},
+			Description: "Creates a new crosspost group.",
+			Cooldown:    userCooldown(),
+			Options: []*router.Option{
+				router.String("name", "Group name").Require(),
+				router.Channel("parent", "Parent channel").Require(),
+			},
+			Examples: []string{"newgroup lewds #nsfw"},
+			Handler:  newGroup(b),
 		},
-		RateLimiter: gumi.NewRateLimiter(10 * time.Second),
-		Exec:        userSet(b),
-	})
+		{
+			Name:        "newpair",
+			Category:    "User",
+			Aliases:     []string{"addpair"},
+			Description: "Creates a new crosspost pair.",
+			Cooldown:    userCooldown(),
+			Options: []*router.Option{
+				router.String("name", "Pair name").Require(),
+				router.Channel("first", "First channel").Require().
+					WithChannelTypes(discordgo.ChannelTypeGuildText),
+				router.Channel("second", "Second channel").Require().
+					WithChannelTypes(discordgo.ChannelTypeGuildText),
+			},
+			Examples: []string{"newpair lewds #nsfw #nsfw-pics"},
+			Handler:  newPair(b),
+		},
+		{
+			Name:        "delgroup",
+			Category:    "User",
+			Description: "Deletes a crosspost group.",
+			Cooldown:    userCooldown(),
+			Options: []*router.Option{
+				router.String("name", "Group name").Require(),
+			},
+			Examples: []string{"delgroup schooldays"},
+			Handler:  delGroup(b),
+		},
+		{
+			Name:        "push",
+			Category:    "User",
+			Description: "Adds channels to a crosspost group.",
+			Cooldown:    userCooldown(),
+			Options: []*router.Option{
+				router.String("group", "Group name").Require(),
+				router.String("channels", "Channels to add").Require().Greedy(),
+			},
+			Examples: []string{"push myCoolGroup #coolchannel #coolerchannel"},
+			Handler:  push(b),
+		},
+		{
+			Name:        "remove",
+			Category:    "User",
+			Aliases:     []string{"pop"},
+			Description: "Removes channels from a crosspost group",
+			Cooldown:    userCooldown(),
+			Options: []*router.Option{
+				router.String("group", "Group name").Require(),
+				router.String("channels", "Channels to remove").Require().Greedy(),
+			},
+			Examples: []string{"remove cuteAnimeGirls #nsfw-channel #cat-pics"},
+			Handler:  remove(b),
+		},
+		{
+			Name:        "editparent",
+			Category:    "User",
+			Description: "Changes the parent channel of a crosspost group",
+			Cooldown:    userCooldown(),
+			Options: []*router.Option{
+				router.String("group", "Group name").Require(),
+				router.Channel("parent", "New parent channel").Require(),
+			},
+			Examples: []string{"editparent cuteAnimeGirls #anime-pics"},
+			Handler:  editParent(b),
+		},
+		{
+			Name:        "rename",
+			Category:    "User",
+			Description: "Renames a crosspost group",
+			Cooldown:    userCooldown(),
+			Options: []*router.Option{
+				router.String("from", "Current name").Require(),
+				router.String("to", "New name").Require(),
+			},
+			Examples: []string{"rename cuteAnimeGirls AnimeGirls"},
+			Handler:  rename(b),
+		},
+		{
+			Name:        "copygroup",
+			Category:    "User",
+			Description: "Copies a crosspost group with a different parent channel",
+			Cooldown:    userCooldown(),
+			Options: []*router.Option{
+				router.String("from", "Source group").Require(),
+				router.String("to", "New group").Require(),
+				router.Channel("parent", "New parent channel").Require(),
+			},
+			Examples: []string{"copygroup sfw1 sfw2 #za-warudo"},
+			Handler:  copyGroup(b),
+		},
+		{
+			Name:        "bookmarks",
+			Category:    "User",
+			Aliases:     []string{"favorites", "favourites", "favs"},
+			Description: "Shows your bookmarks.",
+			Cooldown:    userCooldown(),
+			Options: []*router.Option{
+				router.String("sort", "How to sort bookmarks").WithChoices(
+					router.Choice{Name: "time", Value: "time"},
+					router.Choice{Name: "popularity", Value: "popularity"},
+				),
+				router.String("order", "Sort direction").WithChoices(
+					router.Choice{Name: "asc", Value: "asc"},
+					router.Choice{Name: "desc", Value: "desc"},
+				),
+				router.String("mode", "Which bookmarks to show").WithChoices(
+					router.Choice{Name: "all", Value: "all"},
+					router.Choice{Name: "sfw", Value: "sfw"},
+					router.Choice{Name: "nsfw", Value: "nsfw"},
+				),
+				router.String("during", "Only include recent bookmarks").WithChoices(
+					router.Choice{Name: "day", Value: "day"},
+					router.Choice{Name: "week", Value: "week"},
+					router.Choice{Name: "month", Value: "month"},
+				),
+			},
+			Examples: []string{"bookmarks month time asc"},
+			Handler:  bookmarks(b),
+		},
+		{
+			Name:        "unbookmark",
+			Category:    "User",
+			Aliases:     []string{"unfav", "unfavourite", "unfavorite"},
+			Description: "Remove a bookmark by its ID or URL",
+			Cooldown:    router.NewCooldown(router.CooldownUser, 1, 15*time.Second),
+			Options: []*router.Option{
+				router.String("query", "Artwork ID or URL").Require(),
+			},
+			Examples: []string{"unfav 69"},
+			Handler:  unfav(b),
+		},
+		{
+			Name:        "userset",
+			Category:    "User",
+			Aliases:     []string{"profile"},
+			Description: "Changes user's settings.",
+			Cooldown:    userCooldown(),
+			Options: []*router.Option{
+				router.String("setting", "Setting to change").WithChoices(
+					router.Choice{Name: "dm", Value: "dm"},
+					router.Choice{Name: "crosspost", Value: "crosspost"},
+					router.Choice{Name: "ignore", Value: "ignore"},
+				),
+				router.String("value", "New value").Greedy(),
+			},
+			Examples: []string{"userset dm false"},
+			Handler:  userSet(b),
+		},
+	}
 }
 
 // groups shows the full list of crosspost groups.
-func groups(b *bot.Bot) func(*gumi.Ctx) error {
+func groups(b *bot.Bot) router.Handler {
 	type groupData struct {
 		Name        string
 		Description string
@@ -177,13 +212,13 @@ func groups(b *bot.Bot) func(*gumi.Ctx) error {
 		Groups []groupData
 	}
 
-	return func(gctx *gumi.Ctx) error {
-		user, err := initCommand(b, gctx, 0)
+	return func(ctx *router.Context) error {
+		user, err := initUser(b, ctx)
 		if err != nil {
 			return err
 		}
 
-		locale := messages.UserGroupsEmbed(gctx.Event.Author.Username)
+		locale := messages.UserGroupsEmbed(ctx.Author().Username)
 		eb := embeds.NewBuilder()
 
 		eb.Title(locale.Title)
@@ -227,22 +262,21 @@ func groups(b *bot.Bot) func(*gumi.Ctx) error {
 			eb.AddField(group.Name, group.Description)
 		}
 
-		return gctx.ReplyEmbed(eb.Finalize())
+		return ctx.Reply(router.Embed(eb.Finalize()))
 	}
 }
 
 // newGroup creates a new crosspost group.
-func newGroup(b *bot.Bot) func(*gumi.Ctx) error {
-	return func(gctx *gumi.Ctx) error {
-		user, err := initCommand(b, gctx, 2)
+func newGroup(b *bot.Bot) router.Handler {
+	return func(ctx *router.Context) error {
+		user, err := initUser(b, ctx)
 		if err != nil {
 			return err
 		}
 
-		// Name of crosspost group.
-		name := gctx.Args.Get(0).Raw
-		parent := dgoutils.Trimmer(gctx, 1)
-		if _, err := gctx.Session.Channel(parent); err != nil {
+		name := ctx.Options.String("name")
+		parent := ctx.Options.ID("parent")
+		if _, err := ctx.Session.Channel(parent); err != nil {
 			return messages.ErrChannelNotFound(err, parent)
 		}
 
@@ -255,10 +289,10 @@ func newGroup(b *bot.Bot) func(*gumi.Ctx) error {
 			return messages.ErrNewGroup(name, parent)
 		}
 
-		ctx, cancel := context.WithTimeout(b.Context, 5*time.Second)
+		reqCtx, cancel := context.WithTimeout(ctx.Context(), 5*time.Second)
 		defer cancel()
 
-		_, err = b.Store.CreateCrosspostGroup(ctx, user.ID, &store.Group{
+		_, err = b.Store.CreateCrosspostGroup(reqCtx, user.ID, &store.Group{
 			Name:     name,
 			Parent:   parent,
 			Children: []string{},
@@ -269,29 +303,24 @@ func newGroup(b *bot.Bot) func(*gumi.Ctx) error {
 			return err
 		}
 
-		return successMessage(gctx, messages.UserCreateGroupSuccess(name, parent))
+		return successMessage(ctx, messages.UserCreateGroupSuccess(name, parent))
 	}
 }
 
 // newPair creates a new crosspost pair.
-func newPair(b *bot.Bot) func(*gumi.Ctx) error {
-	return func(gctx *gumi.Ctx) error {
-		user, err := initCommand(b, gctx, 3)
+func newPair(b *bot.Bot) router.Handler {
+	return func(ctx *router.Context) error {
+		user, err := initUser(b, ctx)
 		if err != nil {
 			return err
 		}
 
-		// Name of crosspost pair.
-		name := gctx.Args.Get(0).Raw
-		var children []string
-		children = append(children,
-			dgoutils.Trimmer(gctx, 1),
-			dgoutils.Trimmer(gctx, 2),
-		)
+		name := ctx.Options.String("name")
+		children := []string{ctx.Options.ID("first"), ctx.Options.ID("second")}
 
 		// Checks if crosspost channel is not parent channel.
 		if children[0] == children[1] {
-			return messages.ErrIncorrectCmd(gctx.Command)
+			return messages.ErrIncorrectCmd(ctx.Command)
 		}
 
 		if _, ok := user.FindGroupByName(name); ok {
@@ -299,13 +328,13 @@ func newPair(b *bot.Bot) func(*gumi.Ctx) error {
 		}
 
 		for _, child := range children {
-			ch, err := gctx.Session.Channel(child)
+			ch, err := ctx.Session.Channel(child)
 			if err != nil {
 				return messages.ErrChannelNotFound(err, child)
 			}
 
 			if ch.Type != discordgo.ChannelTypeGuildText {
-				return messages.ErrIncorrectCmd(gctx.Command)
+				return messages.ErrIncorrectCmd(ctx.Command)
 			}
 
 			if _, ok := user.FindGroup(child); ok {
@@ -313,12 +342,12 @@ func newPair(b *bot.Bot) func(*gumi.Ctx) error {
 			}
 		}
 
-		sort.Strings(children)
+		slices.Sort(children)
 
-		ctx, cancel := context.WithTimeout(b.Context, 5*time.Second)
+		reqCtx, cancel := context.WithTimeout(ctx.Context(), 5*time.Second)
 		defer cancel()
 
-		_, err = b.Store.CreateCrosspostPair(ctx, user.ID, &store.Group{
+		_, err = b.Store.CreateCrosspostPair(reqCtx, user.ID, &store.Group{
 			Name:     name,
 			Children: children,
 			IsPair:   true,
@@ -328,45 +357,41 @@ func newPair(b *bot.Bot) func(*gumi.Ctx) error {
 			return err
 		}
 
-		return successMessage(gctx, messages.UserCreatePairSuccess(name, children))
+		return successMessage(ctx, messages.UserCreatePairSuccess(name, children))
 	}
 }
 
 // delGroup deletes a crosspost group.
-func delGroup(b *bot.Bot) func(*gumi.Ctx) error {
-	return func(gctx *gumi.Ctx) error {
-		user, err := initCommand(b, gctx, 1)
+func delGroup(b *bot.Bot) router.Handler {
+	return func(ctx *router.Context) error {
+		user, err := initUser(b, ctx)
 		if err != nil {
 			return err
 		}
 
-		// Name of crosspost group.
-		name := gctx.Args.Get(0).Raw
+		name := ctx.Options.String("name")
 
-		ctx, cancel := context.WithTimeout(b.Context, 5*time.Second)
+		reqCtx, cancel := context.WithTimeout(ctx.Context(), 5*time.Second)
 		defer cancel()
 
-		_, err = b.Store.DeleteCrosspostGroup(ctx, user.ID, name)
+		_, err = b.Store.DeleteCrosspostGroup(reqCtx, user.ID, name)
 		if err := handleStoreError(err, messages.ErrDeleteGroup(name)); err != nil {
 			return err
 		}
 
-		return successMessage(gctx, fmt.Sprintf("Removed a group named `%v`", name))
+		return successMessage(ctx, fmt.Sprintf("Removed a group named `%v`", name))
 	}
 }
 
 // push adds one or more crosspost channels to a group.
-func push(b *bot.Bot) func(*gumi.Ctx) error {
-	return func(gctx *gumi.Ctx) error {
-		user, err := initCommand(b, gctx, 2)
+func push(b *bot.Bot) router.Handler {
+	return func(ctx *router.Context) error {
+		user, err := initUser(b, ctx)
 		if err != nil {
 			return err
 		}
 
-		// Name of crosspost group.
-		name := gctx.Args.Get(0).Raw
-		gctx.Args.Remove(0)
-
+		name := ctx.Options.String("group")
 		group, ok := user.FindGroupByName(name)
 		if !ok {
 			return messages.ErrGroupExistFail(name)
@@ -376,13 +401,14 @@ func push(b *bot.Bot) func(*gumi.Ctx) error {
 			return messages.ErrUserPairFail(name)
 		}
 
-		ctx, cancel := context.WithTimeout(b.Context, 15*time.Second)
+		reqCtx, cancel := context.WithTimeout(ctx.Context(), 15*time.Second)
 		defer cancel()
 
-		inserted := make([]string, 0, gctx.Args.Len())
-		for _, arg := range gctx.Args.Arguments {
-			channelID := dgoutils.TrimmerRaw(arg.Raw)
-			ch, err := gctx.Session.Channel(channelID)
+		targets := strings.Fields(ctx.Options.String("channels"))
+		inserted := make([]string, 0, len(targets))
+		for _, arg := range targets {
+			channelID := dgoutils.TrimmerRaw(arg)
+			ch, err := ctx.Session.Channel(channelID)
 			if err != nil {
 				return messages.ErrChannelNotFound(err, channelID)
 			}
@@ -405,7 +431,7 @@ func push(b *bot.Bot) func(*gumi.Ctx) error {
 			}
 
 			_, err = b.Store.AddCrosspostChannel(
-				ctx,
+				reqCtx,
 				user.ID,
 				name,
 				channelID,
@@ -422,22 +448,19 @@ func push(b *bot.Bot) func(*gumi.Ctx) error {
 			return messages.ErrUserPushFail(name)
 		}
 
-		return successMessage(gctx, messages.UserPushSuccess(name, inserted))
+		return successMessage(ctx, messages.UserPushSuccess(name, inserted))
 	}
 }
 
 // remove deletes one or more crosspost channels from a group.
-func remove(b *bot.Bot) func(*gumi.Ctx) error {
-	return func(gctx *gumi.Ctx) error {
-		user, err := initCommand(b, gctx, 2)
+func remove(b *bot.Bot) router.Handler {
+	return func(ctx *router.Context) error {
+		user, err := initUser(b, ctx)
 		if err != nil {
 			return err
 		}
 
-		// Name of crosspost group or pair.
-		name := gctx.Args.Get(0).Raw
-		gctx.Args.Remove(0)
-
+		name := ctx.Options.String("group")
 		group, ok := user.FindGroupByName(name)
 		if !ok {
 			return messages.ErrGroupExistFail(name)
@@ -447,19 +470,20 @@ func remove(b *bot.Bot) func(*gumi.Ctx) error {
 			return messages.ErrUserPairFail(name)
 		}
 
-		ctx, cancel := context.WithTimeout(b.Context, 15*time.Second)
+		reqCtx, cancel := context.WithTimeout(ctx.Context(), 15*time.Second)
 		defer cancel()
 
-		removed := make([]string, 0, gctx.Args.Len())
-		for _, arg := range gctx.Args.Arguments {
-			channelID := dgoutils.TrimmerRaw(arg.Raw)
+		targets := strings.Fields(ctx.Options.String("channels"))
+		removed := make([]string, 0, len(targets))
+		for _, arg := range targets {
+			channelID := dgoutils.TrimmerRaw(arg)
 
 			if !slices.Contains(group.Children, channelID) {
 				continue
 			}
 
 			_, err = b.Store.DeleteCrosspostChannel(
-				ctx,
+				reqCtx,
 				user.ID,
 				name,
 				channelID,
@@ -476,27 +500,26 @@ func remove(b *bot.Bot) func(*gumi.Ctx) error {
 			return messages.ErrUserRemoveFail(name)
 		}
 
-		return successMessage(gctx, messages.UserRemoveSuccess(name, removed))
+		return successMessage(ctx, messages.UserRemoveSuccess(name, removed))
 	}
 }
 
 // editParent changes the parent channel of a group
-func editParent(b *bot.Bot) func(*gumi.Ctx) error {
-	return func(gctx *gumi.Ctx) error {
-		user, err := initCommand(b, gctx, 2)
+func editParent(b *bot.Bot) router.Handler {
+	return func(ctx *router.Context) error {
+		user, err := initUser(b, ctx)
 		if err != nil {
 			return err
 		}
 
-		// Name of crosspost group
-		name := gctx.Args.Get(0).Raw
+		name := ctx.Options.String("group")
 		group, ok := user.FindGroupByName(name)
 		if !ok {
 			return messages.ErrGroupExistFail(name)
 		}
 
-		dest := dgoutils.Trimmer(gctx, 1)
-		if _, err := gctx.Session.Channel(dest); err != nil {
+		dest := ctx.Options.ID("parent")
+		if _, err := ctx.Session.Channel(dest); err != nil {
 			return messages.ErrChannelNotFound(err, dest)
 		}
 
@@ -512,62 +535,60 @@ func editParent(b *bot.Bot) func(*gumi.Ctx) error {
 			return messages.ErrUserEditParentFail(group.Parent, dest)
 		}
 
-		ctx, cancel := context.WithTimeout(b.Context, 15*time.Second)
+		reqCtx, cancel := context.WithTimeout(ctx.Context(), 15*time.Second)
 		defer cancel()
 
-		_, err = b.Store.EditCrosspostParent(ctx, user.ID, name, dest)
+		_, err = b.Store.EditCrosspostParent(reqCtx, user.ID, name, dest)
 		if err := handleStoreError(err, messages.ErrUserEditParentFail(group.Parent, dest)); err != nil {
 			return err
 		}
 
-		return successMessage(gctx, messages.UserEditParentSuccess(group.Parent, dest))
+		return successMessage(ctx, messages.UserEditParentSuccess(group.Parent, dest))
 	}
 }
 
 // rename changes the name of a group
-func rename(b *bot.Bot) func(*gumi.Ctx) error {
-	return func(gctx *gumi.Ctx) error {
-		user, err := initCommand(b, gctx, 2)
+func rename(b *bot.Bot) router.Handler {
+	return func(ctx *router.Context) error {
+		user, err := initUser(b, ctx)
 		if err != nil {
 			return err
 		}
 
-		// Group name (0) and new name (1)
 		var (
 			cmd  = "rename"
-			src  = gctx.Args.Get(0).Raw
-			dest = gctx.Args.Get(1).Raw
+			src  = ctx.Options.String("from")
+			dest = ctx.Options.String("to")
 		)
 
 		if _, ok := user.FindGroupByName(src); !ok {
 			return messages.ErrGroupExistFail(src)
 		}
 
-		ctx, cancel := context.WithTimeout(b.Context, 5*time.Second)
+		reqCtx, cancel := context.WithTimeout(ctx.Context(), 5*time.Second)
 		defer cancel()
 
-		_, err = b.Store.RenameCrosspostGroup(ctx, user.ID, src, dest)
+		_, err = b.Store.RenameCrosspostGroup(reqCtx, user.ID, src, dest)
 		if err != nil {
 			return messages.ErrUserEditGroupFail(cmd, src, dest)
 		}
 
-		return successMessage(gctx, messages.UserRenameSuccess(src, dest))
+		return successMessage(ctx, messages.UserRenameSuccess(src, dest))
 	}
 }
 
 // copyGroup copies a crosspost group with a new name and parent channel.
-func copyGroup(b *bot.Bot) func(*gumi.Ctx) error {
-	return func(gctx *gumi.Ctx) error {
-		user, err := initCommand(b, gctx, 3)
+func copyGroup(b *bot.Bot) router.Handler {
+	return func(ctx *router.Context) error {
+		user, err := initUser(b, ctx)
 		if err != nil {
 			return err
 		}
 
-		// Source group name (0), destination group name (1)
 		var (
 			cmd  = "copy"
-			src  = gctx.Args.Get(0).Raw
-			dest = gctx.Args.Get(1).Raw
+			src  = ctx.Options.String("from")
+			dest = ctx.Options.String("to")
 		)
 
 		group, ok := user.FindGroupByName(src)
@@ -579,7 +600,7 @@ func copyGroup(b *bot.Bot) func(*gumi.Ctx) error {
 			return messages.ErrUserPairFail(src)
 		}
 
-		parent := dgoutils.Trimmer(gctx, 2)
+		parent := ctx.Options.ID("parent")
 		if _, ok := user.FindGroup(parent); ok {
 			return messages.ErrUserChannelAlreadyParent(parent)
 		}
@@ -592,35 +613,34 @@ func copyGroup(b *bot.Bot) func(*gumi.Ctx) error {
 			}),
 		}
 
-		ctx, cancel := context.WithTimeout(b.Context, 5*time.Second)
+		reqCtx, cancel := context.WithTimeout(ctx.Context(), 5*time.Second)
 		defer cancel()
 
-		_, err = b.Store.CreateCrosspostGroup(ctx, user.ID, newGroup)
+		_, err = b.Store.CreateCrosspostGroup(reqCtx, user.ID, newGroup)
 		if err != nil {
 			return messages.ErrUserEditGroupFail(cmd, src, dest)
 		}
 
-		return successMessage(gctx,
+		return successMessage(ctx,
 			messages.UserCopyGroupSuccess(src, dest, newGroup.Children),
 		)
 	}
 }
 
-func bookmarks(b *bot.Bot) func(*gumi.Ctx) error {
-	return func(gctx *gumi.Ctx) error {
-		ctx, cancel := context.WithTimeout(b.Context, 5*time.Second)
+func bookmarks(b *bot.Bot) router.Handler {
+	return func(ctx *router.Context) error {
+		reqCtx, cancel := context.WithTimeout(ctx.Context(), 5*time.Second)
 		defer cancel()
 
 		var (
 			limit  int64 = 1
 			order        = store.Descending
 			sortBy       = store.ByTime
-			args         = strings.Fields(gctx.Args.Raw)
 			mode         = store.BookmarkFilterSafe
 			filter       = store.ArtworkFilter{}
 		)
 
-		ch, err := gctx.Session.Channel(gctx.Event.ChannelID)
+		ch, err := ctx.Session.Channel(ctx.ChannelID())
 		if err != nil {
 			return err
 		}
@@ -629,31 +649,32 @@ func bookmarks(b *bot.Bot) func(*gumi.Ctx) error {
 			mode = store.BookmarkFilterAll
 		}
 
-		flagsMap, err := flags.FromArgs(args, flags.FlagTypeOrder, flags.FlagTypeMode)
-		if err != nil {
-			return err
+		if ctx.Options.String("order") == "asc" {
+			order = store.Ascending
 		}
 
-		for key, val := range flagsMap {
-			switch key {
-			case flags.FlagTypeOrder:
-				if o, ok := val.(store.Order); ok {
-					order = o
-				}
-			case flags.FlagTypeMode:
-				if m, ok := val.(store.BookmarkFilter); ok {
-					mode = m
-				}
-			}
+		if ctx.Options.String("sort") == "popularity" {
+			sortBy = store.ByPopularity
 		}
 
-		bookmarks, err := b.Store.ListBookmarks(ctx, gctx.Event.Author.ID, mode, order)
+		switch ctx.Options.String("mode") {
+		case "all":
+			mode = store.BookmarkFilterAll
+		case "sfw":
+			mode = store.BookmarkFilterSafe
+		case "nsfw":
+			mode = store.BookmarkFilterUnsafe
+		}
+
+		filter.Time = parseDuring(ctx.Options.String("during"))
+
+		bookmarks, err := b.Store.ListBookmarks(reqCtx, ctx.AuthorID(), mode, order)
 		if err != nil {
 			return err
 		}
 
 		if len(bookmarks) == 0 {
-			return messages.ErrUserNoBookmarks(gctx.Event.Author.ID)
+			return messages.ErrUserNoBookmarks(ctx.AuthorID())
 		}
 
 		filter.IDs = make([]int, 0, limit)
@@ -671,14 +692,14 @@ func bookmarks(b *bot.Bot) func(*gumi.Ctx) error {
 			Sort:  sortBy,
 		}
 
-		artworks, err := b.Store.SearchArtworks(ctx, filter, opts)
+		found, err := b.Store.SearchArtworks(reqCtx, filter, opts)
 		if err != nil {
 			return err
 		}
 
 		pages := make([]*discordgo.MessageEmbed, len(bookmarks))
 		for ind, bookmark := range bookmarks {
-			artwork := arrays.Find(artworks, func(a *store.Artwork) bool { return a.ID == bookmark.ArtworkID })
+			artwork := arrays.Find(found, func(a *store.Artwork) bool { return a.ID == bookmark.ArtworkID })
 			if artwork == nil {
 				break
 			}
@@ -693,83 +714,89 @@ func bookmarks(b *bot.Bot) func(*gumi.Ctx) error {
 			pages[ind] = page
 		}
 
-		wg := widget.New(b.Sender, widget.NewSessionSource(gctx.Session), gctx.Event.GuildID, gctx.Event.Author.ID, pages)
-		wg.WithCallback(func(_ widget.Action, i int) error {
-			ctx := context.WithoutCancel(ctx)
-			if wg.Pages[i] != nil {
+		w := widget.New(ctx.AuthorID(), pages)
+		w.WithCallback(func(_ widget.Action, i int) error {
+			if w.Pages[i] != nil {
 				return nil
 			}
 
-			artwork, err := b.Store.Artwork(ctx, bookmarks[i].ArtworkID, "")
-			if errors.Is(err, store.ErrArtworkNotFound) {
-				eb := embeds.NewBuilder()
-				eb.FailureTemplate("Artwork not found.").
-					AddField("ID", strconv.Itoa(bookmarks[i].ArtworkID))
-
-				wg.Pages[i] = eb.Finalize()
-
-				_, err := b.Store.DeleteBookmark(ctx, bookmarks[i])
-				if err != nil {
-					return fmt.Errorf("failed to delete unknown bookmark: %w", err)
-				}
-
-				return nil
-			}
-
-			if err != nil {
-				return err
-			}
-
-			if artwork == nil {
-				return messages.ErrArtworkNotFound(strconv.Itoa(bookmarks[i].ArtworkID))
-			}
-
-			page := artworkToEmbed(artwork, firstArtworkImage(artwork), i, len(bookmarks))
-			page.Fields = append(page.Fields, &discordgo.MessageEmbedField{
-				Name:   "NSFW",
-				Value:  strconv.FormatBool(bookmarks[i].NSFW),
-				Inline: true,
-			})
-
-			wg.Pages[i] = page
-			return nil
+			return loadBookmarkPage(context.WithoutCancel(reqCtx), b, bookmarks, i, w.Pages)
 		})
 
-		return wg.Start(b.Context, gctx.Event.ChannelID)
+		return serveWidget(ctx, b, w)
 	}
 }
 
-func userSet(b *bot.Bot) func(*gumi.Ctx) error {
-	return func(gctx *gumi.Ctx) error {
-		switch {
-		case gctx.Args.Len() == 0:
-			return showUserProfile(b, gctx)
-		case gctx.Args.Len() >= 2:
-			return changeUserSettings(b, gctx)
-		default:
-			return messages.ErrIncorrectCmd(gctx.Command)
+func loadBookmarkPage(ctx context.Context, b *bot.Bot, bookmarks []*store.Bookmark, i int, pages []*discordgo.MessageEmbed) error {
+	artwork, err := b.Store.Artwork(ctx, bookmarks[i].ArtworkID, "")
+	if errors.Is(err, store.ErrArtworkNotFound) {
+		eb := embeds.NewBuilder()
+		eb.FailureTemplate("Artwork not found.").
+			AddField("ID", strconv.Itoa(bookmarks[i].ArtworkID))
+
+		pages[i] = eb.Finalize()
+
+		_, err := b.Store.DeleteBookmark(ctx, bookmarks[i])
+		if err != nil {
+			return fmt.Errorf("failed to delete unknown bookmark: %w", err)
 		}
+
+		return nil
+	}
+
+	if err != nil {
+		return err
+	}
+
+	if artwork == nil {
+		return messages.ErrArtworkNotFound(strconv.Itoa(bookmarks[i].ArtworkID))
+	}
+
+	page := artworkToEmbed(artwork, firstArtworkImage(artwork), i, len(bookmarks))
+	page.Fields = append(page.Fields, &discordgo.MessageEmbedField{
+		Name:   "NSFW",
+		Value:  strconv.FormatBool(bookmarks[i].NSFW),
+		Inline: true,
+	})
+
+	pages[i] = page
+	return nil
+}
+
+func userSet(b *bot.Bot) router.Handler {
+	return func(ctx *router.Context) error {
+		setting := ctx.Options.String("setting")
+		if setting == "" {
+			return showUserProfile(b, ctx)
+		}
+
+		value := ctx.Options.String("value")
+		if value == "" {
+			return messages.ErrIncorrectCmd(ctx.Command)
+		}
+
+		return changeUserSettings(b, ctx, setting, value)
 	}
 }
 
-func showUserProfile(b *bot.Bot, gctx *gumi.Ctx) error {
-	ctx, cancel := context.WithTimeout(b.Context, 20*time.Second)
+func showUserProfile(b *bot.Bot, ctx *router.Context) error {
+	reqCtx, cancel := context.WithTimeout(ctx.Context(), 20*time.Second)
 	defer cancel()
 
-	user, err := b.Store.User(ctx, gctx.Event.Author.ID)
+	user, err := b.Store.User(reqCtx, ctx.AuthorID())
 	if err != nil {
 		return err
 	}
 
-	bookmarks, err := b.Store.CountBookmarks(ctx, gctx.Event.Author.ID)
+	bookmarks, err := b.Store.CountBookmarks(reqCtx, ctx.AuthorID())
 	if err != nil {
 		return err
 	}
 
-	locale := messages.UserProfileEmbed(gctx.Event.Author.Username)
+	locale := messages.UserProfileEmbed(ctx.Author().Username)
 	eb := embeds.NewBuilder()
 	eb.Title(locale.Title)
-	eb.Thumbnail(gctx.Event.Author.AvatarURL(""))
+	eb.Thumbnail(ctx.Author().AvatarURL(""))
 
 	eb.AddField(
 		locale.Settings,
@@ -789,83 +816,77 @@ func showUserProfile(b *bot.Bot, gctx *gumi.Ctx) error {
 		),
 	)
 
-	return gctx.ReplyEmbed(eb.Finalize())
+	return ctx.Reply(router.Embed(eb.Finalize()))
 }
 
-func changeUserSettings(b *bot.Bot, gctx *gumi.Ctx) error {
-	ctx, cancel := context.WithTimeout(b.Context, 15*time.Second)
+func changeUserSettings(b *bot.Bot, ctx *router.Context, settingName, newSetting string) error {
+	reqCtx, cancel := context.WithTimeout(ctx.Context(), 15*time.Second)
 	defer cancel()
 
-	user, err := b.Store.User(ctx, gctx.Event.Author.ID)
+	user, err := b.Store.User(reqCtx, ctx.AuthorID())
 	if err != nil {
 		return err
 	}
 
 	var (
-		settingName     = gctx.Args.Get(0)
-		newSetting      = gctx.Args.Get(1)
 		newSettingEmbed any
 		oldSettingEmbed any
 	)
 
-	switch settingName.Raw {
+	switch settingName {
 	case "dm":
-		new, err := parseBool(newSetting.Raw)
+		parsed, err := parseBool(newSetting)
 		if err != nil {
 			return err
 		}
 
 		oldSettingEmbed = user.DM
-		newSettingEmbed = new
-		user.DM = new
+		newSettingEmbed = parsed
+		user.DM = parsed
 	case "crosspost":
-		new, err := parseBool(newSetting.Raw)
+		parsed, err := parseBool(newSetting)
 		if err != nil {
 			return err
 		}
 
 		oldSettingEmbed = user.Crosspost
-		newSettingEmbed = new
-		user.Crosspost = new
+		newSettingEmbed = parsed
+		user.Crosspost = parsed
 	case "ignore":
-		new, err := parseBool(newSetting.Raw)
+		parsed, err := parseBool(newSetting)
 		if err != nil {
 			return err
 		}
 
 		oldSettingEmbed = user.Ignore
-		newSettingEmbed = new
-		user.Ignore = new
+		newSettingEmbed = parsed
+		user.Ignore = parsed
 
 	default:
-		return messages.ErrUnknownUserSetting(settingName.Raw)
+		return messages.ErrUnknownUserSetting(settingName)
 	}
 
-	_, err = b.Store.UpdateUser(ctx, user)
+	_, err = b.Store.UpdateUser(reqCtx, user)
 	if err != nil {
 		return err
 	}
 
 	eb := embeds.NewBuilder()
 	eb.InfoTemplate("Successfully changed user setting.")
-	eb.AddField("Setting name", settingName.Raw, true)
+	eb.AddField("Setting name", settingName, true)
 	eb.AddField("Old setting", fmt.Sprintf("%v", oldSettingEmbed), true)
 	eb.AddField("New setting", fmt.Sprintf("%v", newSettingEmbed), true)
 
-	return gctx.ReplyEmbed(eb.Finalize())
+	return ctx.Reply(router.Embed(eb.Finalize()))
 }
 
-func unfav(b *bot.Bot) func(*gumi.Ctx) error {
-	return func(gctx *gumi.Ctx) error {
-		if gctx.Args.Len() == 0 {
-			return messages.ErrIncorrectCmd(gctx.Command)
-		}
-
+func unfav(b *bot.Bot) router.Handler {
+	return func(ctx *router.Context) error {
 		var (
 			id    int
 			url   string
 			err   error
-			query = gctx.Args.Get(0).Raw
+			query = ctx.Options.String("query")
 		)
 
 		// If ID is not an integer assign query to the URL.
@@ -873,12 +894,12 @@ func unfav(b *bot.Bot) func(*gumi.Ctx) error {
 			url = query
 		}
 
-		ctx, cancel := context.WithTimeout(b.Context, 15*time.Second)
+		reqCtx, cancel := context.WithTimeout(ctx.Context(), 15*time.Second)
 		defer cancel()
 
 		var artwork *store.Artwork
 		if url != "" {
-			artwork, err = b.Store.Artwork(ctx, 0, url)
+			artwork, err = b.Store.Artwork(reqCtx, 0, url)
 			if err != nil {
 				return messages.ErrArtworkNotFound(query)
 			}
@@ -890,7 +911,7 @@ func unfav(b *bot.Bot) func(*gumi.Ctx) error {
 			id = artwork.ID
 		}
 
-		deleted, err := b.Store.DeleteBookmark(ctx, &store.Bookmark{UserID: gctx.Event.Author.ID, ArtworkID: id})
+		deleted, err := b.Store.DeleteBookmark(reqCtx, &store.Bookmark{UserID: ctx.AuthorID(), ArtworkID: id})
 		if err != nil {
 			return messages.ErrUserUnbookmarkFail(query, err)
 		}
@@ -900,7 +921,7 @@ func unfav(b *bot.Bot) func(*gumi.Ctx) error {
 		}
 
 		if artwork == nil {
-			artwork, err = b.Store.Artwork(ctx, id, "")
+			artwork, err = b.Store.Artwork(reqCtx, id, "")
 			if err != nil || artwork == nil {
 				eb := embeds.NewBuilder()
 				locale := messages.BookmarkRemovedEmbed()
@@ -909,7 +930,7 @@ func unfav(b *bot.Bot) func(*gumi.Ctx) error {
 					Description(locale.Description).
 					AddField("ID", strconv.Itoa(id), true)
 
-				return gctx.ReplyEmbed(eb.Finalize())
+				return ctx.Reply(router.Embed(eb.Finalize()))
 			}
 		}
 
@@ -925,7 +946,7 @@ func unfav(b *bot.Bot) func(*gumi.Ctx) error {
 			eb.Thumbnail(artwork.Images[0])
 		}
 
-		return gctx.ReplyEmbed(eb.Finalize())
+		return ctx.Reply(router.Embed(eb.Finalize()))
 	}
 }
 
@@ -968,15 +989,11 @@ func artworkToEmbed(artwork *store.Artwork, image string, ind, length int) *disc
 	return eb.Finalize()
 }
 
-func initCommand(b *bot.Bot, gctx *gumi.Ctx, argsLen int) (*store.User, error) {
-	if err := dgoutils.ValidateArgs(gctx, argsLen); err != nil {
-		return nil, err
-	}
-
-	ctx, cancel := context.WithTimeout(b.Context, 5*time.Second)
+func initUser(b *bot.Bot, ctx *router.Context) (*store.User, error) {
+	reqCtx, cancel := context.WithTimeout(ctx.Context(), 5*time.Second)
 	defer cancel()
 
-	return b.Store.User(ctx, gctx.Event.Author.ID)
+	return b.Store.User(reqCtx, ctx.AuthorID())
 }
 
 // handleStoreError returns an error if any store error is raised.
@@ -999,8 +1016,8 @@ func handleStoreError(err error, message ...error) error {
 }
 
 // successMessage builds and returns success message embed.
-func successMessage(gctx *gumi.Ctx, message string) error {
+func successMessage(ctx *router.Context, message string) error {
 	eb := embeds.NewBuilder()
 	eb.SuccessTemplate(message)
-	return gctx.ReplyEmbed(eb.Finalize())
+	return ctx.Reply(router.Embed(eb.Finalize()))
 }

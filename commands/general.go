@@ -3,79 +3,70 @@ package commands
 import (
 	"fmt"
 	"runtime"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/VTGare/boe-tea-go/bot"
-	"github.com/VTGare/boe-tea-go/internal/arrays"
-	"github.com/VTGare/boe-tea-go/internal/dgoutils"
 	"github.com/VTGare/boe-tea-go/messages"
+	"github.com/VTGare/boe-tea-go/router"
 	"github.com/VTGare/embeds"
-	"github.com/VTGare/gumi"
 )
 
-func generalGroup(b *bot.Bot) {
-	group := "general"
-
-	b.Router.RegisterCmd(&gumi.Command{
-		Name:        "about",
-		Group:       group,
-		Aliases:     []string{"invite", "patreon", "support"},
-		Description: "Bot's about page with the invite link and other useful stuff.",
-		Usage:       "bt!about",
-		Example:     "bt!about",
-		RateLimiter: gumi.NewRateLimiter(5 * time.Second),
-		Exec:        about(b),
-	})
-
-	b.Router.RegisterCmd(&gumi.Command{
-		Name:        "help",
-		Group:       group,
-		Aliases:     []string{"documentation", "docs"},
-		Description: "Shows this page.",
-		Usage:       "bt!help <group/command name>",
-		Example:     "bt!help",
-		Exec:        help(b),
-	})
-
-	b.Router.RegisterCmd(&gumi.Command{
-		Name:        "ping",
-		Group:       group,
-		Description: "Checks bot's availabity and response time.",
-		Usage:       "bt!ping",
-		Example:     "bt!ping",
-		RateLimiter: gumi.NewRateLimiter(5 * time.Second),
-		Exec:        ping(b),
-	})
-
-	b.Router.RegisterCmd(&gumi.Command{
-		Name:        "feedback",
-		Group:       group,
-		Description: "Sends feedback to bot's author.",
-		Usage:       "bt!feedback <your wall of text here>",
-		Example:     "bt!feedback Damn your bot sucks!",
-		Exec:        feedback(b),
-	})
-
-	b.Router.RegisterCmd(&gumi.Command{
-		Name:        "stats",
-		Group:       group,
-		Description: "Shows bot's runtime stats. First argument is 'general' by default.",
-		Usage:       "bt!stats [general/artworks/commands]",
-		Example:     "bt!stats",
-		RateLimiter: gumi.NewRateLimiter(5 * time.Second),
-		Exec:        stats(b),
-	})
+func generalGroup(b *bot.Bot) []*router.Command {
+	return []*router.Command{
+		{
+			Name:        "about",
+			Category:    "General",
+			Aliases:     []string{"invite", "patreon", "support"},
+			Description: "Bot's about page with the invite link and other useful stuff.",
+			Cooldown:    router.NewCooldown(router.CooldownUser, 1, 5*time.Second),
+			Examples:    []string{"about"},
+			Handler:     about(b),
+		},
+		{
+			Name:        "ping",
+			Category:    "General",
+			Description: "Checks bot's availability and response time.",
+			Cooldown:    router.NewCooldown(router.CooldownUser, 1, 5*time.Second),
+			Examples:    []string{"ping"},
+			Handler:     ping(b),
+		},
+		{
+			Name:        "feedback",
+			Category:    "General",
+			Description: "Sends feedback to bot's author.",
+			Options: []*router.Option{
+				router.String("text", "Your feedback").Require().Greedy(),
+				router.Attachment("image", "Screenshot to attach"),
+			},
+			Examples: []string{"feedback Damn your bot sucks!"},
+			Handler:  feedback(b),
+		},
+		{
+			Name:        "stats",
+			Category:    "General",
+			Description: "Shows bot's runtime stats.",
+			Cooldown:    router.NewCooldown(router.CooldownUser, 1, 5*time.Second),
+			Options: []*router.Option{
+				router.String("section", "Which stats to show").WithChoices(
+					router.Choice{Name: "general", Value: "general"},
+					router.Choice{Name: "artworks", Value: "artworks"},
+					router.Choice{Name: "commands", Value: "commands"},
+				),
+			},
+			Examples: []string{"stats", "stats artworks"},
+			Handler:  statsCommand(b),
+		},
+	}
 }
 
-func about(*bot.Bot) func(*gumi.Ctx) error {
-	return func(gctx *gumi.Ctx) error {
+func about(*bot.Bot) router.Handler {
+	return func(ctx *router.Context) error {
 		locale := messages.AboutEmbed()
 
 		eb := embeds.NewBuilder()
-		eb.Title(locale.Title).Thumbnail(gctx.Session.State.User.AvatarURL(""))
+		eb.Title(locale.Title).Thumbnail(ctx.Session.State.User.AvatarURL(""))
 		eb.Description(locale.Description)
 
 		eb.AddField(
@@ -98,199 +89,99 @@ func about(*bot.Bot) func(*gumi.Ctx) error {
 			true,
 		)
 
-		return gctx.ReplyEmbed(eb.Finalize())
+		return ctx.Reply(router.Embed(eb.Finalize()))
 	}
 }
 
-func help(b *bot.Bot) func(*gumi.Ctx) error {
-	return func(gctx *gumi.Ctx) error {
+func ping(*bot.Bot) router.Handler {
+	return func(ctx *router.Context) error {
 		eb := embeds.NewBuilder()
 
-		eb.Title("Boe Tea's Documentation").Thumbnail(gctx.Session.State.User.AvatarURL(""))
-		switch {
-		case gctx.Args.Len() == 0:
-			groups := make(map[string][]string)
-			added := make(map[string]struct{})
-
-			for _, cmd := range b.Router.Commands {
-				if _, ok := added[cmd.Name]; ok {
-					continue
-				}
-
-				_, ok := groups[cmd.Group]
-				if !ok {
-					groups[cmd.Group] = []string{cmd.Name}
-					added[cmd.Name] = struct{}{}
-					continue
-				}
-
-				groups[cmd.Group] = append(groups[cmd.Group], cmd.Name)
-				added[cmd.Name] = struct{}{}
-			}
-
-			keys := make([]string, 0, len(groups))
-			for key := range groups {
-				keys = append(keys, key)
-			}
-			sort.Strings(keys)
-
-			for _, group := range groups {
-				sort.Strings(group)
-			}
-
-			eb.Description(
-				"This page shows bot's command groups. Under the group name you'll see a list of available commands. Use `bt!help <command name> for command's documentation.`",
-			)
-
-			for _, key := range keys {
-				group := groups[key]
-
-				eb.AddField(key, fmt.Sprintf(
-					"```\n%v\n```", strings.Join(arrays.Map(group, func(s string) string {
-						return "• " + s
-					}), "\n"),
-				), true)
-			}
-		case gctx.Args.Len() >= 1:
-			name := gctx.Args.Get(0).Raw
-
-			cmd, ok := b.Router.Commands[name]
-			if !ok {
-				return messages.HelpCommandNotFound(name)
-			}
-
-			var sb strings.Builder
-			if cmd.GuildOnly {
-				sb.WriteString("Guild only. ")
-			}
-
-			if cmd.NSFW {
-				sb.WriteString("Only usable in NSFW channels. ")
-			}
-
-			eb.Description(sb.String())
-			eb.AddField(
-				"Description", "```"+cmd.Description+"```",
-			)
-
-			if len(cmd.Aliases) > 0 {
-				eb.AddField(
-					"Aliases", "```"+strings.Join(cmd.Aliases, " • ")+"```",
-				)
-			}
-
-			eb.AddField(
-				"Usage", "```"+cmd.Usage+"```",
-			).AddField(
-				"Example", "```"+cmd.Example+"```",
-			)
-
-			for name, desc := range cmd.Flags {
-				eb.AddField(name, desc)
-			}
-
-			if cmd.RateLimiter != nil {
-				eb.AddField("Cooldown", cmd.RateLimiter.Cooldown.String(), true)
-			}
-
-		}
-
-		return gctx.ReplyEmbed(eb.Finalize())
-	}
-}
-
-func ping(*bot.Bot) func(*gumi.Ctx) error {
-	return func(gctx *gumi.Ctx) error {
-		eb := embeds.NewBuilder()
-
-		return gctx.ReplyEmbed(
+		return ctx.Reply(router.Embed(
 			eb.Title("🏓 Pong!").AddField(
 				"Heartbeat latency",
-				gctx.Session.HeartbeatLatency().Round(time.Millisecond).String(),
+				ctx.Session.HeartbeatLatency().Round(time.Millisecond).String(),
 			).Finalize(),
-		)
+		))
 	}
 }
 
-func feedback(*bot.Bot) func(*gumi.Ctx) error {
-	return func(gctx *gumi.Ctx) error {
-		if err := dgoutils.ValidateArgs(gctx, 1); err != nil {
-			return err
-		}
+func feedback(b *bot.Bot) router.Handler {
+	return func(ctx *router.Context) error {
+		author := ctx.Author()
 
 		eb := embeds.NewBuilder()
 		eb.Author(
-			fmt.Sprintf("Feedback from %v", gctx.Event.Author.String()),
+			fmt.Sprintf("Feedback from %v", author.String()),
 			"",
-			gctx.Event.Author.AvatarURL(""),
+			author.AvatarURL(""),
 		).Description(
-			gctx.Args.Raw,
+			ctx.Options.String("text"),
 		).AddField(
 			"Author Mention",
-			gctx.Event.Author.Mention(),
+			author.Mention(),
 			true,
 		).AddField(
 			"Author ID",
-			gctx.Event.Author.ID,
+			author.ID,
 			true,
 		)
 
-		if gctx.Event.GuildID != "" {
+		if ctx.GuildID() != "" {
 			eb.AddField(
-				"Guild", gctx.Event.GuildID, true,
+				"Guild", ctx.GuildID(), true,
 			)
 		}
 
-		if len(gctx.Event.Attachments) > 0 {
-			att := gctx.Event.Attachments[0]
+		var imageURL, imageName string
+		if ctx.IsMessage() && len(ctx.Message.Attachments) > 0 {
+			imageURL = ctx.Message.Attachments[0].URL
+			imageName = ctx.Message.Attachments[0].Filename
+		} else if att := ctx.Options.Attachment("image"); att != nil {
+			imageURL = att.URL
+			imageName = att.Filename
+		}
 
-			for _, suffix := range []string{"png", "jpg", "jpeg", "gif"} {
-				if strings.HasSuffix(att.Filename, suffix) {
-					eb.Image(att.URL)
-				}
+		for _, suffix := range []string{"png", "jpg", "jpeg", "gif"} {
+			if imageURL != "" && strings.HasSuffix(imageName, suffix) {
+				eb.Image(imageURL)
 			}
 		}
 
-		ch, err := gctx.Session.UserChannelCreate(gctx.Router.AuthorID)
+		ch, err := ctx.Session.UserChannelCreate(b.Config.Discord.AuthorID)
 		if err != nil {
 			return err
 		}
 
-		_, err = gctx.Session.ChannelMessageSendEmbed(ch.ID, eb.Finalize())
+		_, err = ctx.Session.ChannelMessageSendEmbed(ch.ID, eb.Finalize())
 		if err != nil {
 			return err
 		}
 
 		eb.Clear()
 
-		reply := eb.SuccessTemplate("Feedback message has been sent.").Finalize()
-		return gctx.ReplyEmbed(reply)
+		return ctx.Reply(router.Embed(eb.SuccessTemplate("Feedback message has been sent.").Finalize()))
 	}
 }
 
-func stats(b *bot.Bot) func(*gumi.Ctx) error {
-	return func(gctx *gumi.Ctx) error {
-		if gctx.Args.Len() == 0 {
-			return generalStats(b, gctx)
-		}
-
-		arg := gctx.Args.Get(0).Raw
-		switch arg {
+func statsCommand(b *bot.Bot) router.Handler {
+	return func(ctx *router.Context) error {
+		switch ctx.Options.String("section") {
+		case "", "general":
+			return generalStats(b, ctx)
 		case "commands":
-			return commandStats(b, gctx)
+			return commandStats(b, ctx)
 		case "artworks":
-			return artworkStats(b, gctx)
-		case "general":
-			return generalStats(b, gctx)
+			return artworkStats(b, ctx)
 		default:
-			return messages.ErrIncorrectCmd(gctx.Command)
+			return messages.ErrIncorrectCmd(ctx.Command)
 		}
 	}
 }
 
-func generalStats(b *bot.Bot, gctx *gumi.Ctx) error {
+func generalStats(b *bot.Bot, ctx *router.Context) error {
 	var (
-		s   = gctx.Session
+		s   = ctx.Session
 		mem runtime.MemStats
 	)
 	runtime.ReadMemStats(&mem)
@@ -325,10 +216,10 @@ func generalStats(b *bot.Bot, gctx *gumi.Ctx) error {
 		AddField("Uptime", messages.FormatDuration(uptime), true).
 		AddField("RAM used", fmt.Sprintf("%v MB", mem.Alloc/1024/1024), true)
 
-	return gctx.ReplyEmbed(eb.Finalize())
+	return ctx.Reply(router.Embed(eb.Finalize()))
 }
 
-func artworkStats(b *bot.Bot, gctx *gumi.Ctx) error {
+func artworkStats(b *bot.Bot, ctx *router.Context) error {
 	eb := embeds.NewBuilder()
 	eb.Title("Artwork stats")
 
@@ -337,10 +228,10 @@ func artworkStats(b *bot.Bot, gctx *gumi.Ctx) error {
 		eb.AddField(item.Name, strconv.FormatInt(item.Count, 10))
 	}
 
-	return gctx.ReplyEmbed(eb.Finalize())
+	return ctx.Reply(router.Embed(eb.Finalize()))
 }
 
-func commandStats(b *bot.Bot, gctx *gumi.Ctx) error {
+func commandStats(b *bot.Bot, ctx *router.Context) error {
 	eb := embeds.NewBuilder()
 	eb.Title("Command stats")
 
@@ -349,5 +240,5 @@ func commandStats(b *bot.Bot, gctx *gumi.Ctx) error {
 		eb.AddField(item.Name, strconv.FormatInt(item.Count, 10), true)
 	}
 
-	return gctx.ReplyEmbed(eb.Finalize())
+	return ctx.Reply(router.Embed(eb.Finalize()))
 }

@@ -18,8 +18,8 @@ import (
 	"github.com/VTGare/boe-tea-go/messages"
 	"github.com/VTGare/boe-tea-go/post"
 	"github.com/VTGare/boe-tea-go/repost"
+	"github.com/VTGare/boe-tea-go/router"
 	"github.com/VTGare/boe-tea-go/store"
-	"github.com/VTGare/gumi"
 	"github.com/bwmarrin/discordgo"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -28,13 +28,12 @@ import (
 
 func newCommandBot(h *harness, stub *stubProvider, captured *error) *bot.Bot {
 	b := newTestBot(h, stub, newDetector())
-	b.AddRouter(&gumi.Router{
-		Commands:       map[string]*gumi.Command{},
-		PrefixResolver: func(*discordgo.Session, *discordgo.MessageCreate) []string { return []string{"bt!"} },
-		OnErrorCallback: func(_ *gumi.Ctx, err error) {
+	b.AddRouter(router.New(router.Config{
+		Prefixes: []string{"bt!"},
+		ErrorHandler: func(_ *router.Context, err error) {
 			*captured = err
 		},
-	})
+	}))
 	commands.RegisterCommands(b)
 
 	return b
@@ -53,7 +52,7 @@ func invokeCommandIn(b *bot.Bot, h *harness, guildID, authorID, channelID, messa
 		Author:    &discordgo.User{ID: authorID, Username: "e2e-cmd", Bot: false},
 	}}
 
-	b.Router.Handler()(h.session, event)
+	b.Router.HandleMessage(h.session, event)
 }
 
 // dmChannel opens a DM channel with the configured test user, reusing an
@@ -654,8 +653,7 @@ var _ = Describe("Message handler", func() {
 			Author:    &discordgo.User{ID: h.userID, Username: "e2e", Bot: false},
 		}}
 
-		gctx := &gumi.Ctx{Session: h.session, Event: event, Router: gumi.Create(&gumi.Router{})}
-		Expect(handlers.OnMessage(b)(gctx)).To(Succeed())
+		handlers.OnMessage(b)(h.session, event)
 
 		after, err := h.session.ChannelMessages(h.cfg.channelID, 10, "", seed.ID, "")
 		Expect(err).NotTo(HaveOccurred())
@@ -705,8 +703,7 @@ var _ = Describe("DMs", func() {
 			Author:    &discordgo.User{ID: dmAuthor(), Username: "e2e-dm", Bot: false},
 		}}
 
-		gctx := &gumi.Ctx{Session: h.session, Event: event, Router: gumi.Create(&gumi.Router{})}
-		Expect(handlers.OnMessage(b)(gctx)).To(Succeed())
+		handlers.OnMessage(b)(h.session, event)
 
 		after, err := h.session.ChannelMessages(dm, 10, "", seed.ID, "")
 		Expect(err).NotTo(HaveOccurred())
