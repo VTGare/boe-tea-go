@@ -97,7 +97,7 @@ func OnMessage(b *bot.Bot) router.FallbackHandler {
 			return
 		}
 
-		if !(len(guild.ArtChannels) == 0 || slices.Contains(guild.ArtChannels, m.ChannelID)) {
+		if !guild.PostsIn(m.ChannelID) {
 			return
 		}
 

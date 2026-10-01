@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"slices"
 	"sort"
 	"strconv"
 
@@ -35,9 +36,8 @@ func cloneGuild(g *Guild) *Guild {
 
 	c := *g
 
-	if g.ArtChannels != nil {
-		c.ArtChannels = append([]string{}, g.ArtChannels...)
-	}
+	c.ArtChannels = slices.Clone(g.ArtChannels)
+	c.DisabledProviders = slices.Clone(g.DisabledProviders)
 
 	return &c
 }

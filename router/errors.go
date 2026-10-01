@@ -14,6 +14,7 @@ var (
 	ErrUnknownSubcommand = errors.New("unknown subcommand")
 	ErrNoHandler         = errors.New("command has no handler")
 	ErrNoResponse        = errors.New("no response has been sent yet")
+	ErrAlreadyResponded  = errors.New("interaction already responded to")
 	ErrMissingTarget     = errors.New("missing command target")
 )
 

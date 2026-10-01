@@ -90,9 +90,9 @@ func New() *Bluesky {
 	}
 }
 
-// Enabled implements artworks.Provider.
-func (*Bluesky) Enabled(g *store.Guild) bool {
-	return g != nil && g.Bluesky
+// Info implements artworks.Provider.
+func (*Bluesky) Info() artworks.Info {
+	return artworks.Info{Key: "bluesky", Label: "Bluesky"}
 }
 
 // Find implements artworks.Provider.

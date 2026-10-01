@@ -116,15 +116,12 @@ type Command struct {
 	// Shown in help; write without prefix, e.g. "set prefix !".
 	Examples []string
 
-	parent *Command
-	// component handles this command's message components; see
-	// componentPrefix.
-	component componentHandler
-}
+	// Components handles interactions on components built with
+	// ComponentID. Only root commands receive them.
+	Components ComponentHandler
 
-// componentHandler receives a component interaction whose custom ID is
-// componentPrefix + command name + ":" + args.
-type componentHandler func(r *Router, s *discordgo.Session, i *discordgo.InteractionCreate, args string)
+	parent *Command
+}
 
 // Discord's application command limits.
 const (

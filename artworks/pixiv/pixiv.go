@@ -161,8 +161,8 @@ func (p *Pixiv) Find(id string) (artworks.Artwork, error) {
 	})
 }
 
-func (*Pixiv) Enabled(g *store.Guild) bool {
-	return g != nil && g.Pixiv
+func (*Pixiv) Info() artworks.Info {
+	return artworks.Info{Key: "pixiv", Label: "Pixiv"}
 }
 
 func (a *Artwork) StoreArtwork() *store.Artwork {

@@ -10,6 +10,8 @@ import (
 
 	"github.com/VTGare/boe-tea-go/store"
 	"github.com/VTGare/boe-tea-go/store/conformance"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -107,7 +109,7 @@ var _ = Describe("Guilds", func() {
 	It("returns the DM guild for empty IDs and errors on missing guilds", func() {
 		dm, err := testStore.Guild(ctx, "")
 		Expect(err).NotTo(HaveOccurred())
-		Expect(dm.Limit).To(Equal(100))
+		Expect(dm.Posting.Limit).To(Equal(100))
 
 		_, err = testStore.UpdateGuild(ctx, store.DefaultGuild("missing-it"))
 		Expect(err).To(HaveOccurred())
@@ -287,5 +289,126 @@ var _ = Describe("Bookmarks", func() {
 		floor, err := testStore.Artwork(ctx, art.ID, "")
 		Expect(err).NotTo(HaveOccurred())
 		Expect(floor.Favorites).To(Equal(0))
+	})
+})
+
+var _ = Describe("Guild settings", func() {
+	ctx := context.Background()
+
+	It("round-trips grouped settings, providers and repost TTLs", func() {
+		g, err := testStore.CreateGuild(ctx, "g-settings")
+		Expect(err).NotTo(HaveOccurred())
+		Expect(g.Posting.SkipFirstTweet).To(BeTrue())
+		Expect(g.Repost).To(Equal(store.Repost{Mode: store.RepostNotify, TTL: 24 * time.Hour}))
+
+		g.Posting.Limit = 25
+		g.Posting.Quotes = false
+		g.SetProvider("bluesky", false)
+		g.Repost = store.Repost{Mode: store.RepostStrict, TTL: 72 * time.Hour}
+
+		updated, err := testStore.UpdateGuild(ctx, g)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(updated.Posting.Limit).To(Equal(25))
+		Expect(updated.Posting.Quotes).To(BeFalse())
+		Expect(updated.ProviderEnabled("bluesky")).To(BeFalse())
+		Expect(updated.Repost).To(Equal(store.Repost{Mode: store.RepostStrict, TTL: 72 * time.Hour}))
+	})
+
+	It("rejects out-of-range settings at the database", func() {
+		g, err := testStore.CreateGuild(ctx, "g-bounds")
+		Expect(err).NotTo(HaveOccurred())
+
+		g.Posting.Limit = 500
+		_, err = testStore.UpdateGuild(ctx, g)
+		Expect(err).To(MatchError(ContainSubstring("guilds_post_limit_check")))
+
+		g.Posting.Limit = 10
+		g.Repost.TTL = time.Second
+		_, err = testStore.UpdateGuild(ctx, g)
+		Expect(err).To(MatchError(ContainSubstring("guilds_repost_ttl_check")))
+	})
+})
+
+var _ = Describe("Migrating guild settings from the old schema", func() {
+	ctx := context.Background()
+
+	var pool *pgxpool.Pool
+
+	BeforeEach(func() {
+		admin := testStore.(*postgresStore).pool
+		_, err := admin.Exec(ctx, `DROP SCHEMA IF EXISTS mig_test CASCADE; CREATE SCHEMA mig_test`)
+		Expect(err).NotTo(HaveOccurred())
+
+		cfg, err := pgxpool.ParseConfig(dsn())
+		Expect(err).NotTo(HaveOccurred())
+		cfg.ConnConfig.RuntimeParams["search_path"] = "mig_test, public"
+
+		pool, err = pgxpool.NewWithConfig(ctx, cfg)
+		Expect(err).NotTo(HaveOccurred())
+
+		DeferCleanup(func() {
+			pool.Close()
+			_, _ = admin.Exec(ctx, `DROP SCHEMA IF EXISTS mig_test CASCADE`)
+		})
+
+		// A database created by the pre-migration Init: old schema, no
+		// schema_migrations table.
+		migrations, err := loadMigrations()
+		Expect(err).NotTo(HaveOccurred())
+		_, err = pool.Exec(ctx, migrations[0].sql)
+		Expect(err).NotTo(HaveOccurred())
+
+		_, err = pool.Exec(ctx, `INSERT INTO guilds (id, prefix, pixiv, twitter, deviant, bluesky, tags, flavour_text,
+			crosspost, reactions, skip_first, "limit", repost, repost_expiration, art_channels, nsfw, created_at, updated_at)
+		VALUES
+			('g-default', 'bt!', true, true, true, true, true, true, true, false, false, 10, 'enabled', 86400000000000, '{}', true, now(), now()),
+			('g-odd', 'uwu ', false, true, false, true, false, false, false, true, true, 8583838484, 'disabled', 30000000000, '{}', false, now(), now()),
+			('g-strict', '!', true, true, true, true, true, true, true, false, true, 0, 'strict', 259200000000000, '{a,b}', true, now(), now())`)
+		Expect(err).NotTo(HaveOccurred())
+
+		Expect(migrate(ctx, pool)).To(Succeed())
+	})
+
+	guild := func(id string) *store.Guild {
+		g, err := (&guildStore{pool: pool}).Guild(ctx, id)
+		Expect(err).NotTo(HaveOccurred())
+		return g
+	}
+
+	It("keeps default guilds equivalent", func() {
+		g := guild("g-default")
+
+		Expect(g.Prefix).To(Equal("bt!"))
+		Expect(g.Posting).To(Equal(store.Posting{Limit: 10, Tags: true, Crosspost: true, Quotes: true, NSFWQuotes: true}))
+		Expect(g.DisabledProviders).To(BeEmpty())
+		Expect(g.Repost).To(Equal(store.Repost{Mode: store.RepostNotify, TTL: 24 * time.Hour}))
+	})
+
+	It("converts providers, renames, clamps limits and resets bad TTLs", func() {
+		g := guild("g-odd")
+
+		Expect(g.Prefix).To(Equal("uwu "))
+		Expect(g.Posting).To(Equal(store.Posting{Limit: 100, Reactions: true, SkipFirstTweet: true}))
+		Expect(g.DisabledProviders).To(ConsistOf("pixiv", "deviantart"))
+		Expect(g.Repost).To(Equal(store.Repost{Mode: store.RepostOff, TTL: 24 * time.Hour}))
+	})
+
+	It("keeps strict mode, valid TTLs and art channels", func() {
+		g := guild("g-strict")
+
+		Expect(g.Posting.Limit).To(Equal(1))
+		Expect(g.Repost).To(Equal(store.Repost{Mode: store.RepostStrict, TTL: 72 * time.Hour}))
+		Expect(g.ArtChannels).To(Equal([]string{"a", "b"}))
+	})
+
+	It("records versions and is a no-op when run again", func() {
+		Expect(migrate(ctx, pool)).To(Succeed())
+
+		var versions []int
+		rows, err := pool.Query(ctx, `SELECT version FROM schema_migrations ORDER BY version`)
+		Expect(err).NotTo(HaveOccurred())
+		versions, err = pgx.CollectRows(rows, pgx.RowTo[int])
+		Expect(err).NotTo(HaveOccurred())
+		Expect(versions).To(Equal([]int{1, 2}))
 	})
 })

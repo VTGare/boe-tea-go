@@ -11,8 +11,12 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-const guildColumns = `id, prefix, pixiv, twitter, deviant, bluesky, tags, flavour_text,
-	crosspost, reactions, skip_first, "limit", repost, repost_expiration, art_channels, nsfw, created_at, updated_at`
+// settingColumns are the columns UpdateGuild writes, in settingValues
+// order.
+const settingColumns = `prefix, post_limit, tags, reactions, crosspost, skip_first_tweet, quotes,
+	nsfw_quotes, disabled_providers, repost_mode, repost_ttl, art_channels`
+
+const guildColumns = `id, ` + settingColumns + `, created_at, updated_at`
 
 type guildStore struct {
 	pool *pgxpool.Pool
@@ -35,39 +39,26 @@ func (g *guildStore) Guild(ctx context.Context, id string) (*store.Guild, error)
 
 func (g *guildStore) CreateGuild(ctx context.Context, id string) (*store.Guild, error) {
 	guild := store.DefaultGuild(id)
+	args := append(append([]any{guild.ID}, settingValues(guild)...), guild.CreatedAt, guild.UpdatedAt)
 
 	_, err := g.pool.Exec(ctx, `INSERT INTO guilds (`+guildColumns+`)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
-		ON CONFLICT (id) DO NOTHING`,
-		guild.ID, guild.Prefix, guild.Pixiv, guild.Twitter, guild.Deviant, guild.Bluesky, guild.Tags, guild.FlavorText,
-		guild.Crosspost, guild.Reactions, guild.SkipFirst, guild.Limit, string(guild.Repost), int64(guild.RepostExpiration),
-		guild.ArtChannels, guild.NSFW, guild.CreatedAt, guild.UpdatedAt,
-	)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+		ON CONFLICT (id) DO NOTHING`, args...)
 	if err != nil {
 		return nil, err
 	}
 
-	row := g.pool.QueryRow(ctx, `SELECT `+guildColumns+` FROM guilds WHERE id = $1`, id)
-
-	created := &store.Guild{}
-	if err := scanGuild(row, created); err != nil {
-		return nil, err
-	}
-
-	return created, nil
+	return g.Guild(ctx, id)
 }
 
 func (g *guildStore) UpdateGuild(ctx context.Context, guild *store.Guild) (*store.Guild, error) {
 	guild.UpdatedAt = time.Now().UTC()
+	args := append(append([]any{guild.ID}, settingValues(guild)...), guild.UpdatedAt)
 
-	row := g.pool.QueryRow(ctx, `UPDATE guilds SET prefix=$2, pixiv=$3, twitter=$4, deviant=$5, bluesky=$6, tags=$7,
-		flavour_text=$8, crosspost=$9, reactions=$10, skip_first=$11, "limit"=$12, repost=$13, repost_expiration=$14,
-		art_channels=$15, nsfw=$16, updated_at=$17 WHERE id = $1
-		RETURNING `+guildColumns,
-		guild.ID, guild.Prefix, guild.Pixiv, guild.Twitter, guild.Deviant, guild.Bluesky, guild.Tags, guild.FlavorText,
-		guild.Crosspost, guild.Reactions, guild.SkipFirst, guild.Limit, string(guild.Repost), int64(guild.RepostExpiration),
-		guild.ArtChannels, guild.NSFW, guild.UpdatedAt,
-	)
+	row := g.pool.QueryRow(ctx, `UPDATE guilds SET (`+settingColumns+`, updated_at)
+		= ($2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+		WHERE id = $1
+		RETURNING `+guildColumns, args...)
 
 	updated := &store.Guild{}
 	if err := scanGuild(row, updated); err != nil {
@@ -122,13 +113,35 @@ type guildRow interface {
 	Scan(dest ...any) error
 }
 
-func scanGuild(row guildRow, guild *store.Guild) error {
-	var repost string
-	var repostExpiration int64
+// settingValues lists a guild's settings in settingColumns order.
+func settingValues(g *store.Guild) []any {
+	disabled := g.DisabledProviders
+	if disabled == nil {
+		disabled = make([]string, 0)
+	}
 
-	if err := row.Scan(&guild.ID, &guild.Prefix, &guild.Pixiv, &guild.Twitter, &guild.Deviant, &guild.Bluesky,
-		&guild.Tags, &guild.FlavorText, &guild.Crosspost, &guild.Reactions, &guild.SkipFirst, &guild.Limit,
-		&repost, &repostExpiration, &guild.ArtChannels, &guild.NSFW, &guild.CreatedAt, &guild.UpdatedAt,
+	channels := g.ArtChannels
+	if channels == nil {
+		channels = make([]string, 0)
+	}
+
+	p := g.Posting
+
+	return []any{
+		g.Prefix, p.Limit, p.Tags, p.Reactions, p.Crosspost, p.SkipFirstTweet, p.Quotes,
+		p.NSFWQuotes, disabled, string(g.Repost.Mode), g.Repost.TTL, channels,
+	}
+}
+
+func scanGuild(row guildRow, guild *store.Guild) error {
+	var (
+		mode string
+		p    = &guild.Posting
+	)
+
+	if err := row.Scan(&guild.ID, &guild.Prefix, &p.Limit, &p.Tags, &p.Reactions, &p.Crosspost,
+		&p.SkipFirstTweet, &p.Quotes, &p.NSFWQuotes, &guild.DisabledProviders, &mode, &guild.Repost.TTL,
+		&guild.ArtChannels, &guild.CreatedAt, &guild.UpdatedAt,
 	); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return store.ErrGuildNotFound
@@ -137,8 +150,11 @@ func scanGuild(row guildRow, guild *store.Guild) error {
 		return fmt.Errorf("failed to scan guild: %w", err)
 	}
 
-	guild.Repost = store.GuildRepost(repost)
-	guild.RepostExpiration = time.Duration(repostExpiration)
+	guild.Repost.Mode = store.RepostMode(mode)
+
+	if guild.DisabledProviders == nil {
+		guild.DisabledProviders = make([]string, 0)
+	}
 
 	if guild.ArtChannels == nil {
 		guild.ArtChannels = make([]string, 0)

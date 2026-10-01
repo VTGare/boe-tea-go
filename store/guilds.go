@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"errors"
+	"slices"
 	"time"
 )
 
@@ -27,39 +28,90 @@ type GuildStore interface {
 	DeleteArtChannels(ctx context.Context, guildID string, channels []string) (*Guild, error)
 }
 
+// Guild is one server's settings.
 type Guild struct {
-	ID     string `json:"id" bson:"guild_id" validate:"required"`
-	Prefix string `json:"prefix" bson:"prefix" validate:"required,max=5"`
+	ID     string `json:"id" bson:"guild_id"`
+	Prefix string `json:"prefix" bson:"prefix"`
 
-	Pixiv   bool `json:"pixiv" bson:"pixiv"`
-	Twitter bool `json:"twitter" bson:"twitter"`
-	Deviant bool `json:"deviant" bson:"deviant"`
-	Bluesky bool `json:"bluesky" bson:"bluesky"`
+	Posting Posting `json:"posting" bson:"posting"`
+	Repost  Repost  `json:"repost" bson:"repost"`
 
-	Tags       bool `json:"tags" bson:"tags"`
-	FlavorText bool `json:"flavour_text" bson:"flavour_text"`
-	Crosspost  bool `json:"crosspost" bson:"crosspost"`
-	Reactions  bool `json:"reactions" bson:"reactions"`
-	SkipFirst  bool `json:"skip_first" bson:"skip_first"`
-	Limit      int  `json:"limit" bson:"limit" validate:"required"`
+	// DisabledProviders lists the keys (artworks.Info.Key) of turned-off
+	// artwork sources. Everything else is on.
+	DisabledProviders []string `json:"disabled_providers" bson:"disabled_providers"`
 
-	Repost           GuildRepost   `json:"repost" bson:"repost" validate:"required"`
-	RepostExpiration time.Duration `json:"repost_expiration" bson:"repost_expiration"`
+	// ArtChannels restricts posting to these channels. Empty means all.
+	ArtChannels []string `json:"art_channels" bson:"art_channels"`
 
-	ArtChannels []string `json:"art_channels" bson:"art_channels" validate:"required"`
-	NSFW        bool     `json:"nsfw" bson:"nsfw"`
-
-	CreatedAt time.Time `json:"created_at" bson:"created_at" validate:"required"`
+	CreatedAt time.Time `json:"created_at" bson:"created_at"`
 	UpdatedAt time.Time `json:"updated_at" bson:"updated_at"`
 }
 
-type GuildRepost string
+// Posting controls how artwork posts look.
+type Posting struct {
+	// Limit caps the images per post.
+	Limit int `json:"limit" bson:"limit"`
+
+	Tags      bool `json:"tags" bson:"tags"`
+	Reactions bool `json:"reactions" bson:"reactions"`
+	Crosspost bool `json:"crosspost" bson:"crosspost"`
+
+	// SkipFirstTweet drops a tweet's first image, which Discord already
+	// previews.
+	SkipFirstTweet bool `json:"skip_first_tweet" bson:"skip_first_tweet"`
+
+	// Quotes adds a random quote to post footers; NSFWQuotes allows NSFW
+	// ones among them.
+	Quotes     bool `json:"quotes" bson:"quotes"`
+	NSFWQuotes bool `json:"nsfw_quotes" bson:"nsfw_quotes"`
+}
+
+// Repost controls repost detection.
+type Repost struct {
+	Mode RepostMode `json:"mode" bson:"mode"`
+
+	// TTL is how long a posted link counts towards reposts.
+	TTL time.Duration `json:"ttl" bson:"ttl"`
+}
+
+type RepostMode string
 
 const (
-	GuildRepostEnabled  GuildRepost = "enabled"
-	GuildRepostDisabled GuildRepost = "disabled"
-	GuildRepostStrict   GuildRepost = "strict"
+	RepostOff RepostMode = "off"
+	// RepostNotify replies with a notice when a link was already posted.
+	RepostNotify RepostMode = "notify"
+	// RepostStrict also deletes the repost.
+	RepostStrict RepostMode = "strict"
 )
+
+// Setting bounds, mirrored by the Postgres CHECK constraints.
+const (
+	MaxPrefixLength = 5
+	MinPostLimit    = 1
+	MaxPostLimit    = 100
+	MinRepostTTL    = time.Minute
+	MaxRepostTTL    = 7 * 24 * time.Hour
+)
+
+// ProviderEnabled reports whether links from the provider with key are
+// handled.
+func (g *Guild) ProviderEnabled(key string) bool {
+	return g != nil && !slices.Contains(g.DisabledProviders, key)
+}
+
+// SetProvider turns the provider with key on or off.
+func (g *Guild) SetProvider(key string, enabled bool) {
+	g.DisabledProviders = slices.DeleteFunc(g.DisabledProviders, func(d string) bool { return d == key })
+	if !enabled {
+		g.DisabledProviders = append(g.DisabledProviders, key)
+	}
+}
+
+// PostsIn reports whether artwork can be posted in the channel, any channel
+// returns true when no art channels are set.
+func (g *Guild) PostsIn(channelID string) bool {
+	return len(g.ArtChannels) == 0 || slices.Contains(g.ArtChannels, channelID)
+}
 
 // GetOrCreateGuild returns the guild, creating it with defaults on
 // ErrGuildNotFound.
@@ -82,44 +134,41 @@ func GetOrCreateGuild(ctx context.Context, s Store, guildID string) (*Guild, boo
 }
 
 func DefaultGuild(id string) *Guild {
+	now := time.Now()
+
 	return &Guild{
-		ID:               id,
-		Prefix:           "bt!",
-		Limit:            10,
-		NSFW:             true,
-		Pixiv:            true,
-		Twitter:          true,
-		Deviant:          true,
-		Bluesky:          true,
-		Tags:             true,
-		FlavorText:       true,
-		Repost:           GuildRepostEnabled,
-		RepostExpiration: 24 * time.Hour,
-		Crosspost:        true,
-		Reactions:        false,
-		SkipFirst:        false,
-		ArtChannels:      make([]string, 0),
-		CreatedAt:        time.Now(),
-		UpdatedAt:        time.Now(),
+		ID:     id,
+		Prefix: "bt!",
+		Posting: Posting{
+			Limit:          10,
+			Tags:           true,
+			Crosspost:      true,
+			SkipFirstTweet: true,
+			Quotes:         true,
+			NSFWQuotes:     true,
+		},
+		Repost:            Repost{Mode: RepostNotify, TTL: 24 * time.Hour},
+		DisabledProviders: make([]string, 0),
+		ArtChannels:       make([]string, 0),
+		CreatedAt:         now,
+		UpdatedAt:         now,
 	}
 }
 
+// UserGuild is the settings used in DMs.
 func UserGuild() *Guild {
 	return &Guild{
-		ID:               "",
-		Prefix:           "bt!",
-		Limit:            100,
-		NSFW:             true,
-		Pixiv:            true,
-		Twitter:          true,
-		Deviant:          true,
-		Bluesky:          true,
-		Tags:             true,
-		FlavorText:       true,
-		SkipFirst:        true,
-		Repost:           GuildRepostDisabled,
-		RepostExpiration: 0,
-		Crosspost:        false,
-		Reactions:        true,
+		Prefix: "bt!",
+		Posting: Posting{
+			Limit:          100,
+			Tags:           true,
+			Reactions:      true,
+			SkipFirstTweet: true,
+			Quotes:         true,
+			NSFWQuotes:     true,
+		},
+		Repost:            Repost{Mode: RepostOff},
+		DisabledProviders: make([]string, 0),
+		ArtChannels:       make([]string, 0),
 	}
 }

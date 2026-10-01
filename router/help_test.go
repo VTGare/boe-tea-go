@@ -313,45 +313,46 @@ var _ = ginkgo.Describe("Help detail view", func() {
 })
 
 var _ = ginkgo.Describe("Help menu clicks", func() {
-	respond := func(r *Router, help *Command, i *discordgo.InteractionCreate) *discordgo.InteractionResponse {
+	respond := func(r *Router, help *Command, i *discordgo.InteractionCreate) (*Response, bool) {
 		args := strings.TrimPrefix(i.MessageComponentData().CustomID, componentPrefix+help.Name+":")
-		return helpComponentResponse(r, &discordgo.Session{}, HelpConfig{Name: "help", Title: "Commands", Uncategorized: "Other"}, help, i, args)
+		ctx := &ComponentContext{Session: &discordgo.Session{}, Router: r, Command: help, Interaction: i, Args: strings.Split(args, ":")}
+		return helpComponent(ctx, HelpConfig{Name: "help", Title: "Commands", Uncategorized: "Other"}, help)
 	}
 
 	ginkgo.It("opens the picked category in place", func() {
 		r, help := helpRouter(HelpConfig{})
-		resp := respond(r, help, componentClick("u", "rt:help:u:s:cat", "Memes"))
+		resp, private := respond(r, help, componentClick("u", "rt:help:u:s:cat", "Memes"))
 
-		gomega.Expect(resp.Type).To(gomega.Equal(discordgo.InteractionResponseUpdateMessage))
-		gomega.Expect(resp.Data.Embeds[0].Title).To(gomega.Equal("Memes"))
+		gomega.Expect(private).To(gomega.BeFalse())
+		gomega.Expect(resp.Embeds[0].Title).To(gomega.Equal("Memes"))
 	})
 
 	ginkgo.It("opens a picked context menu command", func() {
 		r, help := helpRouter(HelpConfig{})
-		resp := respond(r, help, componentClick("u", "rt:help:u:s:cmd", "1:Find Sauce"))
+		resp, _ := respond(r, help, componentClick("u", "rt:help:u:s:cmd", "1:Find Sauce"))
 
-		gomega.Expect(resp.Data.Embeds[0].Title).To(gomega.Equal("Find Sauce (message menu)"))
+		gomega.Expect(resp.Embeds[0].Title).To(gomega.Equal("Find Sauce (message menu)"))
 	})
 
 	ginkgo.It("goes back to a category from a button", func() {
 		r, help := helpRouter(HelpConfig{})
-		resp := respond(r, help, componentClick("u", "rt:help:u:p:cat:Settings"))
+		resp, _ := respond(r, help, componentClick("u", "rt:help:u:p:cat:Settings"))
 
-		gomega.Expect(resp.Data.Embeds[0].Description).To(gomega.HavePrefix("`bt!set`"))
+		gomega.Expect(resp.Embeds[0].Description).To(gomega.HavePrefix("`bt!set`"))
 	})
 
 	ginkgo.It("falls back to the overview for unknown targets", func() {
 		r, help := helpRouter(HelpConfig{})
-		resp := respond(r, help, componentClick("u", "rt:help:u:s:cmd", "0:nope"))
+		resp, _ := respond(r, help, componentClick("u", "rt:help:u:s:cmd", "0:nope"))
 
-		gomega.Expect(resp.Data.Embeds[0].Title).To(gomega.Equal("Commands"))
+		gomega.Expect(resp.Embeds[0].Title).To(gomega.Equal("Commands"))
 	})
 
 	ginkgo.It("answers other users privately without touching the menu", func() {
 		r, help := helpRouter(HelpConfig{})
-		resp := respond(r, help, componentClick("someone-else", "rt:help:u:s:home"))
+		resp, private := respond(r, help, componentClick("someone-else", "rt:help:u:s:home"))
 
-		gomega.Expect(resp.Type).To(gomega.Equal(discordgo.InteractionResponseChannelMessageWithSource))
-		gomega.Expect(resp.Data.Flags).To(gomega.Equal(discordgo.MessageFlagsEphemeral))
+		gomega.Expect(private).To(gomega.BeTrue())
+		gomega.Expect(resp.Ephemeral).To(gomega.BeTrue())
 	})
 })

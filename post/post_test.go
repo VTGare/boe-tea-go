@@ -68,14 +68,13 @@ func (s *stubArtwork) Len() int {
 }
 
 type stubProvider struct {
-	mu      sync.Mutex
-	ids     map[string]string
-	arts    map[string]*stubArtwork
-	fail    map[string]error
-	delays  map[string]time.Duration
-	enabled bool
-	delay   time.Duration
-	calls   []string
+	mu     sync.Mutex
+	ids    map[string]string
+	arts   map[string]*stubArtwork
+	fail   map[string]error
+	delays map[string]time.Duration
+	delay  time.Duration
+	calls  []string
 }
 
 func (p *stubProvider) Match(url string) (string, bool) {
@@ -108,8 +107,8 @@ func (p *stubProvider) Find(id string) (artworks.Artwork, error) {
 	return nil, errors.New("stub artwork not found")
 }
 
-func (p *stubProvider) Enabled(*store.Guild) bool {
-	return p.enabled
+func (*stubProvider) Info() artworks.Info {
+	return artworks.Info{Key: "stub", Label: "Stub"}
 }
 
 type twitterStubProvider struct {
@@ -124,8 +123,8 @@ func (p *twitterStubProvider) Find(string) (artworks.Artwork, error) {
 	return p.art, nil
 }
 
-func (*twitterStubProvider) Enabled(*store.Guild) bool {
-	return true
+func (*twitterStubProvider) Info() artworks.Info {
+	return artworks.Info{Key: "twitter", Label: "Twitter"}
 }
 
 func (p *stubProvider) findCalls() []string {
@@ -252,7 +251,7 @@ type testDeps struct {
 
 func newTestPoster() (*Poster, *testDeps) {
 	deps := &testDeps{
-		guilds:      &stubGuilds{guild: &store.Guild{ID: "guild-1", Limit: 10}},
+		guilds:      &stubGuilds{guild: &store.Guild{ID: "guild-1", Posting: store.Posting{Limit: 10}}},
 		users:       &stubUsers{user: &store.User{ID: "author-1"}},
 		detector:    newFakeDetector(),
 		artCache:    goCache.New(5*time.Minute, 10*time.Minute),

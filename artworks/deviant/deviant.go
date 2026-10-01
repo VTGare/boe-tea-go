@@ -115,8 +115,8 @@ func (d *DeviantArt) Match(s string) (string, bool) {
 	return res[1], true
 }
 
-func (*DeviantArt) Enabled(g *store.Guild) bool {
-	return g != nil && g.Deviant
+func (*DeviantArt) Info() artworks.Info {
+	return artworks.Info{Key: "deviantart", Label: "DeviantArt", Aliases: []string{"deviant"}}
 }
 
 func (a *Artwork) Render() (artworks.Rendered, error) {

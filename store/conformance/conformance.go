@@ -35,7 +35,7 @@ func Specs(newStore func() store.Store) {
 			guild, err := newStore().Guild(ctx, "")
 
 			Expect(err).NotTo(HaveOccurred())
-			Expect(guild.Limit).To(Equal(100))
+			Expect(guild.Posting.Limit).To(Equal(100))
 		})
 
 		It("creates guilds idempotently", func() {

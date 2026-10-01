@@ -155,19 +155,37 @@ var _ = Describe("scanArtwork", func() {
 var _ = Describe("scanGuild", func() {
 	now := time.Now().UTC()
 	vals := []any{
-		"g", "bt!", true, true, true, true, true, true, true, false, false, 10,
-		"enabled", int64(86400000000000),
+		"g", "bt!", 10, true, false, true, true, true, false,
+		[]string{"pixiv"},
+		"strict", 72 * time.Hour,
 		[]string{"c"},
-		true, now, now,
+		now, now,
 	}
 
-	It("scans a full row with repost and duration", func() {
+	It("scans a full row into grouped settings", func() {
 		g := &store.Guild{}
 
 		Expect(scanGuild(&fakeRow{vals: vals}, g)).To(Succeed())
 		Expect(g.ID).To(Equal("g"))
-		Expect(g.Repost).To(Equal(store.GuildRepostEnabled))
-		Expect(g.RepostExpiration).To(Equal(24 * time.Hour))
+		Expect(g.Posting).To(Equal(store.Posting{
+			Limit: 10, Tags: true, Crosspost: true, SkipFirstTweet: true, Quotes: true,
+		}))
+		Expect(g.Repost).To(Equal(store.Repost{Mode: store.RepostStrict, TTL: 72 * time.Hour}))
+		Expect(g.ProviderEnabled("pixiv")).To(BeFalse())
+		Expect(g.ProviderEnabled("twitter")).To(BeTrue())
+		Expect(g.ArtChannels).To(Equal([]string{"c"}))
+	})
+
+	It("lists settings in column order for writes", func() {
+		g := &store.Guild{}
+		Expect(scanGuild(&fakeRow{vals: vals}, g)).To(Succeed())
+
+		// settingValues mirrors scanGuild minus id and timestamps.
+		values := settingValues(g)
+		Expect(values).To(HaveLen(len(vals) - 3))
+		Expect(values[0]).To(Equal("bt!"))
+		Expect(values[8]).To(Equal([]string{"pixiv"}))
+		Expect(values[9]).To(Equal("strict"))
 	})
 
 	It("maps no rows to ErrGuildNotFound", func() {

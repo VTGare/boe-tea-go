@@ -1021,3 +1021,16 @@ func successMessage(ctx *router.Context, message string) error {
 	eb.SuccessTemplate(message)
 	return ctx.Reply(router.Embed(eb.Finalize()))
 }
+
+func parseBool(s string) (bool, error) {
+	s = strings.ToLower(s)
+	if s == "true" || s == "enable" || s == "enabled" || s == "on" {
+		return true, nil
+	}
+
+	if s == "false" || s == "disable" || s == "disabled" || s == "off" {
+		return false, nil
+	}
+
+	return false, messages.ErrParseBool(s)
+}

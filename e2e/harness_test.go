@@ -153,20 +153,26 @@ func (h *harness) close() {
 }
 
 func baselineGuild(g *store.Guild) {
-	g.Limit = 10
-	g.NSFW = true
-	g.Pixiv = true
-	g.Twitter = true
-	g.Deviant = true
-	g.Bluesky = true
-	g.Tags = true
-	g.FlavorText = false
-	g.Crosspost = true
-	g.Reactions = false
-	g.SkipFirst = false
-	g.Repost = store.GuildRepostEnabled
-	g.RepostExpiration = time.Hour
+	g.Posting = store.Posting{Limit: 10, Tags: true, Crosspost: true, NSFWQuotes: true}
+	g.DisabledProviders = []string{}
+	g.Repost = store.Repost{Mode: store.RepostNotify, TTL: time.Hour}
 	g.ArtChannels = []string{}
+}
+
+// guildOverride tweaks the stored guild in memory, for values the store
+// rejects, such as repost TTLs under a minute.
+type guildOverride struct {
+	post.GuildStore
+	mutate func(*store.Guild)
+}
+
+func (o guildOverride) Guild(ctx context.Context, guildID string) (*store.Guild, error) {
+	g, err := o.GuildStore.Guild(ctx, guildID)
+	if err == nil && g != nil {
+		o.mutate(g)
+	}
+
+	return g, err
 }
 
 func (h *harness) ensureGuild(ctx context.Context, mutate func(*store.Guild)) error {
@@ -233,8 +239,12 @@ func (r *recordedStats) all() []string {
 }
 
 func (h *harness) newPoster(stub *stubProvider, detector repost.Detector, rec *recordedStats) *post.Poster {
+	return h.newPosterWith(h.store, stub, detector, rec)
+}
+
+func (h *harness) newPosterWith(guilds post.GuildStore, stub *stubProvider, detector repost.Detector, rec *recordedStats) *post.Poster {
 	return post.NewPoster(post.Deps{
-		Guilds:       h.store,
+		Guilds:       guilds,
 		Users:        h.store,
 		Match:        stub.match,
 		Reposts:      detector,
@@ -403,17 +413,15 @@ func (s *stubArtwork) Len() int {
 }
 
 type stubProvider struct {
-	mu      sync.Mutex
-	ids     map[string]string
-	arts    map[string]*stubArtwork
-	enabled bool
+	mu   sync.Mutex
+	ids  map[string]string
+	arts map[string]*stubArtwork
 }
 
 func newStubProvider() *stubProvider {
 	return &stubProvider{
-		ids:     make(map[string]string),
-		arts:    make(map[string]*stubArtwork),
-		enabled: true,
+		ids:  make(map[string]string),
+		arts: make(map[string]*stubArtwork),
 	}
 }
 
@@ -448,18 +456,8 @@ func (p *stubProvider) Find(id string) (artworks.Artwork, error) {
 	return art, nil
 }
 
-func (p *stubProvider) Enabled(*store.Guild) bool {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	return p.enabled
-}
-
-func (p *stubProvider) setEnabled(enabled bool) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	p.enabled = enabled
+func (*stubProvider) Info() artworks.Info {
+	return artworks.Info{Key: "stub", Label: "Stub"}
 }
 
 func (p *stubProvider) match(url string) (string, artworks.Provider) {

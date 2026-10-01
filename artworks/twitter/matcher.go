@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/VTGare/boe-tea-go/store"
+	"github.com/VTGare/boe-tea-go/artworks"
 )
 
 type twitterMatcher struct {
@@ -48,6 +48,6 @@ func (tm twitterMatcher) Match(s string) (string, bool) {
 	return snowflake, true
 }
 
-func (twitterMatcher) Enabled(g *store.Guild) bool {
-	return g != nil && g.Twitter
+func (twitterMatcher) Info() artworks.Info {
+	return artworks.Info{Key: "twitter", Label: "Twitter"}
 }

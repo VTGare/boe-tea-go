@@ -9,7 +9,6 @@ const (
 	repost
 	about
 	sauce
-	set
 	bookmarkAdded
 	bookmarkRemoved
 )
@@ -51,42 +50,6 @@ type Sauce struct {
 	ExternalURL string
 	OtherURLs   string
 	NoTitle     string
-}
-
-type SetCommand struct {
-	CurrentSettings string
-	General         *General
-	Features        *Features
-	PixivSettings   *PixivSettings
-	TwitterSettings *ProviderSettings
-	DeviantSettings *ProviderSettings
-	ArtChannels     string
-}
-
-type General struct {
-	Title  string
-	Prefix string
-	NSFW   string
-}
-
-type ProviderSettings struct {
-	Title   string
-	Enabled string
-}
-
-type PixivSettings struct {
-	ProviderSettings
-	Limit string
-}
-
-type Features struct {
-	Title            string
-	Repost           string
-	RepostExpiration string
-	Crosspost        string
-	Reactions        string
-	Tags             string
-	FlavourText      string
 }
 
 type UserProfile struct {
@@ -134,40 +97,6 @@ var embeds = map[Language]map[EmbedType]any{
 			Patreon:       "Patreon",
 		},
 
-		set: &SetCommand{
-			CurrentSettings: "Current settings",
-			ArtChannels:     "Art channels",
-			General: &General{
-				Title:  "General",
-				Prefix: "Prefix",
-				NSFW:   "NSFW",
-			},
-			TwitterSettings: &ProviderSettings{
-				Title:   "Twitter settings",
-				Enabled: "Status (twitter)",
-			},
-			DeviantSettings: &ProviderSettings{
-				Title:   "DeviantArt settings",
-				Enabled: "Status (deviant)",
-			},
-			PixivSettings: &PixivSettings{
-				ProviderSettings: ProviderSettings{
-					Title:   "Pixiv settings",
-					Enabled: "Status (pixiv)",
-				},
-				Limit: "Limit",
-			},
-			Features: &Features{
-				Title:            "Features",
-				Repost:           "Repost",
-				RepostExpiration: "Expiration (repost.expiration)",
-				Crosspost:        "Crosspost",
-				Reactions:        "Reactions",
-				Tags:             "Tags",
-				FlavourText:      "Footer quotes (footer)",
-			},
-		},
-
 		bookmarkAdded: &BaseEmbed{
 			Title:       "💖 Successfully bookmarked an artwork",
 			Description: "If you dislike direct messages, disable them by running `bt!userset dm off` command",
@@ -209,10 +138,6 @@ func AboutEmbed() *About {
 
 func RepostEmbed() *Repost {
 	return embedByType[Repost](English, repost)
-}
-
-func SetEmbed() *SetCommand {
-	return embedByType[SetCommand](English, set)
 }
 
 func BookmarkAddedEmbed() *BaseEmbed {

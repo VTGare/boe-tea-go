@@ -12,9 +12,21 @@ import (
 )
 
 type Provider interface {
+	Info() Info
 	Match(url string) (string, bool)
 	Find(id string) (Artwork, error)
-	Enabled(*store.Guild) bool
+}
+
+// Info describes a provider to guild settings.
+type Info struct {
+	// Key identifies the provider in stored guild settings and names its
+	// /set subcommand: lowercase letters, digits and dashes. It is
+	// persisted, so never change it once released.
+	Key string
+	// Label is the display name in embeds.
+	Label string
+	// Aliases are extra /set names, kept for renamed settings.
+	Aliases []string
 }
 
 type Artwork interface {

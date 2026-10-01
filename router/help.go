@@ -41,7 +41,6 @@ type HelpConfig struct {
 const (
 	maxSelectOptions = 25
 	maxSelectText    = 100
-	maxCustomID      = 100
 	maxEmbedFields   = 25
 	maxDescription   = 4096
 	maxShownChoices  = 6
@@ -88,10 +87,13 @@ func HelpCommand(cfg HelpConfig) *Command {
 		return ctx.Reply(v.detail(cmd))
 	}
 
-	help.component = func(r *Router, s *discordgo.Session, i *discordgo.InteractionCreate, args string) {
-		if resp := helpComponentResponse(r, s, cfg, help, i, args); resp != nil {
-			_ = s.InteractionRespond(i.Interaction, resp)
+	help.Components = func(ctx *ComponentContext) error {
+		resp, private := helpComponent(ctx, cfg, help)
+		if private {
+			return ctx.Reply(resp)
 		}
+
+		return ctx.Update(resp)
 	}
 
 	return help
@@ -126,41 +128,30 @@ func newHelpView(ctx *Context, cfg HelpConfig, help *Command) *helpView {
 	}
 }
 
-// helpComponentResponse answers a click on a help menu: the next view for
-// the invoker, or a private notice for anyone else.
-func helpComponentResponse(r *Router, s *discordgo.Session, cfg HelpConfig, help *Command, i *discordgo.InteractionCreate, args string) *discordgo.InteractionResponse {
-	parts := strings.SplitN(args, ":", 4)
-	if len(parts) < 3 {
-		return nil
-	}
-	ownerID, mode, action := parts[0], parts[1], parts[2]
+// helpComponent answers a click on a help menu: the next view for the
+// invoker, or a private notice (private true) for anyone else.
+func helpComponent(ctx *ComponentContext, cfg HelpConfig, help *Command) (resp *Response, private bool) {
+	ownerID, mode, action := ctx.Arg(0), ctx.Arg(1), ctx.Arg(2)
+
+	// The target may itself contain ':', so it is everything after the action.
 	arg := ""
-	if len(parts) == 4 {
-		arg = parts[3]
+	if len(ctx.Args) > 3 {
+		arg = strings.Join(ctx.Args[3:], ":")
+	}
+	if values := ctx.Values(); len(values) > 0 {
+		arg = values[0]
 	}
 
-	data := i.MessageComponentData()
-	if len(data.Values) > 0 {
-		arg = data.Values[0]
-	}
-
-	if interactionUserID(i) != ownerID {
-		return &discordgo.InteractionResponse{
-			Type: discordgo.InteractionResponseChannelMessageWithSource,
-			Data: &discordgo.InteractionResponseData{
-				Content: fmt.Sprintf("This menu belongs to someone else. Run `/%s` for your own.", cfg.Name),
-				Flags:   discordgo.MessageFlagsEphemeral,
-			},
-		}
+	if ctx.UserID() != ownerID {
+		return Textf("This menu belongs to someone else. Run `/%s` for your own.", cfg.Name).Private(), true
 	}
 
 	v := &helpView{
-		r: r, s: s, cfg: cfg, help: help,
-		guildID: i.GuildID, channelID: i.ChannelID,
+		r: ctx.Router, s: ctx.Session, cfg: cfg, help: help,
+		guildID: ctx.GuildID(), channelID: ctx.ChannelID(),
 		userID: ownerID, prefix: mode == "p",
 	}
 
-	var resp *Response
 	switch action {
 	case "cat":
 		resp = v.category(arg)
@@ -173,23 +164,7 @@ func helpComponentResponse(r *Router, s *discordgo.Session, cfg HelpConfig, help
 		resp = v.home()
 	}
 
-	return &discordgo.InteractionResponse{
-		Type: discordgo.InteractionResponseUpdateMessage,
-		Data: &discordgo.InteractionResponseData{
-			Embeds:     resp.Embeds,
-			Components: resp.Components,
-		},
-	}
-}
-
-func interactionUserID(i *discordgo.InteractionCreate) string {
-	if i.Member != nil && i.Member.User != nil {
-		return i.Member.User.ID
-	}
-	if i.User != nil {
-		return i.User.ID
-	}
-	return ""
+	return resp, false
 }
 
 // prefixLead is the guild's first configured prefix, for showing prefix
@@ -398,7 +373,8 @@ func (v *helpView) category(name string) *Response {
 		Description: truncate(strings.Join(lines, "\n"), maxDescription),
 	}
 
-	return helpResponse(embed,
+	return helpResponse(
+		embed,
 		v.selectRow("cmd", "Pick a command for details", options),
 		buttonRow(v.button("All categories", "home", "")),
 	)
@@ -410,9 +386,12 @@ func (v *helpView) detail(cmd *Command) *Response {
 	var desc strings.Builder
 	desc.WriteString(cmd.Description)
 	if lines := v.helpUsage(cmd); len(lines) > 0 {
-		desc.WriteString("\n```\n" + lines[0] + "\n```")
+		desc.WriteString("\n```\n")
+		desc.WriteString(lines[0])
+		desc.WriteString("\n```")
 		if also := v.alsoLine(cmd); also != "" {
-			desc.WriteString("\n-# Also " + also)
+			desc.WriteString("\n-# Also ")
+			desc.WriteString(also)
 		}
 	}
 
@@ -572,16 +551,11 @@ func (v *helpView) customID(action, arg string) string {
 		mode = "p"
 	}
 
-	id := componentPrefix + v.help.Name + ":" + v.userID + ":" + mode + ":" + action
-	if arg != "" {
-		id += ":" + arg
+	if arg == "" {
+		return ComponentID(v.help, v.userID, mode, action)
 	}
 
-	if len(id) > maxCustomID {
-		return ""
-	}
-
-	return id
+	return ComponentID(v.help, v.userID, mode, action, arg)
 }
 
 func (v *helpView) selectRow(action, placeholder string, options []discordgo.SelectMenuOption) discordgo.MessageComponent {

@@ -135,7 +135,7 @@ var _ = Describe("Live providers", func() {
 
 		Expect(h.ensureGuild(ctx, func(g *store.Guild) {
 			baselineGuild(g)
-			g.SkipFirst = true
+			g.Posting.SkipFirstTweet = true
 		})).To(Succeed())
 		DeferCleanup(func() { _ = h.ensureGuild(context.Background(), baselineGuild) })
 

@@ -35,11 +35,11 @@ var _ = Describe("Skipping the first page", func() {
 	var (
 		twitterArtwork *twitter.Artwork
 		pixivArtwork   = &pixiv.Artwork{}
-		guild          = &store.Guild{SkipFirst: true}
+		guild          = &store.Guild{Posting: store.Posting{SkipFirstTweet: true}}
 	)
 
 	BeforeEach(func() {
-		guild = &store.Guild{SkipFirst: true}
+		guild = &store.Guild{Posting: store.Posting{SkipFirstTweet: true}}
 		twitterArtwork = &twitter.Artwork{Photos: []string{"https://test.com/1.png"}}
 	})
 
@@ -62,7 +62,7 @@ var _ = Describe("Skipping the first page", func() {
 	})
 
 	It("shouldn't skip first if SkipFirst setting is false", func() {
-		guild.SkipFirst = false
+		guild.Posting.SkipFirstTweet = false
 		Expect(skipFirst(guild, twitterArtwork, runOpts{})).To(BeFalse())
 	})
 
@@ -303,7 +303,7 @@ var _ = Describe("Delivering artwork", func() {
 	var (
 		poster *Poster
 		deps   *testDeps
-		guild  = &store.Guild{ID: "guild-1", Limit: 10}
+		guild  = &store.Guild{ID: "guild-1", Posting: store.Posting{Limit: 10}}
 		run    = newTestRun()
 	)
 
@@ -351,8 +351,8 @@ var _ = Describe("Delivering artwork", func() {
 	})
 
 	It("adds bookmark reactions in finalize when the guild wants them", func() {
-		guild.Reactions = true
-		defer func() { guild.Reactions = false }()
+		guild.Posting.Reactions = true
+		defer func() { guild.Posting.Reactions = false }()
 
 		pages, err := poster.deliver(guild, "channel-1", testItems(
 			&stubArtwork{id: "a", images: 1},
@@ -382,7 +382,7 @@ var _ = Describe("Repost notices", func() {
 	var (
 		poster *Poster
 		deps   *testDeps
-		guild  = &store.Guild{ID: "guild-1", Repost: store.GuildRepostStrict}
+		guild  = &store.Guild{ID: "guild-1", Repost: store.Repost{Mode: store.RepostStrict}}
 		run    = newTestRun()
 		reps   = []*repost.Repost{{ID: "a", URL: "https://example.com/a"}}
 	)
@@ -492,13 +492,12 @@ var _ = Describe("Crossposting", func() {
 
 	It("delivers fetched artworks to member channels in order", func() {
 		provider := &stubProvider{
-			ids:     map[string]string{"https://example.com/a": "a", "https://example.com/b": "b"},
-			arts:    map[string]*stubArtwork{"a": {id: "a", images: 1}, "b": {id: "b", images: 1}},
-			enabled: true,
+			ids:  map[string]string{"https://example.com/a": "a", "https://example.com/b": "b"},
+			arts: map[string]*stubArtwork{"a": {id: "a", images: 1}, "b": {id: "b", images: 1}},
 		}
 
 		deps.match = matchProvider(provider)
-		deps.guilds.guild = &store.Guild{ID: "g1", Limit: 10, Crosspost: true}
+		deps.guilds.guild = &store.Guild{ID: "g1", Posting: store.Posting{Limit: 10, Crosspost: true}}
 
 		run.URLs = []string{"https://example.com/a", "https://example.com/b"}
 
@@ -525,9 +524,8 @@ var _ = Describe("Sending posts", func() {
 
 	It("sends matched artworks and returns their infos", func() {
 		provider := &stubProvider{
-			ids:     map[string]string{"https://example.com/a": "a"},
-			arts:    map[string]*stubArtwork{"a": {id: "a", images: 1}},
-			enabled: true,
+			ids:  map[string]string{"https://example.com/a": "a"},
+			arts: map[string]*stubArtwork{"a": {id: "a", images: 1}},
 		}
 
 		deps.match = matchProvider(provider)
@@ -552,9 +550,8 @@ var _ = Describe("Sending posts", func() {
 
 	It("still serves ignored users from commands", func() {
 		provider := &stubProvider{
-			ids:     map[string]string{"https://example.com/a": "a"},
-			arts:    map[string]*stubArtwork{"a": {id: "a", images: 1}},
-			enabled: true,
+			ids:  map[string]string{"https://example.com/a": "a"},
+			arts: map[string]*stubArtwork{"a": {id: "a", images: 1}},
 		}
 
 		deps.match = matchProvider(provider)
@@ -571,9 +568,8 @@ var _ = Describe("Sending posts", func() {
 
 	It("records stats once per fetched artwork", func() {
 		provider := &stubProvider{
-			ids:     map[string]string{"https://example.com/a": "a", "https://example.com/b": "b"},
-			arts:    map[string]*stubArtwork{"a": {id: "a", images: 1}, "b": {id: "b", images: 1}},
-			enabled: true,
+			ids:  map[string]string{"https://example.com/a": "a", "https://example.com/b": "b"},
+			arts: map[string]*stubArtwork{"a": {id: "a", images: 1}, "b": {id: "b", images: 1}},
 		}
 
 		deps.match = matchProvider(provider)
@@ -586,9 +582,8 @@ var _ = Describe("Sending posts", func() {
 
 	It("delivers DMs through the DM guild without reposts or crossposts", func() {
 		provider := &stubProvider{
-			ids:     map[string]string{"https://example.com/a": "a"},
-			arts:    map[string]*stubArtwork{"a": {id: "a", images: 1}},
-			enabled: true,
+			ids:  map[string]string{"https://example.com/a": "a"},
+			arts: map[string]*stubArtwork{"a": {id: "a", images: 1}},
 		}
 
 		deps.match = matchProvider(provider)
@@ -622,9 +617,8 @@ var _ = Describe("Failed renders", func() {
 		poster, deps = newTestPoster()
 
 		provider = &stubProvider{
-			ids:     map[string]string{"https://example.com/poison": "poison"},
-			arts:    map[string]*stubArtwork{"poison": {id: "poison", images: 1, renderErr: errors.New("render boom")}},
-			enabled: true,
+			ids:  map[string]string{"https://example.com/poison": "poison"},
+			arts: map[string]*stubArtwork{"poison": {id: "poison", images: 1, renderErr: errors.New("render boom")}},
 		}
 
 		deps.match = matchProvider(provider)
@@ -632,8 +626,8 @@ var _ = Describe("Failed renders", func() {
 
 	It("aborts Send without side effects", func() {
 		deps.detector.found["channel-1\x00poison"] = &repost.Repost{ID: "poison", URL: "https://example.com/poison"}
-		deps.guilds.guild.Repost = store.GuildRepostEnabled
-		deps.guilds.guild.Crosspost = true
+		deps.guilds.guild.Repost.Mode = store.RepostNotify
+		deps.guilds.guild.Posting.Crosspost = true
 		deps.users.user.Groups = []*store.Group{{Name: "g", Parent: "channel-1", Children: []string{"ch1"}}}
 		deps.users.user.Crosspost = true
 		deps.fake.ChannelGuilds = map[string]string{"ch1": "g1"}
@@ -650,7 +644,7 @@ var _ = Describe("Failed renders", func() {
 	})
 
 	It("aborts one crosspost channel without touching the rest", func() {
-		deps.guilds.guild = &store.Guild{ID: "g1", Limit: 10, Crosspost: true}
+		deps.guilds.guild = &store.Guild{ID: "g1", Posting: store.Posting{Limit: 10, Crosspost: true}}
 		deps.fake.ChannelGuilds = map[string]string{"ch1": "g1"}
 		deps.fake.Members = map[sender.MemberKey]bool{{GuildID: "g1", UserID: "u1"}: true}
 		deps.users.user = &store.User{ID: "u1"}
@@ -668,7 +662,7 @@ var _ = Describe("Recording reposts", func() {
 		poster   *Poster
 		deps     *testDeps
 		provider *stubProvider
-		guild    = &store.Guild{ID: "guild-1", Limit: 10, Repost: store.GuildRepostEnabled}
+		guild    = &store.Guild{ID: "guild-1", Posting: store.Posting{Limit: 10}, Repost: store.Repost{Mode: store.RepostNotify}}
 	)
 
 	BeforeEach(func() {
@@ -679,9 +673,8 @@ var _ = Describe("Recording reposts", func() {
 				"https://example.com/good": "good",
 				"https://example.com/bad":  "bad",
 			},
-			arts:    map[string]*stubArtwork{"good": {id: "good", images: 1}},
-			fail:    map[string]error{"bad": errors.New("provider boom")},
-			enabled: true,
+			arts: map[string]*stubArtwork{"good": {id: "good", images: 1}},
+			fail: map[string]error{"bad": errors.New("provider boom")},
 		}
 
 		deps.match = matchProvider(provider)
@@ -719,9 +712,10 @@ var _ = Describe("Recording reposts", func() {
 	})
 
 	It("records reposts for disabled providers without fetching", func() {
-		provider.enabled = false
+		disabled := *guild
+		disabled.DisabledProviders = []string{"stub"}
 
-		results, err := poster.fetch(context.Background(), guild, "channel-1",
+		results, err := poster.fetch(context.Background(), &disabled, "channel-1",
 			[]string{"https://example.com/good"}, runOpts{messageID: "event-1"})
 
 		Expect(err).NotTo(HaveOccurred())
@@ -733,10 +727,11 @@ var _ = Describe("Recording reposts", func() {
 	})
 
 	It("reports known reposts for disabled providers without fetching", func() {
-		provider.enabled = false
+		disabled := *guild
+		disabled.DisabledProviders = []string{"stub"}
 		deps.detector.found["channel-1\x00good"] = &repost.Repost{ID: "good", URL: "https://example.com/good"}
 
-		results, err := poster.fetch(context.Background(), guild, "channel-1",
+		results, err := poster.fetch(context.Background(), &disabled, "channel-1",
 			[]string{"https://example.com/good"}, runOpts{messageID: "event-1"})
 
 		Expect(err).NotTo(HaveOccurred())
@@ -785,7 +780,7 @@ var _ = Describe("Fetching in order, once each", func() {
 		poster   *Poster
 		deps     *testDeps
 		provider *stubProvider
-		guild    = &store.Guild{ID: "guild-1", Limit: 10}
+		guild    = &store.Guild{ID: "guild-1", Posting: store.Posting{Limit: 10}}
 	)
 
 	BeforeEach(func() {
@@ -800,8 +795,7 @@ var _ = Describe("Fetching in order, once each", func() {
 				"slow": {id: "slow", images: 1},
 				"fast": {id: "fast", images: 1},
 			},
-			delays:  map[string]time.Duration{"slow": 80 * time.Millisecond},
-			enabled: true,
+			delays: map[string]time.Duration{"slow": 80 * time.Millisecond},
 		}
 
 		deps.match = matchProvider(provider)

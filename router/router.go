@@ -386,19 +386,15 @@ func resolveUserTarget(ctx *Context, m *discordgo.MessageCreate, args string) er
 	return nil
 }
 
-// componentPrefix namespaces the router's own component custom IDs.
-const componentPrefix = "rt:"
-
-// HandleInteraction runs application commands and the router's own
-// components (custom IDs starting with componentPrefix). It ignores
-// everything else, so it can share a session with your own component and
-// modal handlers.
+// HandleInteraction runs application commands and the components and
+// modals built with ComponentID. It ignores everything else, so it can
+// share a session with your own component and modal handlers.
 func (r *Router) HandleInteraction(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	if i == nil || i.Interaction == nil {
 		return
 	}
 	switch {
-	case i.Type == discordgo.InteractionMessageComponent:
+	case i.Type == discordgo.InteractionMessageComponent || i.Type == discordgo.InteractionModalSubmit:
 		r.handleComponent(s, i)
 	case i.Type == discordgo.InteractionApplicationCommand && !r.cfg.DisableSlashCommands:
 		r.handleCommand(s, i)
@@ -462,25 +458,6 @@ func (r *Router) handleCommand(s *discordgo.Session, i *discordgo.InteractionCre
 	}
 
 	r.dispatch(ctx, parseErr)
-}
-
-// handleComponent routes a component to the root command named in its
-// custom ID. Components skip middleware, so it recovers panics itself.
-func (r *Router) handleComponent(s *discordgo.Session, i *discordgo.InteractionCreate) {
-	rest, ok := strings.CutPrefix(i.MessageComponentData().CustomID, componentPrefix)
-	if !ok {
-		return
-	}
-	name, args, _ := strings.Cut(rest, ":")
-
-	cmds := r.Commands()
-	idx := slices.IndexFunc(cmds, func(c *Command) bool { return c.Name == name && c.component != nil })
-	if idx < 0 {
-		return
-	}
-
-	defer func() { _ = recover() }()
-	cmds[idx].component(r, s, i, args)
 }
 
 // dispatch runs middleware, then checks and cooldowns, then the handler.

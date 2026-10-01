@@ -246,7 +246,7 @@ var _ = Describe("Posting", func() {
 		ctx := context.Background()
 		Expect(h.ensureGuild(ctx, func(g *store.Guild) {
 			baselineGuild(g)
-			g.Repost = store.GuildRepostStrict
+			g.Repost.Mode = store.RepostStrict
 		})).To(Succeed())
 
 		stub := newStubProvider()
@@ -320,7 +320,7 @@ var _ = Describe("Posting", func() {
 		ctx := context.Background()
 		Expect(h.ensureGuild(ctx, func(g *store.Guild) {
 			baselineGuild(g)
-			g.Reactions = true
+			g.Posting.Reactions = true
 		})).To(Succeed())
 
 		stub := newStubProvider()
@@ -360,7 +360,7 @@ var _ = Describe("Reposts", func() {
 		ctx := context.Background()
 		Expect(h.ensureGuild(ctx, func(g *store.Guild) {
 			baselineGuild(g)
-			g.Repost = store.GuildRepostDisabled
+			g.Repost.Mode = store.RepostOff
 		})).To(Succeed())
 
 		stub := newStubProvider()
@@ -388,13 +388,15 @@ var _ = Describe("Reposts", func() {
 
 	It("warns about reposts without sending when the provider is disabled", func() {
 		ctx := context.Background()
-		Expect(h.ensureGuild(ctx, baselineGuild)).To(Succeed())
+		Expect(h.ensureGuild(ctx, func(g *store.Guild) {
+			baselineGuild(g)
+			g.DisabledProviders = []string{"stub"}
+		})).To(Succeed())
 
 		stub := newStubProvider()
 		artURL := uniqueURL("repost-disabled")
 
 		stub.add(artURL, "dis", &stubArtwork{previews: []string{"https://example.com/d.png"}})
-		stub.setEnabled(false)
 
 		detector := newDetector()
 
@@ -424,7 +426,7 @@ var _ = Describe("Reposts", func() {
 		ctx := context.Background()
 		Expect(h.ensureGuild(ctx, func(g *store.Guild) {
 			baselineGuild(g)
-			g.Repost = store.GuildRepostStrict
+			g.Repost.Mode = store.RepostStrict
 		})).To(Succeed())
 
 		stub := newStubProvider()
@@ -464,10 +466,10 @@ var _ = Describe("Reposts", func() {
 
 	It("forgets reposts after expiry", func() {
 		ctx := context.Background()
-		Expect(h.ensureGuild(ctx, func(g *store.Guild) {
-			baselineGuild(g)
-			g.RepostExpiration = time.Second
-		})).To(Succeed())
+		Expect(h.ensureGuild(ctx, baselineGuild)).To(Succeed())
+
+		// The store keeps TTLs at a minute or more; shorten it in memory.
+		guilds := guildOverride{GuildStore: h.store, mutate: func(g *store.Guild) { g.Repost.TTL = time.Second }}
 
 		stub := newStubProvider()
 		artURL := uniqueURL("repost-expiry")
@@ -478,7 +480,7 @@ var _ = Describe("Reposts", func() {
 
 		seed1 := seedChannel(h, h.cfg.channelID, "expiry-1")
 
-		first, err := h.newPoster(stub, detector, nil).Send(ctx, h.newRun(h.cfg.channelID, seed1.ID, artURL))
+		first, err := h.newPosterWith(guilds, stub, detector, nil).Send(ctx, h.newRun(h.cfg.channelID, seed1.ID, artURL))
 		Expect(err).NotTo(HaveOccurred())
 		Expect(first).To(HaveLen(1))
 		cleanupSent(h, first)
@@ -487,7 +489,7 @@ var _ = Describe("Reposts", func() {
 
 		seed2 := seedChannel(h, h.cfg.channelID, "expiry-2")
 
-		second, err := h.newPoster(stub, detector, nil).Send(ctx, h.newRun(h.cfg.channelID, seed2.ID, artURL))
+		second, err := h.newPosterWith(guilds, stub, detector, nil).Send(ctx, h.newRun(h.cfg.channelID, seed2.ID, artURL))
 		Expect(err).NotTo(HaveOccurred())
 		Expect(second).To(HaveLen(1))
 		cleanupSent(h, second)
@@ -538,7 +540,7 @@ var _ = Describe("Reposts", func() {
 		ctx := context.Background()
 		Expect(h.ensureGuild(ctx, func(g *store.Guild) {
 			baselineGuild(g)
-			g.Limit = 2
+			g.Posting.Limit = 2
 		})).To(Succeed())
 
 		stub := newStubProvider()

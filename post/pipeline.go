@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"slices"
 	"strings"
 
 	"github.com/VTGare/boe-tea-go/artworks"
@@ -154,7 +153,7 @@ func (r *Poster) doFetch(ctx context.Context, guild *store.Guild, channelID stri
 
 	needsCreate := false
 
-	if guild.Repost != store.GuildRepostDisabled {
+	if guild.Repost.Mode != store.RepostOff {
 		rep, err := r.deps.Reposts.Find(ctx, channelID, job.id)
 		if err != nil && !errors.Is(err, repost.ErrNotFound) {
 			log.With("error", err).Error("failed to find a repost")
@@ -163,7 +162,7 @@ func (r *Poster) doFetch(ctx context.Context, guild *store.Guild, channelID stri
 		if rep != nil {
 			slot.rep = rep
 
-			if opts.isCrosspost || guild.Repost == store.GuildRepostStrict {
+			if opts.isCrosspost || guild.Repost.Mode == store.RepostStrict {
 				return slot
 			}
 		} else {
@@ -174,9 +173,9 @@ func (r *Poster) doFetch(ctx context.Context, guild *store.Guild, channelID stri
 	_, isTwitter := job.provider.(*twitter.Twitter)
 
 	// Twitter crossposts bypass guild settings by design.
-	if !job.provider.Enabled(guild) && !opts.isCommand && !(opts.isCrosspost && isTwitter) {
+	if !guild.ProviderEnabled(job.provider.Info().Key) && !opts.isCommand && !(opts.isCrosspost && isTwitter) {
 		// While not ideal because it records fetch failures and imageless tweets, we still want
-		// to record the sighting of a link even if the provider is disabled. 
+		// to record the sighting of a link even if the provider is disabled.
 		if needsCreate {
 			r.createRepost(ctx, guild, channelID, job, opts.messageID)
 		}
@@ -219,7 +218,7 @@ func (r *Poster) createRepost(ctx context.Context, guild *store.Guild, channelID
 		MessageID: messageID,
 	}
 
-	if err := r.deps.Reposts.Create(ctx, rep, guild.RepostExpiration); err != nil {
+	if err := r.deps.Reposts.Create(ctx, rep, guild.Repost.TTL); err != nil {
 		r.log.With(
 			"guild_id", guild.ID,
 			"channel_id", channelID,
@@ -285,7 +284,7 @@ func (r *Poster) deliver(guild *store.Guild, channelID string, items []fetchedIt
 
 	// Only the first bundle is filtered since this code path can only be reached through a command.
 	bundles[0].Sends = applySkip(bundles[0].Sends, run.Skip)
-	bundles = applyLimit(bundles, guild.Limit)
+	bundles = applyLimit(bundles, guild.Posting.Limit)
 
 	if opts.isCrosspost && len(bundles) > 0 && len(bundles[0].Sends) > 0 {
 		first := bundles[0].Sends[0]
@@ -351,8 +350,8 @@ func (r *Poster) generateMessages(guild *store.Guild, items []fetchedItem, run P
 		}
 
 		var quote string
-		if guild.FlavorText && r.deps.RandomQuote != nil {
-			quote = r.deps.RandomQuote(guild.NSFW)
+		if guild.Posting.Quotes && r.deps.RandomQuote != nil {
+			quote = r.deps.RandomQuote(guild.Posting.NSFWQuotes)
 		}
 
 		rendered, err := item.artwork.Render()
@@ -373,7 +372,7 @@ func (r *Poster) generateMessages(guild *store.Guild, items []fetchedItem, run P
 
 func renderOptions(guild *store.Guild, run Post, opts runOpts) render.Options {
 	renderOpts := render.Options{
-		TagsEnabled: guild.Tags,
+		TagsEnabled: guild.Posting.Tags,
 		Crosspost:   opts.isCrosspost,
 	}
 
@@ -392,7 +391,7 @@ func renderOptions(guild *store.Guild, run Post, opts runOpts) render.Options {
 }
 
 func skipFirst(guild *store.Guild, a artworks.Artwork, opts runOpts) bool {
-	if !guild.SkipFirst {
+	if !guild.Posting.SkipFirstTweet {
 		return false
 	}
 
@@ -494,7 +493,7 @@ func (r *Poster) notifyReposts(guild *store.Guild, run Post, reps []*repost.Repo
 
 	errs := make([]error, 0)
 
-	if guild.Repost == store.GuildRepostStrict && !run.IsInteraction {
+	if guild.Repost.Mode == store.RepostStrict && !run.IsInteraction {
 		perm, err := r.deps.Sender.BotHasGuildPerms(
 			guild.ID,
 			discordgo.PermissionAdministrator|discordgo.PermissionManageMessages,
@@ -569,7 +568,7 @@ func (r *Poster) finalize(run Post, guild *store.Guild, pages []sentPage, fetche
 
 	errs := make([]error, 0)
 
-	if guild.Reactions && !opts.isCommand && !opts.isCrosspost && fetched.originTwitter {
+	if guild.Posting.Reactions && !opts.isCommand && !opts.isCrosspost && fetched.originTwitter {
 		if err := r.addBookmarkReactions(run.GuildID, run.ChannelID, run.MessageID); err != nil {
 			r.log.With("error", err).Debug("failed to add bookmark reactions")
 
@@ -577,7 +576,7 @@ func (r *Poster) finalize(run Post, guild *store.Guild, pages []sentPage, fetche
 		}
 	}
 
-	if guild.Reactions && len(pages) > 0 {
+	if guild.Posting.Reactions && len(pages) > 0 {
 		mediaCount := 0
 		for _, item := range fetched.items {
 			if item.artwork == nil {
@@ -666,11 +665,11 @@ func (r *Poster) crosspostOne(ctx context.Context, run Post, userID, groupName, 
 		return crossSlot{}
 	}
 
-	if !guild.Crosspost {
+	if !guild.Posting.Crosspost {
 		return crossSlot{}
 	}
 
-	if len(guild.ArtChannels) != 0 && !slices.Contains(guild.ArtChannels, channelID) {
+	if !guild.PostsIn(channelID) {
 		return crossSlot{}
 	}
 
