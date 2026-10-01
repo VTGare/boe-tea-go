@@ -273,11 +273,22 @@ func (r *Router) dispatchMessage(s *discordgo.Session, m *discordgo.MessageCreat
 	var parseErr error
 	i := 1
 	for cmd.IsGroup() {
+		var sub *Command
+		if i < len(toks) {
+			sub = cmd.Subcommand(toks[i].text)
+		}
+
+		if sub == nil && cmd.Default != "" {
+			if def := cmd.Subcommand(cmd.Default); !def.DisablePrefix {
+				cmd = def
+				continue
+			}
+		}
+
 		if i >= len(toks) {
 			parseErr = &SubcommandError{Command: cmd}
 			break
 		}
-		sub := cmd.Subcommand(toks[i].text)
 		if sub == nil || sub.DisablePrefix {
 			parseErr = &SubcommandError{Command: cmd, Given: toks[i].text}
 			break

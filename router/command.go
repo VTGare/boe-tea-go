@@ -88,6 +88,11 @@ type Command struct {
 	// Subcommands turn this into a group: no options or handler allowed,
 	// at most two levels deep (command > group > sub).
 	Subcommands []*Command
+	// Default is the subcommand a prefix invocation runs when no
+	// subcommand is given, e.g. "bt!groups" runs "bt!groups list". If the
+	// next word isn't a subcommand, it's passed to the default as an
+	// argument: "bt!bookmarks popularity" runs "bt!bookmarks list popularity".
+	Default string
 	// Required for non-group commands.
 	Handler Handler
 	// Group checks also guard its subcommands.
@@ -213,6 +218,9 @@ func (c *Command) Usage(lead string) string {
 		parts = append(parts, "<subcommand>")
 	}
 	for _, o := range c.Options {
+		if o.NoPrefix && lead != "/" {
+			continue
+		}
 		parts = append(parts, o.usage())
 	}
 	return strings.Join(parts, " ")
@@ -317,6 +325,8 @@ func (c *Command) validateGroup(depth int) error {
 		return fmt.Errorf("router: %q: group commands cannot have a handler", c.Name)
 	case len(c.Subcommands) > maxEntries:
 		return fmt.Errorf("router: %q: at most %d subcommands are allowed", c.Name, maxEntries)
+	case c.Default != "" && c.Subcommand(c.Default) == nil:
+		return fmt.Errorf("router: %q: default subcommand %q not found", c.Name, c.Default)
 	}
 
 	seen := make(map[string]bool)

@@ -452,6 +452,16 @@ func (c *Context) ReplyEmbed(embed *discordgo.MessageEmbed) error { return c.Rep
 
 func (c *Context) ReplyEphemeral(content string) error { return c.Reply(Text(content).Private()) }
 
+// SetEphemeral decides at runtime whether replies are invoker-only, e.g.
+// from an option. Discord fixes it with the first response (including
+// Defer), so call it before that. No effect over prefix.
+func (c *Context) SetEphemeral(on bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.ephemeral = on
+}
+
 // Defer gives the handler up to 15 minutes by showing "thinking…" (or
 // typing, over prefix). Calling it twice does nothing.
 func (c *Context) Defer() error {

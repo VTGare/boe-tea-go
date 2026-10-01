@@ -70,6 +70,10 @@ func parsePrefixOptions(ctx *Context, cmd *Command, raw string) (*Options, error
 	attachmentIdx := 0
 
 	for _, o := range cmd.Options {
+		if o.NoPrefix {
+			continue
+		}
+
 		if o.Type == OptionAttachment {
 			atts := ctx.messageAttachments()
 			if attachmentIdx < len(atts) {

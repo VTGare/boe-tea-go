@@ -39,4 +39,32 @@ var _ = Describe("RegisterCommands", func() {
 			}
 		}
 	})
+
+	It("keeps the old prefix names of merged commands", func() {
+		b := &bot.Bot{Router: router.New(router.Config{}), ArtworkProviders: realProviders()}
+		RegisterCommands(b)
+
+		for _, name := range []string{
+			"share", "si", "shareexclude", "ex", "crosspostexclude", "cp",
+			"unbookmark", "unfav", "userset", "ls",
+		} {
+			Expect(b.Router.Lookup(name)).NotTo(BeNil(), name)
+		}
+	})
+
+	It("registers only the merged slash commands", func() {
+		b := &bot.Bot{Router: router.New(router.Config{}), ArtworkProviders: realProviders()}
+		RegisterCommands(b)
+
+		global, _ := b.Router.ApplicationCommands()
+		names := make([]string, 0, len(global))
+		for _, c := range global {
+			names = append(names, c.Name)
+		}
+
+		Expect(names).To(ContainElements("share", "groups", "bookmarks", "profile", "Find Sauce", "Find Sauce (Private)"))
+		for _, old := range []string{"shareexclude", "crosspostexclude", "newgroup", "unbookmark", "userset"} {
+			Expect(names).NotTo(ContainElement(old))
+		}
+	})
 })

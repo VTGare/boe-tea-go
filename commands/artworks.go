@@ -78,44 +78,53 @@ func artworksGroup(b *bot.Bot) []*router.Command {
 			Name:        "share",
 			Category:    "Artworks",
 			Aliases:     []string{"pixiv", "twitter", "include", "shareinclude", "si"},
-			Description: "Shares an artwork from a URL, optionally includes some images.",
+			Description: "Shares an artwork from a URL, optionally picking which images to post.",
 			Cooldown:    router.NewCooldown(router.CooldownUser, 1, 5*time.Second),
 			Defer:       true,
 			Options: []*router.Option{
 				router.String("url", "Artwork URL").Require(),
-				router.String("indices", "Images to include, e.g. 1-3 5").Greedy(),
+				router.String("images", "Images to post, e.g. 1-3 5").Greedy(),
+				router.String("mode", "Post only the listed images, or all but them").SlashOnly().WithChoices(
+					router.Choice{Name: "include", Value: "include"},
+					router.Choice{Name: "exclude", Value: "exclude"},
+				),
+				router.String("skip_channels", "Crosspost channels to skip").SlashOnly(),
 			},
 			Examples: []string{"share https://pixiv.net/artworks/86341538 1-3 5"},
 			Handler:  share(b, post.SkipModeInclude),
 		},
+
+		// Kept as prefix-only commands for legacy reasons.
 		{
-			Name:        "shareexclude",
-			Category:    "Artworks",
-			Aliases:     []string{"exclude", "ex"},
-			Description: "Shares an artwork from a URL, optionally excludes some images.",
-			Cooldown:    router.NewCooldown(router.CooldownUser, 1, 5*time.Second),
-			Defer:       true,
+			Name:         "shareexclude",
+			Category:     "Artworks",
+			Aliases:      []string{"exclude", "ex"},
+			Description:  "Shares an artwork from a URL, optionally excludes some images.",
+			Cooldown:     router.NewCooldown(router.CooldownUser, 1, 5*time.Second),
+			Defer:        true,
+			DisableSlash: true,
 			Options: []*router.Option{
 				router.String("url", "Artwork URL").Require(),
-				router.String("indices", "Images to exclude, e.g. 1-3 5").Greedy(),
+				router.String("images", "Images to exclude, e.g. 1-3 5").Greedy(),
 			},
 			Examples: []string{"shareexclude https://pixiv.net/artworks/86341538 1"},
 			Handler:  share(b, post.SkipModeExclude),
 		},
 		{
-			Name:        "crosspostexclude",
-			Category:    "Artworks",
-			Aliases:     []string{"crosspost", "cp", "cpex"},
-			Description: "Shares an artwork from a URL without crossposting.",
-			Checks:      []router.Check{router.GuildOnly},
-			Cooldown:    router.NewCooldown(router.CooldownUser, 1, 5*time.Second),
-			Defer:       true,
+			Name:         "crosspostexclude",
+			Category:     "Artworks",
+			Aliases:      []string{"crosspost", "cp", "cpex"},
+			Description:  "Shares an artwork from a URL without crossposting.",
+			Checks:       []router.Check{router.GuildOnly},
+			Cooldown:     router.NewCooldown(router.CooldownUser, 1, 5*time.Second),
+			Defer:        true,
+			DisableSlash: true,
 			Options: []*router.Option{
 				router.String("url", "Artwork URL").Require(),
-				router.String("channels", "Channels to exclude").Greedy(),
+				router.String("skip_channels", "Channels to exclude").Greedy(),
 			},
 			Examples: []string{"crosspostexclude https://pixiv.net/artworks/86341538 #seiso-channel"},
-			Handler:  crosspostExclude(b),
+			Handler:  share(b, post.SkipModeInclude),
 		},
 	}
 }
@@ -192,39 +201,26 @@ func parseSkipIndices(raw string) (map[int]struct{}, error) {
 	return indices, nil
 }
 
-func share(b *bot.Bot, skip post.SkipMode) router.Handler {
+// share posts an artwork. defaultMode is the prefix command's skip mode;
+// the slash command picks one with the mode option instead.
+func share(b *bot.Bot, defaultMode post.SkipMode) router.Handler {
 	return func(ctx *router.Context) error {
-		indices, err := parseSkipIndices(ctx.Options.String("indices"))
+		indices, err := parseSkipIndices(ctx.Options.String("images"))
 		if err != nil {
 			return err
 		}
 
-		p := post.NewPoster(post.DepsFromBot(b))
-		run := post.RunFromMessage(runMessage(ctx), []string{dgoutils.TrimmerRaw(ctx.Options.String("url"))}, true)
-		run.Skip = post.SkipFilter{Mode: skip, Indices: indices}
-		run.IsInteraction = ctx.IsInteraction()
-
-		reqCtx, cancel := context.WithTimeout(ctx.Context(), 30*time.Second)
-		defer cancel()
-
-		sent, err := p.Send(reqCtx, run)
-		post.CacheResult(b.EmbedCache, run.AuthorID, run.ChannelID, run.MessageID, sent)
-
-		if err != nil {
-			return err
+		mode := defaultMode
+		if ctx.Options.String("mode") == "exclude" {
+			mode = post.SkipModeExclude
 		}
 
-		return shareAck(ctx, run)
-	}
-}
-
-func crosspostExclude(b *bot.Bot) router.Handler {
-	return func(ctx *router.Context) error {
 		p := post.NewPoster(post.DepsFromBot(b))
 		run := post.RunFromMessage(runMessage(ctx), []string{dgoutils.TrimmerRaw(ctx.Options.String("url"))}, true)
+		run.Skip = post.SkipFilter{Mode: mode, Indices: indices}
 		run.IsInteraction = ctx.IsInteraction()
 
-		for _, arg := range strings.Fields(ctx.Options.String("channels")) {
+		for arg := range strings.FieldsSeq(ctx.Options.String("skip_channels")) {
 			run.ExcludedChannels = append(run.ExcludedChannels, dgoutils.TrimmerRaw(arg))
 		}
 

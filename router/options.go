@@ -45,8 +45,13 @@ type Option struct {
 	MinLength *int
 	MaxLength *int
 	// Consume the rest of the message over prefix (string only). Only
-	// attachments may follow it. Ignored by slash commands.
+	// attachments and slash-only options may follow it. Ignored by slash
+	// commands.
 	Rest bool
+	// Skip the option over prefix, where it keeps its zero value. Lets a
+	// slash command take extra options without breaking the positional
+	// prefix syntax. Cannot be required.
+	NoPrefix bool
 }
 
 // Declare options fluently, e.g.
@@ -92,6 +97,8 @@ func Attachment(name, description string) *Option {
 func (o *Option) Require() *Option { o.Required = true; return o }
 
 func (o *Option) Greedy() *Option { o.Rest = true; return o }
+
+func (o *Option) SlashOnly() *Option { o.NoPrefix = true; return o }
 
 func (o *Option) WithChoices(choices ...Choice) *Option { o.Choices = choices; return o }
 
@@ -178,14 +185,18 @@ func validateOptions(opts []*Option) error {
 			seenOptional = true
 		}
 
+		if o.NoPrefix && o.Required {
+			return fmt.Errorf("option %q: slash-only options cannot be required", o.Name)
+		}
+
 		if o.Rest {
 			if o.Type != OptionString {
 				return fmt.Errorf("option %q: only string options can be greedy", o.Name)
 			}
 
 			for _, after := range opts[i+1:] {
-				if after != nil && after.Type != OptionAttachment {
-					return fmt.Errorf("option %q: only attachments may follow a greedy option", o.Name)
+				if after != nil && after.Type != OptionAttachment && !after.NoPrefix {
+					return fmt.Errorf("option %q: only attachments and slash-only options may follow a greedy option", o.Name)
 				}
 			}
 		}

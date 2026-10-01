@@ -7,7 +7,7 @@ import (
 func UserGroupsEmbed(username string) *UserGroups {
 	return &UserGroups{
 		Title:       fmt.Sprintf("%v's groups", username),
-		Description: "To add a new group use `bt!newgroup` or `bt!newpair` command.",
+		Description: "To add a new group use `/groups create` or `/groups pair`.",
 		Group:       "Group",
 		Pair:        "Pair",
 		Parent:      "Parent",

@@ -99,12 +99,12 @@ var embeds = map[Language]map[EmbedType]any{
 
 		bookmarkAdded: &BaseEmbed{
 			Title:       "💖 Successfully bookmarked an artwork",
-			Description: "If you dislike direct messages, disable them by running `bt!userset dm off` command",
+			Description: "If you dislike direct messages, disable them by running `/profile dm off`",
 		},
 
 		bookmarkRemoved: &BaseEmbed{
 			Title:       "💔 Successfully removed a bookmark",
-			Description: "If you dislike direct messages, disable them by running `bt!userset dm off` command",
+			Description: "If you dislike direct messages, disable them by running `/profile dm off`",
 		},
 	},
 }

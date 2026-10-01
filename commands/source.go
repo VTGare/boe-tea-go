@@ -32,10 +32,10 @@ func sourceGroup(b *bot.Bot) []*router.Command {
 			Aliases:     []string{"saucenao"},
 			Description: "Search sauce on SauceNAO",
 			Cooldown:    router.NewCooldown(router.CooldownUser, 1, 5*time.Second),
-			Defer:       true,
 			Options: []*router.Option{
 				router.String("url", "Image URL or Discord message link").Greedy(),
 				router.Attachment("image", "Image to look up"),
+				router.Boolean("private", "Only you can see the results").SlashOnly(),
 			},
 			Examples: []string{"sauce https://imagehosting.com/animegirl.png"},
 			Handler:  sauce(b),
@@ -46,14 +46,31 @@ func sourceGroup(b *bot.Bot) []*router.Command {
 			Type:        router.MessageContext,
 			Description: "Find the source of images in a message",
 			Cooldown:    router.NewCooldown(router.CooldownUser, 1, 5*time.Second),
-			Defer:       true,
 			Handler:     sauce(b),
+		},
+		{
+			Name:          "Find Sauce (Private)",
+			Category:      "Source",
+			Type:          router.MessageContext,
+			Description:   "Find the source of images in a message, only you see the results",
+			Cooldown:      router.NewCooldown(router.CooldownUser, 1, 5*time.Second),
+			Ephemeral:     true,
+			DisablePrefix: true,
+			Handler:       sauce(b),
 		},
 	}
 }
 
 func sauce(b *bot.Bot) router.Handler {
 	return func(ctx *router.Context) error {
+		if ctx.Options.Bool("private") {
+			ctx.SetEphemeral(true)
+		}
+
+		if err := ctx.Defer(); err != nil {
+			return err
+		}
+
 		if ctx.TargetMessage != nil {
 			url, ok := findImage(ctx.Session, ctx.TargetMessage, nil)
 			if !ok {

@@ -27,35 +27,26 @@ func userGroup(b *bot.Bot) []*router.Command {
 		return router.NewCooldown(router.CooldownUser, 1, 10*time.Second)
 	}
 
-	return []*router.Command{
+	groupCommands := []*router.Command{
 		{
-			Name:        "groups",
-			Category:    "User",
-			Aliases:     []string{"ls", "list"},
+			Name:        "list",
 			Description: "Shows all crosspost groups.",
-			Cooldown:    userCooldown(),
-			Examples:    []string{"groups"},
+			Examples:    []string{"groups list"},
 			Handler:     groups(b),
 		},
 		{
-			Name:        "newgroup",
-			Category:    "User",
-			Aliases:     []string{"addgroup", "create"},
+			Name:        "create",
 			Description: "Creates a new crosspost group.",
-			Cooldown:    userCooldown(),
 			Options: []*router.Option{
 				router.String("name", "Group name").Require(),
 				router.Channel("parent", "Parent channel").Require(),
 			},
-			Examples: []string{"newgroup lewds #nsfw"},
+			Examples: []string{"groups create lewds #nsfw"},
 			Handler:  newGroup(b),
 		},
 		{
-			Name:        "newpair",
-			Category:    "User",
-			Aliases:     []string{"addpair"},
+			Name:        "pair",
 			Description: "Creates a new crosspost pair.",
-			Cooldown:    userCooldown(),
 			Options: []*router.Option{
 				router.String("name", "Pair name").Require(),
 				router.Channel("first", "First channel").Require().
@@ -63,86 +54,74 @@ func userGroup(b *bot.Bot) []*router.Command {
 				router.Channel("second", "Second channel").Require().
 					WithChannelTypes(discordgo.ChannelTypeGuildText),
 			},
-			Examples: []string{"newpair lewds #nsfw #nsfw-pics"},
+			Examples: []string{"groups pair lewds #nsfw #nsfw-pics"},
 			Handler:  newPair(b),
 		},
 		{
-			Name:        "delgroup",
-			Category:    "User",
+			Name:        "delete",
 			Description: "Deletes a crosspost group.",
-			Cooldown:    userCooldown(),
 			Options: []*router.Option{
 				router.String("name", "Group name").Require(),
 			},
-			Examples: []string{"delgroup schooldays"},
+			Examples: []string{"groups delete schooldays"},
 			Handler:  delGroup(b),
 		},
 		{
-			Name:        "push",
-			Category:    "User",
+			Name:        "add",
 			Description: "Adds channels to a crosspost group.",
-			Cooldown:    userCooldown(),
 			Options: []*router.Option{
 				router.String("group", "Group name").Require(),
 				router.String("channels", "Channels to add").Require().Greedy(),
 			},
-			Examples: []string{"push myCoolGroup #coolchannel #coolerchannel"},
+			Examples: []string{"groups add myCoolGroup #coolchannel #coolerchannel"},
 			Handler:  push(b),
 		},
 		{
 			Name:        "remove",
-			Category:    "User",
-			Aliases:     []string{"pop"},
-			Description: "Removes channels from a crosspost group",
-			Cooldown:    userCooldown(),
+			Description: "Removes channels from a crosspost group.",
 			Options: []*router.Option{
 				router.String("group", "Group name").Require(),
 				router.String("channels", "Channels to remove").Require().Greedy(),
 			},
-			Examples: []string{"remove cuteAnimeGirls #nsfw-channel #cat-pics"},
+			Examples: []string{"groups remove cuteAnimeGirls #nsfw-channel #cat-pics"},
 			Handler:  remove(b),
 		},
 		{
-			Name:        "editparent",
-			Category:    "User",
-			Description: "Changes the parent channel of a crosspost group",
-			Cooldown:    userCooldown(),
+			Name:        "parent",
+			Description: "Changes the parent channel of a crosspost group.",
 			Options: []*router.Option{
 				router.String("group", "Group name").Require(),
 				router.Channel("parent", "New parent channel").Require(),
 			},
-			Examples: []string{"editparent cuteAnimeGirls #anime-pics"},
+			Examples: []string{"groups parent cuteAnimeGirls #anime-pics"},
 			Handler:  editParent(b),
 		},
 		{
 			Name:        "rename",
-			Category:    "User",
-			Description: "Renames a crosspost group",
-			Cooldown:    userCooldown(),
+			Description: "Renames a crosspost group.",
 			Options: []*router.Option{
 				router.String("from", "Current name").Require(),
 				router.String("to", "New name").Require(),
 			},
-			Examples: []string{"rename cuteAnimeGirls AnimeGirls"},
+			Examples: []string{"groups rename cuteAnimeGirls AnimeGirls"},
 			Handler:  rename(b),
 		},
 		{
-			Name:        "copygroup",
-			Category:    "User",
-			Description: "Copies a crosspost group with a different parent channel",
-			Cooldown:    userCooldown(),
+			Name:        "copy",
+			Description: "Copies a crosspost group with a different parent channel.",
 			Options: []*router.Option{
 				router.String("from", "Source group").Require(),
 				router.String("to", "New group").Require(),
 				router.Channel("parent", "New parent channel").Require(),
 			},
-			Examples: []string{"copygroup sfw1 sfw2 #za-warudo"},
+			Examples: []string{"groups copy sfw1 sfw2 #za-warudo"},
 			Handler:  copyGroup(b),
 		},
+	}
+
+	bookmarkCommands := []*router.Command{
 		{
-			Name:        "bookmarks",
-			Category:    "User",
-			Aliases:     []string{"favorites", "favourites", "favs"},
+			Name:        "list",
 			Description: "Shows your bookmarks.",
 			Cooldown:    userCooldown(),
 			Options: []*router.Option{
@@ -165,37 +144,92 @@ func userGroup(b *bot.Bot) []*router.Command {
 					router.Choice{Name: "month", Value: "month"},
 				),
 			},
-			Examples: []string{"bookmarks month time asc"},
+			Examples: []string{"bookmarks list popularity asc"},
 			Handler:  bookmarks(b),
 		},
 		{
-			Name:        "unbookmark",
-			Category:    "User",
-			Aliases:     []string{"unfav", "unfavourite", "unfavorite"},
-			Description: "Remove a bookmark by its ID or URL",
+			Name:        "remove",
+			Description: "Removes a bookmark by its ID or URL.",
 			Cooldown:    router.NewCooldown(router.CooldownUser, 1, 15*time.Second),
 			Options: []*router.Option{
 				router.String("query", "Artwork ID or URL").Require(),
 			},
-			Examples: []string{"unfav 69"},
+			Examples: []string{"bookmarks remove 69"},
 			Handler:  unfav(b),
 		},
+	}
+
+	profileCommands := []*router.Command{
 		{
-			Name:        "userset",
+			Name:        "show",
+			Description: "Shows your settings and stats.",
+			Examples:    []string{"profile"},
+			Handler:     showUserProfile(b),
+		},
+		userToggle(b, "dm", "Sends you a DM when you add or remove a bookmark."),
+		userToggle(b, "crosspost", "Crossposts artworks you share to your crosspost groups."),
+		userToggle(b, "ignore", "Makes Boe Tea ignore artwork links you post."),
+	}
+
+	for _, sub := range slices.Concat(groupCommands, profileCommands) {
+		sub.Cooldown = userCooldown()
+	}
+
+	return []*router.Command{
+		{
+			Name:        "groups",
 			Category:    "User",
-			Aliases:     []string{"profile"},
-			Description: "Changes user's settings.",
-			Cooldown:    userCooldown(),
-			Options: []*router.Option{
-				router.String("setting", "Setting to change").WithChoices(
-					router.Choice{Name: "dm", Value: "dm"},
-					router.Choice{Name: "crosspost", Value: "crosspost"},
-					router.Choice{Name: "ignore", Value: "ignore"},
-				),
-				router.String("value", "New value").Greedy(),
-			},
-			Examples: []string{"userset dm false"},
-			Handler:  userSet(b),
+			Aliases:     []string{"ls", "list"},
+			Description: "Shows or changes your crosspost groups.",
+			Default:     "list",
+			Subcommands: groupCommands,
+		},
+		{
+			Name:        "bookmarks",
+			Category:    "User",
+			Aliases:     []string{"favorites", "favourites", "favs"},
+			Description: "Shows or removes your bookmarks.",
+			Default:     "list",
+			Subcommands: bookmarkCommands,
+		},
+		{
+			Name:        "profile",
+			Category:    "User",
+			Aliases:     []string{"userset"},
+			Description: "Shows or changes your settings.",
+			Default:     "show",
+			Subcommands: profileCommands,
+		},
+		oldPrefixCommand(bookmarkCommands[1], "unbookmark", "unfav", "unfavourite", "unfavorite"),
+	}
+}
+
+// oldPrefixCommand copies a subcommand into a hidden, prefix-only root
+// command under the name it had before it moved into a group.
+func oldPrefixCommand(sub *router.Command, name string, aliases ...string) *router.Command {
+	return &router.Command{
+		Name:         name,
+		Category:     "User",
+		Aliases:      aliases,
+		Description:  sub.Description,
+		Cooldown:     sub.Cooldown,
+		Options:      sub.Options,
+		Handler:      sub.Handler,
+		DisableSlash: true,
+		Hidden:       true,
+	}
+}
+
+func userToggle(b *bot.Bot, setting, description string) *router.Command {
+	return &router.Command{
+		Name:        setting,
+		Description: description,
+		Options: []*router.Option{
+			router.Boolean("value", "On or off").Require(),
+		},
+		Examples: []string{"profile " + setting + " off"},
+		Handler: func(ctx *router.Context) error {
+			return changeUserSettings(b, ctx, setting, ctx.Options.Bool("value"))
 		},
 	}
 }
@@ -231,7 +265,8 @@ func groups(b *bot.Bot) router.Handler {
 				category = locale.Pair
 			} else {
 				category = locale.Group
-				parent = fmt.Sprintf("**%v:** %v\n",
+				parent = fmt.Sprintf(
+					"**%v:** %v\n",
 					locale.Parent,
 					fmt.Sprintf("<#%v> | `%v`", group.Parent, group.Parent),
 				)
@@ -239,7 +274,8 @@ func groups(b *bot.Bot) router.Handler {
 			}
 
 			name := fmt.Sprintf("%v «%v»", category, group.Name)
-			desc := fmt.Sprintf("%v %v %v",
+			desc := fmt.Sprintf(
+				"%v %v %v",
 				parent,
 				children,
 				strings.Join(arrays.Map(group.Children, func(s string) string {
@@ -621,7 +657,8 @@ func copyGroup(b *bot.Bot) router.Handler {
 			return messages.ErrUserEditGroupFail(cmd, src, dest)
 		}
 
-		return successMessage(ctx,
+		return successMessage(
+			ctx,
 			messages.UserCopyGroupSuccess(src, dest, newGroup.Children),
 		)
 	}
@@ -763,63 +800,49 @@ func loadBookmarkPage(ctx context.Context, b *bot.Bot, bookmarks []*store.Bookma
 	return nil
 }
 
-func userSet(b *bot.Bot) router.Handler {
+func showUserProfile(b *bot.Bot) router.Handler {
 	return func(ctx *router.Context) error {
-		setting := ctx.Options.String("setting")
-		if setting == "" {
-			return showUserProfile(b, ctx)
+		reqCtx, cancel := context.WithTimeout(ctx.Context(), 20*time.Second)
+		defer cancel()
+
+		user, err := b.Store.User(reqCtx, ctx.AuthorID())
+		if err != nil {
+			return err
 		}
 
-		value := ctx.Options.String("value")
-		if value == "" {
-			return messages.ErrIncorrectCmd(ctx.Command)
+		bookmarks, err := b.Store.CountBookmarks(reqCtx, ctx.AuthorID())
+		if err != nil {
+			return err
 		}
 
-		return changeUserSettings(b, ctx, setting, value)
+		locale := messages.UserProfileEmbed(ctx.Author().Username)
+		eb := embeds.NewBuilder()
+		eb.Title(locale.Title)
+		eb.Thumbnail(ctx.Author().AvatarURL(""))
+
+		eb.AddField(
+			locale.Settings,
+			fmt.Sprintf(
+				"**%v:** %v | **%v:** %v",
+				locale.Crosspost, messages.FormatBool(user.Crosspost),
+				locale.DM, messages.FormatBool(user.DM),
+			),
+		)
+
+		eb.AddField(
+			locale.Stats,
+			fmt.Sprintf(
+				"**%v:** %v | **%v:** %v",
+				locale.Groups, len(user.Groups),
+				locale.Bookmarks, bookmarks,
+			),
+		)
+
+		return ctx.Reply(router.Embed(eb.Finalize()))
 	}
 }
 
-func showUserProfile(b *bot.Bot, ctx *router.Context) error {
-	reqCtx, cancel := context.WithTimeout(ctx.Context(), 20*time.Second)
-	defer cancel()
-
-	user, err := b.Store.User(reqCtx, ctx.AuthorID())
-	if err != nil {
-		return err
-	}
-
-	bookmarks, err := b.Store.CountBookmarks(reqCtx, ctx.AuthorID())
-	if err != nil {
-		return err
-	}
-
-	locale := messages.UserProfileEmbed(ctx.Author().Username)
-	eb := embeds.NewBuilder()
-	eb.Title(locale.Title)
-	eb.Thumbnail(ctx.Author().AvatarURL(""))
-
-	eb.AddField(
-		locale.Settings,
-		fmt.Sprintf(
-			"**%v:** %v | **%v:** %v",
-			locale.Crosspost, messages.FormatBool(user.Crosspost),
-			locale.DM, messages.FormatBool(user.DM),
-		),
-	)
-
-	eb.AddField(
-		locale.Stats,
-		fmt.Sprintf(
-			"**%v:** %v | **%v:** %v",
-			locale.Groups, len(user.Groups),
-			locale.Bookmarks, bookmarks,
-		),
-	)
-
-	return ctx.Reply(router.Embed(eb.Finalize()))
-}
-
-func changeUserSettings(b *bot.Bot, ctx *router.Context, settingName, newSetting string) error {
+func changeUserSettings(b *bot.Bot, ctx *router.Context, settingName string, value bool) error {
 	reqCtx, cancel := context.WithTimeout(ctx.Context(), 15*time.Second)
 	defer cancel()
 
@@ -828,43 +851,20 @@ func changeUserSettings(b *bot.Bot, ctx *router.Context, settingName, newSetting
 		return err
 	}
 
-	var (
-		newSettingEmbed any
-		oldSettingEmbed any
-	)
-
+	var setting *bool
 	switch settingName {
 	case "dm":
-		parsed, err := parseBool(newSetting)
-		if err != nil {
-			return err
-		}
-
-		oldSettingEmbed = user.DM
-		newSettingEmbed = parsed
-		user.DM = parsed
+		setting = &user.DM
 	case "crosspost":
-		parsed, err := parseBool(newSetting)
-		if err != nil {
-			return err
-		}
-
-		oldSettingEmbed = user.Crosspost
-		newSettingEmbed = parsed
-		user.Crosspost = parsed
+		setting = &user.Crosspost
 	case "ignore":
-		parsed, err := parseBool(newSetting)
-		if err != nil {
-			return err
-		}
-
-		oldSettingEmbed = user.Ignore
-		newSettingEmbed = parsed
-		user.Ignore = parsed
-
+		setting = &user.Ignore
 	default:
 		return messages.ErrUnknownUserSetting(settingName)
 	}
+
+	old := *setting
+	*setting = value
 
 	_, err = b.Store.UpdateUser(reqCtx, user)
 	if err != nil {
@@ -874,8 +874,8 @@ func changeUserSettings(b *bot.Bot, ctx *router.Context, settingName, newSetting
 	eb := embeds.NewBuilder()
 	eb.InfoTemplate("Successfully changed user setting.")
 	eb.AddField("Setting name", settingName, true)
-	eb.AddField("Old setting", fmt.Sprintf("%v", oldSettingEmbed), true)
-	eb.AddField("New setting", fmt.Sprintf("%v", newSettingEmbed), true)
+	eb.AddField("Old setting", strconv.FormatBool(old), true)
+	eb.AddField("New setting", strconv.FormatBool(value), true)
 
 	return ctx.Reply(router.Embed(eb.Finalize()))
 }
@@ -959,15 +959,20 @@ func firstArtworkImage(artwork *store.Artwork) string {
 }
 
 func artworkToEmbed(artwork *store.Artwork, image string, ind, length int) *discordgo.MessageEmbed {
-	title := ternary.If(length > 1,
-		fmt.Sprintf("[%v/%v] %v", ind+1, length,
-			ternary.If(artwork.Title == "",
+	title := ternary.If(
+		length > 1,
+		fmt.Sprintf(
+			"[%v/%v] %v", ind+1, length,
+			ternary.If(
+				artwork.Title == "",
 				artwork.Author,
 				artwork.Title,
 			),
 		),
-		fmt.Sprintf("%v",
-			ternary.If(artwork.Title == "",
+		fmt.Sprintf(
+			"%v",
+			ternary.If(
+				artwork.Title == "",
 				artwork.Author,
 				artwork.Title,
 			),
@@ -1020,17 +1025,4 @@ func successMessage(ctx *router.Context, message string) error {
 	eb := embeds.NewBuilder()
 	eb.SuccessTemplate(message)
 	return ctx.Reply(router.Embed(eb.Finalize()))
-}
-
-func parseBool(s string) (bool, error) {
-	s = strings.ToLower(s)
-	if s == "true" || s == "enable" || s == "enabled" || s == "on" {
-		return true, nil
-	}
-
-	if s == "false" || s == "disable" || s == "disabled" || s == "off" {
-		return false, nil
-	}
-
-	return false, messages.ErrParseBool(s)
 }
