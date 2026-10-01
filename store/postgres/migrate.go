@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"embed"
+	"errors"
 	"fmt"
 	"path"
 	"slices"
@@ -89,20 +90,25 @@ func apply(ctx context.Context, pool *pgxpool.Pool, m migration) error {
 			return err
 		}
 
-		var applied bool
-		if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM schema_migrations WHERE version = $1)`, m.version).Scan(&applied); err != nil {
-			return err
-		}
-
-		if applied {
+		var recorded string
+		err := tx.QueryRow(ctx, `SELECT name FROM schema_migrations WHERE version = $1`, m.version).Scan(&recorded)
+		switch {
+		case err == nil && recorded == m.name:
 			return nil
+		case err == nil:
+			// Squashed migrations leave their versions recorded, so a new
+			// file reusing one would be skipped here but run on new
+			// databases.
+			return fmt.Errorf("version %d is already recorded as %q; number new migrations after the highest recorded version", m.version, recorded)
+		case !errors.Is(err, pgx.ErrNoRows):
+			return err
 		}
 
 		if _, err := tx.Exec(ctx, m.sql); err != nil {
 			return err
 		}
 
-		_, err := tx.Exec(ctx, `INSERT INTO schema_migrations (version, name) VALUES ($1, $2)`, m.version, m.name)
+		_, err = tx.Exec(ctx, `INSERT INTO schema_migrations (version, name) VALUES ($1, $2)`, m.version, m.name)
 		return err
 	})
 }

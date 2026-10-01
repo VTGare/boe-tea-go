@@ -329,192 +329,50 @@ var _ = Describe("Guild settings", func() {
 	})
 })
 
-// oldSchemaPool returns a pool on a scratch schema holding the database
-// as the pre-migration Init created it: old schema, no schema_migrations.
-func oldSchemaPool(ctx context.Context) *pgxpool.Pool {
-	admin := testStore.(*postgresStore).pool
-	_, err := admin.Exec(ctx, `DROP SCHEMA IF EXISTS mig_test CASCADE; CREATE SCHEMA mig_test`)
-	Expect(err).NotTo(HaveOccurred())
-
-	cfg, err := pgxpool.ParseConfig(dsn())
-	Expect(err).NotTo(HaveOccurred())
-	cfg.ConnConfig.RuntimeParams["search_path"] = "mig_test, public"
-
-	pool, err := pgxpool.NewWithConfig(ctx, cfg)
-	Expect(err).NotTo(HaveOccurred())
-
-	DeferCleanup(func() {
-		pool.Close()
-		_, _ = admin.Exec(ctx, `DROP SCHEMA IF EXISTS mig_test CASCADE`)
-	})
-
-	migrations, err := loadMigrations()
-	Expect(err).NotTo(HaveOccurred())
-	_, err = pool.Exec(ctx, migrations[0].sql)
-	Expect(err).NotTo(HaveOccurred())
-
-	return pool
-}
-
-var _ = Describe("Migrating guild settings from the old schema", func() {
+var _ = Describe("Migrations", func() {
 	ctx := context.Background()
 
 	var pool *pgxpool.Pool
 
 	BeforeEach(func() {
-		pool = oldSchemaPool(ctx)
-
-		_, err := pool.Exec(ctx, `INSERT INTO guilds (id, prefix, pixiv, twitter, deviant, bluesky, tags, flavour_text,
-			crosspost, reactions, skip_first, "limit", repost, repost_expiration, art_channels, nsfw, created_at, updated_at)
-		VALUES
-			('g-default', 'bt!', true, true, true, true, true, true, true, false, false, 10, 'enabled', 86400000000000, '{}', true, now(), now()),
-			('g-odd', 'uwu ', false, true, false, true, false, false, false, true, true, 8583838484, 'disabled', 30000000000, '{}', false, now(), now()),
-			('g-strict', '!', true, true, true, true, true, true, true, false, true, 0, 'strict', 259200000000000, '{a,b}', true, now(), now())`)
+		admin := testStore.(*postgresStore).pool
+		_, err := admin.Exec(ctx, `DROP SCHEMA IF EXISTS mig_test CASCADE; CREATE SCHEMA mig_test`)
 		Expect(err).NotTo(HaveOccurred())
 
-		Expect(migrate(ctx, pool)).To(Succeed())
-	})
-
-	guild := func(id string) *store.Guild {
-		g, err := (&guildStore{pool: pool}).Guild(ctx, id)
+		cfg, err := pgxpool.ParseConfig(dsn())
 		Expect(err).NotTo(HaveOccurred())
-		return g
-	}
+		cfg.ConnConfig.RuntimeParams["search_path"] = "mig_test, public"
 
-	It("keeps default guilds equivalent", func() {
-		g := guild("g-default")
+		pool, err = pgxpool.NewWithConfig(ctx, cfg)
+		Expect(err).NotTo(HaveOccurred())
 
-		Expect(g.Prefix).To(Equal("bt!"))
-		Expect(g.Posting).To(Equal(store.Posting{Limit: 10, Tags: true, Crosspost: true, Quotes: true, NSFWQuotes: true}))
-		Expect(g.DisabledProviders).To(BeEmpty())
-		Expect(g.Repost).To(Equal(store.Repost{Mode: store.RepostNotify, TTL: 24 * time.Hour}))
+		DeferCleanup(func() {
+			pool.Close()
+			_, _ = admin.Exec(ctx, `DROP SCHEMA IF EXISTS mig_test CASCADE`)
+		})
 	})
 
-	It("converts providers, renames, clamps limits and resets bad TTLs", func() {
-		g := guild("g-odd")
-
-		Expect(g.Prefix).To(Equal("uwu "))
-		Expect(g.Posting).To(Equal(store.Posting{Limit: 100, Reactions: true, SkipFirstTweet: true}))
-		Expect(g.DisabledProviders).To(ConsistOf("pixiv", "deviantart"))
-		Expect(g.Repost).To(Equal(store.Repost{Mode: store.RepostOff, TTL: 24 * time.Hour}))
-	})
-
-	It("keeps strict mode, valid TTLs and art channels", func() {
-		g := guild("g-strict")
-
-		Expect(g.Posting.Limit).To(Equal(1))
-		Expect(g.Repost).To(Equal(store.Repost{Mode: store.RepostStrict, TTL: 72 * time.Hour}))
-		Expect(g.ArtChannels).To(Equal([]string{"a", "b"}))
-	})
-
-	It("records versions and is a no-op when run again", func() {
+	It("builds an empty database, records versions and is a no-op when run again", func() {
+		Expect(migrate(ctx, pool)).To(Succeed())
 		Expect(migrate(ctx, pool)).To(Succeed())
 
-		var versions []int
 		rows, err := pool.Query(ctx, `SELECT version FROM schema_migrations ORDER BY version`)
 		Expect(err).NotTo(HaveOccurred())
-		versions, err = pgx.CollectRows(rows, pgx.RowTo[int])
+		versions, err := pgx.CollectRows(rows, pgx.RowTo[int])
 		Expect(err).NotTo(HaveOccurred())
-		Expect(versions).To(Equal([]int{1, 2, 3}))
+		Expect(versions).To(Equal([]int{1}))
+
+		_, err = pool.Exec(ctx, `INSERT INTO artworks (url, source_key, created_at, updated_at)
+			VALUES ('https://x.com/a/status/1', 'twitter:1', now(), now())`)
+		Expect(err).NotTo(HaveOccurred())
 	})
-})
 
-var _ = Describe("Merging duplicate artworks by source key", func() {
-	ctx := context.Background()
-
-	var pool *pgxpool.Pool
-
-	BeforeEach(func() {
-		pool = oldSchemaPool(ctx)
-
-		// Copies of one tweet under twitter.com, x.com and a renamed handle,
-		// one Pixiv post with and without www, and rows no provider matches.
-		_, err := pool.Exec(ctx, `INSERT INTO artworks (id, title, author, url, favourites, created_at, updated_at) VALUES
-			(1, '', 'artist', 'https://twitter.com/artist/status/100', 2, now(), now()),
-			(2, '', 'artist', 'https://x.com/artist/status/100', 2, now(), now()),
-			(3, '', 'renamed', 'https://x.com/renamed/status/100', 1, now(), now()),
-			(4, 'p', 'p', 'https://pixiv.net/artworks/200', 1, now(), now()),
-			(5, 'p', 'p', 'https://www.pixiv.net/en/artworks/200', 0, now(), now()),
-			(6, '', '', 'https://www.artstation.com/artwork/wJqLBY', 0, now(), now()),
-			(7, '', 'a', 'https://twitter.com/a/status/undefined', 0, now(), now()),
-			(8, '', 'solo', 'https://twitter.com/solo/status/300', 1, now(), now())`)
-		Expect(err).NotTo(HaveOccurred())
-
-		// u1 already has the oldest copy; u2's earliest bookmark is on a
-		// later copy, so that one moves.
-		_, err = pool.Exec(ctx, `INSERT INTO bookmarks (user_id, artwork_id, nsfw, created_at) VALUES
-			('u1', 1, false, '2024-02-01'),
-			('u1', 2, true, '2024-01-01'),
-			('u2', 2, true, '2024-03-01'),
-			('u2', 3, false, '2024-01-01'),
-			('u3', 1, false, '2024-01-01'),
-			('u4', 5, true, '2024-01-01'),
-			('u5', 8, false, '2024-01-01')`)
-		Expect(err).NotTo(HaveOccurred())
-
+	It("refuses a migration whose version is recorded under another name", func() {
 		Expect(migrate(ctx, pool)).To(Succeed())
-	})
 
-	It("keeps the oldest copy of each artwork with its source key", func() {
-		rows, err := pool.Query(ctx, `SELECT id, COALESCE(source_key, '') FROM artworks ORDER BY id`)
+		_, err := pool.Exec(ctx, `UPDATE schema_migrations SET name = 'squashed_away' WHERE version = 1`)
 		Expect(err).NotTo(HaveOccurred())
 
-		type row struct {
-			ID  int
-			Key string
-		}
-		got, err := pgx.CollectRows(rows, pgx.RowToStructByPos[row])
-		Expect(err).NotTo(HaveOccurred())
-
-		Expect(got).To(Equal([]row{
-			{1, "twitter:100"},
-			{4, "pixiv:200"},
-			{6, ""},
-			{7, ""},
-			{8, "twitter:300"},
-		}))
-	})
-
-	It("moves bookmarks to the kept copy, one per user", func() {
-		rows, err := pool.Query(ctx, `SELECT user_id, artwork_id, nsfw, created_at::date::text FROM bookmarks ORDER BY user_id`)
-		Expect(err).NotTo(HaveOccurred())
-
-		type row struct {
-			User      string
-			ArtworkID int
-			NSFW      bool
-			CreatedAt string
-		}
-		got, err := pgx.CollectRows(rows, pgx.RowToStructByPos[row])
-		Expect(err).NotTo(HaveOccurred())
-
-		Expect(got).To(Equal([]row{
-			{"u1", 1, false, "2024-02-01"},
-			{"u2", 1, false, "2024-01-01"},
-			{"u3", 1, false, "2024-01-01"},
-			{"u4", 4, true, "2024-01-01"},
-			{"u5", 8, false, "2024-01-01"},
-		}))
-	})
-
-	It("recounts favourites of merged artworks only", func() {
-		rows, err := pool.Query(ctx, `SELECT id, favourites FROM artworks WHERE id IN (1, 4, 8) ORDER BY id`)
-		Expect(err).NotTo(HaveOccurred())
-
-		got, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) ([2]int, error) {
-			var v [2]int
-			err := r.Scan(&v[0], &v[1])
-			return v, err
-		})
-		Expect(err).NotTo(HaveOccurred())
-
-		Expect(got).To(Equal([][2]int{{1, 3}, {4, 1}, {8, 1}}))
-	})
-
-	It("rejects a second artwork with the same source key", func() {
-		_, err := pool.Exec(ctx, `INSERT INTO artworks (id, url, source_key, created_at, updated_at)
-			VALUES (99, 'https://x.com/new/status/100', 'twitter:100', now(), now())`)
-
-		Expect(err).To(MatchError(ContainSubstring("artworks_source_key_idx")))
+		Expect(migrate(ctx, pool)).To(MatchError(ContainSubstring(`version 1 is already recorded as "squashed_away"`)))
 	})
 })
