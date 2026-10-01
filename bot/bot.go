@@ -2,6 +2,7 @@ package bot
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -127,6 +128,31 @@ func (b *Bot) Start(ctx context.Context) error {
 	b.ShardManager.Shutdown()
 
 	return ctx.Err()
+}
+
+// SourceKey is artworks.SourceKey for whichever provider matches url, or
+// "" if none does.
+func (b *Bot) SourceKey(url string) string {
+	if _, p := b.Match(url); p != nil {
+		key, _ := artworks.SourceKey(p, url)
+		return key
+	}
+
+	return ""
+}
+
+// FindArtwork looks up a saved artwork by URL. The URL can be in any form
+// its provider accepts. Artworks without a source key, e.g. from providers
+// Boe Tea no longer supports, are found by their exact saved URL.
+func (b *Bot) FindArtwork(ctx context.Context, url string) (*store.Artwork, error) {
+	if key := b.SourceKey(url); key != "" {
+		artwork, err := b.Store.ArtworkByKey(ctx, key)
+		if !errors.Is(err, store.ErrArtworkNotFound) {
+			return artwork, err
+		}
+	}
+
+	return b.Store.Artwork(ctx, 0, url)
 }
 
 func (b *Bot) Match(url string) (string, artworks.Provider) {

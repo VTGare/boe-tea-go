@@ -140,7 +140,14 @@ func artwork(b *bot.Bot) router.Handler {
 		reqCtx, cancel := context.WithTimeout(ctx.Context(), 5*time.Second)
 		defer cancel()
 
-		artwork, err := b.Store.Artwork(reqCtx, id, url)
+		var artwork *store.Artwork
+		var err error
+		if url != "" {
+			artwork, err = b.FindArtwork(reqCtx, url)
+		} else {
+			artwork, err = b.Store.Artwork(reqCtx, id, "")
+		}
+
 		if err != nil {
 			switch {
 			case errors.Is(err, store.ErrArtworkNotFound):

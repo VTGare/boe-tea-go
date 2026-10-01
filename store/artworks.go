@@ -7,15 +7,20 @@ import (
 
 type ArtworkStore interface {
 	Artwork(ctx context.Context, id int, url string) (*Artwork, error)
+	ArtworkByKey(ctx context.Context, key string) (*Artwork, error)
 	CreateArtwork(context.Context, *Artwork) (*Artwork, error)
 	SearchArtworks(context.Context, ArtworkFilter, ...ArtworkSearchOptions) ([]*Artwork, error)
 }
 
 type Artwork struct {
-	ID        int       `json:"id" bson:"artwork_id"`
-	Title     string    `json:"title" bson:"title"`
-	Author    string    `json:"author" bson:"author"`
-	URL       string    `json:"url" bson:"url"`
+	ID     int    `json:"id" bson:"artwork_id"`
+	Title  string `json:"title" bson:"title"`
+	Author string `json:"author" bson:"author"`
+	URL    string `json:"url" bson:"url"`
+
+	// SourceKey identifies the artwork on its provider, e.g. "twitter:123",
+	// so the same post is found again after its URL changes.
+	SourceKey string    `json:"source_key" bson:"source_key,omitempty"`
 	Images    []string  `json:"images" bson:"images"`
 	Favorites int       `json:"favourites" bson:"favourites"`
 	CreatedAt time.Time `json:"created_at" bson:"created_at"`

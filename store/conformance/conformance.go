@@ -114,6 +114,30 @@ func Specs(newStore func() store.Store) {
 			Expect(err).To(MatchError(store.ErrArtworkNotFound))
 		})
 
+		It("finds artworks by source key", func() {
+			s := newStore()
+
+			created, err := s.CreateArtwork(ctx, &store.Artwork{
+				URL:       "https://conformance.invalid/user/status/1",
+				SourceKey: "conformance:1",
+				Images:    []string{},
+			})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(created.SourceKey).To(Equal("conformance:1"))
+
+			found, err := s.ArtworkByKey(ctx, "conformance:1")
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(found.ID).To(Equal(created.ID))
+			Expect(found.SourceKey).To(Equal("conformance:1"))
+		})
+
+		It("reports ErrArtworkNotFound for a missing source key", func() {
+			_, err := newStore().ArtworkByKey(ctx, "conformance:missing")
+
+			Expect(err).To(MatchError(store.ErrArtworkNotFound))
+		})
+
 		It("creates missing guilds exactly once via GetOrCreateGuild", func() {
 			s := newStore()
 

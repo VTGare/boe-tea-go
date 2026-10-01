@@ -28,6 +28,16 @@ type Info struct {
 	Aliases []string
 }
 
+// SourceKey identifies an artwork on its provider, e.g. "twitter:123".
+func SourceKey(p Provider, url string) (string, bool) {
+	id, ok := p.Match(url)
+	if !ok {
+		return "", false
+	}
+
+	return p.Info().Key + ":" + id, true
+}
+
 type Artwork interface {
 	StoreArtwork() *store.Artwork
 	Render() (Rendered, error)

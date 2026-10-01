@@ -127,10 +127,11 @@ var _ = Describe("scanArtwork", func() {
 	It("scans a full row", func() {
 		a := &store.Artwork{}
 
-		err := scanArtwork(&fakeRow{vals: []any{7, "t", "a", "u", []string{"i"}, 3, now, now}}, a)
+		err := scanArtwork(&fakeRow{vals: []any{7, "t", "a", "u", "twitter:1", []string{"i"}, 3, now, now}}, a)
 
 		Expect(err).NotTo(HaveOccurred())
 		Expect(a.ID).To(Equal(7))
+		Expect(a.SourceKey).To(Equal("twitter:1"))
 		Expect(a.Images).To(Equal([]string{"i"}))
 		Expect(a.Favorites).To(Equal(3))
 	})
@@ -144,7 +145,7 @@ var _ = Describe("scanArtwork", func() {
 	It("treats missing images as empty", func() {
 		a := &store.Artwork{}
 
-		err := scanArtwork(&fakeRow{vals: []any{7, "t", "a", "u", []string(nil), 0, now, now}}, a)
+		err := scanArtwork(&fakeRow{vals: []any{7, "t", "a", "u", "", []string(nil), 0, now, now}}, a)
 
 		Expect(err).NotTo(HaveOccurred())
 		Expect(a.Images).ToNot(BeNil())

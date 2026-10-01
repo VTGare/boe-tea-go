@@ -12,7 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-const artworkColumns = `id, title, author, url, images, favourites, created_at, updated_at`
+const artworkColumns = `id, title, author, url, COALESCE(source_key, ''), images, favourites, created_at, updated_at`
 
 type artworkStore struct {
 	pool *pgxpool.Pool
@@ -46,6 +46,21 @@ func (a *artworkStore) Artwork(ctx context.Context, id int, url string) (*store.
 	return artwork, nil
 }
 
+func (a *artworkStore) ArtworkByKey(ctx context.Context, key string) (*store.Artwork, error) {
+	if key == "" {
+		return nil, store.ErrArtworkNotFound
+	}
+
+	row := a.pool.QueryRow(ctx, `SELECT `+artworkColumns+` FROM artworks WHERE source_key = $1`, key)
+
+	artwork := &store.Artwork{}
+	if err := scanArtwork(row, artwork); err != nil {
+		return nil, err
+	}
+
+	return artwork, nil
+}
+
 func (a *artworkStore) CreateArtwork(ctx context.Context, artwork *store.Artwork) (*store.Artwork, error) {
 	now := time.Now().UTC()
 
@@ -54,10 +69,10 @@ func (a *artworkStore) CreateArtwork(ctx context.Context, artwork *store.Artwork
 		images = make([]string, 0)
 	}
 
-	row := a.pool.QueryRow(ctx, `INSERT INTO artworks (id, title, author, url, images, favourites, created_at, updated_at)
-		VALUES (nextval('artwork_id_seq'), $1, $2, $3, $4, 0, $5, $6)
+	row := a.pool.QueryRow(ctx, `INSERT INTO artworks (id, title, author, url, source_key, images, favourites, created_at, updated_at)
+		VALUES (nextval('artwork_id_seq'), $1, $2, $3, NULLIF($4, ''), $5, 0, $6, $7)
 		RETURNING `+artworkColumns,
-		artwork.Title, artwork.Author, artwork.URL, images, now, now,
+		artwork.Title, artwork.Author, artwork.URL, artwork.SourceKey, images, now, now,
 	)
 
 	created := &store.Artwork{}
@@ -157,7 +172,7 @@ type artworkRow interface {
 }
 
 func scanArtwork(row artworkRow, a *store.Artwork) error {
-	if err := row.Scan(&a.ID, &a.Title, &a.Author, &a.URL, &a.Images, &a.Favorites, &a.CreatedAt, &a.UpdatedAt); err != nil {
+	if err := row.Scan(&a.ID, &a.Title, &a.Author, &a.URL, &a.SourceKey, &a.Images, &a.Favorites, &a.CreatedAt, &a.UpdatedAt); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return store.ErrArtworkNotFound
 		}

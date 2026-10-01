@@ -899,7 +899,7 @@ func unfav(b *bot.Bot) router.Handler {
 
 		var artwork *store.Artwork
 		if url != "" {
-			artwork, err = b.Store.Artwork(reqCtx, 0, url)
+			artwork, err = b.FindArtwork(reqCtx, url)
 			if err != nil {
 				return messages.ErrArtworkNotFound(query)
 			}

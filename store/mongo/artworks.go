@@ -55,6 +55,19 @@ func (a *artworkStore) Artwork(ctx context.Context, id int, url string) (*store.
 	return artwork, nil
 }
 
+func (a *artworkStore) ArtworkByKey(ctx context.Context, key string) (*store.Artwork, error) {
+	artwork := &store.Artwork{}
+	if err := a.col.FindOne(ctx, bson.M{"source_key": key}).Decode(artwork); err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return nil, store.ErrArtworkNotFound
+		}
+
+		return nil, fmt.Errorf("failed to decode an artwork: %w", err)
+	}
+
+	return artwork, nil
+}
+
 func (a *artworkStore) SearchArtworks(ctx context.Context, filter store.ArtworkFilter, opts ...store.ArtworkSearchOptions) ([]*store.Artwork, error) {
 	opt := store.DefaultSearchOptions()
 	if len(opts) != 0 {

@@ -155,6 +155,19 @@ func (s *StatefulStore) Artwork(ctx context.Context, id int, url string) (*Artwo
 	return artwork, nil
 }
 
+func (s *StatefulStore) ArtworkByKey(ctx context.Context, key string) (*Artwork, error) {
+	artwork, err := s.Store.ArtworkByKey(ctx, key)
+	if err != nil {
+		return nil, err
+	}
+
+	if artwork != nil {
+		cacheSet(s.cache, artworkKey(artwork.ID), artwork, cloneArtwork)
+	}
+
+	return artwork, nil
+}
+
 func (s *StatefulStore) CreateArtwork(ctx context.Context, a *Artwork) (*Artwork, error) {
 	artwork, err := s.Store.CreateArtwork(ctx, a)
 	if err != nil {
