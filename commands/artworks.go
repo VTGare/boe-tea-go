@@ -83,12 +83,12 @@ func artworksGroup(b *bot.Bot) []*router.Command {
 			Defer:       true,
 			Options: []*router.Option{
 				router.String("url", "Artwork URL").Require(),
-				router.String("images", "Images to post, e.g. 1-3 5").Greedy(),
-				router.String("mode", "Post only the listed images, or all but them").SlashOnly().WithChoices(
-					router.Choice{Name: "include", Value: "include"},
-					router.Choice{Name: "exclude", Value: "exclude"},
+				router.String("images", `Images to post (or remove if "mode" is set to "Exclude"), e.g. 1, 3-5`).Greedy(),
+				router.String("mode", `Include or exclude listed images to post (set to "Include" by default)`).SlashOnly().WithChoices(
+					router.Choice{Name: "Include", Value: "include"},
+					router.Choice{Name: "Exclude", Value: "exclude"},
 				),
-				router.String("skip_channels", "Crosspost channels to skip").SlashOnly(),
+				router.String("skip_channels", "Crosspost channels not to post this artwork to, e.g. #art #memes").SlashOnly(),
 			},
 			Examples: []string{"share https://pixiv.net/artworks/86341538 1-3 5"},
 			Handler:  share(b, post.SkipModeInclude),
@@ -182,7 +182,8 @@ func parseArtworkArgument(arg string) (int, string, bool) {
 func parseSkipIndices(raw string) (map[int]struct{}, error) {
 	indices := make(map[int]struct{})
 
-	for _, arg := range strings.Fields(raw) {
+	// Commas are allowed as separators too, e.g. "1, 3-5".
+	for arg := range strings.FieldsSeq(strings.ReplaceAll(raw, ",", " ")) {
 		index, err := strconv.Atoi(arg)
 		if err != nil {
 			ran, err := dgoutils.NewRange(arg)
