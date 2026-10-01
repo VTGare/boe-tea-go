@@ -90,12 +90,10 @@ func New() *Bluesky {
 	}
 }
 
-// Info implements artworks.Provider.
 func (*Bluesky) Info() artworks.Info {
 	return artworks.Info{Key: "bluesky", Label: "Bluesky"}
 }
 
-// Find implements artworks.Provider.
 func (b *Bluesky) Find(id string) (artworks.Artwork, error) {
 	return artworks.WrapError(b, func() (artworks.Artwork, error) {
 		did, key, _ := strings.Cut(id, ":")
@@ -170,7 +168,6 @@ func (b *Bluesky) Find(id string) (artworks.Artwork, error) {
 	})
 }
 
-// Match implements artworks.Provider.
 func (b *Bluesky) Match(url string) (string, bool) {
 	res := b.regex.FindStringSubmatch(url)
 	if res == nil {
@@ -180,7 +177,6 @@ func (b *Bluesky) Match(url string) (string, bool) {
 	return res[1] + ":" + res[2], true
 }
 
-// Render implements artworks.Artwork.
 func (a *Artwork) Render() (artworks.Rendered, error) {
 	rendered := artworks.Rendered{
 		Title:           fmt.Sprintf("%v (%v)", a.AuthorDisplayName, a.AuthorHandle),
@@ -215,17 +211,14 @@ func (a *Artwork) Render() (artworks.Rendered, error) {
 	return rendered, nil
 }
 
-// ID implements artworks.Artwork.
 func (a *Artwork) ID() string {
 	return a.id
 }
 
-// Len implements artworks.Artwork.
 func (a *Artwork) Len() int {
 	return len(a.Images)
 }
 
-// StoreArtwork implements artworks.Artwork.
 func (a *Artwork) StoreArtwork() *store.Artwork {
 	return &store.Artwork{
 		Author: a.AuthorHandle,
@@ -234,7 +227,6 @@ func (a *Artwork) StoreArtwork() *store.Artwork {
 	}
 }
 
-// URL implements artworks.Artwork.
 func (a *Artwork) URL() string {
 	return a.url
 }

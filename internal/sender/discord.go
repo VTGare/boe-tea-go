@@ -11,9 +11,8 @@ import (
 	"go.uber.org/zap"
 )
 
-// DiscordSender is the production Sender adapter. It resolves the
-// shard session owning each guild, so callers pass guild IDs instead
-// of sessions.
+// DiscordSender sends through the shard that owns each guild, so
+// callers pass guild IDs instead of sessions.
 type DiscordSender struct {
 	manager  *shards.Manager
 	fallback *discordgo.Session

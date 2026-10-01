@@ -23,7 +23,6 @@ import (
 )
 
 type Bot struct {
-	// misc.
 	Log       *zap.SugaredLogger
 	Config    *config.Config
 	Stats     *stats.Stats
@@ -31,12 +30,10 @@ type Bot struct {
 	Router    *router.Router
 	Context   context.Context
 
-	// caches
 	BannedUsers  *ttlcache.Cache
 	EmbedCache   *cache.EmbedCache
 	ArtworkCache *goCache.Cache
 
-	// services
 	Sengoku          *sengoku.Sengoku
 	ArtworkProviders []artworks.Provider
 	RepostDetector   repost.Detector

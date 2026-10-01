@@ -63,7 +63,8 @@ type CheckError struct {
 	Check   string
 	Message string
 
-	// Silent sends no reply; for commands you don't want to leak.
+	// Silent sends no reply, for commands whose existence shouldn't be
+	// revealed.
 	Silent bool
 }
 

@@ -24,7 +24,7 @@ type fetchedItem struct {
 	provider artworks.Provider
 }
 
-// fetchResults is one fetch run, in input-URL order.
+// fetchResults holds what a fetch found, in the order of the input URLs.
 type fetchResults struct {
 	items         []fetchedItem
 	reposts       []*repost.Repost
@@ -38,7 +38,7 @@ type fetchJob struct {
 	provider artworks.Provider
 }
 
-// fetchSlot is one job's outcome; rep and artwork can coexist.
+// fetchSlot is the result for one URL. It can have both a repost and an artwork.
 type fetchSlot struct {
 	artwork  artworks.Artwork
 	provider artworks.Provider
@@ -46,7 +46,8 @@ type fetchSlot struct {
 	err      error
 }
 
-// fetch resolves URLs in input order; reposts record only after successful fetch.
+// fetch looks up every URL, keeping input order. Reposts are only
+// recorded after a successful fetch.
 func (r *Poster) fetch(ctx context.Context, guild *store.Guild, channelID string, urls []string, opts runOpts) (fetchResults, error) {
 	log := r.log.With(
 		"guild_id", guild.ID,
@@ -174,8 +175,9 @@ func (r *Poster) doFetch(ctx context.Context, guild *store.Guild, channelID stri
 
 	// Twitter crossposts bypass guild settings by design.
 	if !guild.ProviderEnabled(job.provider.Info().Key) && !opts.isCommand && !(opts.isCrosspost && isTwitter) {
-		// While not ideal because it records fetch failures and imageless tweets, we still want
-		// to record the sighting of a link even if the provider is disabled.
+		// This also records fetch failures and imageless tweets, which isn't
+		// ideal, but we want to remember a link was posted even when its
+		// provider is turned off.
 		if needsCreate {
 			r.createRepost(ctx, guild, channelID, job, opts.messageID)
 		}
@@ -258,7 +260,8 @@ type sentPage struct {
 	embedURL string
 }
 
-// deliver renders and sends every page best-effort, failures join.
+// deliver renders and sends every page. A failed page doesn't stop the
+// rest; all errors are returned together.
 func (r *Poster) deliver(guild *store.Guild, channelID string, items []fetchedItem, run Post, opts runOpts) ([]sentPage, error) {
 	artworks := make([]artworks.Artwork, 0, len(items))
 	for _, item := range items {
@@ -554,7 +557,7 @@ func (r *Poster) notifyReposts(guild *store.Guild, run Post, reps []*repost.Repo
 	return errors.Join(errs...)
 }
 
-// finalize runs the post-send side effects.
+// finalize does the follow-up after sending: stats and bookmark reactions.
 func (r *Poster) finalize(run Post, guild *store.Guild, pages []sentPage, fetched fetchResults, opts runOpts) error {
 	if r.deps.RecordArtwork != nil {
 		for _, item := range fetched.items {

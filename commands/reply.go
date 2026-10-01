@@ -35,13 +35,13 @@ func serveWidget(ctx *router.Context, b *bot.Bot, w *widget.Widget) error {
 	return w.Serve(ctx.Context(), b.WidgetDispatcher)
 }
 
-// replyPages delivers embed pages through one button-paginated message.
+// replyPages sends the pages as one message with page buttons.
 func replyPages(ctx *router.Context, b *bot.Bot, pages []*discordgo.MessageEmbed) error {
 	return serveWidget(ctx, b, widget.New(ctx.AuthorID(), pages))
 }
 
-// runMessage returns the triggering message, synthesizing one for slash
-// invocations where no message exists.
+// runMessage returns the message that triggered the command, or a
+// stand-in for slash commands, which have none.
 func runMessage(ctx *router.Context) *discordgo.Message {
 	if ctx.Message != nil {
 		return ctx.Message

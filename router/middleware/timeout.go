@@ -7,8 +7,8 @@ import (
 	"github.com/VTGare/boe-tea-go/router"
 )
 
-// Timeout deadlines ctx.Context(); pass it down so I/O cancels.
-// Interaction tokens die after 15 minutes regardless.
+// Timeout puts a deadline on ctx.Context(). Pass that context to I/O so
+// it gets cancelled. Interaction tokens expire after 15 minutes anyway.
 func Timeout(d time.Duration) router.Middleware {
 	return func(next router.Handler) router.Handler {
 		return func(ctx *router.Context) error {

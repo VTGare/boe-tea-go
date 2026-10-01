@@ -26,8 +26,9 @@ func (s Source) String() string {
 	return "unknown"
 }
 
-// Context is one command invocation, with a single reply API no matter how
-// it was triggered. Exactly one of Message / Interaction is set.
+// Context is a single command invocation. Replies work the same whether
+// it came from a slash command or a message. Exactly one of Message and
+// Interaction is set.
 type Context struct {
 	Session       *discordgo.Session
 	Router        *Router
@@ -451,8 +452,8 @@ func (c *Context) ReplyEmbed(embed *discordgo.MessageEmbed) error { return c.Rep
 
 func (c *Context) ReplyEphemeral(content string) error { return c.Reply(Text(content).Private()) }
 
-// Defer buys the handler up to 15 minutes ("thinking…", or typing over
-// prefix). Calling it twice is a no-op.
+// Defer gives the handler up to 15 minutes by showing "thinking…" (or
+// typing, over prefix). Calling it twice does nothing.
 func (c *Context) Defer() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()

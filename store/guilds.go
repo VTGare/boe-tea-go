@@ -84,7 +84,8 @@ const (
 	RepostStrict RepostMode = "strict"
 )
 
-// Setting bounds, mirrored by the Postgres CHECK constraints.
+// Setting limits. Keep them in sync with the CHECK constraints in the
+// Postgres migrations.
 const (
 	MaxPrefixLength = 5
 	MinPostLimit    = 1
@@ -107,8 +108,8 @@ func (g *Guild) SetProvider(key string, enabled bool) {
 	}
 }
 
-// PostsIn reports whether artwork can be posted in the channel, any channel
-// returns true when no art channels are set.
+// PostsIn reports whether artwork is posted in the channel. With no art
+// channels set, every channel counts.
 func (g *Guild) PostsIn(channelID string) bool {
 	return len(g.ArtChannels) == 0 || slices.Contains(g.ArtChannels, channelID)
 }

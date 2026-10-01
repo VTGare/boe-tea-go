@@ -12,14 +12,14 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
-// DefaultTimeout bounds one widget run.
+// DefaultTimeout is how long a widget accepts clicks.
 const DefaultTimeout = 2 * time.Minute
 
-// customPrefix namespaces button IDs so the Dispatcher ignores everyone
-// else's components.
+// customPrefix marks widget button IDs, so the Dispatcher can ignore
+// other components.
 const customPrefix = "boe:page"
 
-// Action is one pagination control.
+// Action is a pagination button.
 type Action int
 
 const (
@@ -47,8 +47,8 @@ func (a Action) String() string {
 	return "unknown"
 }
 
-// Widget is one paginated message run. Clicks are serialized internally;
-// set the callback before serving and don't call widget methods from it.
+// Widget is a paginated message. Clicks are handled one at a time. Set
+// the callback before Serve, and don't call widget methods from inside it.
 type Widget struct {
 	author   string
 	Pages    []*discordgo.MessageEmbed
@@ -159,8 +159,8 @@ func (w *Widget) move(action Action) {
 	}
 }
 
-// click applies one control and answers the interaction. Every path
-// responds: component interactions fail visibly when left hanging.
+// click applies a button press and always answers the interaction:
+// Discord shows an error for clicks left unanswered.
 func (w *Widget) click(s *discordgo.Session, in *discordgo.Interaction, action Action) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -204,8 +204,8 @@ func (w *Widget) checkUser(i *discordgo.InteractionCreate) bool {
 	return id != "" && id == w.author
 }
 
-// Dispatcher routes button clicks to live widgets. Add its Handle to the
-// session once and Serve every widget on it.
+// Dispatcher routes button clicks to live widgets. Register its Handle
+// on the session once, then Serve each widget with it.
 type Dispatcher struct {
 	mu   sync.Mutex
 	live map[string]*Widget

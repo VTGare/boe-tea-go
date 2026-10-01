@@ -270,7 +270,6 @@ func (r *Router) dispatchMessage(s *discordgo.Session, m *discordgo.MessageCreat
 		return false
 	}
 
-	// Walk subcommands.
 	var parseErr error
 	i := 1
 	for cmd.IsGroup() {
@@ -461,7 +460,7 @@ func (r *Router) handleCommand(s *discordgo.Session, i *discordgo.InteractionCre
 }
 
 // dispatch runs middleware, then checks and cooldowns, then the handler.
-// parseErr rides the middleware chain so logging sees rejections too.
+// Parse errors go through the middleware too, so logging sees them.
 func (r *Router) dispatch(ctx *Context, parseErr error) {
 	cmd := ctx.Command
 	chain := cmd.chain()

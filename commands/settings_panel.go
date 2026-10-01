@@ -14,8 +14,9 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
-// settingsPanel is the /settings message: an overview plus one page per
-// section, driven by stateless component IDs (owner, action, arg).
+// settingsPanel is the /settings message: an overview plus a page per
+// section. All state lives in the button IDs (owner, action, arg), so
+// the panel keeps working across restarts.
 type settingsPanel struct {
 	b    *bot.Bot
 	cmd  *router.Command
@@ -51,8 +52,8 @@ func (p *settingsPanel) open(ctx *router.Context) error {
 	return ctx.Reply(p.view(ctx.Session, guild, ctx.AuthorID()).render("home"))
 }
 
-// handle answers panel interactions; only the invoker may use the panel
-// and only managers may change anything.
+// handle handles clicks on the panel. Only the person who opened it can
+// use it, and changing anything needs Manage Server.
 func (p *settingsPanel) handle(ctx *router.ComponentContext) error {
 	owner, action, arg := ctx.Arg(0), ctx.Arg(1), ctx.Arg(2)
 
@@ -85,8 +86,8 @@ func (p *settingsPanel) handle(ctx *router.ComponentContext) error {
 	return ctx.Update(p.view(ctx.Session, guild, owner).render(section))
 }
 
-// apply performs one panel action on guild, in place, and returns the
-// section to show.
+// apply runs one panel action, changing guild in place, and returns the
+// section to show next.
 func (p *settingsPanel) apply(reqCtx context.Context, ctx *router.ComponentContext, guild *store.Guild, action, arg string) (string, error) {
 	value := ""
 	if values := ctx.Values(); len(values) > 0 {
@@ -190,7 +191,7 @@ func (p *settingsPanel) view(s *discordgo.Session, guild *store.Guild, owner str
 	return v
 }
 
-// panelView renders the panel for one guild and owner.
+// panelView renders the panel for one guild.
 type panelView struct {
 	cmd        *router.Command
 	spec       *settingsSpec
@@ -294,7 +295,7 @@ func (v *panelView) renderHome(embed *discordgo.MessageEmbed) {
 	}
 }
 
-// line is one setting: bold name, value, and a muted hint.
+// line formats a setting: bold name and value, then a small hint line.
 func line(name, value, hint string) string {
 	return fmt.Sprintf("**%s** %s\n-# %s", name, value, hint)
 }

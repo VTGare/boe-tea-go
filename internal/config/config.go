@@ -78,8 +78,8 @@ type Media struct {
 	SpoolDir      string `json:"spool_dir"`
 }
 
-// SpoolConfig converts media limits to a spool config. A nil Media
-// yields a zero config, which selects built-in defaults downstream.
+// SpoolConfig converts Media to a spool.Config. A nil Media gives a zero
+// config, which means defaults.
 func (m *Media) SpoolConfig() spool.Config {
 	if m == nil {
 		return spool.Config{}
@@ -91,9 +91,8 @@ func (m *Media) SpoolConfig() spool.Config {
 	}
 }
 
-// Debug stores temporary diagnostic switches for the ongoing OOM
-// investigation. Slated for removal once the leak is diagnosed.
-// A zero PprofPort disables all diagnostics.
+// Debug holds temporary switches for the OOM investigation; remove it
+// once the leak is found. A zero PprofPort turns diagnostics off.
 type Debug struct {
 	PprofPort int `json:"pprof_port"`
 }

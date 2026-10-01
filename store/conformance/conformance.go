@@ -1,13 +1,13 @@
-// Package conformance holds the shared Store adapter-parity specs.
+// Package conformance has specs every Store backend must pass, so the
+// backends behave the same, e.g. when something isn't found.
 //
-// Every backend runs the same miss-contract cases so
-// the next adapter-shaped bug is found by the suite instead of in
-// production. Host suites must isolate specs (truncate or fresh IDs):
-// all cases below use the "conf-" ID prefix and assume an empty store.
+// The specs use IDs starting with "conf-" and expect an empty store, so
+// clear the data between specs. Register them from an integration-tagged
+// suite:
 //
-// Wire it from an integration-tagged suite file:
-//
-//	var _ = conformance.Specs(func() store.Store { return testStore })
+//	func init() {
+//		conformance.Specs(func() store.Store { return testStore })
+//	}
 package conformance
 
 import (
@@ -19,8 +19,8 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-// Specs registers the adapter conformance cases against newStore. The
-// func is evaluated per spec, so it may return a shared handle.
+// Specs registers the specs. newStore is called for every spec, so it
+// can return a shared store.
 func Specs(newStore func() store.Store) {
 	Describe("Store adapter conformance", func() {
 		ctx := context.Background()

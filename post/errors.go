@@ -30,8 +30,8 @@ func (e *Error) Unwrap() error {
 	return e.Cause
 }
 
-// renderError marks a fatal artwork-render failure. Unlike per-message
-// send failures it aborts the run instead of joining and continuing.
+// renderError is a render failure. Unlike a failed send, it stops the
+// whole run.
 type renderError struct {
 	err error
 }

@@ -32,8 +32,7 @@ func ComponentID(cmd *Command, args ...string) string {
 	return id
 }
 
-// ComponentContext is one component interaction: a button click, a select
-// or a modal submit.
+// ComponentContext is a button click, select or modal submit.
 type ComponentContext struct {
 	Session     *discordgo.Session
 	Router      *Router
@@ -57,7 +56,7 @@ func (c *ComponentContext) GuildID() string { return c.Interaction.GuildID }
 
 func (c *ComponentContext) ChannelID() string { return c.Interaction.ChannelID }
 
-// UserID is who interacted.
+// UserID returns the ID of the user who clicked.
 func (c *ComponentContext) UserID() string {
 	if m := c.Interaction.Member; m != nil && m.User != nil {
 		return m.User.ID

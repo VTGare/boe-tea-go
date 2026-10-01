@@ -69,8 +69,8 @@ type Middleware func(next Handler) Handler
 // Reject with a UserFacing error to tell the user why.
 type Check func(ctx *Context) error
 
-// Command is written once; the router derives the slash definition and the
-// prefix command from it.
+// Command is declared once and works as both a slash command and a
+// prefix command.
 type Command struct {
 	// Chat input names: 1-32 lowercase chars, no spaces. Context menu
 	// names are free-form.
@@ -95,7 +95,8 @@ type Command struct {
 	Middleware []Middleware
 	// Set on a group to cover its subcommands too.
 	Cooldown *Cooldown
-	// Ack first ("thinking…", or typing over prefix) for up to 15 minutes.
+	// Acknowledge first ("thinking…", or typing over prefix), giving the
+	// handler up to 15 minutes.
 	Defer bool
 	// Invoker-only replies. No effect over prefix.
 	Ephemeral bool

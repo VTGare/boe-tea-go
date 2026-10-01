@@ -242,8 +242,8 @@ func crosspostExclude(b *bot.Bot) router.Handler {
 	}
 }
 
-// shareAck replies with who shared which link. The link stays wrapped so
-// Discord doesn't unfurl it into another embed.
+// shareAck says who shared which link. The link is wrapped in <> so
+// Discord doesn't add a preview of its own.
 func shareAck(ctx *router.Context, run post.Post) error {
 	link := ""
 	if len(run.URLs) > 0 {

@@ -1,4 +1,4 @@
-// Package render owns artwork presentation.
+// Package render turns provider data into Discord messages.
 package render
 
 import (
@@ -17,8 +17,8 @@ const (
 	aiFieldValue = "This artwork is AI-generated."
 )
 
-// Options carries the per-send presentation inputs. Everything in here
-// varies per guild or per event, never per provider.
+// Options holds the per-guild and per-message rendering settings.
+// Nothing in here depends on the provider.
 type Options struct {
 	TagsEnabled   bool
 	Crosspost     bool
@@ -27,7 +27,7 @@ type Options struct {
 	Reference     *discordgo.MessageReference
 }
 
-// Input is one artwork awaiting rendering.
+// Input is an artwork waiting to be rendered.
 type Input struct {
 	ID            string
 	Footer        string
@@ -35,7 +35,7 @@ type Input struct {
 	SkipFirstPage bool
 }
 
-// Bundle pairs sent messages with the artwork they came from.
+// Bundle groups the messages built for one artwork.
 type Bundle struct {
 	ID    string
 	Sends []*discordgo.MessageSend
@@ -129,8 +129,8 @@ func pageImage(eb *embeds.Builder, image artworks.RenderedImage) {
 	}
 }
 
-// description composes the first-page description from the artwork text
-// and its tag block.
+// description builds the first page's text from the artwork's text and
+// its tags.
 func description(r artworks.Rendered, tagsEnabled bool) string {
 	desc := r.Description
 
@@ -155,8 +155,8 @@ func description(r artworks.Rendered, tagsEnabled bool) string {
 	return desc
 }
 
-// decorate stamps every page with the crosspost author or the reply
-// reference.
+// decorate adds the crosspost author or the reply reference to every
+// page.
 func decorate(sends []*discordgo.MessageSend, opts Options) {
 	for _, send := range sends {
 		if send == nil || len(send.Embeds) == 0 || send.Embeds[0] == nil {

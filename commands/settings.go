@@ -18,18 +18,18 @@ import (
 
 const successColor = 0x3ba55c
 
-// canManage reports whether permissions allow changing settings.
 func canManage(perms int64) bool {
 	return perms&(discordgo.PermissionAdministrator|discordgo.PermissionManageGuild) != 0
 }
 
-// toggle is one on/off setting, shared by /set, the panel and displays.
+// toggle is an on/off setting. One definition drives its /set
+// subcommand, its panel button and how it's displayed.
 type toggle struct {
-	// name is the /set subcommand and the panel's custom ID key.
+	// name is the /set subcommand and the key in panel button IDs.
 	name    string
 	aliases []string
 	label   string
-	// short labels the panel button.
+	// short is the panel button label.
 	short   string
 	hint    string
 	section string
@@ -48,7 +48,7 @@ func providerToggle(info artworks.Info) toggle {
 	}
 }
 
-// postingToggles are the fixed toggles; sources come from the providers.
+// postingToggles never change; source toggles are added per provider.
 var postingToggles = []toggle{
 	{
 		name: "tags", label: "Tags", short: "Tags", section: "posting",
@@ -88,7 +88,7 @@ var postingToggles = []toggle{
 	},
 }
 
-// settingsSpec is every toggle: the fixed posting ones plus one per
+// settingsSpec holds all toggles: the posting ones plus one for each
 // registered provider.
 type settingsSpec struct {
 	toggles []toggle
@@ -121,7 +121,7 @@ func (s *settingsSpec) in(section string) []toggle {
 	return out
 }
 
-// sourceLabels lists the providers by display name.
+// sourceLabels returns the provider names, comma separated.
 func (s *settingsSpec) sourceLabels() string {
 	labels := make([]string, 0, 4)
 	for _, t := range s.in("sources") {
@@ -209,7 +209,7 @@ func formatTTL(d time.Duration) string {
 	}
 }
 
-// settingChange describes an applied change for the confirmation reply.
+// settingChange is what a change did, for the confirmation reply.
 type settingChange struct {
 	name, old, new, hint string
 }

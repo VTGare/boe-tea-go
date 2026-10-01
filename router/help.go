@@ -108,7 +108,8 @@ type helpView struct {
 
 	guildID, channelID string
 	userID             string
-	// prefix is set when help was invoked over prefix: prefix syntax leads.
+	// prefix is true when help was run as a prefix command, so prefix syntax
+	// is shown first.
 	prefix bool
 	// usedPrefix is the prefix help was invoked with, if any.
 	usedPrefix string

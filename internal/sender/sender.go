@@ -1,4 +1,5 @@
-// Package sender owns every Discord write the artwork pipeline performs.
+// Package sender does all the Discord writes for posting artwork, so the
+// pipeline can be tested without Discord.
 package sender
 
 import (
@@ -8,9 +9,8 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
-// ErrSkipped reports that a send was skipped because the bot lacks the
-// required channel permissions. It is not a failure: callers should
-// drop the message and continue with the next one.
+// ErrSkipped means a send was skipped because the bot lacks channel
+// permissions. It isn't a failure: drop the message and move on.
 var ErrSkipped = errors.New("sender: skipped, missing permissions")
 
 // SendPermissions is the permission set for posting artwork.
@@ -25,22 +25,19 @@ type Sender interface {
 	// lacks the required permissions.
 	SendEmbed(guildID, channelID string, embed *discordgo.MessageEmbed) (*discordgo.Message, error)
 
-	// DeleteMessage deletes a message, used by the strict repost path.
+	// DeleteMessage deletes a message, e.g. a repost in strict mode.
 	DeleteMessage(guildID, channelID, messageID string) error
 
 	// AddReaction adds a bookmark reaction to a message.
 	AddReaction(guildID, channelID, messageID, emoji string) error
 
-	// EditEmbed replaces a message's embeds, used by the reaction
-	// pagination widget.
+	// EditEmbed replaces a message's embeds.
 	EditEmbed(guildID, channelID, messageID string, embed *discordgo.MessageEmbed) (*discordgo.Message, error)
 
-	// RemoveReaction removes one user's reaction, used by the reaction
-	// pagination widget.
+	// RemoveReaction removes one user's reaction.
 	RemoveReaction(guildID, channelID, messageID, emoji, userID string) error
 
-	// RemoveAllReactions clears a message's reactions, used by the
-	// reaction pagination widget's stop control.
+	// RemoveAllReactions clears a message's reactions.
 	RemoveAllReactions(guildID, channelID, messageID string) error
 
 	// ChannelGuildID resolves which guild a channel belongs to.

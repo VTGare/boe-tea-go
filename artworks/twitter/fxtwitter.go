@@ -69,10 +69,9 @@ func newFxTwitter() artworks.Provider {
 	}
 }
 
-// pickVariant returns the highest bitrate mp4 variant that fits into
-// maxVideoBytes, verified with a HEAD request. It returns an empty
-// string when nothing fits: oversized videos are never downloaded,
-// callers fall back to a link instead.
+// pickVariant picks the highest-bitrate mp4 under maxVideoBytes,
+// checking sizes with a HEAD request. It returns "" when nothing fits:
+// we never download oversized videos and post a link instead.
 func (fxt *fxTwitter) pickVariant(fallback string, variants []fxVideoVariant) string {
 	mp4 := mp4Variants(variants)
 

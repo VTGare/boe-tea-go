@@ -8,17 +8,17 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
-// Config bounds concurrent media payloads and locates the on-disk
-// spool. Files are removed right after sending, so there are no
-// retention bounds. Zero values select defaults.
+// Config limits how many media payloads are in flight and where they're
+// spooled on disk. Files are deleted right after sending, so nothing
+// piles up. Zero values mean defaults.
 type Config struct {
-	// MaxConcurrent bounds simultaneous payloads in flight.
+	// MaxConcurrent caps how many payloads are in flight at once.
 	MaxConcurrent int
 
 	Dir string
 }
 
-// DefaultMaxConcurrent bounds simultaneous payloads in flight.
+// DefaultMaxConcurrent is the default Config.MaxConcurrent.
 const DefaultMaxConcurrent = 5
 
 // DefaultDir returns the built-in spool directory.
@@ -39,9 +39,9 @@ var (
 	dir   = DefaultDir()
 )
 
-// Configure applies the config, filling zero values with defaults. It
-// ensures the directory exists and sweeps files left behind by previous
-// runs. Call once at startup. It returns the effective config.
+// Configure applies the config, using defaults for zero values, creates
+// the directory and deletes files left over from earlier runs. Call it
+// once at startup. It returns the config actually in use.
 func Configure(c Config) Config {
 	defaults := DefaultConfig()
 
@@ -62,8 +62,8 @@ func Configure(c Config) Config {
 	return defaults
 }
 
-// Acquire waits for a free payload slot. Payloads beyond the bound wait
-// instead of buffering unboundedly in memory.
+// Acquire waits for a free payload slot, so big uploads queue up instead
+// of piling up in memory.
 func Acquire() {
 	slots <- struct{}{}
 }
@@ -130,9 +130,8 @@ func RemoveFiles(files []*discordgo.File) {
 	}
 }
 
-// Sweep deletes files left behind by previous runs. Everything in the
-// directory is an orphan by definition: this process just started, so
-// nothing can hold a reference to them.
+// Sweep deletes everything in the spool directory. It runs at startup,
+// when nothing there can still be in use.
 func Sweep() {
 	entries, err := os.ReadDir(dir)
 	if err != nil {

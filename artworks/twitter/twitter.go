@@ -17,7 +17,6 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
-// Common Twitter errors
 var (
 	ErrTweetNotFound  = errors.New("tweet not found")
 	ErrPrivateAccount = errors.New("unable to view this tweet because account is private")
@@ -100,7 +99,6 @@ func (a *Artwork) StoreArtwork() *store.Artwork {
 	}
 }
 
-// Render returns the artwork as data for the render module.
 func (a *Artwork) Render() (artworks.Rendered, error) {
 	if a.FullName == "" && a.Len() == 0 {
 		return artworks.Rendered{

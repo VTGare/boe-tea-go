@@ -16,8 +16,8 @@ import (
 //go:embed migrations/*.sql
 var migrationFiles embed.FS
 
-// migrationLock is the advisory lock key serialising migrations across
-// bot instances.
+// migrationLock is the Postgres advisory lock that stops two bot
+// instances from migrating at the same time.
 const migrationLock = 7_241_503
 
 type migration struct {

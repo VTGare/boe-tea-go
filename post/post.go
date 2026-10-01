@@ -13,7 +13,8 @@ type SkipFilter struct {
 	Indices map[int]struct{}
 }
 
-// Post is one immutable artwork-posting run, safe to share across sends.
+// Post describes one artwork-posting run. It's never modified, so it's
+// safe to share between sends.
 type Post struct {
 	GuildID   string
 	ChannelID string

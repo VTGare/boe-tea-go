@@ -19,13 +19,12 @@ type Provider interface {
 
 // Info describes a provider to guild settings.
 type Info struct {
-	// Key identifies the provider in stored guild settings and names its
-	// /set subcommand: lowercase letters, digits and dashes. It is
-	// persisted, so never change it once released.
+	// Key is saved in guild settings and is also the provider's /set
+	// subcommand, so stick to lowercase letters, digits and dashes, and
+	// never change it after release.
 	Key string
 	// Label is the display name in embeds.
-	Label string
-	// Aliases are extra /set names, kept for renamed settings.
+	Label   string
 	Aliases []string
 }
 
@@ -37,21 +36,21 @@ type Artwork interface {
 	Len() int
 }
 
-// RenderedImage is one page of artwork. A non-empty Original gains an
-// "Original quality" field on its page when rendered.
+// RenderedImage is a single page. If Original is set, the page gets an
+// "Original quality" link.
 type RenderedImage struct {
 	Preview  string
 	Original string
 }
 
-// RenderedField is one stat line on an embed.
+// RenderedField is an extra name/value line on the embed.
 type RenderedField struct {
 	Name   string
 	Value  string
 	Inline bool
 }
 
-// Rendered is the data a Provider hands to the render module.
+// Rendered is everything the render package needs to build a provider's embeds.
 type Rendered struct {
 	Title           string
 	URL             string

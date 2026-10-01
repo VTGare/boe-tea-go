@@ -18,9 +18,9 @@ func ChannelPermissions(s *discordgo.Session, channelID string) (int64, error) {
 	return s.State.UserChannelPermissions(s.State.User.ID, channelID)
 }
 
-// CheckChannelPerms reports whether the session's user holds the given
-// permissions in a channel. It fails open: lookup errors return true
-// with the error so the caller can attempt the send anyway.
+// CheckChannelPerms reports whether the session's user has the given
+// permissions in a channel. If the lookup fails it returns true along
+// with the error, so the caller can still try to send.
 func CheckChannelPerms(s *discordgo.Session, channelID string, permissions int64) (bool, error) {
 	perms, err := ChannelPermissions(s, channelID)
 	if err != nil {

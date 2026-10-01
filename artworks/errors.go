@@ -5,10 +5,6 @@ import (
 	"fmt"
 )
 
-// Common errors.
-//
-// ErrArtworkNotFound reports a provider fetch failure and renders
-// user-facing errors.
 var (
 	ErrArtworkNotFound = errors.New("artwork not found")
 	ErrRateLimited     = errors.New("provider rate limited")

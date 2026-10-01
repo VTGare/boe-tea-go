@@ -62,9 +62,9 @@ type RemovedReaction struct {
 	UserID    string
 }
 
-// FakeSender is the test Sender adapter. It records every call behind
-// a mutex and answers from its configurable fields. Use NewFake so
-// permission checks default to allowed.
+// FakeSender is a Sender for tests. It records every call and answers
+// lookups from its fields. Create it with NewFake so permission checks
+// pass by default.
 type FakeSender struct {
 	mu sync.Mutex
 
@@ -95,8 +95,8 @@ type FakeSender struct {
 	DeleteErr error
 	ReactErr  error
 
-	// Skip makes sends fail with ErrSkipped, exercising the
-	// permission-skip path without touching permission flags.
+	// Skip makes every send return ErrSkipped, as if the bot lacked
+	// permissions.
 	Skip bool
 
 	counter int

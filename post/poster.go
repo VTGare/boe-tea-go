@@ -71,7 +71,7 @@ func NewPoster(deps Deps) *Poster {
 	}
 }
 
-// Send runs the pipeline.
+// Send posts the artworks for run.
 func (r *Poster) Send(ctx context.Context, run Post) ([]*cache.MessageInfo, error) {
 	guild, err := r.deps.Guilds.Guild(ctx, run.GuildID)
 	if err != nil {
@@ -118,7 +118,7 @@ func (r *Poster) Send(ctx context.Context, run Post) ([]*cache.MessageInfo, erro
 		errs = append(errs, err)
 	}
 
-	// Repost notices are auxiliary. Failures stay in the logs, never fail the run.
+	// Repost notices are extra: if one fails, log it and carry on.
 	_ = r.notifyReposts(guild, run, fetched.reposts, fetched.matched)
 
 	sent := pagesToInfos(pages)
@@ -135,7 +135,8 @@ func (r *Poster) Send(ctx context.Context, run Post) ([]*cache.MessageInfo, erro
 	return sent, errors.Join(errs...)
 }
 
-// Crosspost fans out without mutating group; per-channel failures join.
+// Crosspost posts to every channel in group. A failed channel doesn't
+// stop the others; all errors are returned together.
 func (r *Poster) Crosspost(ctx context.Context, run Post, userID string, group *store.Group) ([]*cache.MessageInfo, error) {
 	user, err := r.deps.Users.User(ctx, userID)
 	if err != nil {

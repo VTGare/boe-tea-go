@@ -17,7 +17,7 @@ import (
 // artChannelTypes are channels Boe Tea can post artwork in.
 var artChannelTypes = []discordgo.ChannelType{discordgo.ChannelTypeGuildText, discordgo.ChannelTypeGuildNews}
 
-// channelsPerPage bounds one /channels list page.
+// channelsPerPage is how many channels one /channels list page shows.
 const channelsPerPage = 20
 
 func channelsCommand(b *bot.Bot) *router.Command {
@@ -59,7 +59,7 @@ func channelsCommand(b *bot.Bot) *router.Command {
 	}
 }
 
-// guildChannels lists a guild's channels, state cache first.
+// guildChannels returns a guild's channels, from the state cache if it can.
 func guildChannels(s *discordgo.Session, guildID string) ([]*discordgo.Channel, error) {
 	if s.State != nil {
 		if g, err := s.State.Guild(guildID); err == nil && len(g.Channels) > 0 {
@@ -70,8 +70,8 @@ func guildChannels(s *discordgo.Session, guildID string) ([]*discordgo.Channel, 
 	return s.GuildChannels(guildID)
 }
 
-// pickedChannels resolves IDs against the guild's channels. IDs of
-// deleted channels resolve to bare placeholders so they can be removed.
+// pickedChannels looks up IDs among the guild's channels. Unknown IDs
+// (deleted channels) become placeholders so they can still be removed.
 func pickedChannels(all []*discordgo.Channel, ids []string) []*discordgo.Channel {
 	picked := make([]*discordgo.Channel, 0, len(ids))
 	for _, id := range ids {
@@ -86,9 +86,9 @@ func pickedChannels(all []*discordgo.Channel, ids []string) []*discordgo.Channel
 	return picked
 }
 
-// expandArtChannels turns picks into postable channel IDs: categories
-// become their text channels, other channel types are dropped, and
-// duplicates are skipped.
+// expandArtChannels turns picked channels into the IDs to store: a
+// category becomes its text channels, other channel types are dropped,
+// and duplicates are skipped.
 func expandArtChannels(all, picked []*discordgo.Channel) []string {
 	ids := make([]string, 0, len(picked))
 	add := func(c *discordgo.Channel) {
@@ -201,8 +201,8 @@ func listChannels(b *bot.Bot) router.Handler {
 			return err
 		}
 
-		// Channels deleted while the bot was offline never fired a delete
-		// event; drop them now.
+		// Channels deleted while the bot was offline never sent a delete event,
+		// so clean them up here.
 		deleted := slices.DeleteFunc(slices.Clone(guild.ArtChannels), func(id string) bool {
 			return slices.ContainsFunc(all, func(c *discordgo.Channel) bool { return c.ID == id })
 		})
