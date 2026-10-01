@@ -3,6 +3,7 @@ package sender
 import (
 	"fmt"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/VTGare/boe-tea-go/internal/spool"
@@ -17,6 +18,14 @@ type DiscordSender struct {
 	manager  *shards.Manager
 	fallback *discordgo.Session
 	log      *zap.SugaredLogger
+
+	// ready holds each shard's session by shard ID, filled in as shards
+	// become ready. The manager stays locked until every shard has
+	// connected, which takes over a minute at startup, so lookups go here
+	// first to avoid waiting on it.
+	mu         sync.RWMutex
+	ready      map[int]*discordgo.Session
+	shardCount int
 }
 
 func NewDiscordSender(manager *shards.Manager, log *zap.SugaredLogger, fallback *discordgo.Session) *DiscordSender {
@@ -24,15 +33,49 @@ func NewDiscordSender(manager *shards.Manager, log *zap.SugaredLogger, fallback 
 		log = zap.NewNop().Sugar()
 	}
 
-	return &DiscordSender{
+	d := &DiscordSender{
 		manager:  manager,
 		fallback: fallback,
 		log:      log,
+		ready:    make(map[int]*discordgo.Session),
 	}
+
+	if manager != nil {
+		manager.AddHandler(d.trackShard)
+	}
+
+	return d
+}
+
+// trackShard remembers a shard's session once it's ready.
+func (d *DiscordSender) trackShard(s *discordgo.Session, _ *discordgo.Ready) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	d.ready[s.ShardID] = s
+	d.shardCount = max(s.ShardCount, 1)
+}
+
+// readyShard returns the session of a ready shard that owns guildID (0
+// for DMs), or nil if that shard isn't ready yet.
+func (d *DiscordSender) readyShard(guildID int64) *discordgo.Session {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+
+	if d.shardCount == 0 {
+		return nil
+	}
+
+	return d.ready[int((guildID>>22)%int64(d.shardCount))]
 }
 
 func (d *DiscordSender) sessionFor(guildID string) (*discordgo.Session, error) {
 	if guildID == "" {
+		// Only shard 0 receives DMs.
+		if s := d.readyShard(0); s != nil {
+			return s, nil
+		}
+
 		if d.manager != nil {
 			if s := d.manager.SessionForDM(); s != nil {
 				return s, nil
@@ -46,12 +89,16 @@ func (d *DiscordSender) sessionFor(guildID string) (*discordgo.Session, error) {
 		return nil, fmt.Errorf("no session for DM")
 	}
 
-	if d.manager != nil {
-		id, err := strconv.ParseInt(guildID, 10, 64)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse guild id: %w", err)
-		}
+	id, err := strconv.ParseInt(guildID, 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse guild id: %w", err)
+	}
 
+	if s := d.readyShard(id); s != nil {
+		return s, nil
+	}
+
+	if d.manager != nil {
 		if s := d.manager.SessionForGuild(id); s != nil {
 			return s, nil
 		}

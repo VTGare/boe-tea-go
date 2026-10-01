@@ -3,6 +3,8 @@ package sender
 import (
 	"errors"
 	"net/http"
+	"strconv"
+	"time"
 
 	"github.com/bwmarrin/discordgo"
 	. "github.com/onsi/ginkgo/v2"
@@ -386,5 +388,72 @@ var _ = Describe("DiscordSender", func() {
 		_, err = d.IsMember("1", "u")
 
 		Expect(err).To(HaveOccurred())
+	})
+})
+
+var _ = Describe("DiscordSender ready shards", func() {
+	nopLog := zap.NewNop().Sugar()
+
+	// Discord routes a guild to shard (id >> 22) % shard count.
+	guildOnShard := func(shard int) string {
+		return strconv.FormatInt(int64(shard)<<22, 10)
+	}
+
+	ready := func(d *DiscordSender, count int) []*discordgo.Session {
+		sessions := make([]*discordgo.Session, count)
+		for i := range sessions {
+			sessions[i] = &discordgo.Session{ShardID: i, ShardCount: count}
+			d.trackShard(sessions[i], &discordgo.Ready{})
+		}
+		return sessions
+	}
+
+	It("routes guilds to the shard that owns them", func() {
+		d := NewDiscordSender(nil, nopLog, nil)
+		sessions := ready(d, 3)
+
+		for shard := range 3 {
+			s, err := d.sessionFor(guildOnShard(shard))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(s).To(BeIdenticalTo(sessions[shard]))
+		}
+	})
+
+	It("sends DMs through shard 0", func() {
+		d := NewDiscordSender(nil, nopLog, nil)
+		sessions := ready(d, 2)
+
+		s, err := d.sessionFor("")
+		Expect(err).NotTo(HaveOccurred())
+		Expect(s).To(BeIdenticalTo(sessions[0]))
+	})
+
+	It("doesn't wait for the manager while the other shards are still starting", func() {
+		// The manager holds its lock until every shard has connected.
+		mgr := &shards.Manager{}
+		d := NewDiscordSender(mgr, nopLog, nil)
+		sessions := ready(d, 2)
+
+		mgr.Lock()
+		defer mgr.Unlock()
+
+		found := make(chan *discordgo.Session, 1)
+		go func() {
+			s, _ := d.sessionFor(guildOnShard(1))
+			found <- s
+		}()
+
+		Eventually(found).WithTimeout(time.Second).Should(Receive(BeIdenticalTo(sessions[1])))
+	})
+
+	It("asks the manager for shards that aren't ready yet", func() {
+		fallback := &discordgo.Session{}
+		d := NewDiscordSender(&shards.Manager{}, nopLog, fallback)
+		ready(d, 2)
+		d.ready = map[int]*discordgo.Session{0: d.ready[0]}
+
+		s, err := d.sessionFor(guildOnShard(1))
+		Expect(err).NotTo(HaveOccurred())
+		Expect(s).To(BeIdenticalTo(fallback))
 	})
 })
