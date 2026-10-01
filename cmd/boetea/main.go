@@ -36,7 +36,7 @@ import (
 )
 
 func initStore(ctx context.Context, cfg *config.Config) (store.Store, error) {
-	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	connectCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
 
 	resolved, err := cfg.StoreBackend()
@@ -48,18 +48,23 @@ func initStore(ctx context.Context, cfg *config.Config) (store.Store, error) {
 
 	switch resolved.Backend {
 	case "postgres":
-		backend, err = postgres.New(ctx, resolved.Postgres.DSN)
+		backend, err = postgres.New(connectCtx, resolved.Postgres.DSN)
 		if err != nil {
 			return nil, err
 		}
 	default:
-		backend, err = mongo.New(ctx, resolved.Mongo.URI, resolved.Mongo.Database)
+		backend, err = mongo.New(connectCtx, resolved.Mongo.URI, resolved.Mongo.Database)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	if err := backend.Init(ctx); err != nil {
+	// Init applies migrations, which can rewrite whole tables and take
+	// minutes, so it gets far longer than connecting does.
+	initCtx, cancelInit := context.WithTimeout(ctx, 30*time.Minute)
+	defer cancelInit()
+
+	if err := backend.Init(initCtx); err != nil {
 		return nil, err
 	}
 
