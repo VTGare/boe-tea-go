@@ -242,6 +242,12 @@ func share(b *bot.Bot, defaultMode post.SkipMode) router.Handler {
 			return err
 		}
 
+		// A prefix command's own message already shows who shared the link.
+		// Only a slash command needs a reply, since Discord expects one.
+		if !ctx.IsInteraction() {
+			return nil
+		}
+
 		return shareAck(ctx, run)
 	}
 }

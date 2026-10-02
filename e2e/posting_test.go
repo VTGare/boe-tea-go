@@ -103,6 +103,28 @@ func embedImagesAfter(h *harness, channelID, seedID string) []string {
 	return images
 }
 
+// shareAcksAfter counts "X shared <link>" replies, which only slash
+// commands should get.
+func shareAcksAfter(h *harness, channelID, seedID string) int {
+	msgs, err := h.session.ChannelMessages(channelID, 25, "", seedID, "")
+	Expect(err).NotTo(HaveOccurred())
+
+	count := 0
+	for _, m := range msgs {
+		if m == nil {
+			continue
+		}
+
+		for _, e := range m.Embeds {
+			if e != nil && strings.Contains(e.Description, " shared <") {
+				count++
+			}
+		}
+	}
+
+	return count
+}
+
 func newestMessageID(h *harness, channelID string) string {
 	msgs, err := h.session.ChannelMessages(channelID, 1, "", "", "")
 	Expect(err).NotTo(HaveOccurred())
@@ -804,6 +826,7 @@ var _ = Describe("Share command", func() {
 			HaveLen(2),
 			ContainElements("https://example.com/1.png", "https://example.com/3.png"),
 		))
+		Expect(shareAcksAfter(h, h.cfg.channelID, seed.ID)).To(BeZero())
 		cleanupAfter(h, h.cfg.channelID, seed.ID)
 
 		cached, ok := b.EmbedCache.Get(h.cfg.channelID, seed.ID)
