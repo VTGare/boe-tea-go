@@ -8,3 +8,4 @@ docs/
 AGENTS.md
 Dockerfile
 compose.yaml
+pximg-proxy/

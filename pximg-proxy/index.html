@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pixiv image proxy</title>
+<meta name="description" content="Open and embed Pixiv images anywhere by swapping i.pximg.net for boetea.dev.">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#893d42">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2391454e'/%3E%3Cpath d='M9 13h12v5a6 6 0 0 1-12 0z M21 14h2a2.5 2.5 0 0 1 0 5h-2' fill='none' stroke='%23fff' stroke-width='2.2' stroke-linejoin='round'/%3E%3C/svg%3E">
+<style>
+:root {
+	--bg: #fcf3ea;
+	--surface: #fffaf5;
+	--text: #1c1718;
+	--muted: #6e5458;
+	--border: #ecd6c6;
+	--accent: #91454e;
+	--accent-text: #823f49;
+	--on-accent: #fffaf5;
+	--code-bg: #f6e3d3;
+	--bad: #b3363f;
+	--old: #7a5a6c;
+	--band-a: #893d42;
+	--band-b: #a05863;
+	--band-text: #fae5d1;
+	--band-dot: #f597a4;
+}
+@media (prefers-color-scheme: dark) {
+	:root {
+		--bg: #1a0d10;
+		--surface: #24131a;
+		--text: #fae5d1;
+		--muted: #c7a3a3;
+		--border: #42232b;
+		--accent: #f597a4;
+		--accent-text: #f7a9b4;
+		--on-accent: #2b0c12;
+		--code-bg: #2f1820;
+		--bad: #ff8f86;
+		--old: #bb88aa;
+		--band-a: #2b0c12;
+		--band-b: #492229;
+		--band-text: #fae5d1;
+		--band-dot: #f597a4;
+	}
+}
+* { box-sizing: border-box; }
+::selection { background: #f597a4; color: #2b0c12; }
+body {
+	margin: 0;
+	background: var(--bg);
+	color: var(--text);
+	font: 16px/1.65 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+header {
+	background: linear-gradient(160deg, var(--band-a) 0 46%, var(--band-b) 46% 100%);
+	color: var(--band-text);
+}
+header div, main { max-width: 680px; margin: 0 auto; padding: 0 16px; }
+header div { padding-top: 44px; padding-bottom: 40px; }
+h1 { font-size: 2.25rem; line-height: 1.1; margin: 0; letter-spacing: -0.02em; font-weight: 700; }
+h1 span { color: var(--band-dot); }
+main { padding-top: 32px; padding-bottom: 40px; }
+h2 { font-size: 1.1rem; margin: 40px 0 10px; }
+p { margin: 0 0 12px; }
+a { color: var(--accent-text); text-underline-offset: 3px; }
+a:hover { text-decoration-thickness: 2px; }
+code {
+	font: 0.88em/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+	background: var(--code-bg);
+	padding: 1px 5px;
+	border-radius: 4px;
+	overflow-wrap: anywhere;
+}
+.card {
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: 12px;
+	padding: 20px;
+}
+.swap {
+	display: grid;
+	gap: 8px;
+	margin: 20px 0 24px;
+	padding: 14px 16px;
+	background: var(--code-bg);
+	border-radius: 12px;
+	font: 0.85rem/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+.swap div { display: flex; gap: 12px; align-items: baseline; }
+.swap b {
+	flex: none;
+	width: 3.6em;
+	font: 600 0.7rem/1.5 system-ui, sans-serif;
+	color: var(--muted);
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+}
+.swap span { word-break: break-all; }
+.swap .host-old { color: var(--old); text-decoration: line-through; text-decoration-thickness: 1.5px; }
+.swap .host-new { color: var(--accent-text); font-weight: 700; }
+label { display: block; font-weight: 600; margin-bottom: 8px; }
+input {
+	width: 100%;
+	font: inherit;
+	font-size: 0.95rem;
+	padding: 11px 12px;
+	border: 1px solid var(--border);
+	border-radius: 8px;
+	background: var(--bg);
+	color: var(--text);
+}
+input::placeholder { color: var(--muted); opacity: 0.8; }
+input:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: transparent; }
+#result { margin-top: 12px; }
+#result[hidden] { display: none; }
+.out { display: flex; gap: 8px; align-items: stretch; }
+.out a {
+	flex: 1;
+	min-width: 0;
+	padding: 10px 12px;
+	background: var(--code-bg);
+	border-radius: 8px;
+	font: 0.85rem/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+	overflow-wrap: anywhere;
+	text-decoration: none;
+}
+button {
+	font: inherit;
+	font-size: 0.9rem;
+	font-weight: 600;
+	min-width: 84px;
+	padding: 0 16px;
+	border: 0;
+	border-radius: 8px;
+	background: var(--accent);
+	color: var(--on-accent);
+	cursor: pointer;
+	white-space: nowrap;
+}
+button:hover { filter: brightness(1.1); }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+#preview {
+	display: block;
+	max-width: 100%;
+	max-height: 320px;
+	margin-top: 12px;
+	border-radius: 8px;
+	border: 1px solid var(--border);
+}
+#error { color: var(--bad); margin: 12px 0 0; }
+ul { padding-left: 20px; margin: 0 0 12px; }
+li { margin-bottom: 6px; }
+li::marker { color: var(--accent); }
+footer { margin-top: 48px; padding-top: 20px; border-top: 1px solid var(--border); color: var(--muted); font-size: 0.9rem; }
+@media (max-width: 480px) {
+	header div { padding-top: 32px; padding-bottom: 28px; }
+	h1 { font-size: 1.9rem; }
+	.out { flex-direction: column; }
+	button { padding: 10px 16px; }
+	.swap div { flex-direction: column; gap: 0; }
+}
+</style>
+</head>
+<body>
+<header><div><h1>boetea<span>.dev</span></h1></div></header>
+<main>
+	<p>Pixiv's image server, <code>i.pximg.net</code>, refuses to serve images to anything that isn't pixiv.net. Open an image link in a new tab, embed it on a forum or post it in a chat, and you get <em>403 Forbidden</em>. Replace the domain with <code>boetea.dev</code> and the same link works everywhere.</p>
+
+	<div class="swap" aria-label="Example">
+		<div><b>Before</b><span>https://<span class="host-old">i.pximg.net</span>/img-original/img/2025/08/09/00/51/34/133648578_p0.jpg</span></div>
+		<div><b>After</b><span>https://<span class="host-new">boetea.dev</span>/img-original/img/2025/08/09/00/51/34/133648578_p0.jpg</span></div>
+	</div>
+
+	<div class="card">
+		<label for="link">Convert a link</label>
+		<input id="link" type="url" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://i.pximg.net/img-original/img/…">
+		<div id="result" hidden>
+			<div class="out">
+				<a id="out" target="_blank" rel="noopener"></a>
+				<button id="copy" type="button">Copy</button>
+			</div>
+			<img id="preview" alt="Preview">
+		</div>
+		<p id="error" hidden></p>
+	</div>
+
+	<h2>Finding an image link</h2>
+	<p>Open the artwork on pixiv, open the image you want, then right-click it and choose <em>Copy image address</em>. Links to artwork pages (<code>pixiv.net/artworks/…</code>) aren't images, so they can't be converted.</p>
+
+	<h2>What works</h2>
+	<ul>
+		<li>Original files (<code>/img-original/</code>), resized images (<code>/img-master/</code>), thumbnails (<code>/c/</code>, <code>/custom-thumb/</code>), avatars (<code>/user-profile/</code>) and ugoira zips (<code>/img-zip-ugoira/</code>).</li>
+		<li>Every rating, including R-18 works.</li>
+		<li>Images are cached, so links stay fast after the first load.</li>
+	</ul>
+
+	<footer>
+		Run by <a href="https://github.com/VTGare/boe-tea-go">Boe Tea</a>, a Discord bot that reposts artwork from Pixiv, Twitter, Bluesky and DeviantArt with working embeds. <a href="https://discord.com/api/oauth2/authorize?client_id=636468907049353216&amp;permissions=537259072&amp;scope=bot">Invite it to your server</a>.
+	</footer>
+</main>
+<script>
+const ALLOWED = /^\/(img-original|img-master|c|custom-thumb|user-profile|img-zip-ugoira)\//;
+const input = document.getElementById("link");
+const result = document.getElementById("result");
+const out = document.getElementById("out");
+const preview = document.getElementById("preview");
+const error = document.getElementById("error");
+const copy = document.getElementById("copy");
+
+function convert(raw) {
+	if (raw.startsWith("/")) raw = "https://i.pximg.net" + raw;
+	else if (!raw.includes("://")) raw = "https://" + raw;
+
+	let url;
+	try {
+		url = new URL(raw);
+	} catch {
+		return { error: "That doesn't look like a link." };
+	}
+
+	if (/(^|\.)pixiv\.net$/.test(url.hostname)) {
+		return { error: "That's an artwork page, not an image. Open the image on pixiv, right-click it, choose “Copy image address” and paste that here." };
+	}
+	if (!/(^|\.)pximg\.net$/.test(url.hostname)) {
+		return { error: "Paste a link that starts with https://i.pximg.net/." };
+	}
+	if (!ALLOWED.test(url.pathname)) {
+		return { error: "That kind of pximg link isn't supported." };
+	}
+	return { url: location.origin + url.pathname };
+}
+
+function update() {
+	const raw = input.value.trim();
+	const res = raw ? convert(raw) : {};
+
+	error.hidden = !res.error;
+	error.textContent = res.error || "";
+	result.hidden = !res.url;
+	if (!res.url) return;
+
+	out.href = out.textContent = res.url;
+	copy.textContent = "Copy";
+	preview.hidden = false;
+	preview.src = res.url;
+}
+
+input.addEventListener("input", update);
+preview.addEventListener("error", () => { preview.hidden = true; });
+copy.addEventListener("click", async () => {
+	try {
+		await navigator.clipboard.writeText(out.href);
+		copy.textContent = "Copied";
+		setTimeout(() => { copy.textContent = "Copy"; }, 2000);
+	} catch {
+		getSelection().selectAllChildren(out);
+	}
+});
+</script>
+</body>
+</html>
