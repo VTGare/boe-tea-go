@@ -2,14 +2,14 @@ package widget
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
-	"net/http"
-	"net/http/httptest"
-	"sync"
 	"time"
 
-	"github.com/bwmarrin/discordgo"
+	gt "github.com/VTGare/gumi/v2/gumitest"
+	"github.com/disgoorg/disgo/bot"
+	"github.com/disgoorg/disgo/discord"
+	"github.com/disgoorg/disgo/events"
+	"github.com/disgoorg/snowflake/v2"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -17,77 +17,40 @@ import (
 
 var errTestFailure = errors.New("test failure")
 
-func testPages() []*discordgo.MessageEmbed {
-	return []*discordgo.MessageEmbed{{Title: "one"}, {Title: "two"}, {Title: "three"}}
+const (
+	author   snowflake.ID = 7
+	stranger snowflake.ID = 8
+)
+
+func testPages() []*discord.Embed {
+	return []*discord.Embed{{Title: "one"}, {Title: "two"}, {Title: "three"}}
 }
 
-type recordedResponse struct {
-	Type discordgo.InteractionResponseType `json:"type"`
-	Data responseData                      `json:"data"`
+func click(c *bot.Client, userID snowflake.ID, customID string) *events.ComponentInteractionCreate {
+	e := gt.Button(userID, customID).Event(c)
+
+	return &events.ComponentInteractionCreate{
+		GenericEvent:         e.GenericEvent,
+		ComponentInteraction: e.Interaction.(discord.ComponentInteraction),
+		Respond:              e.Respond,
+	}
 }
 
-type responseData struct {
-	Embeds     []*discordgo.MessageEmbed `json:"embeds"`
-	Components []json.RawMessage         `json:"components"`
-	Content    string                    `json:"content"`
-	Flags      discordgo.MessageFlags    `json:"flags"`
+func embedTitle(response map[string]any) string {
+	embeds, _ := response["embeds"].([]any)
+	if len(embeds) == 0 {
+		return ""
+	}
+
+	title, _ := embeds[0].(map[string]any)["title"].(string)
+
+	return title
 }
 
-// testAPI reroutes Discord REST calls at the test server and records
-// every interaction response.
-type testAPI struct {
-	mu      sync.Mutex
-	records []recordedResponse
-}
+func ephemeral(response map[string]any) bool {
+	flags, _ := response["flags"].(float64)
 
-func (a *testAPI) handler(w http.ResponseWriter, r *http.Request) {
-	var resp recordedResponse
-	Expect(json.NewDecoder(r.Body).Decode(&resp)).To(Succeed())
-
-	a.mu.Lock()
-	defer a.mu.Unlock()
-
-	a.records = append(a.records, resp)
-	w.WriteHeader(http.StatusOK)
-}
-
-func (a *testAPI) responses() []recordedResponse {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-
-	return append([]recordedResponse(nil), a.records...)
-}
-
-func testSession(api *testAPI) *discordgo.Session {
-	ts := httptest.NewServer(http.HandlerFunc(api.handler))
-	DeferCleanup(ts.Close)
-
-	oldEndpoint := discordgo.EndpointAPI
-	discordgo.EndpointAPI = ts.URL + "/api/v9/"
-	DeferCleanup(func() { discordgo.EndpointAPI = oldEndpoint })
-
-	s, err := discordgo.New("Bot test")
-	Expect(err).NotTo(HaveOccurred())
-	s.Client = ts.Client()
-
-	return s
-}
-
-func clickInteraction(userID, customID string) *discordgo.InteractionCreate {
-	return &discordgo.InteractionCreate{Interaction: &discordgo.Interaction{
-		ID:    "interaction-1",
-		Token: "token-1",
-		Type:  discordgo.InteractionMessageComponent,
-		Member: &discordgo.Member{
-			GuildID: "g",
-			User:    &discordgo.User{ID: userID},
-		},
-		Message: &discordgo.Message{ID: "m", ChannelID: "c"},
-		Data: discordgo.MessageComponentInteractionData{
-			CustomID:      customID,
-			ComponentType: discordgo.ButtonComponent,
-		},
-	}}
+	return discord.MessageFlags(flags).Has(discord.MessageFlagEphemeral)
 }
 
 func actionID(w *Widget, action Action) string {
@@ -116,21 +79,21 @@ var _ = Describe("Custom IDs", func() {
 
 var _ = Describe("Controls", func() {
 	It("renders nothing for a single page", func() {
-		w := New("author", testPages()[:1])
+		w := New(author, testPages()[:1])
 
 		Expect(w.Controls()).To(BeEmpty())
 	})
 
 	It("disables backward controls on the first page", func() {
-		w := New("author", testPages())
-		row, ok := w.Controls()[0].(discordgo.ActionsRow)
+		w := New(author, testPages())
+		row, ok := w.Controls()[0].(discord.ActionRowComponent)
 
 		Expect(ok).To(BeTrue())
 		Expect(row.Components).To(HaveLen(5))
 
-		buttons := make([]discordgo.Button, 0, 5)
+		buttons := make([]discord.ButtonComponent, 0, 5)
 		for _, c := range row.Components {
-			button, ok := c.(discordgo.Button)
+			button, ok := c.(discord.ButtonComponent)
 
 			Expect(ok).To(BeTrue())
 			buttons = append(buttons, button)
@@ -146,14 +109,13 @@ var _ = Describe("Controls", func() {
 
 var _ = Describe("Widget", func() {
 	var (
-		api  *testAPI
-		s    *discordgo.Session
+		c    *bot.Client
+		rec  *gt.Recorder
 		disp *Dispatcher
 	)
 
 	BeforeEach(func() {
-		api = &testAPI{}
-		s = testSession(api)
+		c, rec = gt.NewClient()
 		disp = NewDispatcher()
 	})
 
@@ -174,91 +136,85 @@ var _ = Describe("Widget", func() {
 	}
 
 	It("flips pages on the author's buttons", func() {
-		w := New("author", testPages())
+		w := New(author, testPages())
 		done := serveWidget(w)
 
-		disp.Handle(s, clickInteraction("author", actionID(w, ActionNextPage)))
+		disp.Handle(click(c, author, actionID(w, ActionNextPage)))
 
-		Eventually(api.responses).Should(HaveLen(1))
-		Expect(api.responses()[0].Type).To(Equal(discordgo.InteractionResponseUpdateMessage))
-		Expect(api.responses()[0].Data.Embeds).To(HaveLen(1))
-		Expect(api.responses()[0].Data.Embeds[0].Title).To(Equal("two"))
+		Eventually(rec.Responses).Should(HaveLen(1))
+		Expect(rec.ResponseTypes()[0]).To(Equal(discord.InteractionResponseTypeUpdateMessage))
+		Expect(rec.Responses()[0]["embeds"]).To(HaveLen(1))
+		Expect(embedTitle(rec.Responses()[0])).To(Equal("two"))
 
-		disp.Handle(s, clickInteraction("author", actionID(w, ActionLastPage)))
+		disp.Handle(click(c, author, actionID(w, ActionLastPage)))
 
-		Eventually(api.responses).Should(HaveLen(2))
-		Expect(api.responses()[1].Data.Embeds[0].Title).To(Equal("three"))
+		Eventually(rec.Responses).Should(HaveLen(2))
+		Expect(embedTitle(rec.Responses()[1])).To(Equal("three"))
 
-		disp.Handle(s, clickInteraction("author", actionID(w, ActionFirstPage)))
+		disp.Handle(click(c, author, actionID(w, ActionFirstPage)))
 
-		Eventually(api.responses).Should(HaveLen(3))
-		Expect(api.responses()[2].Data.Embeds[0].Title).To(Equal("one"))
+		Eventually(rec.Responses).Should(HaveLen(3))
+		Expect(embedTitle(rec.Responses()[2])).To(Equal("one"))
 
-		disp.Handle(s, clickInteraction("author", actionID(w, ActionStop)))
+		disp.Handle(click(c, author, actionID(w, ActionStop)))
 
 		Eventually(done).Should(Receive(Succeed()))
 	})
 
 	It("strips buttons on stop", func() {
-		w := New("author", testPages())
+		w := New(author, testPages())
 		done := serveWidget(w)
 
-		disp.Handle(s, clickInteraction("author", actionID(w, ActionStop)))
+		disp.Handle(click(c, author, actionID(w, ActionStop)))
 
 		Eventually(done).Should(Receive(Succeed()))
-		Eventually(api.responses).Should(HaveLen(1))
-		Expect(api.responses()[0].Type).To(Equal(discordgo.InteractionResponseUpdateMessage))
-		Expect(api.responses()[0].Data.Components).To(BeEmpty())
+		Eventually(rec.Responses).Should(HaveLen(1))
+		Expect(rec.ResponseTypes()[0]).To(Equal(discord.InteractionResponseTypeUpdateMessage))
+		Expect(rec.Responses()[0]).To(HaveKeyWithValue("components", BeEmpty()))
 	})
 
 	It("rejects other users without flipping", func() {
-		w := New("author", testPages())
+		w := New(author, testPages())
 		done := serveWidget(w)
 
-		disp.Handle(s, clickInteraction("stranger", actionID(w, ActionNextPage)))
+		disp.Handle(click(c, stranger, actionID(w, ActionNextPage)))
 
-		Eventually(api.responses).Should(HaveLen(1))
-		Expect(api.responses()[0].Type).To(Equal(discordgo.InteractionResponseChannelMessageWithSource))
-		Expect(api.responses()[0].Data.Flags & discordgo.MessageFlagsEphemeral).NotTo(BeZero())
+		Eventually(rec.Responses).Should(HaveLen(1))
+		Expect(rec.ResponseTypes()[0]).To(Equal(discord.InteractionResponseTypeCreateMessage))
+		Expect(ephemeral(rec.Responses()[0])).To(BeTrue())
 
 		Consistently(done, 50*time.Millisecond).ShouldNot(Receive())
 
-		disp.Handle(s, clickInteraction("author", actionID(w, ActionStop)))
+		disp.Handle(click(c, author, actionID(w, ActionStop)))
 		Eventually(done).Should(Receive(Succeed()))
 	})
 
 	It("expires menus that are gone", func() {
-		w := New("author", testPages())
+		w := New(author, testPages())
 
-		disp.Handle(s, clickInteraction("author", actionID(w, ActionNextPage)))
+		disp.Handle(click(c, author, actionID(w, ActionNextPage)))
 
-		Eventually(api.responses).Should(HaveLen(1))
-		Expect(api.responses()[0].Data.Content).To(Equal("This menu has expired."))
+		Eventually(rec.Responses).Should(HaveLen(1))
+		Expect(rec.Responses()[0]["content"]).To(Equal("This menu has expired."))
 	})
 
-	It("ignores other components and events", func() {
-		w := New("author", testPages())
+	It("ignores other components", func() {
+		w := New(author, testPages())
 		done := serveWidget(w)
 
-		foreign := clickInteraction("author", "other:thing")
-		disp.Handle(s, foreign)
+		disp.Handle(click(c, author, "other:thing"))
+		disp.Handle(click(c, author, "rt:settings:x"))
 
-		nonComponent := clickInteraction("author", actionID(w, ActionNextPage))
-		nonComponent.Type = discordgo.InteractionApplicationCommand
-		disp.Handle(s, nonComponent)
+		Consistently(rec.Responses, 50*time.Millisecond).Should(BeEmpty())
 
-		disp.Handle(s, nil)
-
-		Consistently(api.responses, 50*time.Millisecond).Should(BeEmpty())
-
-		disp.Handle(s, clickInteraction("author", actionID(w, ActionStop)))
+		disp.Handle(click(c, author, actionID(w, ActionStop)))
 		Eventually(done).Should(Receive(Succeed()))
 	})
 
 	It("runs the callback before each page edit", func() {
 		var actions []Action
 
-		w := New("author", testPages())
+		w := New(author, testPages())
 		w.WithCallback(func(action Action, _ int) error {
 			actions = append(actions, action)
 
@@ -266,44 +222,44 @@ var _ = Describe("Widget", func() {
 		})
 		done := serveWidget(w)
 
-		disp.Handle(s, clickInteraction("author", actionID(w, ActionNextPage)))
+		disp.Handle(click(c, author, actionID(w, ActionNextPage)))
 
-		Eventually(api.responses).Should(HaveLen(1))
+		Eventually(rec.Responses).Should(HaveLen(1))
 		Expect(actions).To(Equal([]Action{ActionNextPage}))
 
-		disp.Handle(s, clickInteraction("author", actionID(w, ActionStop)))
+		disp.Handle(click(c, author, actionID(w, ActionStop)))
 		Eventually(done).Should(Receive(Succeed()))
 	})
 
 	It("ends the run on callback failure", func() {
-		w := New("author", testPages())
+		w := New(author, testPages())
 		w.WithCallback(func(Action, int) error {
 			return errTestFailure
 		})
 		done := serveWidget(w)
 
-		disp.Handle(s, clickInteraction("author", actionID(w, ActionNextPage)))
+		disp.Handle(click(c, author, actionID(w, ActionNextPage)))
 
 		Eventually(done).Should(Receive(MatchError(errTestFailure)))
-		Eventually(api.responses).Should(HaveLen(1))
-		Expect(api.responses()[0].Data.Flags & discordgo.MessageFlagsEphemeral).NotTo(BeZero())
+		Eventually(rec.Responses).Should(HaveLen(1))
+		Expect(ephemeral(rec.Responses()[0])).To(BeTrue())
 	})
 
 	It("returns immediately for a single page", func() {
-		w := New("author", testPages()[:1])
+		w := New(author, testPages()[:1])
 
 		Expect(w.Serve(context.Background(), disp)).To(Succeed())
 	})
 
 	It("ends on timeout", func() {
-		w := New("author", testPages())
+		w := New(author, testPages())
 		w.Timeout = 20 * time.Millisecond
 
 		Expect(w.Serve(context.Background(), disp)).To(Succeed())
 
-		disp.Handle(s, clickInteraction("author", actionID(w, ActionNextPage)))
+		disp.Handle(click(c, author, actionID(w, ActionNextPage)))
 
-		Eventually(api.responses).Should(HaveLen(1))
-		Expect(api.responses()[0].Data.Content).To(Equal("This menu has expired."))
+		Eventually(rec.Responses).Should(HaveLen(1))
+		Expect(rec.Responses()[0]["content"]).To(Equal("This menu has expired."))
 	})
 })

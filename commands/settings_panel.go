@@ -9,9 +9,11 @@ import (
 	"time"
 
 	"github.com/VTGare/boe-tea-go/bot"
-	"github.com/VTGare/boe-tea-go/router"
+	"github.com/VTGare/boe-tea-go/internal/dgoutils"
 	"github.com/VTGare/boe-tea-go/store"
-	"github.com/bwmarrin/discordgo"
+	"github.com/VTGare/gumi/v2"
+	disgobot "github.com/disgoorg/disgo/bot"
+	"github.com/disgoorg/disgo/discord"
 )
 
 // settingsPanel is the /settings message: an overview plus a page per
@@ -19,7 +21,7 @@ import (
 // the panel keeps working across restarts.
 type settingsPanel struct {
 	b    *bot.Bot
-	cmd  *router.Command
+	cmd  *gumi.Command
 	spec *settingsSpec
 }
 
@@ -40,30 +42,30 @@ func (s *settingsSpec) sections() []panelSection {
 // maxListedChannels caps channel mentions in the panel.
 const maxListedChannels = 30
 
-func (p *settingsPanel) open(ctx *router.Context) error {
+func (p *settingsPanel) open(ctx *gumi.Context) error {
 	reqCtx, cancel := context.WithTimeout(ctx.Context(), 10*time.Second)
 	defer cancel()
 
-	guild, _, err := store.GetOrCreateGuild(reqCtx, p.b.Store, ctx.GuildID())
+	guild, _, err := store.GetOrCreateGuild(reqCtx, p.b.Store, ctx.GuildID().String())
 	if err != nil {
 		return err
 	}
 
-	return ctx.Reply(p.view(ctx.Session, guild, ctx.AuthorID()).render("home"))
+	return ctx.Reply(p.view(ctx.Client, guild, ctx.AuthorID().String()).render("home"))
 }
 
 // handle handles clicks on the panel. Only the person who opened it can
 // use it, and changing anything needs Manage Server.
-func (p *settingsPanel) handle(ctx *router.ComponentContext) error {
+func (p *settingsPanel) handle(ctx *gumi.ComponentContext) error {
 	owner, action, arg := ctx.Arg(0), ctx.Arg(1), ctx.Arg(2)
 
-	if ctx.UserID() != owner {
-		return ctx.Reply(router.Text("This panel belongs to someone else. Run `/settings` for your own.").Private())
+	if ctx.UserID().String() != owner {
+		return ctx.Reply(gumi.Text("This panel belongs to someone else. Run `/settings` for your own.").Private())
 	}
 
 	navigating := action == "go" || action == "nav"
 	if !navigating && !canManage(ctx.Permissions()) {
-		return ctx.Reply(router.Text("You need the Manage Server permission to change settings.").Private())
+		return ctx.Reply(gumi.Text("You need the Manage Server permission to change settings.").Private())
 	}
 
 	if action == "edit" {
@@ -73,7 +75,7 @@ func (p *settingsPanel) handle(ctx *router.ComponentContext) error {
 	reqCtx, cancel := context.WithTimeout(p.b.Context, 10*time.Second)
 	defer cancel()
 
-	guild, _, err := store.GetOrCreateGuild(reqCtx, p.b.Store, ctx.GuildID())
+	guild, _, err := store.GetOrCreateGuild(reqCtx, p.b.Store, ctx.GuildID().String())
 	if err != nil {
 		return err
 	}
@@ -83,12 +85,12 @@ func (p *settingsPanel) handle(ctx *router.ComponentContext) error {
 		return err
 	}
 
-	return ctx.Update(p.view(ctx.Session, guild, owner).render(section))
+	return ctx.Update(p.view(ctx.Client, guild, owner).render(section))
 }
 
 // apply runs one panel action, changing guild in place, and returns the
 // section to show next.
-func (p *settingsPanel) apply(reqCtx context.Context, ctx *router.ComponentContext, guild *store.Guild, action, arg string) (string, error) {
+func (p *settingsPanel) apply(reqCtx context.Context, ctx *gumi.ComponentContext, guild *store.Guild, action, arg string) (string, error) {
 	value := ""
 	if values := ctx.Values(); len(values) > 0 {
 		value = values[0]
@@ -129,12 +131,12 @@ func (p *settingsPanel) apply(reqCtx context.Context, ctx *router.ComponentConte
 
 		limit, err := strconv.Atoi(strings.TrimSpace(input))
 		if err != nil {
-			return "", router.Errorf("Images per post must be a whole number from %d to %d.", store.MinPostLimit, store.MaxPostLimit)
+			return "", gumi.Errorf("Images per post must be a whole number from %d to %d.", store.MinPostLimit, store.MaxPostLimit)
 		}
 		_, err = applyLimit(guild, limit)
 		return "posting", save(err)
 	case "add", "remove":
-		all, err := guildChannels(ctx.Session, ctx.GuildID())
+		all, err := guildChannels(ctx.Client, ctx.GuildID())
 		if err != nil {
 			return "", err
 		}
@@ -158,34 +160,37 @@ func (p *settingsPanel) apply(reqCtx context.Context, ctx *router.ComponentConte
 	return "home", nil
 }
 
-func (p *settingsPanel) openModal(ctx *router.ComponentContext, owner, field string) error {
-	id := router.ComponentID(p.cmd, owner, "submit", field)
+func (p *settingsPanel) openModal(ctx *gumi.ComponentContext, owner, field string) error {
+	id := gumi.ComponentID(p.cmd, owner, "submit", field)
 
 	if field == "prefix" {
-		return ctx.Modal(id, "Change prefix", discordgo.TextInput{
-			CustomID: "value", Label: "Prefix (1-5 characters)", Style: discordgo.TextInputShort,
-			Required: true, MinLength: 1, MaxLength: store.MaxPrefixLength,
-		})
+		return ctx.Modal(id, "Change prefix", discord.NewLabel("Prefix (1-5 characters)",
+			discord.NewShortTextInput("value").WithRequired(true).WithMinLength(1).WithMaxLength(store.MaxPrefixLength),
+		))
 	}
 
-	return ctx.Modal(id, "Images per post", discordgo.TextInput{
-		CustomID: "value", Label: fmt.Sprintf("Images per post (%d-%d)", store.MinPostLimit, store.MaxPostLimit),
-		Style: discordgo.TextInputShort, Required: true, MinLength: 1, MaxLength: 3,
-	})
+	return ctx.Modal(id, "Images per post", discord.NewLabel(fmt.Sprintf("Images per post (%d-%d)", store.MinPostLimit, store.MaxPostLimit),
+		discord.NewShortTextInput("value").WithRequired(true).WithMinLength(1).WithMaxLength(3),
+	))
 }
 
-func (p *settingsPanel) view(s *discordgo.Session, guild *store.Guild, owner string) *panelView {
+func (p *settingsPanel) view(c *disgobot.Client, guild *store.Guild, owner string) *panelView {
 	v := &panelView{cmd: p.cmd, spec: p.spec, owner: owner, guild: guild}
 
-	var g *discordgo.Guild
-	if s.State != nil {
-		g, _ = s.State.Guild(guild.ID)
+	id := dgoutils.ParseID(guild.ID)
+
+	g, ok := c.Caches.Guild(id)
+	if !ok {
+		if rg, err := c.Rest.GetGuild(id, false); err == nil {
+			g, ok = rg.Guild, true
+		}
 	}
-	if g == nil {
-		g, _ = s.Guild(guild.ID)
-	}
-	if g != nil {
-		v.name, v.icon = g.Name, g.IconURL("128")
+
+	if ok {
+		v.name = g.Name
+		if icon := g.IconURL(discord.WithSize(128)); icon != nil {
+			v.icon = *icon
+		}
 	}
 
 	return v
@@ -193,7 +198,7 @@ func (p *settingsPanel) view(s *discordgo.Session, guild *store.Guild, owner str
 
 // panelView renders the panel for one guild.
 type panelView struct {
-	cmd        *router.Command
+	cmd        *gumi.Command
 	spec       *settingsSpec
 	owner      string
 	guild      *store.Guild
@@ -201,39 +206,39 @@ type panelView struct {
 }
 
 func (v *panelView) id(action string, arg ...string) string {
-	return router.ComponentID(v.cmd, append([]string{v.owner, action}, arg...)...)
+	return gumi.ComponentID(v.cmd, append([]string{v.owner, action}, arg...)...)
 }
 
-func (v *panelView) render(section string) *router.Response {
-	embed := &discordgo.MessageEmbed{Color: 0x439ef1}
+func (v *panelView) render(section string) *gumi.Response {
+	embed := discord.Embed{Color: 0x439ef1}
 	if v.name != "" {
-		embed.Author = &discordgo.MessageEmbedAuthor{Name: v.name, IconURL: v.icon}
+		embed.Author = &discord.EmbedAuthor{Name: v.name, IconURL: v.icon}
 	}
 
-	var rows []discordgo.MessageComponent
-	back := button("Back to settings", discordgo.SecondaryButton, v.id("go", "home"))
+	var rows []discord.LayoutComponent
+	back := button("Back to settings", discord.ButtonStyleSecondary, v.id("go", "home"))
 
 	switch section {
 	case "general":
 		embed.Title = "General"
 		embed.Description = "Prefix commands start with this. Slash commands and mentioning the bot always work.\n\n" +
 			line("Prefix", "`"+v.guild.Prefix+"`", fmt.Sprintf("Up to %d characters, e.g. bt! or ?", store.MaxPrefixLength))
-		rows = buttonRows(button("Change prefix", discordgo.SecondaryButton, v.id("edit", "prefix")), back)
+		rows = buttonRows(button("Change prefix", discord.ButtonStyleSecondary, v.id("edit", "prefix")), back)
 	case "posting":
 		embed.Title = "Posting"
 		lines := []string{"How Boe Tea posts artwork from links.", line("Images per post", strconv.Itoa(v.guild.Posting.Limit), "Longer galleries are cut off after this many")}
-		buttons := make([]discordgo.MessageComponent, 0, 8)
+		buttons := make([]discord.InteractiveComponent, 0, 8)
 		for _, t := range v.spec.in("posting") {
 			lines = append(lines, line(t.label, onOff(t.get(v.guild)), t.hint))
 			buttons = append(buttons, v.toggleButton(t))
 		}
 		embed.Description = strings.Join(lines, "\n\n")
-		buttons = append(buttons, button(fmt.Sprintf("Images per post: %d", v.guild.Posting.Limit), discordgo.SecondaryButton, v.id("edit", "limit")))
+		buttons = append(buttons, button(fmt.Sprintf("Images per post: %d", v.guild.Posting.Limit), discord.ButtonStyleSecondary, v.id("edit", "limit")))
 		rows = append(buttonRows(buttons...), buttonRows(back)...)
 	case "sources":
 		embed.Title = "Sources"
 		embed.Description = "Links from turned-off sources are ignored."
-		buttons := make([]discordgo.MessageComponent, 0, 4)
+		buttons := make([]discord.InteractiveComponent, 0, 4)
 		for _, t := range v.spec.in("sources") {
 			buttons = append(buttons, v.toggleButton(t))
 		}
@@ -244,25 +249,25 @@ func (v *panelView) render(section string) *router.Response {
 		embed.Description = "Catch artwork that was already posted in this server.\n\n" +
 			line("Mode", mode.label, mode.hint) + "\n\n" +
 			line("Remember links for", formatTTL(v.guild.Repost.TTL), "A link counts as a repost within this time")
-		rows = []discordgo.MessageComponent{v.modeSelect(), v.ttlSelect()}
+		rows = []discord.LayoutComponent{v.modeSelect(), v.ttlSelect()}
 		rows = append(rows, buttonRows(back)...)
 	case "channels":
 		embed.Title = fmt.Sprintf("Art channels · %d", len(v.guild.ArtChannels))
 		embed.Description = channelsSummary(v.guild.ArtChannels, maxListedChannels)
-		rows = []discordgo.MessageComponent{
+		rows = []discord.LayoutComponent{
 			v.channelSelect("add", "Add channels or categories…"),
 			v.channelSelect("remove", "Remove channels or categories…"),
 		}
 		rows = append(rows, buttonRows(back)...)
 	default:
-		v.renderHome(embed)
-		rows = []discordgo.MessageComponent{v.navSelect()}
+		v.renderHome(&embed)
+		rows = []discord.LayoutComponent{v.navSelect()}
 	}
 
-	return &router.Response{Embeds: []*discordgo.MessageEmbed{embed}, Components: compact(rows)}
+	return &gumi.Response{Embeds: []discord.Embed{embed}, Components: compact(rows)}
 }
 
-func (v *panelView) renderHome(embed *discordgo.MessageEmbed) {
+func (v *panelView) renderHome(embed *discord.Embed) {
 	g := v.guild
 	p := g.Posting
 	mode, _ := findRepostMode(g.Repost.Mode)
@@ -279,7 +284,7 @@ func (v *panelView) renderHome(embed *discordgo.MessageEmbed) {
 
 	embed.Title = "Settings"
 	embed.Description = "Pick a section below to change it. Quick edits: `/set` and `/channels`."
-	embed.Fields = []*discordgo.MessageEmbedField{
+	embed.Fields = []discord.EmbedField{
 		{Name: "General", Value: "Prefix `" + g.Prefix + "`"},
 		{Name: "Posting", Value: fmt.Sprintf(
 			"Up to **%d** images per post · Tags **%s** · Reactions **%s**\nSkip first tweet image **%s** · Crossposting **%s**\nFooter quotes **%s** · NSFW quotes **%s**",
@@ -289,9 +294,9 @@ func (v *panelView) renderHome(embed *discordgo.MessageEmbed) {
 		{Name: "Reposts", Value: reposts},
 		{Name: fmt.Sprintf("Art channels · %d", len(g.ArtChannels)), Value: channelsSummary(g.ArtChannels, 15)},
 	}
-	embed.Footer = &discordgo.MessageEmbedFooter{Text: "Changing settings needs Manage Server"}
+	embed.Footer = &discord.EmbedFooter{Text: "Changing settings needs Manage Server"}
 	if v.icon != "" {
-		embed.Thumbnail = &discordgo.MessageEmbedThumbnail{URL: v.icon}
+		embed.Thumbnail = &discord.EmbedResource{URL: v.icon}
 	}
 }
 
@@ -318,97 +323,97 @@ func channelsSummary(ids []string, limit int) string {
 	return s + "\n-# Boe Tea only posts artwork in these channels"
 }
 
-func button(label string, style discordgo.ButtonStyle, id string) discordgo.MessageComponent {
+// button is nil when the custom ID is too long to build.
+func button(label string, style discord.ButtonStyle, id string) discord.InteractiveComponent {
 	if id == "" {
 		return nil
 	}
-	return discordgo.Button{Label: label, Style: style, CustomID: id}
+	return discord.NewButton(style, label, id, "", 0)
 }
 
-func (v *panelView) toggleButton(t toggle) discordgo.MessageComponent {
+func (v *panelView) toggleButton(t toggle) discord.InteractiveComponent {
 	if t.get(v.guild) {
-		return button(t.short+": On", discordgo.SuccessButton, v.id("toggle", t.name))
+		return button(t.short+": On", discord.ButtonStyleSuccess, v.id("toggle", t.name))
 	}
-	return button(t.short+": Off", discordgo.SecondaryButton, v.id("toggle", t.name))
+	return button(t.short+": Off", discord.ButtonStyleSecondary, v.id("toggle", t.name))
 }
 
-func (v *panelView) navSelect() discordgo.MessageComponent {
+func (v *panelView) navSelect() discord.LayoutComponent {
 	sections := v.spec.sections()
-	options := make([]discordgo.SelectMenuOption, 0, len(sections))
+	options := make([]discord.StringSelectMenuOption, 0, len(sections))
 	for _, s := range sections {
-		options = append(options, discordgo.SelectMenuOption{Label: s.title, Value: s.key, Description: s.summary})
+		options = append(options, discord.StringSelectMenuOption{Label: s.title, Value: s.key, Description: s.summary})
 	}
 	return v.stringSelect("nav", "Edit a section…", options)
 }
 
-func (v *panelView) modeSelect() discordgo.MessageComponent {
-	options := make([]discordgo.SelectMenuOption, 0, len(repostModes))
+func (v *panelView) modeSelect() discord.LayoutComponent {
+	options := make([]discord.StringSelectMenuOption, 0, len(repostModes))
 	for _, m := range repostModes {
-		options = append(options, discordgo.SelectMenuOption{
+		options = append(options, discord.StringSelectMenuOption{
 			Label: "Mode: " + m.label, Value: string(m.mode), Description: m.hint, Default: m.mode == v.guild.Repost.Mode,
 		})
 	}
 	return v.stringSelect("mode", "Repost mode", options)
 }
 
-func (v *panelView) ttlSelect() discordgo.MessageComponent {
-	options := make([]discordgo.SelectMenuOption, 0, len(ttlPresets))
+func (v *panelView) ttlSelect() discord.LayoutComponent {
+	options := make([]discord.StringSelectMenuOption, 0, len(ttlPresets))
 	for _, p := range ttlPresets {
-		options = append(options, discordgo.SelectMenuOption{
+		options = append(options, discord.StringSelectMenuOption{
 			Label: "Remember links for " + p.name, Value: p.value, Default: p.ttl == v.guild.Repost.TTL,
 		})
 	}
 	return v.stringSelect("ttl", "Remember links for…", options)
 }
 
-func (v *panelView) stringSelect(action, placeholder string, options []discordgo.SelectMenuOption) discordgo.MessageComponent {
+func (v *panelView) stringSelect(action, placeholder string, options []discord.StringSelectMenuOption) discord.LayoutComponent {
 	id := v.id(action)
 	if id == "" {
 		return nil
 	}
 
-	return discordgo.ActionsRow{Components: []discordgo.MessageComponent{discordgo.SelectMenu{
-		MenuType: discordgo.StringSelectMenu, CustomID: id, Placeholder: placeholder, Options: options,
-	}}}
+	return discord.NewActionRow(discord.StringSelectMenuComponent{
+		CustomID: id, Placeholder: placeholder, Options: options,
+	})
 }
 
-func (v *panelView) channelSelect(action, placeholder string) discordgo.MessageComponent {
+func (v *panelView) channelSelect(action, placeholder string) discord.LayoutComponent {
 	id := v.id(action)
 	if id == "" {
 		return nil
 	}
 
-	return discordgo.ActionsRow{Components: []discordgo.MessageComponent{discordgo.SelectMenu{
-		MenuType:     discordgo.ChannelSelectMenu,
+	return discord.NewActionRow(discord.ChannelSelectMenuComponent{
 		CustomID:     id,
 		Placeholder:  placeholder,
 		MaxValues:    25,
-		ChannelTypes: append(slices.Clone(artChannelTypes), discordgo.ChannelTypeGuildCategory),
-	}}}
+		ChannelTypes: append(slices.Clone(artChannelTypes), discord.ChannelTypeGuildCategory),
+	})
 }
 
 // buttonRows packs buttons into rows of Discord's maximum of five.
-func buttonRows(buttons ...discordgo.MessageComponent) []discordgo.MessageComponent {
-	var rows []discordgo.MessageComponent
-	row := make([]discordgo.MessageComponent, 0, 5)
+func buttonRows(buttons ...discord.InteractiveComponent) []discord.LayoutComponent {
+	var rows []discord.LayoutComponent
+	row := make([]discord.InteractiveComponent, 0, 5)
 	for _, b := range buttons {
 		if b == nil {
 			continue
 		}
 		if len(row) == 5 {
-			rows = append(rows, discordgo.ActionsRow{Components: row})
-			row = make([]discordgo.MessageComponent, 0, 5)
+			rows = append(rows, discord.NewActionRow(row...))
+			row = make([]discord.InteractiveComponent, 0, 5)
 		}
 		row = append(row, b)
 	}
 	if len(row) > 0 {
-		rows = append(rows, discordgo.ActionsRow{Components: row})
+		rows = append(rows, discord.NewActionRow(row...))
 	}
 	return rows
 }
 
-func compact(rows []discordgo.MessageComponent) []discordgo.MessageComponent {
-	out := make([]discordgo.MessageComponent, 0, len(rows))
+func compact(rows []discord.LayoutComponent) []discord.LayoutComponent {
+	out := make([]discord.LayoutComponent, 0, len(rows))
 	for _, r := range rows {
 		if r != nil {
 			out = append(out, r)

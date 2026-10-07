@@ -14,7 +14,7 @@ import (
 	"github.com/VTGare/boe-tea-go/internal/spool"
 	"github.com/VTGare/boe-tea-go/store"
 
-	"github.com/bwmarrin/discordgo"
+	"github.com/disgoorg/disgo/discord"
 )
 
 var (
@@ -132,7 +132,7 @@ func (a *Artwork) Render() (artworks.Rendered, error) {
 	}
 
 	if len(a.Videos) > 0 {
-		files := make([]*discordgo.File, 0, len(a.Videos))
+		files := make([]*discord.File, 0, len(a.Videos))
 		for _, video := range a.Videos {
 			if video.URL == "" {
 				if video.FallbackLink != "" {
@@ -172,7 +172,7 @@ func (a *Artwork) ID() string {
 	return a.id
 }
 
-func downloadVideo(fileURL string) (*discordgo.File, error) {
+func downloadVideo(fileURL string) (*discord.File, error) {
 	spool.Acquire()
 	defer spool.Release()
 
@@ -194,7 +194,7 @@ func downloadVideo(fileURL string) (*discordgo.File, error) {
 		return nil, fmt.Errorf("error spooling twitter video: %w", err)
 	}
 
-	return &discordgo.File{
+	return &discord.File{
 		Name:   splits[len(splits)-1],
 		Reader: tmp,
 	}, nil

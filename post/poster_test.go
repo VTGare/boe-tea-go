@@ -14,7 +14,9 @@ import (
 	"github.com/VTGare/boe-tea-go/repost"
 	"github.com/VTGare/boe-tea-go/store"
 
-	"github.com/bwmarrin/discordgo"
+	"github.com/disgoorg/disgo/discord"
+	"github.com/disgoorg/disgo/rest"
+	"github.com/disgoorg/snowflake/v2"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -81,9 +83,9 @@ var _ = Describe("Skipping the first page", func() {
 })
 
 var _ = Describe("Album limits", func() {
-	artwork := []*discordgo.MessageSend{{Content: "1"}, {Content: "2"}, {Content: "3"}, {Content: "4"}}
+	artwork := []*discord.MessageCreate{{Content: "1"}, {Content: "2"}, {Content: "3"}, {Content: "4"}}
 
-	bundles := func(sends ...[]*discordgo.MessageSend) []render.Bundle {
+	bundles := func(sends ...[]*discord.MessageCreate) []render.Bundle {
 		out := make([]render.Bundle, 0, len(sends))
 		for ind, s := range sends {
 			out = append(out, render.Bundle{ID: strconv.Itoa(ind), Sends: s})
@@ -131,7 +133,7 @@ var _ = Describe("Album limits", func() {
 })
 
 var _ = Describe("Skipping pages", func() {
-	artworks := []*discordgo.MessageSend{
+	artworks := []*discord.MessageCreate{
 		{Content: "1"}, {Content: "2"}, {Content: "3"}, {Content: "4"},
 	}
 
@@ -143,7 +145,7 @@ var _ = Describe("Skipping pages", func() {
 
 		Expect(result).Should(And(
 			HaveLen(2),
-			ContainElements(&discordgo.MessageSend{Content: "1"}, &discordgo.MessageSend{Content: "2"}),
+			ContainElements(&discord.MessageCreate{Content: "1"}, &discord.MessageCreate{Content: "2"}),
 		))
 	})
 
@@ -155,7 +157,7 @@ var _ = Describe("Skipping pages", func() {
 
 		Expect(result).Should(And(
 			HaveLen(2),
-			ContainElements(&discordgo.MessageSend{Content: "3"}, &discordgo.MessageSend{Content: "4"}),
+			ContainElements(&discord.MessageCreate{Content: "3"}, &discord.MessageCreate{Content: "4"}),
 		))
 	})
 
@@ -167,7 +169,7 @@ var _ = Describe("Skipping pages", func() {
 
 		Expect(result).Should(And(
 			HaveLen(2),
-			ContainElements(&discordgo.MessageSend{Content: "1"}, &discordgo.MessageSend{Content: "2"}),
+			ContainElements(&discord.MessageCreate{Content: "1"}, &discord.MessageCreate{Content: "2"}),
 		))
 	})
 
@@ -180,8 +182,8 @@ var _ = Describe("Skipping pages", func() {
 		Expect(result).Should(And(
 			HaveLen(4),
 			ContainElements(
-				&discordgo.MessageSend{Content: "1"}, &discordgo.MessageSend{Content: "2"},
-				&discordgo.MessageSend{Content: "3"}, &discordgo.MessageSend{Content: "4"},
+				&discord.MessageCreate{Content: "1"}, &discord.MessageCreate{Content: "2"},
+				&discord.MessageCreate{Content: "3"}, &discord.MessageCreate{Content: "4"},
 			),
 		))
 	})
@@ -239,7 +241,7 @@ var _ = Describe("Imageless tweets", func() {
 })
 
 func restError(status int) error {
-	return &discordgo.RESTError{Response: &http.Response{StatusCode: status}}
+	return &rest.Error{Response: &http.Response{StatusCode: status, Status: http.StatusText(status)}}
 }
 
 var _ = Describe("Classify", func() {
@@ -264,7 +266,7 @@ var _ = Describe("Classify", func() {
 
 		Expect(err.Kind).To(Equal(KindNoPerms))
 
-		var restErr *discordgo.RESTError
+		var restErr *rest.Error
 		Expect(errors.As(err, &restErr)).To(BeTrue())
 	})
 })
@@ -273,7 +275,7 @@ var _ = Describe("Missing send permissions", func() {
 	var (
 		poster *Poster
 		deps   *testDeps
-		guild  = &store.Guild{ID: "guild-1"}
+		guild  = &store.Guild{ID: testGuildID.String()}
 	)
 
 	BeforeEach(func() {
@@ -284,7 +286,7 @@ var _ = Describe("Missing send permissions", func() {
 	It("skips the fetch without permissions", func() {
 		deps.fake.ChannelPerms = false
 
-		results, err := poster.fetch(context.Background(), guild, "channel-1", nil, runOpts{})
+		results, err := poster.fetch(context.Background(), guild, testChannelID, nil, runOpts{})
 
 		Expect(err).NotTo(HaveOccurred())
 		Expect(results.items).To(BeEmpty())
@@ -292,7 +294,7 @@ var _ = Describe("Missing send permissions", func() {
 	})
 
 	It("returns empty results with permissions and no urls", func() {
-		results, err := poster.fetch(context.Background(), guild, "channel-1", nil, runOpts{})
+		results, err := poster.fetch(context.Background(), guild, testChannelID, nil, runOpts{})
 
 		Expect(err).NotTo(HaveOccurred())
 		Expect(results.items).To(BeEmpty())
@@ -303,7 +305,7 @@ var _ = Describe("Delivering artwork", func() {
 	var (
 		poster *Poster
 		deps   *testDeps
-		guild  = &store.Guild{ID: "guild-1", Posting: store.Posting{Limit: 10}}
+		guild  = &store.Guild{ID: testGuildID.String(), Posting: store.Posting{Limit: 10}}
 		run    = newTestRun()
 	)
 
@@ -313,7 +315,7 @@ var _ = Describe("Delivering artwork", func() {
 	})
 
 	It("records one bundle per artwork with its artwork ID", func() {
-		pages, err := poster.deliver(guild, "channel-1", testItems(
+		pages, err := poster.deliver(guild, testChannelID, testItems(
 			&stubArtwork{id: "a", images: 1},
 			&stubArtwork{id: "b", images: 2},
 		), run, runOpts{})
@@ -324,13 +326,13 @@ var _ = Describe("Delivering artwork", func() {
 		Expect(pages[1].info.ArtworkID).To(Equal("b"))
 		Expect(pages[2].info.ArtworkID).To(Equal("b"))
 		Expect(deps.fake.Complex).To(HaveLen(3))
-		Expect(deps.fake.Complex[0].ChannelID).To(Equal("channel-1"))
+		Expect(deps.fake.Complex[0].ChannelID).To(Equal(testChannelID))
 	})
 
 	It("drops every message when the sender skips", func() {
 		deps.fake.Skip = true
 
-		pages, err := poster.deliver(guild, "channel-1", testItems(
+		pages, err := poster.deliver(guild, testChannelID, testItems(
 			&stubArtwork{id: "a", images: 1},
 		), run, runOpts{})
 
@@ -342,7 +344,7 @@ var _ = Describe("Delivering artwork", func() {
 	It("joins send failures instead of swallowing them", func() {
 		deps.fake.SendErr = errors.New("boom")
 
-		pages, err := poster.deliver(guild, "channel-1", testItems(
+		pages, err := poster.deliver(guild, testChannelID, testItems(
 			&stubArtwork{id: "a", images: 1},
 		), run, runOpts{})
 
@@ -354,7 +356,7 @@ var _ = Describe("Delivering artwork", func() {
 		guild.Posting.Reactions = true
 		defer func() { guild.Posting.Reactions = false }()
 
-		pages, err := poster.deliver(guild, "channel-1", testItems(
+		pages, err := poster.deliver(guild, testChannelID, testItems(
 			&stubArtwork{id: "a", images: 1},
 		), run, runOpts{})
 
@@ -368,13 +370,13 @@ var _ = Describe("Delivering artwork", func() {
 	})
 
 	It("references the triggering message on every page", func() {
-		_, err := poster.deliver(guild, "channel-1", testItems(
+		_, err := poster.deliver(guild, testChannelID, testItems(
 			&stubArtwork{id: "a", images: 1},
 		), run, runOpts{})
 
 		Expect(err).NotTo(HaveOccurred())
 		Expect(deps.fake.Complex).To(HaveLen(1))
-		Expect(deps.fake.Complex[0].Message.Reference.MessageID).To(Equal("event-1"))
+		Expect(*deps.fake.Complex[0].Message.MessageReference.MessageID).To(Equal(testMessageID))
 	})
 })
 
@@ -382,7 +384,7 @@ var _ = Describe("Repost notices", func() {
 	var (
 		poster *Poster
 		deps   *testDeps
-		guild  = &store.Guild{ID: "guild-1", Repost: store.Repost{Mode: store.RepostStrict}}
+		guild  = &store.Guild{ID: testGuildID.String(), Repost: store.Repost{Mode: store.RepostStrict}}
 		run    = newTestRun()
 		reps   = []*repost.Repost{{ID: "a", URL: "https://example.com/a"}}
 	)
@@ -396,7 +398,7 @@ var _ = Describe("Repost notices", func() {
 		Expect(poster.notifyReposts(guild, run, reps, 1)).To(Succeed())
 
 		Expect(deps.fake.Deleted).To(HaveLen(1))
-		Expect(deps.fake.Deleted[0].MessageID).To(Equal("event-1"))
+		Expect(deps.fake.Deleted[0].MessageID).To(Equal(testMessageID))
 		Expect(deps.fake.Embeds).To(HaveLen(1))
 		Expect(deps.fake.Expired).To(HaveLen(1))
 	})
@@ -423,7 +425,7 @@ var _ = Describe("Repost notices", func() {
 var _ = Describe("Keeping artwork with its pages", func() {
 	It("keeps each ID with its own pages without positional coupling", func() {
 		poster, _ := newTestPoster()
-		guild := &store.Guild{ID: "guild-1"}
+		guild := &store.Guild{ID: testGuildID.String()}
 
 		bundles, err := poster.generateMessages(guild, testItems(
 			&stubArtwork{id: "a", images: 1},
@@ -449,13 +451,13 @@ var _ = Describe("Crossposting", func() {
 	BeforeEach(func() {
 		poster, deps = newTestPoster()
 
-		deps.fake.ChannelGuilds = map[string]string{"ch1": "g1", "ch2": "g1"}
-		deps.fake.Members = map[sender.MemberKey]bool{{GuildID: "g1", UserID: "u1"}: true}
-		deps.users.user = &store.User{ID: "u1"}
+		deps.fake.ChannelGuilds = map[snowflake.ID]snowflake.ID{crossChannel: crossGuildID, pairChannel: crossGuildID}
+		deps.fake.Members = map[sender.MemberKey]bool{{GuildID: crossGuildID, UserID: testAuthorID}: true}
+		deps.users.user = &store.User{ID: testAuthorID.String()}
 	})
 
 	It("sends to member channels without touching the group", func() {
-		sent, err := poster.Crosspost(context.Background(), run, "u1", crosspostGroup("ch1", "ch2"))
+		sent, err := poster.Crosspost(context.Background(), run, testAuthorID, crosspostGroup(crossChannel, pairChannel))
 
 		Expect(err).NotTo(HaveOccurred())
 		Expect(sent).To(BeEmpty())
@@ -463,19 +465,19 @@ var _ = Describe("Crossposting", func() {
 	})
 
 	It("removes channels the member left", func() {
-		delete(deps.fake.Members, sender.MemberKey{GuildID: "g1", UserID: "u1"})
+		delete(deps.fake.Members, sender.MemberKey{GuildID: crossGuildID, UserID: testAuthorID})
 
-		_, err := poster.Crosspost(context.Background(), run, "u1", crosspostGroup("ch1"))
+		_, err := poster.Crosspost(context.Background(), run, testAuthorID, crosspostGroup(crossChannel))
 
 		Expect(err).NotTo(HaveOccurred())
 		Expect(deps.users.deletions()).To(HaveLen(1))
-		Expect(deps.users.deletions()[0].channel).To(Equal("ch1"))
+		Expect(deps.users.deletions()[0].channel).To(Equal(crossChannel.String()))
 	})
 
 	It("keeps channels on membership lookup failures", func() {
 		deps.fake.MemberErr = errors.New("boom")
 
-		_, err := poster.Crosspost(context.Background(), run, "u1", crosspostGroup("ch1"))
+		_, err := poster.Crosspost(context.Background(), run, testAuthorID, crosspostGroup(crossChannel))
 
 		Expect(err).NotTo(HaveOccurred())
 		Expect(deps.users.deletions()).To(BeEmpty())
@@ -484,7 +486,7 @@ var _ = Describe("Crossposting", func() {
 	It("skips unresolvable channels", func() {
 		deps.fake.ChannelErr = errors.New("boom")
 
-		_, err := poster.Crosspost(context.Background(), run, "u1", crosspostGroup("ch1"))
+		_, err := poster.Crosspost(context.Background(), run, testAuthorID, crosspostGroup(crossChannel))
 
 		Expect(err).NotTo(HaveOccurred())
 		Expect(deps.users.deletions()).To(BeEmpty())
@@ -497,18 +499,18 @@ var _ = Describe("Crossposting", func() {
 		}
 
 		deps.match = matchProvider(provider)
-		deps.guilds.guild = &store.Guild{ID: "g1", Posting: store.Posting{Limit: 10, Crosspost: true}}
+		deps.guilds.guild = &store.Guild{ID: crossGuildID.String(), Posting: store.Posting{Limit: 10, Crosspost: true}}
 
 		run.URLs = []string{"https://example.com/a", "https://example.com/b"}
 
-		sent, err := poster.Crosspost(context.Background(), run, "u1", crosspostGroup("ch1"))
+		sent, err := poster.Crosspost(context.Background(), run, testAuthorID, crosspostGroup(crossChannel))
 
 		Expect(err).NotTo(HaveOccurred())
 		Expect(sent).To(HaveLen(2))
 		Expect(sent[0].ArtworkID).To(Equal("a"))
 		Expect(sent[1].ArtworkID).To(Equal("b"))
 		Expect(deps.fake.Complex).To(HaveLen(2))
-		Expect(deps.fake.Complex[0].ChannelID).To(Equal("ch1"))
+		Expect(deps.fake.Complex[0].ChannelID).To(Equal(crossChannel))
 	})
 })
 
@@ -539,7 +541,7 @@ var _ = Describe("Sending posts", func() {
 	})
 
 	It("stays silent for ignored users outside commands", func() {
-		deps.users.user = &store.User{ID: "author-1", Ignore: true}
+		deps.users.user = &store.User{ID: testAuthorID.String(), Ignore: true}
 
 		sent, err := poster.Send(context.Background(), newTestRun("https://example.com/a"))
 
@@ -555,7 +557,7 @@ var _ = Describe("Sending posts", func() {
 		}
 
 		deps.match = matchProvider(provider)
-		deps.users.user = &store.User{ID: "author-1", Ignore: true}
+		deps.users.user = &store.User{ID: testAuthorID.String(), Ignore: true}
 
 		run := newTestRun("https://example.com/a")
 		run.IsCommand = true
@@ -588,11 +590,11 @@ var _ = Describe("Sending posts", func() {
 
 		deps.match = matchProvider(provider)
 		deps.guilds.guild = store.UserGuild()
-		deps.users.user = &store.User{ID: "author-1"}
+		deps.users.user = &store.User{ID: testAuthorID.String()}
 
 		run := newTestRun("https://example.com/a")
-		run.GuildID = ""
-		run.ChannelID = "dm-channel"
+		run.GuildID = 0
+		run.ChannelID = 901
 
 		sent, err := poster.Send(context.Background(), run)
 
@@ -600,8 +602,7 @@ var _ = Describe("Sending posts", func() {
 		Expect(sent).To(HaveLen(1))
 		Expect(sent[0].ArtworkID).To(Equal("a"))
 		Expect(deps.fake.Complex).To(HaveLen(1))
-		Expect(deps.fake.Complex[0].GuildID).To(BeEmpty())
-		Expect(deps.fake.Complex[0].ChannelID).To(Equal("dm-channel"))
+		Expect(deps.fake.Complex[0].ChannelID).To(Equal(snowflake.ID(901)))
 		Expect(deps.detector.created()).To(BeEmpty())
 	})
 })
@@ -625,13 +626,13 @@ var _ = Describe("Failed renders", func() {
 	})
 
 	It("aborts Send without side effects", func() {
-		deps.detector.found["channel-1\x00poison"] = &repost.Repost{ID: "poison", URL: "https://example.com/poison"}
+		deps.detector.found[testChannelID.String()+"\x00poison"] = &repost.Repost{ID: "poison", URL: "https://example.com/poison"}
 		deps.guilds.guild.Repost.Mode = store.RepostNotify
 		deps.guilds.guild.Posting.Crosspost = true
-		deps.users.user.Groups = []*store.Group{{Name: "g", Parent: "channel-1", Children: []string{"ch1"}}}
+		deps.users.user.Groups = []*store.Group{{Name: "g", Parent: testChannelID.String(), Children: []string{crossChannel.String()}}}
 		deps.users.user.Crosspost = true
-		deps.fake.ChannelGuilds = map[string]string{"ch1": "g1"}
-		deps.fake.Members = map[sender.MemberKey]bool{{GuildID: "g1", UserID: "author-1"}: true}
+		deps.fake.ChannelGuilds = map[snowflake.ID]snowflake.ID{crossChannel: crossGuildID}
+		deps.fake.Members = map[sender.MemberKey]bool{{GuildID: crossGuildID, UserID: testAuthorID}: true}
 
 		sent, err := poster.Send(context.Background(), newTestRun("https://example.com/poison"))
 
@@ -644,12 +645,12 @@ var _ = Describe("Failed renders", func() {
 	})
 
 	It("aborts one crosspost channel without touching the rest", func() {
-		deps.guilds.guild = &store.Guild{ID: "g1", Posting: store.Posting{Limit: 10, Crosspost: true}}
-		deps.fake.ChannelGuilds = map[string]string{"ch1": "g1"}
-		deps.fake.Members = map[sender.MemberKey]bool{{GuildID: "g1", UserID: "u1"}: true}
-		deps.users.user = &store.User{ID: "u1"}
+		deps.guilds.guild = &store.Guild{ID: crossGuildID.String(), Posting: store.Posting{Limit: 10, Crosspost: true}}
+		deps.fake.ChannelGuilds = map[snowflake.ID]snowflake.ID{crossChannel: crossGuildID}
+		deps.fake.Members = map[sender.MemberKey]bool{{GuildID: crossGuildID, UserID: testAuthorID}: true}
+		deps.users.user = &store.User{ID: testAuthorID.String()}
 
-		sent, err := poster.Crosspost(context.Background(), newTestRun("https://example.com/poison"), "u1", crosspostGroup("ch1"))
+		sent, err := poster.Crosspost(context.Background(), newTestRun("https://example.com/poison"), testAuthorID, crosspostGroup(crossChannel))
 
 		Expect(err).To(HaveOccurred())
 		Expect(sent).To(BeEmpty())
@@ -662,7 +663,7 @@ var _ = Describe("Recording reposts", func() {
 		poster   *Poster
 		deps     *testDeps
 		provider *stubProvider
-		guild    = &store.Guild{ID: "guild-1", Posting: store.Posting{Limit: 10}, Repost: store.Repost{Mode: store.RepostNotify}}
+		guild    = &store.Guild{ID: testGuildID.String(), Posting: store.Posting{Limit: 10}, Repost: store.Repost{Mode: store.RepostNotify}}
 	)
 
 	BeforeEach(func() {
@@ -681,8 +682,8 @@ var _ = Describe("Recording reposts", func() {
 	})
 
 	It("records a repost only for successful fetches", func() {
-		results, err := poster.fetch(context.Background(), guild, "channel-1",
-			[]string{"https://example.com/good", "https://example.com/bad"}, runOpts{messageID: "event-1"})
+		results, err := poster.fetch(context.Background(), guild, testChannelID,
+			[]string{"https://example.com/good", "https://example.com/bad"}, runOpts{messageID: testMessageID})
 
 		Expect(err).To(HaveOccurred())
 		Expect(results.items).To(HaveLen(1))
@@ -692,18 +693,18 @@ var _ = Describe("Recording reposts", func() {
 	})
 
 	It("never records a repost when every fetch fails", func() {
-		_, err := poster.fetch(context.Background(), guild, "channel-1",
-			[]string{"https://example.com/bad"}, runOpts{messageID: "event-1"})
+		_, err := poster.fetch(context.Background(), guild, testChannelID,
+			[]string{"https://example.com/bad"}, runOpts{messageID: testMessageID})
 
 		Expect(err).To(HaveOccurred())
 		Expect(deps.detector.created()).To(BeEmpty())
 	})
 
 	It("keeps reporting known reposts without re-recording them", func() {
-		deps.detector.found["channel-1\x00good"] = &repost.Repost{ID: "good", URL: "https://example.com/good"}
+		deps.detector.found[testChannelID.String()+"\x00good"] = &repost.Repost{ID: "good", URL: "https://example.com/good"}
 
-		results, err := poster.fetch(context.Background(), guild, "channel-1",
-			[]string{"https://example.com/good"}, runOpts{messageID: "event-1"})
+		results, err := poster.fetch(context.Background(), guild, testChannelID,
+			[]string{"https://example.com/good"}, runOpts{messageID: testMessageID})
 
 		Expect(err).NotTo(HaveOccurred())
 		Expect(results.items).To(HaveLen(1))
@@ -715,8 +716,8 @@ var _ = Describe("Recording reposts", func() {
 		disabled := *guild
 		disabled.DisabledProviders = []string{"stub"}
 
-		results, err := poster.fetch(context.Background(), &disabled, "channel-1",
-			[]string{"https://example.com/good"}, runOpts{messageID: "event-1"})
+		results, err := poster.fetch(context.Background(), &disabled, testChannelID,
+			[]string{"https://example.com/good"}, runOpts{messageID: testMessageID})
 
 		Expect(err).NotTo(HaveOccurred())
 		Expect(results.items).To(BeEmpty())
@@ -729,10 +730,10 @@ var _ = Describe("Recording reposts", func() {
 	It("reports known reposts for disabled providers without fetching", func() {
 		disabled := *guild
 		disabled.DisabledProviders = []string{"stub"}
-		deps.detector.found["channel-1\x00good"] = &repost.Repost{ID: "good", URL: "https://example.com/good"}
+		deps.detector.found[testChannelID.String()+"\x00good"] = &repost.Repost{ID: "good", URL: "https://example.com/good"}
 
-		results, err := poster.fetch(context.Background(), &disabled, "channel-1",
-			[]string{"https://example.com/good"}, runOpts{messageID: "event-1"})
+		results, err := poster.fetch(context.Background(), &disabled, testChannelID,
+			[]string{"https://example.com/good"}, runOpts{messageID: testMessageID})
 
 		Expect(err).NotTo(HaveOccurred())
 		Expect(results.items).To(BeEmpty())
@@ -752,25 +753,25 @@ var _ = Describe("Leaving the input group alone", func() {
 	BeforeEach(func() {
 		poster, deps = newTestPoster()
 
-		deps.fake.ChannelGuilds = map[string]string{"ch1": "g1", "ch2": "g1"}
-		deps.fake.Members = map[sender.MemberKey]bool{{GuildID: "g1", UserID: "u1"}: true}
-		deps.users.user = &store.User{ID: "u1"}
+		deps.fake.ChannelGuilds = map[snowflake.ID]snowflake.ID{crossChannel: crossGuildID, pairChannel: crossGuildID}
+		deps.fake.Members = map[sender.MemberKey]bool{{GuildID: crossGuildID, UserID: testAuthorID}: true}
+		deps.users.user = &store.User{ID: testAuthorID.String()}
 	})
 
 	It("never mutates the input group", func() {
 		group := &store.Group{
 			Name:     "g",
-			Parent:   "parent",
-			Children: []string{"channel-1", "ch1", "ch2"},
+			Parent:   testChannelID.String(),
+			Children: []string{testChannelID.String(), crossChannel.String(), pairChannel.String()},
 			IsPair:   true,
 		}
 
-		run.ExcludedChannels = []string{"ch2"}
+		run.ExcludedChannels = []snowflake.ID{pairChannel}
 
-		_, err := poster.Crosspost(context.Background(), run, "u1", group)
+		_, err := poster.Crosspost(context.Background(), run, testAuthorID, group)
 
 		Expect(err).NotTo(HaveOccurred())
-		Expect(group.Children).To(Equal([]string{"channel-1", "ch1", "ch2"}))
+		Expect(group.Children).To(Equal([]string{testChannelID.String(), crossChannel.String(), pairChannel.String()}))
 		Expect(deps.users.deletions()).To(BeEmpty())
 	})
 })
@@ -780,7 +781,7 @@ var _ = Describe("Fetching in order, once each", func() {
 		poster   *Poster
 		deps     *testDeps
 		provider *stubProvider
-		guild    = &store.Guild{ID: "guild-1", Posting: store.Posting{Limit: 10}}
+		guild    = &store.Guild{ID: testGuildID.String(), Posting: store.Posting{Limit: 10}}
 	)
 
 	BeforeEach(func() {
@@ -802,7 +803,7 @@ var _ = Describe("Fetching in order, once each", func() {
 	})
 
 	It("keeps input-URL order despite uneven fetch latency", func() {
-		results, err := poster.fetch(context.Background(), guild, "channel-1",
+		results, err := poster.fetch(context.Background(), guild, testChannelID,
 			[]string{"https://example.com/slow", "https://example.com/fast"}, runOpts{})
 
 		Expect(err).NotTo(HaveOccurred())
@@ -813,7 +814,7 @@ var _ = Describe("Fetching in order, once each", func() {
 	})
 
 	It("fetches a duplicated artwork ID once", func() {
-		results, err := poster.fetch(context.Background(), guild, "channel-1",
+		results, err := poster.fetch(context.Background(), guild, testChannelID,
 			[]string{"https://example.com/slow", "https://example.com/slow"}, runOpts{})
 
 		Expect(err).NotTo(HaveOccurred())

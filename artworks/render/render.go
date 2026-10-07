@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	"github.com/VTGare/boe-tea-go/artworks"
-	"github.com/VTGare/embeds"
-	"github.com/bwmarrin/discordgo"
+	"github.com/VTGare/boe-tea-go/internal/embeds"
+	"github.com/disgoorg/disgo/discord"
 )
 
 const (
@@ -24,7 +24,7 @@ type Options struct {
 	Crosspost     bool
 	AuthorName    string
 	AuthorIconURL string
-	Reference     *discordgo.MessageReference
+	Reference     *discord.MessageReference
 }
 
 // Input is an artwork waiting to be rendered.
@@ -38,7 +38,7 @@ type Input struct {
 // Bundle groups the messages built for one artwork.
 type Bundle struct {
 	ID    string
-	Sends []*discordgo.MessageSend
+	Sends []*discord.MessageCreate
 }
 
 // Build renders every input into a Bundle.
@@ -63,10 +63,10 @@ func Build(inputs []Input, opts Options) []Bundle {
 	return bundles
 }
 
-func pages(r artworks.Rendered, footer string, opts Options) []*discordgo.MessageSend {
+func pages(r artworks.Rendered, footer string, opts Options) []*discord.MessageCreate {
 	count := max(len(r.Images), 1)
 
-	sends := make([]*discordgo.MessageSend, 0, count)
+	sends := make([]*discord.MessageCreate, 0, count)
 	for ind := range count {
 		eb := embeds.NewBuilder()
 		eb.Title(pageTitle(r, ind)).URL(r.URL).Timestamp(r.Timestamp)
@@ -81,7 +81,7 @@ func pages(r artworks.Rendered, footer string, opts Options) []*discordgo.Messag
 			pageImage(eb, r.Images[ind])
 		}
 
-		send := &discordgo.MessageSend{Embeds: []*discordgo.MessageEmbed{eb.Finalize()}}
+		send := &discord.MessageCreate{Embeds: []discord.Embed{eb.Finalize()}}
 
 		if ind == 0 {
 			send.Files = r.Files
@@ -157,22 +157,22 @@ func description(r artworks.Rendered, tagsEnabled bool) string {
 
 // decorate adds the crosspost author or the reply reference to every
 // page.
-func decorate(sends []*discordgo.MessageSend, opts Options) {
+func decorate(sends []*discord.MessageCreate, opts Options) {
 	for _, send := range sends {
-		if send == nil || len(send.Embeds) == 0 || send.Embeds[0] == nil {
+		if send == nil || len(send.Embeds) == 0 {
 			continue
 		}
 
 		if opts.Crosspost {
 			if opts.AuthorName != "" {
-				send.Embeds[0].Author = &discordgo.MessageEmbedAuthor{
+				send.Embeds[0].Author = &discord.EmbedAuthor{
 					Name:    opts.AuthorName,
 					IconURL: opts.AuthorIconURL,
 				}
 			}
 		} else if opts.Reference != nil {
-			send.AllowedMentions = &discordgo.MessageAllowedMentions{}
-			send.Reference = opts.Reference
+			send.AllowedMentions = &discord.AllowedMentions{}
+			send.MessageReference = opts.Reference
 		}
 	}
 }

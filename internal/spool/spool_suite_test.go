@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/bwmarrin/discordgo"
+	"github.com/disgoorg/disgo/discord"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -63,7 +63,7 @@ var _ = Describe("RemoveFiles", func() {
 		disk, err := os.Open(plain)
 		Expect(err).NotTo(HaveOccurred())
 
-		RemoveFiles([]*discordgo.File{
+		RemoveFiles([]*discord.File{
 			{Reader: spooled},
 			{Reader: disk},
 			nil,

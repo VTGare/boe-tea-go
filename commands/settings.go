@@ -11,15 +11,15 @@ import (
 
 	"github.com/VTGare/boe-tea-go/artworks"
 	"github.com/VTGare/boe-tea-go/bot"
-	"github.com/VTGare/boe-tea-go/router"
 	"github.com/VTGare/boe-tea-go/store"
-	"github.com/bwmarrin/discordgo"
+	"github.com/VTGare/gumi/v2"
+	"github.com/disgoorg/disgo/discord"
 )
 
 const successColor = 0x3ba55c
 
-func canManage(perms int64) bool {
-	return perms&(discordgo.PermissionAdministrator|discordgo.PermissionManageGuild) != 0
+func canManage(perms discord.Permissions) bool {
+	return perms&(discord.PermissionAdministrator|discord.PermissionManageGuild) != 0
 }
 
 // toggle is an on/off setting. One definition drives its /set
@@ -214,13 +214,13 @@ type settingChange struct {
 	name, old, new, hint string
 }
 
-func (c settingChange) embed() *discordgo.MessageEmbed {
+func (c settingChange) embed() discord.Embed {
 	desc := fmt.Sprintf("**%s** %s → **%s**", c.name, c.old, c.new)
 	if c.hint != "" {
 		desc += "\n-# " + c.hint
 	}
 
-	return &discordgo.MessageEmbed{Color: successColor, Description: desc}
+	return discord.Embed{Color: successColor, Description: desc}
 }
 
 func applyPrefix(g *store.Guild, value string) (settingChange, error) {
@@ -232,7 +232,7 @@ func applyPrefix(g *store.Guild, value string) (settingChange, error) {
 	}
 
 	if n := len([]rune(prefix)); n < 1 || n > store.MaxPrefixLength {
-		return settingChange{}, router.Errorf("Prefixes are 1 to %d characters long, counting the space added after letters.", store.MaxPrefixLength)
+		return settingChange{}, gumi.Errorf("Prefixes are 1 to %d characters long, counting the space added after letters.", store.MaxPrefixLength)
 	}
 
 	c := settingChange{name: "Prefix", old: "`" + g.Prefix + "`", new: "`" + prefix + "`", hint: "Slash commands and mentions always work"}
@@ -243,7 +243,7 @@ func applyPrefix(g *store.Guild, value string) (settingChange, error) {
 
 func applyLimit(g *store.Guild, limit int) (settingChange, error) {
 	if limit < store.MinPostLimit || limit > store.MaxPostLimit {
-		return settingChange{}, router.Errorf("Images per post must be between %d and %d.", store.MinPostLimit, store.MaxPostLimit)
+		return settingChange{}, gumi.Errorf("Images per post must be between %d and %d.", store.MinPostLimit, store.MaxPostLimit)
 	}
 
 	c := settingChange{name: "Images per post", old: strconv.Itoa(g.Posting.Limit), new: strconv.Itoa(limit), hint: "Longer galleries are cut off after this many"}
@@ -265,7 +265,7 @@ func applyReposts(g *store.Guild, mode, ttl string) (settingChange, error) {
 
 	if mode != "" {
 		if _, ok := findRepostMode(store.RepostMode(mode)); !ok {
-			return settingChange{}, router.Errorf("Unknown repost mode `%s`.", mode)
+			return settingChange{}, gumi.Errorf("Unknown repost mode `%s`.", mode)
 		}
 		g.Repost.Mode = store.RepostMode(mode)
 	}
@@ -273,7 +273,7 @@ func applyReposts(g *store.Guild, mode, ttl string) (settingChange, error) {
 	if ttl != "" {
 		d, ok := findTTL(ttl)
 		if !ok {
-			return settingChange{}, router.Errorf("Unknown repost time `%s`.", ttl)
+			return settingChange{}, gumi.Errorf("Unknown repost time `%s`.", ttl)
 		}
 		g.Repost.TTL = d
 	}
@@ -288,45 +288,45 @@ func applyReposts(g *store.Guild, mode, ttl string) (settingChange, error) {
 	return settingChange{name: "Reposts", old: describe(before), new: describe(g.Repost), hint: m.hint}, nil
 }
 
-func settingsGroup(b *bot.Bot) []*router.Command {
+func settingsGroup(b *bot.Bot) []*gumi.Command {
 	spec := newSettingsSpec(b.ArtworkProviders)
 	panel := &settingsPanel{b: b, spec: spec}
-	panel.cmd = &router.Command{
+	panel.cmd = &gumi.Command{
 		Name:        "settings",
 		Category:    "Settings",
 		Aliases:     []string{"cfg", "config"},
 		Description: "Shows server settings with controls to change them.",
-		Checks:      []router.Check{router.GuildOnly},
-		Cooldown:    router.NewCooldown(router.CooldownUser, 1, 5*time.Second),
+		Checks:      []gumi.Check{gumi.GuildOnly},
+		Cooldown:    gumi.NewCooldown(gumi.CooldownUser, 1, 5*time.Second),
 		Ephemeral:   true,
 		Examples:    []string{"settings"},
 		Handler:     panel.open,
 		Components:  panel.handle,
 	}
 
-	return []*router.Command{panel.cmd, setCommand(b, spec), channelsCommand(b)}
+	return []*gumi.Command{panel.cmd, setCommand(b, spec), channelsCommand(b)}
 }
 
-func setCommand(b *bot.Bot, spec *settingsSpec) *router.Command {
-	modeChoices := make([]router.Choice, 0, len(repostModes))
+func setCommand(b *bot.Bot, spec *settingsSpec) *gumi.Command {
+	modeChoices := make([]gumi.Choice, 0, len(repostModes))
 	for _, m := range repostModes {
-		modeChoices = append(modeChoices, router.Choice{Name: m.label, Value: string(m.mode)})
+		modeChoices = append(modeChoices, gumi.Choice{Name: m.label, Value: string(m.mode)})
 	}
 
-	ttlChoices := make([]router.Choice, 0, len(ttlPresets))
+	ttlChoices := make([]gumi.Choice, 0, len(ttlPresets))
 	for _, p := range ttlPresets {
-		ttlChoices = append(ttlChoices, router.Choice{Name: p.name, Value: p.value})
+		ttlChoices = append(ttlChoices, gumi.Choice{Name: p.name, Value: p.value})
 	}
 
-	subs := []*router.Command{
+	subs := []*gumi.Command{
 		{
 			Name:        "prefix",
 			Description: "Changes the prefix for prefix commands.",
-			Options: []*router.Option{
-				router.String("value", "New prefix, up to 5 characters").Require().WithLength(1, store.MaxPrefixLength),
+			Options: []*gumi.Option{
+				gumi.String("value", "New prefix, up to 5 characters").Require().WithLength(1, store.MaxPrefixLength),
 			},
 			Examples: []string{"set prefix !"},
-			Handler: func(ctx *router.Context) error {
+			Handler: func(ctx *gumi.Context) error {
 				return changeGuild(ctx, b, func(g *store.Guild) (settingChange, error) {
 					return applyPrefix(g, ctx.Options.String("value"))
 				})
@@ -335,11 +335,11 @@ func setCommand(b *bot.Bot, spec *settingsSpec) *router.Command {
 		{
 			Name:        "limit",
 			Description: "Changes how many images a post shows.",
-			Options: []*router.Option{
-				router.Integer("value", "Images per post").Require().WithRange(store.MinPostLimit, store.MaxPostLimit),
+			Options: []*gumi.Option{
+				gumi.Integer("value", "Images per post").Require().WithRange(store.MinPostLimit, store.MaxPostLimit),
 			},
 			Examples: []string{"set limit 20"},
-			Handler: func(ctx *router.Context) error {
+			Handler: func(ctx *gumi.Context) error {
 				return changeGuild(ctx, b, func(g *store.Guild) (settingChange, error) {
 					return applyLimit(g, int(ctx.Options.Int("value")))
 				})
@@ -349,12 +349,12 @@ func setCommand(b *bot.Bot, spec *settingsSpec) *router.Command {
 			Name:        "reposts",
 			Aliases:     []string{"repost"},
 			Description: "Changes repost detection.",
-			Options: []*router.Option{
-				router.String("mode", "What to do with reposts").Require().WithChoices(modeChoices...),
-				router.String("remember", "How long links count towards reposts").WithChoices(ttlChoices...),
+			Options: []*gumi.Option{
+				gumi.String("mode", "What to do with reposts").Require().WithChoices(modeChoices...),
+				gumi.String("remember", "How long links count towards reposts").WithChoices(ttlChoices...),
 			},
 			Examples: []string{"set reposts strict 3d"},
-			Handler: func(ctx *router.Context) error {
+			Handler: func(ctx *gumi.Context) error {
 				return changeGuild(ctx, b, func(g *store.Guild) (settingChange, error) {
 					return applyReposts(g, ctx.Options.String("mode"), ctx.Options.String("remember"))
 				})
@@ -363,13 +363,13 @@ func setCommand(b *bot.Bot, spec *settingsSpec) *router.Command {
 	}
 
 	for _, t := range spec.toggles {
-		subs = append(subs, &router.Command{
+		subs = append(subs, &gumi.Command{
 			Name:        t.name,
 			Aliases:     t.aliases,
 			Description: "Turns " + strings.ToLower(t.label[:1]) + t.label[1:] + " on or off.",
-			Options:     []*router.Option{router.Boolean("enabled", "On or off").Require()},
+			Options:     []*gumi.Option{gumi.Boolean("enabled", "On or off").Require()},
 			Examples:    []string{"set " + t.name + " off"},
-			Handler: func(ctx *router.Context) error {
+			Handler: func(ctx *gumi.Context) error {
 				return changeGuild(ctx, b, func(g *store.Guild) (settingChange, error) {
 					return applyToggle(g, t, ctx.Options.Bool("enabled")), nil
 				})
@@ -377,22 +377,22 @@ func setCommand(b *bot.Bot, spec *settingsSpec) *router.Command {
 		})
 	}
 
-	return &router.Command{
+	return &gumi.Command{
 		Name:        "set",
 		Category:    "Settings",
 		Description: "Changes one server setting.",
-		Checks:      []router.Check{router.GuildOnly, router.HasPermissions(discordgo.PermissionManageGuild)},
-		Cooldown:    router.NewCooldown(router.CooldownUser, 1, 5*time.Second),
+		Checks:      []gumi.Check{gumi.GuildOnly, gumi.HasPermissions(discord.PermissionManageGuild)},
+		Cooldown:    gumi.NewCooldown(gumi.CooldownUser, 1, 5*time.Second),
 		Subcommands: subs,
 	}
 }
 
 // changeGuild applies change to the invoking guild, saves it and confirms.
-func changeGuild(ctx *router.Context, b *bot.Bot, change func(*store.Guild) (settingChange, error)) error {
+func changeGuild(ctx *gumi.Context, b *bot.Bot, change func(*store.Guild) (settingChange, error)) error {
 	reqCtx, cancel := context.WithTimeout(ctx.Context(), 10*time.Second)
 	defer cancel()
 
-	guild, _, err := store.GetOrCreateGuild(reqCtx, b.Store, ctx.GuildID())
+	guild, _, err := store.GetOrCreateGuild(reqCtx, b.Store, ctx.GuildID().String())
 	if err != nil {
 		return err
 	}

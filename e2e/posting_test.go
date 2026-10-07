@@ -4,7 +4,6 @@ package e2e
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -18,9 +17,11 @@ import (
 	"github.com/VTGare/boe-tea-go/messages"
 	"github.com/VTGare/boe-tea-go/post"
 	"github.com/VTGare/boe-tea-go/repost"
-	"github.com/VTGare/boe-tea-go/router"
 	"github.com/VTGare/boe-tea-go/store"
-	"github.com/bwmarrin/discordgo"
+	"github.com/VTGare/gumi/v2"
+	"github.com/disgoorg/disgo/discord"
+	"github.com/disgoorg/disgo/events"
+	"github.com/disgoorg/snowflake/v2"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -28,9 +29,9 @@ import (
 
 func newCommandBot(h *harness, stub *stubProvider, captured *error) *bot.Bot {
 	b := newTestBot(h, stub, newDetector())
-	b.AddRouter(router.New(router.Config{
+	b.AddRouter(gumi.New(gumi.Config{
 		Prefixes: []string{"bt!"},
-		ErrorHandler: func(_ *router.Context, err error) {
+		ErrorHandler: func(_ *gumi.Context, err error) {
 			*captured = err
 		},
 	}))
@@ -39,62 +40,56 @@ func newCommandBot(h *harness, stub *stubProvider, captured *error) *bot.Bot {
 	return b
 }
 
-func invokeCommand(b *bot.Bot, h *harness, authorID, channelID, messageID, content string) {
+func invokeCommand(b *bot.Bot, h *harness, authorID, channelID, messageID snowflake.ID, content string) {
 	invokeCommandIn(b, h, h.cfg.guildID, authorID, channelID, messageID, content)
 }
 
-func invokeCommandIn(b *bot.Bot, h *harness, guildID, authorID, channelID, messageID, content string) {
-	event := &discordgo.MessageCreate{Message: &discordgo.Message{
-		ID:        messageID,
-		ChannelID: channelID,
-		GuildID:   guildID,
-		Content:   content,
-		Author:    &discordgo.User{ID: authorID, Username: "e2e-cmd", Bot: false},
+// guildID 0 makes it a DM.
+func invokeCommandIn(b *bot.Bot, h *harness, guildID, authorID, channelID, messageID snowflake.ID, content string) {
+	b.Router.HandleMessage(messageEvent(h, guildID, channelID, messageID, discord.User{ID: authorID, Username: "e2e-cmd"}, content))
+}
+
+// messageEvent fakes the gateway event for a message, as if author sent it.
+func messageEvent(h *harness, guildID, channelID, messageID snowflake.ID, author discord.User, content string) *events.MessageCreate {
+	msg := discord.Message{ID: messageID, ChannelID: channelID, Content: content, Author: author}
+
+	var gid *snowflake.ID
+	if guildID != 0 {
+		gid = &guildID
+		msg.GuildID = gid
+		msg.Member = &discord.Member{GuildID: guildID, User: author}
+	}
+
+	return &events.MessageCreate{GenericMessage: &events.GenericMessage{
+		GenericEvent: events.NewGenericEvent(h.client, 0, 0),
+		MessageID:    messageID,
+		Message:      msg,
+		ChannelID:    channelID,
+		GuildID:      gid,
 	}}
-
-	b.Router.HandleMessage(h.session, event)
 }
 
-// dmChannel opens a DM channel with the configured test user, reusing an
-// existing one when the suite runs without E2E_TEST_USER_ID.
-func dmChannel(h *harness) string {
-	if h.cfg.userID != "" {
-		ch, err := h.session.UserChannelCreate(h.cfg.userID)
-		Expect(err).NotTo(HaveOccurred())
-
-		return ch.ID
+// dmChannel opens a DM channel with the configured test user. The bot
+// can't DM itself, so the DM specs need E2E_TEST_USER_ID.
+func dmChannel(h *harness) snowflake.ID {
+	if h.cfg.userID == 0 {
+		Skip("set E2E_TEST_USER_ID to enable the DM specs")
 	}
 
-	h.session.State.RLock()
-	defer h.session.State.RUnlock()
+	ch, err := h.client.Rest.CreateDMChannel(h.cfg.userID)
+	Expect(err).NotTo(HaveOccurred())
 
-	for _, ch := range h.session.State.PrivateChannels {
-		if ch != nil && ch.Type == discordgo.ChannelTypeDM {
-			return ch.ID
-		}
-	}
-
-	Skip("no DM channel available: set E2E_TEST_USER_ID or open a DM with the test bot")
-
-	return ""
+	return ch.ID()
 }
 
-func dmAuthor() string {
-	return fmt.Sprintf("e2e-dm-%d", time.Now().UnixNano())
-}
-
-func embedImagesAfter(h *harness, channelID, seedID string) []string {
-	msgs, err := h.session.ChannelMessages(channelID, 25, "", seedID, "")
+func embedImagesAfter(h *harness, channelID, seedID snowflake.ID) []string {
+	msgs, err := h.messagesAfter(channelID, seedID, 25)
 	Expect(err).NotTo(HaveOccurred())
 
 	images := make([]string, 0)
 	for _, m := range msgs {
-		if m == nil {
-			continue
-		}
-
 		for _, e := range m.Embeds {
-			if e != nil && e.Image != nil {
+			if e.Image != nil {
 				images = append(images, e.Image.URL)
 			}
 		}
@@ -105,18 +100,14 @@ func embedImagesAfter(h *harness, channelID, seedID string) []string {
 
 // shareAcksAfter counts "X shared <link>" replies, which only slash
 // commands should get.
-func shareAcksAfter(h *harness, channelID, seedID string) int {
-	msgs, err := h.session.ChannelMessages(channelID, 25, "", seedID, "")
+func shareAcksAfter(h *harness, channelID, seedID snowflake.ID) int {
+	msgs, err := h.messagesAfter(channelID, seedID, 25)
 	Expect(err).NotTo(HaveOccurred())
 
 	count := 0
 	for _, m := range msgs {
-		if m == nil {
-			continue
-		}
-
 		for _, e := range m.Embeds {
-			if e != nil && strings.Contains(e.Description, " shared <") {
+			if strings.Contains(e.Description, " shared <") {
 				count++
 			}
 		}
@@ -125,12 +116,12 @@ func shareAcksAfter(h *harness, channelID, seedID string) int {
 	return count
 }
 
-func newestMessageID(h *harness, channelID string) string {
-	msgs, err := h.session.ChannelMessages(channelID, 1, "", "", "")
+func newestMessageID(h *harness, channelID snowflake.ID) snowflake.ID {
+	msgs, err := h.client.Rest.GetMessages(channelID, 0, 0, 0, 1)
 	Expect(err).NotTo(HaveOccurred())
 
 	if len(msgs) == 0 {
-		return ""
+		return 0
 	}
 
 	return msgs[0].ID
@@ -166,12 +157,12 @@ var _ = Describe("Posting", func() {
 		Expect(sent[0].ArtworkID).To(Equal("single"))
 		cleanupSent(h, sent)
 
-		msg, err := h.session.ChannelMessage(h.cfg.channelID, sent[0].MessageID)
+		msg, err := h.sentMessage(sent[0])
 		Expect(err).NotTo(HaveOccurred())
 		Expect(msg.Embeds).To(HaveLen(1))
 		Expect(msg.Embeds[0].URL).To(Equal(artURL))
 		Expect(msg.MessageReference).NotTo(BeNil())
-		Expect(msg.MessageReference.MessageID).To(Equal(seed.ID))
+		Expect(*msg.MessageReference.MessageID).To(Equal(seed.ID))
 		Expect(rec.all()).To(HaveLen(1))
 	})
 
@@ -217,7 +208,7 @@ var _ = Describe("Posting", func() {
 		Expect(sent).To(HaveLen(1))
 		cleanupSent(h, sent)
 
-		msg, err := h.session.ChannelMessage(h.cfg.channelID, sent[0].MessageID)
+		msg, err := h.sentMessage(sent[0])
 		Expect(err).NotTo(HaveOccurred())
 		Expect(msg.Embeds).To(HaveLen(1))
 		Expect(msg.Embeds[0].Image).NotTo(BeNil())
@@ -246,7 +237,7 @@ var _ = Describe("Posting", func() {
 		Expect(second[0].ArtworkID).To(Equal("rep"))
 		cleanupSent(h, second)
 
-		after, err := h.session.ChannelMessages(h.cfg.channelID, 10, "", seed2.ID, "")
+		after, err := h.messagesAfter(h.cfg.channelID, seed2.ID, 10)
 		Expect(err).NotTo(HaveOccurred())
 
 		notice := findEmbedByTitle(after, repostNoticeName)
@@ -255,10 +246,7 @@ var _ = Describe("Posting", func() {
 	})
 
 	It("deletes reposts in strict mode", func() {
-		perm, err := h.sender.BotHasGuildPerms(
-			h.cfg.guildID,
-			discordgo.PermissionAdministrator|discordgo.PermissionManageMessages,
-		)
+		perm, err := h.sender.BotHasGuildPerms(h.cfg.guildID, discord.PermissionManageMessages)
 		Expect(err).NotTo(HaveOccurred())
 
 		if !perm {
@@ -290,10 +278,10 @@ var _ = Describe("Posting", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(second).To(BeEmpty())
 
-		_, err = h.session.ChannelMessage(h.cfg.channelID, seed2.ID)
+		_, err = h.client.Rest.GetMessage(h.cfg.channelID, seed2.ID)
 		Expect(err).To(HaveOccurred())
 
-		after, err := h.session.ChannelMessages(h.cfg.channelID, 10, "", seed1.ID, "")
+		after, err := h.messagesAfter(h.cfg.channelID, seed1.ID, 10)
 		Expect(err).NotTo(HaveOccurred())
 
 		notice := findEmbedByTitle(after, repostNoticeName)
@@ -303,7 +291,7 @@ var _ = Describe("Posting", func() {
 
 	It("sends videos as attachments", func() {
 		ok, err := h.sender.HasChannelPerms(h.cfg.guildID, h.cfg.channelID,
-			sender.SendPermissions|discordgo.PermissionAttachFiles)
+			sender.SendPermissions|discord.PermissionAttachFiles)
 		Expect(err).NotTo(HaveOccurred())
 
 		if !ok {
@@ -320,7 +308,7 @@ var _ = Describe("Posting", func() {
 		stub := newStubProvider()
 		artURL := uniqueURL("video")
 
-		stub.add(artURL, "vid", &stubArtwork{files: []*discordgo.File{{Name: "e2e.mp4", Reader: file}}})
+		stub.add(artURL, "vid", &stubArtwork{files: []*discord.File{{Name: "e2e.mp4", Reader: file}}})
 
 		seed := seedChannel(h, h.cfg.channelID, "video")
 
@@ -329,7 +317,7 @@ var _ = Describe("Posting", func() {
 		Expect(sent).To(HaveLen(1))
 		cleanupSent(h, sent)
 
-		msg, err := h.session.ChannelMessage(h.cfg.channelID, sent[0].MessageID)
+		msg, err := h.sentMessage(sent[0])
 		Expect(err).NotTo(HaveOccurred())
 		Expect(msg.Attachments).To(HaveLen(1))
 
@@ -358,7 +346,7 @@ var _ = Describe("Posting", func() {
 		cleanupSent(h, sent)
 
 		Eventually(func(g Gomega) {
-			msg, err := h.session.ChannelMessage(h.cfg.channelID, sent[0].MessageID)
+			msg, err := h.sentMessage(sent[0])
 			g.Expect(err).NotTo(HaveOccurred())
 
 			names := make([]string, 0, len(msg.Reactions))
@@ -401,7 +389,7 @@ var _ = Describe("Reposts", func() {
 			cleanupSent(h, sent)
 
 			if tag == "off-2" {
-				after, err := h.session.ChannelMessages(h.cfg.channelID, 10, "", seed.ID, "")
+				after, err := h.messagesAfter(h.cfg.channelID, seed.ID, 10)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(findEmbedByTitle(after, repostNoticeName)).To(BeNil())
 			}
@@ -436,7 +424,7 @@ var _ = Describe("Reposts", func() {
 		Expect(second).To(BeEmpty())
 		Expect(embedImagesAfter(h, h.cfg.channelID, seed2.ID)).To(BeEmpty())
 
-		after, err := h.session.ChannelMessages(h.cfg.channelID, 10, "", seed2.ID, "")
+		after, err := h.messagesAfter(h.cfg.channelID, seed2.ID, 10)
 		Expect(err).NotTo(HaveOccurred())
 
 		notice := findEmbedByTitle(after, repostNoticeName)
@@ -475,10 +463,10 @@ var _ = Describe("Reposts", func() {
 		Expect(second[0].ArtworkID).To(Equal("pb"))
 		cleanupSent(h, second)
 
-		_, err = h.session.ChannelMessage(h.cfg.channelID, seed2.ID)
+		_, err = h.client.Rest.GetMessage(h.cfg.channelID, seed2.ID)
 		Expect(err).NotTo(HaveOccurred())
 
-		after, err := h.session.ChannelMessages(h.cfg.channelID, 10, "", seed2.ID, "")
+		after, err := h.messagesAfter(h.cfg.channelID, seed2.ID, 10)
 		Expect(err).NotTo(HaveOccurred())
 
 		notice := findEmbedByTitle(after, repostNoticeName)
@@ -516,7 +504,7 @@ var _ = Describe("Reposts", func() {
 		Expect(second).To(HaveLen(1))
 		cleanupSent(h, second)
 
-		after, err := h.session.ChannelMessages(h.cfg.channelID, 10, "", seed2.ID, "")
+		after, err := h.messagesAfter(h.cfg.channelID, seed2.ID, 10)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(findEmbedByTitle(after, repostNoticeName)).To(BeNil())
 	})
@@ -525,7 +513,7 @@ var _ = Describe("Reposts", func() {
 		ctx := context.Background()
 		Expect(h.ensureGuild(ctx, baselineGuild)).To(Succeed())
 
-		user, err := h.store.User(ctx, h.userID)
+		user, err := h.store.User(ctx, h.userID.String())
 		Expect(err).NotTo(HaveOccurred())
 
 		user.Ignore = true
@@ -583,7 +571,7 @@ var _ = Describe("Reposts", func() {
 		Expect(sent).To(HaveLen(2))
 		cleanupSent(h, sent)
 
-		msg, err := h.session.ChannelMessage(h.cfg.channelID, sent[0].MessageID)
+		msg, err := h.sentMessage(sent[0])
 		Expect(err).NotTo(HaveOccurred())
 		Expect(msg.Content).To(Equal(messages.LimitExceeded(2, 1, 4)))
 	})
@@ -602,11 +590,11 @@ var _ = Describe("Crossposts", func() {
 
 		group := fmt.Sprintf("e2e-%d", time.Now().UnixNano())
 
-		_, err := h.store.CreateCrosspostGroup(ctx, h.userID, &store.Group{Name: group, Parent: h.cfg.channelID})
+		_, err := h.store.CreateCrosspostGroup(ctx, h.userID.String(), &store.Group{Name: group, Parent: h.cfg.channelID.String()})
 		Expect(err).NotTo(HaveOccurred())
-		DeferCleanup(func() { _, _ = h.store.DeleteCrosspostGroup(ctx, h.userID, group) })
+		DeferCleanup(func() { _, _ = h.store.DeleteCrosspostGroup(ctx, h.userID.String(), group) })
 
-		_, err = h.store.AddCrosspostChannel(ctx, h.userID, group, h.cfg.xpostChannelID)
+		_, err = h.store.AddCrosspostChannel(ctx, h.userID.String(), group, h.cfg.xpostChannelID.String())
 		Expect(err).NotTo(HaveOccurred())
 
 		detector := newDetector()
@@ -621,9 +609,10 @@ var _ = Describe("Crossposts", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(sent).NotTo(BeEmpty())
 		DeferCleanup(func() {
-			byChannel := map[string][]string{}
+			byChannel := map[snowflake.ID][]snowflake.ID{}
 			for _, info := range sent {
-				byChannel[info.ChannelID] = append(byChannel[info.ChannelID], info.MessageID)
+				channelID := parseID(info.ChannelID)
+				byChannel[channelID] = append(byChannel[channelID], parseID(info.MessageID))
 			}
 
 			for channelID, ids := range byChannel {
@@ -631,13 +620,13 @@ var _ = Describe("Crossposts", func() {
 			}
 		})
 
-		var mainMsg, xpostMsg *discordgo.Message
+		var mainMsg, xpostMsg *discord.Message
 
 		for _, info := range sent {
-			msg, err := h.session.ChannelMessage(info.ChannelID, info.MessageID)
+			msg, err := h.sentMessage(info)
 			Expect(err).NotTo(HaveOccurred())
 
-			switch info.ChannelID {
+			switch msg.ChannelID {
 			case h.cfg.channelID:
 				mainMsg = msg
 			case h.cfg.xpostChannelID:
@@ -669,17 +658,10 @@ var _ = Describe("Message handler", func() {
 		seed := seedChannel(h, h.cfg.channelID, "handler")
 		b := newTestBot(h, stub, detector)
 
-		event := &discordgo.MessageCreate{Message: &discordgo.Message{
-			ID:        seed.ID,
-			ChannelID: h.cfg.channelID,
-			GuildID:   h.cfg.guildID,
-			Content:   artURL,
-			Author:    &discordgo.User{ID: h.userID, Username: "e2e", Bot: false},
-		}}
+		handlers.OnMessage(b)(messageEvent(h, h.cfg.guildID, h.cfg.channelID, seed.ID,
+			discord.User{ID: h.userID, Username: "e2e"}, artURL))
 
-		handlers.OnMessage(b)(h.session, event)
-
-		after, err := h.session.ChannelMessages(h.cfg.channelID, 10, "", seed.ID, "")
+		after, err := h.messagesAfter(h.cfg.channelID, seed.ID, 10)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(messageIDsAfter(after)).NotTo(BeEmpty())
 		cleanupAfter(h, h.cfg.channelID, seed.ID)
@@ -688,7 +670,7 @@ var _ = Describe("Message handler", func() {
 
 		for _, m := range after {
 			for _, e := range m.Embeds {
-				if e != nil && e.URL == artURL {
+				if e.URL == artURL {
 					found = true
 				}
 			}
@@ -696,7 +678,7 @@ var _ = Describe("Message handler", func() {
 
 		Expect(found).To(BeTrue())
 
-		cached, ok := b.EmbedCache.Get(h.cfg.channelID, seed.ID)
+		cached, ok := b.EmbedCache.Get(h.cfg.channelID.String(), seed.ID.String())
 		Expect(ok).To(BeTrue())
 		Expect(cached.IsParent).To(BeTrue())
 	})
@@ -719,17 +701,10 @@ var _ = Describe("DMs", func() {
 		seed := seedChannel(h, dm, "dm-handler")
 		b := newTestBot(h, stub, newDetector())
 
-		event := &discordgo.MessageCreate{Message: &discordgo.Message{
-			ID:        seed.ID,
-			ChannelID: dm,
-			GuildID:   "",
-			Content:   artURL,
-			Author:    &discordgo.User{ID: dmAuthor(), Username: "e2e-dm", Bot: false},
-		}}
+		handlers.OnMessage(b)(messageEvent(h, 0, dm, seed.ID,
+			discord.User{ID: newID(), Username: "e2e-dm"}, artURL))
 
-		handlers.OnMessage(b)(h.session, event)
-
-		after, err := h.session.ChannelMessages(dm, 10, "", seed.ID, "")
+		after, err := h.messagesAfter(dm, seed.ID, 10)
 		Expect(err).NotTo(HaveOccurred())
 		cleanupAfter(h, dm, seed.ID)
 
@@ -737,7 +712,7 @@ var _ = Describe("DMs", func() {
 
 		for _, m := range after {
 			for _, e := range m.Embeds {
-				if e != nil && e.URL == artURL {
+				if e.URL == artURL {
 					found = true
 				}
 			}
@@ -760,7 +735,7 @@ var _ = Describe("DMs", func() {
 		b := newCommandBot(h, stub, &captured)
 		seed := seedChannel(h, dm, "dm-share")
 
-		invokeCommandIn(b, h, "", dmAuthor(), dm, seed.ID, "bt!share "+artURL)
+		invokeCommandIn(b, h, 0, newID(), dm, seed.ID, "bt!share "+artURL)
 
 		Expect(captured).NotTo(HaveOccurred())
 		Expect(embedImagesAfter(h, dm, seed.ID)).To(And(
@@ -785,7 +760,7 @@ var _ = Describe("DMs", func() {
 		b := newCommandBot(h, stub, &captured)
 		seed := seedChannel(h, dm, "dm-exclude")
 
-		invokeCommandIn(b, h, "", dmAuthor(), dm, seed.ID, "bt!ex "+artURL+" 2")
+		invokeCommandIn(b, h, 0, newID(), dm, seed.ID, "bt!ex "+artURL+" 2")
 
 		Expect(captured).NotTo(HaveOccurred())
 		Expect(embedImagesAfter(h, dm, seed.ID)).To(And(
@@ -818,7 +793,7 @@ var _ = Describe("Share command", func() {
 		b := newCommandBot(h, stub, &captured)
 		seed := seedChannel(h, h.cfg.channelID, "share-idx")
 
-		invokeCommand(b, h, fmt.Sprintf("e2e-cmd-%d", time.Now().UnixNano()),
+		invokeCommand(b, h, newID(),
 			h.cfg.channelID, seed.ID, "bt!share "+artURL+" 1 3")
 
 		Expect(captured).NotTo(HaveOccurred())
@@ -829,7 +804,7 @@ var _ = Describe("Share command", func() {
 		Expect(shareAcksAfter(h, h.cfg.channelID, seed.ID)).To(BeZero())
 		cleanupAfter(h, h.cfg.channelID, seed.ID)
 
-		cached, ok := b.EmbedCache.Get(h.cfg.channelID, seed.ID)
+		cached, ok := b.EmbedCache.Get(h.cfg.channelID.String(), seed.ID.String())
 		Expect(ok).To(BeTrue())
 		Expect(cached.IsParent).To(BeTrue())
 	})
@@ -848,7 +823,7 @@ var _ = Describe("Share command", func() {
 		b := newCommandBot(h, stub, &captured)
 		seed := seedChannel(h, h.cfg.channelID, "share-range")
 
-		invokeCommand(b, h, fmt.Sprintf("e2e-cmd-%d", time.Now().UnixNano()),
+		invokeCommand(b, h, newID(),
 			h.cfg.channelID, seed.ID, "bt!share "+artURL+" 1-2")
 
 		Expect(captured).NotTo(HaveOccurred())
@@ -873,7 +848,7 @@ var _ = Describe("Share command", func() {
 		b := newCommandBot(h, stub, &captured)
 		seed := seedChannel(h, h.cfg.channelID, "share-ex")
 
-		invokeCommand(b, h, fmt.Sprintf("e2e-cmd-%d", time.Now().UnixNano()),
+		invokeCommand(b, h, newID(),
 			h.cfg.channelID, seed.ID, "bt!ex "+artURL+" 2")
 
 		Expect(captured).NotTo(HaveOccurred())
@@ -894,7 +869,7 @@ var _ = Describe("Share command", func() {
 		b := newCommandBot(h, stub, &captured)
 		seed := seedChannel(h, h.cfg.channelID, "share-bad")
 
-		invokeCommand(b, h, fmt.Sprintf("e2e-cmd-%d", time.Now().UnixNano()),
+		invokeCommand(b, h, newID(),
 			h.cfg.channelID, seed.ID, "bt!share "+artURL+" abc")
 
 		Expect(captured).To(HaveOccurred())
@@ -907,11 +882,10 @@ var _ = Describe("Share command", func() {
 		b := newCommandBot(h, newStubProvider(), &captured)
 		seed := seedChannel(h, h.cfg.channelID, "share-noargs")
 
-		invokeCommand(b, h, fmt.Sprintf("e2e-cmd-%d", time.Now().UnixNano()),
+		invokeCommand(b, h, newID(),
 			h.cfg.channelID, seed.ID, "bt!share")
 
-		var cmdErr *messages.IncorrectCmd
-		Expect(errors.As(captured, &cmdErr)).To(BeTrue())
+		Expect(captured).To(MatchError(gumi.ErrMissingOption))
 		Expect(embedImagesAfter(h, h.cfg.channelID, seed.ID)).To(BeEmpty())
 	})
 
@@ -928,11 +902,11 @@ var _ = Describe("Share command", func() {
 
 		group := fmt.Sprintf("e2e-cmd-%d", time.Now().UnixNano())
 
-		_, err := h.store.CreateCrosspostGroup(ctx, h.userID, &store.Group{Name: group, Parent: h.cfg.channelID})
+		_, err := h.store.CreateCrosspostGroup(ctx, h.userID.String(), &store.Group{Name: group, Parent: h.cfg.channelID.String()})
 		Expect(err).NotTo(HaveOccurred())
-		DeferCleanup(func() { _, _ = h.store.DeleteCrosspostGroup(ctx, h.userID, group) })
+		DeferCleanup(func() { _, _ = h.store.DeleteCrosspostGroup(ctx, h.userID.String(), group) })
 
-		_, err = h.store.AddCrosspostChannel(ctx, h.userID, group, h.cfg.xpostChannelID)
+		_, err = h.store.AddCrosspostChannel(ctx, h.userID.String(), group, h.cfg.xpostChannelID.String())
 		Expect(err).NotTo(HaveOccurred())
 
 		var captured error
@@ -941,7 +915,7 @@ var _ = Describe("Share command", func() {
 		before := newestMessageID(h, h.cfg.xpostChannelID)
 
 		invokeCommand(b, h, h.userID, h.cfg.channelID, seed.ID,
-			"bt!crosspostexclude "+artURL+" <#"+h.cfg.xpostChannelID+">")
+			"bt!crosspostexclude "+artURL+" "+discord.ChannelMention(h.cfg.xpostChannelID))
 
 		Expect(captured).NotTo(HaveOccurred())
 		Expect(embedImagesAfter(h, h.cfg.channelID, seed.ID)).To(ContainElement("https://example.com/x.png"))

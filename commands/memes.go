@@ -8,8 +8,8 @@ import (
 
 	"github.com/VTGare/boe-tea-go/bot"
 	"github.com/VTGare/boe-tea-go/internal/arrays"
-	"github.com/VTGare/boe-tea-go/router"
-	"github.com/VTGare/embeds"
+	"github.com/VTGare/boe-tea-go/internal/embeds"
+	"github.com/VTGare/gumi/v2"
 	"github.com/julien040/go-ternary"
 )
 
@@ -40,13 +40,13 @@ var (
 	))
 )
 
-func memesGroup(b *bot.Bot) []*router.Command {
-	return []*router.Command{
+func memesGroup(b *bot.Bot) []*gumi.Command {
+	return []*gumi.Command{
 		{
 			Name:        "brainpower",
 			Category:    "Memes",
 			Description: "Adrenaline is pumping.",
-			Cooldown:    router.NewCooldown(router.CooldownUser, 1, 15*time.Second),
+			Cooldown:    gumi.NewCooldown(gumi.CooldownUser, 1, 15*time.Second),
 			Examples:    []string{"brainpower"},
 			Handler:     brainPower(b),
 		},
@@ -61,9 +61,9 @@ func memesGroup(b *bot.Bot) []*router.Command {
 			Name:        "nuggets",
 			Category:    "Memes",
 			Description: "Create ships by feeding nuggets.",
-			Options: []*router.Option{
-				router.String("person1", "First person").Require(),
-				router.String("person2", "Second person").Require(),
+			Options: []*gumi.Option{
+				gumi.String("person1", "First person").Require(),
+				gumi.String("person2", "Second person").Require(),
 			},
 			Examples: []string{"nuggets 2B 9S"},
 			Handler:  nuggets(b),
@@ -72,8 +72,8 @@ func memesGroup(b *bot.Bot) []*router.Command {
 			Name:        "whois",
 			Category:    "Memes",
 			Description: "Who is Faker?",
-			Options: []*router.Option{
-				router.String("person", "Person to identify").Require(),
+			Options: []*gumi.Option{
+				gumi.String("person", "Person to identify").Require(),
 			},
 			Examples: []string{"whois Faker"},
 			Handler:  whoIs(b),
@@ -111,27 +111,27 @@ func memesGroup(b *bot.Bot) []*router.Command {
 	}
 }
 
-func brainPower(*bot.Bot) router.Handler {
-	return func(ctx *router.Context) error {
-		return ctx.Reply(router.Text(
+func brainPower(*bot.Bot) gumi.Handler {
+	return func(ctx *gumi.Context) error {
+		return ctx.Reply(gumi.Text(
 			"O-oooooooooo AAAAE-A-A-I-A-U- JO-oooooooooooo AAE-O-A-A-U-U-A- " +
 				"E-eee-ee-eee AAAAE-A-E-I-E-A-JO-ooo-oo-oo-oo EEEEO-A-AAA-AAAA",
 		))
 	}
 }
 
-func borgar(*bot.Bot) router.Handler {
-	return func(ctx *router.Context) error {
+func borgar(*bot.Bot) gumi.Handler {
+	return func(ctx *gumi.Context) error {
 		eb := embeds.NewBuilder()
 		eb.Title("Cute dino girl enjoys borgar.").
 			Description("🦕🍔").
 			Image("https://i.kym-cdn.com/photos/images/original/001/568/282/ef2.gif")
-		return ctx.Reply(router.Embed(eb.Finalize()))
+		return ctx.Reply(gumi.Embed(eb.Finalize()))
 	}
 }
 
-func nuggets(*bot.Bot) router.Handler {
-	return func(ctx *router.Context) error {
+func nuggets(*bot.Bot) gumi.Handler {
+	return func(ctx *gumi.Context) error {
 		n := &struct {
 			Amelia string
 			Ryo    string
@@ -142,12 +142,12 @@ func nuggets(*bot.Bot) router.Handler {
 			return err
 		}
 
-		return ctx.Reply(router.Text(buf.String()))
+		return ctx.Reply(gumi.Text(buf.String()))
 	}
 }
 
-func whoIs(*bot.Bot) router.Handler {
-	return func(ctx *router.Context) error {
+func whoIs(*bot.Bot) gumi.Handler {
+	return func(ctx *gumi.Context) error {
 		n := &struct {
 			Faker string
 		}{Faker: ctx.Options.String("person")}
@@ -157,12 +157,12 @@ func whoIs(*bot.Bot) router.Handler {
 			return err
 		}
 
-		return ctx.Reply(router.Text(buf.String()))
+		return ctx.Reply(gumi.Text(buf.String()))
 	}
 }
 
-func gamba(*bot.Bot) router.Handler {
-	return func(ctx *router.Context) error {
+func gamba(*bot.Bot) gumi.Handler {
+	return func(ctx *gumi.Context) error {
 		getItTwisted := rand.Intn(10) != 0
 
 		text := ternary.If(getItTwisted,
@@ -170,18 +170,18 @@ func gamba(*bot.Bot) router.Handler {
 			`🦍 🗣️ DO NOT GET IT TWISTED 🌪️ , DO NOT GAMBLE 🚫 . DO NOT START GAMBLING ❌ . GAMBLING IS ENTERTAINMENT 🎰 AND ENTERTAINMENT ONLY 👍 . YOU WONT BREAK EVEN 🛑 , YOU WONT WIN ⚠️ ️. YOU WONT DO ANY OF THAT 💯 , YOU UNDERSTAND ⁉️ ️ YOU WILL ONLY GO INTO DEBT 💵 📉 AND RUIN YOUR FUCKING LIFE 😵`,
 		)
 
-		return ctx.Reply(router.Text(text))
+		return ctx.Reply(gumi.Text(text))
 	}
 }
 
-func cake(*bot.Bot) router.Handler {
-	return func(ctx *router.Context) error {
+func cake(*bot.Bot) gumi.Handler {
+	return func(ctx *gumi.Context) error {
 		eb := embeds.NewBuilder()
 		eb.Title("Local God eats cake").
 			Description("🙏🍰").
 			Image("https://cdn.discordapp.com/attachments/1129829799179853914/1160609012115578970/haruhi-haruhi-suzumiya.gif")
 
-		return ctx.Reply(router.Embed(eb.Finalize()))
+		return ctx.Reply(gumi.Embed(eb.Finalize()))
 	}
 }
 
@@ -196,8 +196,8 @@ var frenzyImages = []string{
 	"https://static.wikia.nocookie.net/to-be-a-power-in-the-shadows/images/9/9f/Red_Moon-_Anime.png",
 }
 
-func frenzy(*bot.Bot) router.Handler {
-	return func(ctx *router.Context) error {
+func frenzy(*bot.Bot) gumi.Handler {
+	return func(ctx *gumi.Context) error {
 		image := arrays.RandomElement(frenzyImages)
 
 		eb := embeds.NewBuilder()
@@ -206,12 +206,12 @@ func frenzy(*bot.Bot) router.Handler {
 			Color(0x880808).
 			Image(*image)
 
-		return ctx.Reply(router.Embed(eb.Finalize()))
+		return ctx.Reply(gumi.Embed(eb.Finalize()))
 	}
 }
 
-func kaiki(*bot.Bot) router.Handler {
-	return func(ctx *router.Context) error {
-		return ctx.Reply(router.Text("https://imgpx.com/en/3EUv19fdWN78.png"))
+func kaiki(*bot.Bot) gumi.Handler {
+	return func(ctx *gumi.Context) error {
+		return ctx.Reply(gumi.Text("https://imgpx.com/en/3EUv19fdWN78.png"))
 	}
 }

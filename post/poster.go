@@ -9,10 +9,12 @@ import (
 	"github.com/VTGare/boe-tea-go/artworks"
 	"github.com/VTGare/boe-tea-go/bot"
 	"github.com/VTGare/boe-tea-go/internal/cache"
+	"github.com/VTGare/boe-tea-go/internal/dgoutils"
 	"github.com/VTGare/boe-tea-go/internal/sender"
 	"github.com/VTGare/boe-tea-go/repost"
 	"github.com/VTGare/boe-tea-go/store"
-	"github.com/bwmarrin/discordgo"
+	"github.com/disgoorg/disgo/discord"
+	"github.com/disgoorg/snowflake/v2"
 	goCache "github.com/patrickmn/go-cache"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
@@ -73,7 +75,7 @@ func NewPoster(deps Deps) *Poster {
 
 // Send posts the artworks for run.
 func (r *Poster) Send(ctx context.Context, run Post) ([]*cache.MessageInfo, error) {
-	guild, err := r.deps.Guilds.Guild(ctx, run.GuildID)
+	guild, err := r.deps.Guilds.Guild(ctx, dgoutils.IDString(run.GuildID))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get a guild: %w", err)
 	}
@@ -82,7 +84,7 @@ func (r *Poster) Send(ctx context.Context, run Post) ([]*cache.MessageInfo, erro
 		return nil, fmt.Errorf("failed to get a guild: not found")
 	}
 
-	user, err := r.deps.Users.User(ctx, run.AuthorID)
+	user, err := r.deps.Users.User(ctx, run.AuthorID.String())
 	if err != nil {
 		return nil, fmt.Errorf("failed to get a user: %w", err)
 	}
@@ -123,8 +125,8 @@ func (r *Poster) Send(ctx context.Context, run Post) ([]*cache.MessageInfo, erro
 
 	sent := pagesToInfos(pages)
 
-	if group, ok := user.FindGroup(run.ChannelID); user.Crosspost && ok {
-		cross, err := r.Crosspost(ctx, run, user.ID, group)
+	if group, ok := user.FindGroup(run.ChannelID.String()); user.Crosspost && ok {
+		cross, err := r.Crosspost(ctx, run, run.AuthorID, group)
 		if err != nil {
 			errs = append(errs, err)
 		}
@@ -137,8 +139,8 @@ func (r *Poster) Send(ctx context.Context, run Post) ([]*cache.MessageInfo, erro
 
 // Crosspost posts to every channel in group. A failed channel doesn't
 // stop the others; all errors are returned together.
-func (r *Poster) Crosspost(ctx context.Context, run Post, userID string, group *store.Group) ([]*cache.MessageInfo, error) {
-	user, err := r.deps.Users.User(ctx, userID)
+func (r *Poster) Crosspost(ctx context.Context, run Post, userID snowflake.ID, group *store.Group) ([]*cache.MessageInfo, error) {
+	user, err := r.deps.Users.User(ctx, userID.String())
 	if err != nil {
 		return nil, err
 	}
@@ -151,26 +153,16 @@ func (r *Poster) Crosspost(ctx context.Context, run Post, userID string, group *
 		return []*cache.MessageInfo{}, nil
 	}
 
-	children := append([]string(nil), group.Children...)
-
-	if len(run.ExcludedChannels) > 0 {
-		excluded := make(map[string]struct{}, len(run.ExcludedChannels))
-		for _, channelID := range run.ExcludedChannels {
-			excluded[channelID] = struct{}{}
+	children := make([]snowflake.ID, 0, len(group.Children))
+	for _, child := range group.Children {
+		if id := dgoutils.ParseID(child); id != 0 {
+			children = append(children, id)
 		}
-
-		children = slices.DeleteFunc(children, func(channelID string) bool {
-			_, ok := excluded[channelID]
-
-			return ok
-		})
 	}
 
-	if group.IsPair {
-		children = slices.DeleteFunc(children, func(channelID string) bool {
-			return channelID == run.ChannelID
-		})
-	}
+	children = slices.DeleteFunc(children, func(channelID snowflake.ID) bool {
+		return slices.Contains(run.ExcludedChannels, channelID) || (group.IsPair && channelID == run.ChannelID)
+	})
 
 	slots := make([]crossSlot, len(children))
 
@@ -203,19 +195,19 @@ func (r *Poster) Crosspost(ctx context.Context, run Post, userID string, group *
 	return sent, errors.Join(errs...)
 }
 
-func CacheResult(ec *cache.EmbedCache, authorID, channelID, messageID string, sent []*cache.MessageInfo) {
+func CacheResult(ec *cache.EmbedCache, authorID, channelID, messageID snowflake.ID, sent []*cache.MessageInfo) {
 	if ec == nil || len(sent) == 0 {
 		return
 	}
 
-	ec.Set(authorID, channelID, messageID, true, sent...)
+	ec.Set(authorID.String(), channelID.String(), messageID.String(), true, sent...)
 
 	for _, msg := range sent {
 		if msg == nil {
 			continue
 		}
 
-		ec.Set(authorID, msg.ChannelID, msg.MessageID, false)
+		ec.Set(authorID.String(), msg.ChannelID, msg.MessageID, false)
 	}
 }
 
@@ -259,7 +251,7 @@ func DepsFromBot(b *bot.Bot) Deps {
 
 // RunFromMessage builds the immutable run for one triggering message.
 // Skip filters and channel exclusions are set by the caller.
-func RunFromMessage(msg *discordgo.Message, urls []string, isCommand bool) Post {
+func RunFromMessage(msg *discord.Message, urls []string, isCommand bool) Post {
 	run := Post{
 		URLs: append([]string(nil), urls...),
 		Skip: SkipFilter{Indices: make(map[int]struct{})},
@@ -269,16 +261,16 @@ func RunFromMessage(msg *discordgo.Message, urls []string, isCommand bool) Post 
 		return run
 	}
 
-	run.GuildID = msg.GuildID
+	if msg.GuildID != nil {
+		run.GuildID = *msg.GuildID
+	}
+
 	run.ChannelID = msg.ChannelID
 	run.MessageID = msg.ID
 	run.IsCommand = isCommand
-
-	if author := msg.Author; author != nil {
-		run.AuthorID = author.ID
-		run.AuthorName = author.Username
-		run.AuthorAvatar = author.AvatarURL("")
-	}
+	run.AuthorID = msg.Author.ID
+	run.AuthorName = msg.Author.Username
+	run.AuthorAvatar = msg.Author.EffectiveAvatarURL()
 
 	return run
 }

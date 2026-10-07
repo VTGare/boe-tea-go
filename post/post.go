@@ -1,5 +1,7 @@
 package post
 
+import "github.com/disgoorg/snowflake/v2"
+
 type SkipMode int
 
 const (
@@ -16,11 +18,12 @@ type SkipFilter struct {
 // Post describes one artwork-posting run. It's never modified, so it's
 // safe to share between sends.
 type Post struct {
-	GuildID   string
-	ChannelID string
-	MessageID string
+	// 0 in DMs.
+	GuildID   snowflake.ID
+	ChannelID snowflake.ID
+	MessageID snowflake.ID
 
-	AuthorID     string
+	AuthorID     snowflake.ID
 	AuthorName   string
 	AuthorAvatar string
 
@@ -33,13 +36,13 @@ type Post struct {
 	URLs []string
 	Skip SkipFilter
 
-	ExcludedChannels []string
+	ExcludedChannels []snowflake.ID
 }
 
 type runOpts struct {
 	isCommand   bool
 	isCrosspost bool
-	messageID   string
+	messageID   snowflake.ID
 }
 
 func (p Post) optsFor() runOpts {

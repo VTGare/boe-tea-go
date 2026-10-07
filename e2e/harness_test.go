@@ -20,7 +20,12 @@ import (
 	"github.com/VTGare/boe-tea-go/repost"
 	"github.com/VTGare/boe-tea-go/store"
 	"github.com/VTGare/boe-tea-go/store/postgres"
-	"github.com/bwmarrin/discordgo"
+	"github.com/disgoorg/disgo"
+	disgobot "github.com/disgoorg/disgo/bot"
+	disgocache "github.com/disgoorg/disgo/cache"
+	"github.com/disgoorg/disgo/discord"
+	"github.com/disgoorg/disgo/gateway"
+	"github.com/disgoorg/snowflake/v2"
 	goCache "github.com/patrickmn/go-cache"
 	"go.uber.org/zap"
 
@@ -35,28 +40,35 @@ const (
 
 type e2eConfig struct {
 	token          string
-	guildID        string
-	channelID      string
-	xpostChannelID string
+	guildID        snowflake.ID
+	channelID      snowflake.ID
+	xpostChannelID snowflake.ID
 	dsn            string
-	userID         string
+	userID         snowflake.ID
 }
 
 func (c e2eConfig) hasXpost() bool {
-	return c.xpostChannelID != ""
+	return c.xpostChannelID != 0
+}
+
+// envID is 0 when the variable is unset or isn't an ID.
+func envID(name string) snowflake.ID {
+	id, _ := snowflake.Parse(os.Getenv(name))
+
+	return id
 }
 
 func loadConfig() (e2eConfig, bool) {
 	cfg := e2eConfig{
 		token:          os.Getenv("E2E_DISCORD_TOKEN"),
-		guildID:        os.Getenv("E2E_GUILD_ID"),
-		channelID:      os.Getenv("E2E_CHANNEL_ID"),
-		xpostChannelID: os.Getenv("E2E_XPOST_CHANNEL_ID"),
+		guildID:        envID("E2E_GUILD_ID"),
+		channelID:      envID("E2E_CHANNEL_ID"),
+		xpostChannelID: envID("E2E_XPOST_CHANNEL_ID"),
 		dsn:            os.Getenv("E2E_POSTGRES_DSN"),
-		userID:         os.Getenv("E2E_TEST_USER_ID"),
+		userID:         envID("E2E_TEST_USER_ID"),
 	}
 
-	if cfg.token == "" || cfg.guildID == "" || cfg.channelID == "" {
+	if cfg.token == "" || cfg.guildID == 0 || cfg.channelID == 0 {
 		return e2eConfig{}, false
 	}
 
@@ -68,43 +80,67 @@ func loadConfig() (e2eConfig, bool) {
 }
 
 type harness struct {
-	cfg     e2eConfig
-	session *discordgo.Session
-	store   store.Store
-	sender  *sender.DiscordSender
-	botID   string
-	userID  string
-	log     *zap.SugaredLogger
+	cfg    e2eConfig
+	client *disgobot.Client
+	store  store.Store
+	sender *sender.DiscordSender
+	botID  snowflake.ID
+	userID snowflake.ID
+	log    *zap.SugaredLogger
+}
+
+// newClient connects one gateway and waits until the test channel and the
+// bot's member are cached, which permission checks need.
+func newClient(ctx context.Context, cfg e2eConfig) (*disgobot.Client, error) {
+	client, err := disgo.New(cfg.token,
+		disgobot.WithGatewayConfigOpts(
+			gateway.WithIntents(gateway.IntentsNonPrivileged, gateway.IntentMessageContent),
+		),
+		disgobot.WithCacheConfigOpts(
+			disgocache.WithCaches(disgocache.FlagGuilds, disgocache.FlagChannels, disgocache.FlagRoles, disgocache.FlagMembers),
+		),
+		disgobot.WithEventManagerConfigOpts(disgobot.WithAsyncEventsEnabled()),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := client.OpenGateway(ctx); err != nil {
+		return nil, err
+	}
+
+	for {
+		_, channel := client.Caches.Channel(cfg.channelID)
+		_, member := client.Caches.Member(cfg.guildID, client.ID())
+		if channel && member {
+			return client, nil
+		}
+
+		select {
+		case <-ctx.Done():
+			client.Close(context.Background())
+
+			return nil, fmt.Errorf("e2e: test guild never arrived: %w", ctx.Err())
+		case <-time.After(100 * time.Millisecond):
+		}
+	}
 }
 
 func setupHarness(ctx context.Context, cfg e2eConfig) (*harness, error) {
-	session, err := discordgo.New("Bot " + cfg.token)
+	client, err := newClient(ctx, cfg)
 	if err != nil {
-		return nil, err
-	}
-
-	session.Identify.Intents = discordgo.IntentsAllWithoutPrivileged | discordgo.IntentMessageContent
-
-	if err := session.Open(); err != nil {
-		return nil, err
-	}
-
-	me, err := session.User("@me")
-	if err != nil {
-		session.Close()
-
 		return nil, err
 	}
 
 	st, err := postgres.New(ctx, cfg.dsn)
 	if err != nil {
-		session.Close()
+		client.Close(context.Background())
 
 		return nil, err
 	}
 
 	if err := st.Init(ctx); err != nil {
-		session.Close()
+		client.Close(context.Background())
 
 		return nil, err
 	}
@@ -112,16 +148,16 @@ func setupHarness(ctx context.Context, cfg e2eConfig) (*harness, error) {
 	log := zap.NewNop().Sugar()
 
 	h := &harness{
-		cfg:     cfg,
-		session: session,
-		store:   st,
-		sender:  sender.NewDiscordSender(nil, log, session),
-		botID:   me.ID,
-		userID:  cfg.userID,
-		log:     log,
+		cfg:    cfg,
+		client: client,
+		store:  st,
+		sender: sender.NewDiscordSender(client, log),
+		botID:  client.ID(),
+		userID: cfg.userID,
+		log:    log,
 	}
 
-	if h.userID == "" {
+	if h.userID == 0 {
 		h.userID = h.botID
 	}
 
@@ -143,8 +179,8 @@ func setupHarness(ctx context.Context, cfg e2eConfig) (*harness, error) {
 }
 
 func (h *harness) close() {
-	if h.session != nil {
-		h.session.Close()
+	if h.client != nil {
+		h.client.Close(context.Background())
 	}
 
 	if h.store != nil {
@@ -176,13 +212,13 @@ func (o guildOverride) Guild(ctx context.Context, guildID string) (*store.Guild,
 }
 
 func (h *harness) ensureGuild(ctx context.Context, mutate func(*store.Guild)) error {
-	g, err := h.store.Guild(ctx, h.cfg.guildID)
+	g, err := h.store.Guild(ctx, h.cfg.guildID.String())
 	if err != nil {
 		if !errors.Is(err, store.ErrGuildNotFound) {
 			return err
 		}
 
-		g, err = h.store.CreateGuild(ctx, h.cfg.guildID)
+		g, err = h.store.CreateGuild(ctx, h.cfg.guildID.String())
 		if err != nil {
 			return err
 		}
@@ -202,7 +238,7 @@ func (h *harness) ensureGuild(ctx context.Context, mutate func(*store.Guild)) er
 }
 
 func (h *harness) ensureUser(ctx context.Context) error {
-	u, err := h.store.User(ctx, h.userID)
+	u, err := h.store.User(ctx, h.userID.String())
 	if err != nil {
 		return err
 	}
@@ -259,7 +295,7 @@ func (h *harness) newPosterWith(guilds post.GuildStore, stub *stubProvider, dete
 	})
 }
 
-func (h *harness) newRun(channelID, messageID string, urls ...string) post.Post {
+func (h *harness) newRun(channelID, messageID snowflake.ID, urls ...string) post.Post {
 	return post.Post{
 		GuildID:    h.cfg.guildID,
 		ChannelID:  channelID,
@@ -271,18 +307,37 @@ func (h *harness) newRun(channelID, messageID string, urls ...string) post.Post 
 	}
 }
 
-func (h *harness) seed(channelID, tag string) (*discordgo.Message, error) {
-	return h.session.ChannelMessageSend(channelID, "e2e seed "+tag)
+func (h *harness) seed(channelID snowflake.ID, tag string) (*discord.Message, error) {
+	return h.client.Rest.CreateMessage(channelID, discord.MessageCreate{Content: "e2e seed " + tag})
 }
 
-func (h *harness) deleteAll(channelID string, ids ...string) {
+func (h *harness) deleteAll(channelID snowflake.ID, ids ...snowflake.ID) {
 	for _, id := range ids {
-		if id == "" {
+		if id == 0 {
 			continue
 		}
 
-		_ = h.session.ChannelMessageDelete(channelID, id)
+		_ = h.client.Rest.DeleteMessage(channelID, id)
 	}
+}
+
+func (h *harness) sentMessage(info *cache.MessageInfo) (*discord.Message, error) {
+	return h.client.Rest.GetMessage(parseID(info.ChannelID), parseID(info.MessageID))
+}
+
+func (h *harness) messagesAfter(channelID, afterID snowflake.ID, limit int) ([]discord.Message, error) {
+	return h.client.Rest.GetMessages(channelID, 0, 0, afterID, limit)
+}
+
+func parseID(s string) snowflake.ID {
+	id, _ := snowflake.Parse(s)
+
+	return id
+}
+
+// newID makes an ID no real user has, for authors of fake messages.
+func newID() snowflake.ID {
+	return snowflake.New(time.Now())
 }
 
 func newTestBot(h *harness, stub *stubProvider, detector repost.Detector) *bot.Bot {
@@ -293,6 +348,7 @@ func newTestBot(h *harness, stub *stubProvider, detector repost.Detector) *bot.B
 		ArtworkCache:     goCache.New(5*time.Minute, 10*time.Minute),
 		EmbedCache:       cache.NewEmbedCache(),
 		Sender:           h.sender,
+		Client:           h.client,
 		Context:          context.Background(),
 		WidgetDispatcher: widget.NewDispatcher(),
 	}
@@ -308,7 +364,7 @@ func newDetector() repost.Detector {
 	return detector
 }
 
-func seedChannel(h *harness, channelID, tag string) *discordgo.Message {
+func seedChannel(h *harness, channelID snowflake.ID, tag string) *discord.Message {
 	seed, err := h.seed(channelID, tag)
 	Expect(err).NotTo(HaveOccurred())
 	DeferCleanup(func() { h.deleteAll(channelID, seed.ID) })
@@ -319,14 +375,14 @@ func seedChannel(h *harness, channelID, tag string) *discordgo.Message {
 func cleanupSent(h *harness, sent []*cache.MessageInfo) {
 	DeferCleanup(func() {
 		for _, info := range sent {
-			h.deleteAll(info.ChannelID, info.MessageID)
+			h.deleteAll(parseID(info.ChannelID), parseID(info.MessageID))
 		}
 	})
 }
 
-func cleanupAfter(h *harness, channelID, seedID string) {
+func cleanupAfter(h *harness, channelID, seedID snowflake.ID) {
 	DeferCleanup(func() {
-		after, _ := h.session.ChannelMessages(channelID, 25, "", seedID, "")
+		after, _ := h.messagesAfter(channelID, seedID, 25)
 		h.deleteAll(channelID, messageIDsAfter(after)...)
 	})
 }
@@ -335,26 +391,20 @@ func uniqueURL(tag string) string {
 	return fmt.Sprintf("https://example.com/e2e/%d/%s", time.Now().UnixNano(), tag)
 }
 
-func messageIDsAfter(msgs []*discordgo.Message) []string {
-	ids := make([]string, 0, len(msgs))
+func messageIDsAfter(msgs []discord.Message) []snowflake.ID {
+	ids := make([]snowflake.ID, 0, len(msgs))
 	for _, m := range msgs {
-		if m != nil {
-			ids = append(ids, m.ID)
-		}
+		ids = append(ids, m.ID)
 	}
 
 	return ids
 }
 
-func findEmbedByTitle(msgs []*discordgo.Message, title string) *discordgo.Message {
-	for _, m := range msgs {
-		if m == nil {
-			continue
-		}
-
+func findEmbedByTitle(msgs []discord.Message, title string) *discord.Message {
+	for i, m := range msgs {
 		for _, e := range m.Embeds {
-			if e != nil && e.Title == title {
-				return m
+			if e.Title == title {
+				return &msgs[i]
 			}
 		}
 	}
@@ -366,7 +416,7 @@ type stubArtwork struct {
 	id        string
 	url       string
 	previews  []string
-	files     []*discordgo.File
+	files     []*discord.File
 	renderErr error
 }
 

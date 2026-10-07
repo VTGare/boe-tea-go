@@ -5,9 +5,8 @@ import (
 	"testing"
 
 	"github.com/VTGare/boe-tea-go/bot"
-	"github.com/VTGare/boe-tea-go/router"
-	"github.com/VTGare/boe-tea-go/router/middleware"
-	"github.com/bwmarrin/discordgo"
+	"github.com/VTGare/gumi/v2"
+	"github.com/VTGare/gumi/v2/middleware"
 	"go.uber.org/zap"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -23,11 +22,11 @@ var _ = Describe("Recover middleware", func() {
 	It("converts panics into PanicError", func() {
 		mw := middleware.Recover()
 
-		err := mw(func(*router.Context) error {
+		err := mw(func(*gumi.Context) error {
 			panic("boom")
-		})(&router.Context{})
+		})(&gumi.Context{})
 
-		var panicErr *router.PanicError
+		var panicErr *gumi.PanicError
 
 		Expect(errors.As(err, &panicErr)).To(BeTrue())
 		Expect(panicErr.Value).To(Equal("boom"))
@@ -36,25 +35,9 @@ var _ = Describe("Recover middleware", func() {
 	It("passes handler results through", func() {
 		mw := middleware.Recover()
 
-		Expect(mw(func(*router.Context) error {
+		Expect(mw(func(*gumi.Context) error {
 			return nil
-		})(&router.Context{})).To(BeNil())
-	})
-})
-
-var _ = Describe("OnMessage fallback", func() {
-	var b *bot.Bot
-
-	BeforeEach(func() {
-		logger := zap.NewExample().Sugar()
-		b = &bot.Bot{Log: logger}
-	})
-
-	It("drops nil and malformed messages", func() {
-		Expect(func() {
-			OnMessage(b)(nil, nil)
-			OnMessage(b)(nil, &discordgo.MessageCreate{})
-		}).NotTo(Panic())
+		})(&gumi.Context{})).To(BeNil())
 	})
 })
 
@@ -74,13 +57,13 @@ var _ = Describe("OnError", func() {
 
 	It("logs panics without replying", func() {
 		Expect(func() {
-			OnError(b)(&router.Context{}, &router.PanicError{Value: "boom"})
+			OnError(b)(&gumi.Context{}, &gumi.PanicError{Value: "boom"})
 		}).NotTo(Panic())
 	})
 
 	It("swallows silent check errors", func() {
 		Expect(func() {
-			OnError(b)(&router.Context{}, &router.CheckError{Check: "owner_only", Silent: true})
+			OnError(b)(&gumi.Context{}, &gumi.CheckError{Check: "owner_only", Silent: true})
 		}).NotTo(Panic())
 	})
 })

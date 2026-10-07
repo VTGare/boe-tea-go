@@ -3,7 +3,7 @@ package messages
 import (
 	"fmt"
 
-	"github.com/VTGare/boe-tea-go/router"
+	"github.com/VTGare/gumi/v2"
 )
 
 type IncorrectCmd struct {
@@ -17,7 +17,7 @@ func (cmd *IncorrectCmd) Error() string {
 	return fmt.Sprintf("Command `%v` was used incorrectly", cmd.Name)
 }
 
-func ErrIncorrectCmd(cmd *router.Command) error {
+func ErrIncorrectCmd(cmd *gumi.Command) error {
 	return &IncorrectCmd{
 		Name:        cmd.QualifiedName(),
 		Description: cmd.Description,

@@ -11,23 +11,23 @@ import (
 
 	"github.com/VTGare/boe-tea-go/bot"
 	"github.com/VTGare/boe-tea-go/internal/dgoutils"
+	"github.com/VTGare/boe-tea-go/internal/embeds"
 	"github.com/VTGare/boe-tea-go/messages"
 	"github.com/VTGare/boe-tea-go/post"
-	"github.com/VTGare/boe-tea-go/router"
 	"github.com/VTGare/boe-tea-go/store"
-	"github.com/VTGare/embeds"
-	"github.com/bwmarrin/discordgo"
+	"github.com/VTGare/gumi/v2"
+	"github.com/disgoorg/disgo/discord"
 )
 
-func artworksGroup(b *bot.Bot) []*router.Command {
-	return []*router.Command{
+func artworksGroup(b *bot.Bot) []*gumi.Command {
+	return []*gumi.Command{
 		{
 			Name:        "artwork",
 			Category:    "Artworks",
 			Description: "Embeds Boe Tea's artwork by its ID or parent URL.",
-			Cooldown:    router.NewCooldown(router.CooldownUser, 1, 10*time.Second),
-			Options: []*router.Option{
-				router.String("query", "Artwork ID or URL").Require(),
+			Cooldown:    gumi.NewCooldown(gumi.CooldownUser, 1, 10*time.Second),
+			Options: []*gumi.Option{
+				gumi.String("query", "Artwork ID or URL").Require(),
 			},
 			Examples: []string{"artwork 69", "artwork https://pixiv.net/en/artworks/1234567"},
 			Handler:  artwork(b),
@@ -37,13 +37,13 @@ func artworksGroup(b *bot.Bot) []*router.Command {
 			Category:    "Artworks",
 			Aliases:     []string{"lb", "top"},
 			Description: "Sends a leaderboard of saved Boe Tea's artworks",
-			Cooldown:    router.NewCooldown(router.CooldownUser, 1, 10*time.Second),
-			Options: []*router.Option{
-				router.Integer("limit", "Leaderboard size, up to 100"),
-				router.String("during", "Only include recent artworks").WithChoices(
-					router.Choice{Name: "day", Value: "day"},
-					router.Choice{Name: "week", Value: "week"},
-					router.Choice{Name: "month", Value: "month"},
+			Cooldown:    gumi.NewCooldown(gumi.CooldownUser, 1, 10*time.Second),
+			Options: []*gumi.Option{
+				gumi.Integer("limit", "Leaderboard size, up to 100"),
+				gumi.String("during", "Only include recent artworks").WithChoices(
+					gumi.Choice{Name: "day", Value: "day"},
+					gumi.Choice{Name: "week", Value: "week"},
+					gumi.Choice{Name: "month", Value: "month"},
 				),
 			},
 			Examples: []string{"leaderboard 10 week"},
@@ -53,22 +53,22 @@ func artworksGroup(b *bot.Bot) []*router.Command {
 			Name:        "search",
 			Category:    "Artworks",
 			Description: "Search artworks in Boe Tea's database.",
-			Cooldown:    router.NewCooldown(router.CooldownUser, 1, 10*time.Second),
-			Options: []*router.Option{
-				router.String("query", "What to search for").Require(),
-				router.Integer("limit", "Result size, up to 100"),
-				router.String("sort", "How to sort results").WithChoices(
-					router.Choice{Name: "time", Value: "time"},
-					router.Choice{Name: "popularity", Value: "popularity"},
+			Cooldown:    gumi.NewCooldown(gumi.CooldownUser, 1, 10*time.Second),
+			Options: []*gumi.Option{
+				gumi.String("query", "What to search for").Require(),
+				gumi.Integer("limit", "Result size, up to 100"),
+				gumi.String("sort", "How to sort results").WithChoices(
+					gumi.Choice{Name: "time", Value: "time"},
+					gumi.Choice{Name: "popularity", Value: "popularity"},
 				),
-				router.String("order", "Sort direction").WithChoices(
-					router.Choice{Name: "asc", Value: "asc"},
-					router.Choice{Name: "desc", Value: "desc"},
+				gumi.String("order", "Sort direction").WithChoices(
+					gumi.Choice{Name: "asc", Value: "asc"},
+					gumi.Choice{Name: "desc", Value: "desc"},
 				),
-				router.String("during", "Only include recent artworks").WithChoices(
-					router.Choice{Name: "day", Value: "day"},
-					router.Choice{Name: "week", Value: "week"},
-					router.Choice{Name: "month", Value: "month"},
+				gumi.String("during", "Only include recent artworks").WithChoices(
+					gumi.Choice{Name: "day", Value: "day"},
+					gumi.Choice{Name: "week", Value: "week"},
+					gumi.Choice{Name: "month", Value: "month"},
 				),
 			},
 			Examples: []string{"search hews 10 popularity"},
@@ -79,16 +79,16 @@ func artworksGroup(b *bot.Bot) []*router.Command {
 			Category:    "Artworks",
 			Aliases:     []string{"pixiv", "twitter", "include", "shareinclude", "si"},
 			Description: "Shares an artwork from a URL, optionally picking which images to post.",
-			Cooldown:    router.NewCooldown(router.CooldownUser, 1, 5*time.Second),
+			Cooldown:    gumi.NewCooldown(gumi.CooldownUser, 1, 5*time.Second),
 			Defer:       true,
-			Options: []*router.Option{
-				router.String("url", "Artwork URL").Require(),
-				router.String("images", `Images to post (or remove if "mode" is set to "Exclude"), e.g. 1, 3-5`).Greedy(),
-				router.String("mode", `Include or exclude listed images to post (set to "Include" by default)`).SlashOnly().WithChoices(
-					router.Choice{Name: "Include", Value: "include"},
-					router.Choice{Name: "Exclude", Value: "exclude"},
+			Options: []*gumi.Option{
+				gumi.String("url", "Artwork URL").Require(),
+				gumi.String("images", `Images to post (or remove if "mode" is set to "Exclude"), e.g. 1, 3-5`).Greedy(),
+				gumi.String("mode", `Include or exclude listed images to post (set to "Include" by default)`).SlashOnly().WithChoices(
+					gumi.Choice{Name: "Include", Value: "include"},
+					gumi.Choice{Name: "Exclude", Value: "exclude"},
 				),
-				router.String("skip_channels", "Crosspost channels not to post this artwork to, e.g. #art #memes").SlashOnly(),
+				gumi.String("skip_channels", "Crosspost channels not to post this artwork to, e.g. #art #memes").SlashOnly(),
 			},
 			Examples: []string{"share https://pixiv.net/artworks/86341538 1-3 5"},
 			Handler:  share(b, post.SkipModeInclude),
@@ -100,12 +100,12 @@ func artworksGroup(b *bot.Bot) []*router.Command {
 			Category:     "Artworks",
 			Aliases:      []string{"exclude", "ex"},
 			Description:  "Shares an artwork from a URL, optionally excludes some images.",
-			Cooldown:     router.NewCooldown(router.CooldownUser, 1, 5*time.Second),
+			Cooldown:     gumi.NewCooldown(gumi.CooldownUser, 1, 5*time.Second),
 			Defer:        true,
 			DisableSlash: true,
-			Options: []*router.Option{
-				router.String("url", "Artwork URL").Require(),
-				router.String("images", "Images to exclude, e.g. 1-3 5").Greedy(),
+			Options: []*gumi.Option{
+				gumi.String("url", "Artwork URL").Require(),
+				gumi.String("images", "Images to exclude, e.g. 1-3 5").Greedy(),
 			},
 			Examples: []string{"shareexclude https://pixiv.net/artworks/86341538 1"},
 			Handler:  share(b, post.SkipModeExclude),
@@ -115,13 +115,13 @@ func artworksGroup(b *bot.Bot) []*router.Command {
 			Category:     "Artworks",
 			Aliases:      []string{"crosspost", "cp", "cpex"},
 			Description:  "Shares an artwork from a URL without crossposting.",
-			Checks:       []router.Check{router.GuildOnly},
-			Cooldown:     router.NewCooldown(router.CooldownUser, 1, 5*time.Second),
+			Checks:       []gumi.Check{gumi.GuildOnly},
+			Cooldown:     gumi.NewCooldown(gumi.CooldownUser, 1, 5*time.Second),
 			Defer:        true,
 			DisableSlash: true,
-			Options: []*router.Option{
-				router.String("url", "Artwork URL").Require(),
-				router.String("skip_channels", "Channels to exclude").Greedy(),
+			Options: []*gumi.Option{
+				gumi.String("url", "Artwork URL").Require(),
+				gumi.String("skip_channels", "Channels to exclude").Greedy(),
 			},
 			Examples: []string{"crosspostexclude https://pixiv.net/artworks/86341538 #seiso-channel"},
 			Handler:  share(b, post.SkipModeInclude),
@@ -129,8 +129,8 @@ func artworksGroup(b *bot.Bot) []*router.Command {
 	}
 }
 
-func artwork(b *bot.Bot) router.Handler {
-	return func(ctx *router.Context) error {
+func artwork(b *bot.Bot) gumi.Handler {
+	return func(ctx *gumi.Context) error {
 		arg := ctx.Options.String("query")
 		id, url, ok := parseArtworkArgument(arg)
 		if !ok {
@@ -161,7 +161,7 @@ func artwork(b *bot.Bot) router.Handler {
 			return messages.ErrArtworkNotFound(arg)
 		}
 
-		embeds := make([]*discordgo.MessageEmbed, 0, len(artwork.Images))
+		embeds := make([]discord.Embed, 0, len(artwork.Images))
 		for _, image := range artwork.Images {
 			embed := artworkToEmbed(artwork, image, 0, 1)
 
@@ -211,8 +211,8 @@ func parseSkipIndices(raw string) (map[int]struct{}, error) {
 
 // share posts an artwork. defaultMode is the prefix command's skip mode;
 // the slash command picks one with the mode option instead.
-func share(b *bot.Bot, defaultMode post.SkipMode) router.Handler {
-	return func(ctx *router.Context) error {
+func share(b *bot.Bot, defaultMode post.SkipMode) gumi.Handler {
+	return func(ctx *gumi.Context) error {
 		indices, err := parseSkipIndices(ctx.Options.String("images"))
 		if err != nil {
 			return err
@@ -229,7 +229,9 @@ func share(b *bot.Bot, defaultMode post.SkipMode) router.Handler {
 		run.IsInteraction = ctx.IsInteraction()
 
 		for arg := range strings.FieldsSeq(ctx.Options.String("skip_channels")) {
-			run.ExcludedChannels = append(run.ExcludedChannels, dgoutils.TrimmerRaw(arg))
+			if id := dgoutils.ParseID(dgoutils.TrimmerRaw(arg)); id != 0 {
+				run.ExcludedChannels = append(run.ExcludedChannels, id)
+			}
 		}
 
 		reqCtx, cancel := context.WithTimeout(ctx.Context(), 30*time.Second)
@@ -254,7 +256,7 @@ func share(b *bot.Bot, defaultMode post.SkipMode) router.Handler {
 
 // shareAck says who shared which link. The link is wrapped in <> so
 // Discord doesn't add a preview of its own.
-func shareAck(ctx *router.Context, run post.Post) error {
+func shareAck(ctx *gumi.Context, run post.Post) error {
 	link := ""
 	if len(run.URLs) > 0 {
 		link = run.URLs[0]
@@ -263,7 +265,7 @@ func shareAck(ctx *router.Context, run post.Post) error {
 	eb := embeds.NewBuilder()
 	eb.Description(fmt.Sprintf("%v shared <%v>", ctx.Author().Mention(), link))
 
-	return ctx.Reply(router.Embed(eb.Finalize()))
+	return ctx.Reply(gumi.Embed(eb.Finalize()))
 }
 
 func parseDuring(raw string) time.Duration {
@@ -279,8 +281,8 @@ func parseDuring(raw string) time.Duration {
 	}
 }
 
-func warningEmbed(ch *discordgo.Channel) []*discordgo.MessageEmbed {
-	if ch == nil || ch.NSFW {
+func warningEmbed(ch discord.Channel) []discord.Embed {
+	if ch, ok := ch.(discord.GuildMessageChannel); ok && ch.NSFW() {
 		return nil
 	}
 
@@ -288,11 +290,11 @@ func warningEmbed(ch *discordgo.Channel) []*discordgo.MessageEmbed {
 	eb := embeds.NewBuilder()
 	embed := eb.Title(locale.Title).Description(locale.Description).Finalize()
 
-	return []*discordgo.MessageEmbed{embed}
+	return []discord.Embed{embed}
 }
 
-func leaderboard(b *bot.Bot) router.Handler {
-	return func(ctx *router.Context) error {
+func leaderboard(b *bot.Bot) gumi.Handler {
+	return func(ctx *gumi.Context) error {
 		limit := ctx.Options.IntOr("limit", 100)
 		if limit > 100 {
 			return messages.ErrLimitTooHigh(limit)
@@ -313,9 +315,9 @@ func leaderboard(b *bot.Bot) router.Handler {
 			return err
 		}
 
-		ch, err := ctx.Session.Channel(ctx.ChannelID())
+		ch, err := ctx.Channel()
 		if err != nil {
-			return messages.ErrChannelNotFound(err, ctx.ChannelID())
+			return messages.ErrChannelNotFound(err, ctx.ChannelID().String())
 		}
 
 		artworkEmbeds := warningEmbed(ch)
@@ -331,8 +333,8 @@ func leaderboard(b *bot.Bot) router.Handler {
 	}
 }
 
-func search(b *bot.Bot) router.Handler {
-	return func(ctx *router.Context) error {
+func search(b *bot.Bot) gumi.Handler {
+	return func(ctx *gumi.Context) error {
 		// Remove $'s to sanitize the input
 		query := strings.ReplaceAll(ctx.Options.String("query"), "$", "")
 
@@ -373,9 +375,9 @@ func search(b *bot.Bot) router.Handler {
 			return messages.ErrArtworkNotFound(query)
 		}
 
-		ch, err := ctx.Session.Channel(ctx.ChannelID())
+		ch, err := ctx.Channel()
 		if err != nil {
-			return messages.ErrChannelNotFound(err, ctx.ChannelID())
+			return messages.ErrChannelNotFound(err, ctx.ChannelID().String())
 		}
 
 		artworkEmbeds := warningEmbed(ch)

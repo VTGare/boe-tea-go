@@ -8,19 +8,20 @@ import (
 	"time"
 
 	"github.com/VTGare/boe-tea-go/bot"
+	"github.com/VTGare/boe-tea-go/internal/dgoutils"
+	"github.com/VTGare/boe-tea-go/internal/embeds"
 	"github.com/VTGare/boe-tea-go/messages"
-	"github.com/VTGare/boe-tea-go/router"
-	"github.com/VTGare/embeds"
+	"github.com/VTGare/gumi/v2"
 )
 
-func generalGroup(b *bot.Bot) []*router.Command {
-	return []*router.Command{
+func generalGroup(b *bot.Bot) []*gumi.Command {
+	return []*gumi.Command{
 		{
 			Name:        "about",
 			Category:    "General",
 			Aliases:     []string{"invite", "patreon", "support"},
 			Description: "Bot's about page with the invite link and other useful stuff.",
-			Cooldown:    router.NewCooldown(router.CooldownUser, 1, 5*time.Second),
+			Cooldown:    gumi.NewCooldown(gumi.CooldownUser, 1, 5*time.Second),
 			Examples:    []string{"about"},
 			Handler:     about(b),
 		},
@@ -28,7 +29,7 @@ func generalGroup(b *bot.Bot) []*router.Command {
 			Name:        "ping",
 			Category:    "General",
 			Description: "Checks bot's availability and response time.",
-			Cooldown:    router.NewCooldown(router.CooldownUser, 1, 5*time.Second),
+			Cooldown:    gumi.NewCooldown(gumi.CooldownUser, 1, 5*time.Second),
 			Examples:    []string{"ping"},
 			Handler:     ping(b),
 		},
@@ -36,9 +37,9 @@ func generalGroup(b *bot.Bot) []*router.Command {
 			Name:        "feedback",
 			Category:    "General",
 			Description: "Sends feedback to bot's author.",
-			Options: []*router.Option{
-				router.String("text", "Your feedback").Require().Greedy(),
-				router.Attachment("image", "Screenshot to attach"),
+			Options: []*gumi.Option{
+				gumi.String("text", "Your feedback").Require().Greedy(),
+				gumi.Attachment("image", "Screenshot to attach"),
 			},
 			Examples: []string{"feedback Damn your bot sucks!"},
 			Handler:  feedback(b),
@@ -47,12 +48,12 @@ func generalGroup(b *bot.Bot) []*router.Command {
 			Name:        "stats",
 			Category:    "General",
 			Description: "Shows bot's runtime stats.",
-			Cooldown:    router.NewCooldown(router.CooldownUser, 1, 5*time.Second),
-			Options: []*router.Option{
-				router.String("section", "Which stats to show").WithChoices(
-					router.Choice{Name: "general", Value: "general"},
-					router.Choice{Name: "artworks", Value: "artworks"},
-					router.Choice{Name: "commands", Value: "commands"},
+			Cooldown:    gumi.NewCooldown(gumi.CooldownUser, 1, 5*time.Second),
+			Options: []*gumi.Option{
+				gumi.String("section", "Which stats to show").WithChoices(
+					gumi.Choice{Name: "general", Value: "general"},
+					gumi.Choice{Name: "artworks", Value: "artworks"},
+					gumi.Choice{Name: "commands", Value: "commands"},
 				),
 			},
 			Examples: []string{"stats", "stats artworks"},
@@ -61,12 +62,12 @@ func generalGroup(b *bot.Bot) []*router.Command {
 	}
 }
 
-func about(*bot.Bot) router.Handler {
-	return func(ctx *router.Context) error {
+func about(b *bot.Bot) gumi.Handler {
+	return func(ctx *gumi.Context) error {
 		locale := messages.AboutEmbed()
 
 		eb := embeds.NewBuilder()
-		eb.Title(locale.Title).Thumbnail(ctx.Session.State.User.AvatarURL(""))
+		eb.Title(locale.Title).Thumbnail(b.AvatarURL())
 		eb.Description(locale.Description)
 
 		eb.AddField(
@@ -89,32 +90,32 @@ func about(*bot.Bot) router.Handler {
 			true,
 		)
 
-		return ctx.Reply(router.Embed(eb.Finalize()))
+		return ctx.Reply(gumi.Embed(eb.Finalize()))
 	}
 }
 
-func ping(*bot.Bot) router.Handler {
-	return func(ctx *router.Context) error {
+func ping(b *bot.Bot) gumi.Handler {
+	return func(ctx *gumi.Context) error {
 		eb := embeds.NewBuilder()
 
-		return ctx.Reply(router.Embed(
+		return ctx.Reply(gumi.Embed(
 			eb.Title("🏓 Pong!").AddField(
 				"Heartbeat latency",
-				ctx.Session.HeartbeatLatency().Round(time.Millisecond).String(),
+				b.Latency(ctx.GuildID()).Round(time.Millisecond).String(),
 			).Finalize(),
 		))
 	}
 }
 
-func feedback(b *bot.Bot) router.Handler {
-	return func(ctx *router.Context) error {
+func feedback(b *bot.Bot) gumi.Handler {
+	return func(ctx *gumi.Context) error {
 		author := ctx.Author()
 
 		eb := embeds.NewBuilder()
 		eb.Author(
-			fmt.Sprintf("Feedback from %v", author.String()),
+			fmt.Sprintf("Feedback from %v", author.Username),
 			"",
-			author.AvatarURL(""),
+			author.EffectiveAvatarURL(),
 		).Description(
 			ctx.Options.String("text"),
 		).AddField(
@@ -123,13 +124,13 @@ func feedback(b *bot.Bot) router.Handler {
 			true,
 		).AddField(
 			"Author ID",
-			author.ID,
+			author.ID.String(),
 			true,
 		)
 
-		if ctx.GuildID() != "" {
+		if ctx.GuildID() != 0 {
 			eb.AddField(
-				"Guild", ctx.GuildID(), true,
+				"Guild", ctx.GuildID().String(), true,
 			)
 		}
 
@@ -148,24 +149,18 @@ func feedback(b *bot.Bot) router.Handler {
 			}
 		}
 
-		ch, err := ctx.Session.UserChannelCreate(b.Config.Discord.AuthorID)
-		if err != nil {
-			return err
-		}
-
-		_, err = ctx.Session.ChannelMessageSendEmbed(ch.ID, eb.Finalize())
-		if err != nil {
+		if err := dgoutils.SendDM(ctx.Client, dgoutils.ParseID(b.Config.Discord.AuthorID), eb.Finalize()); err != nil {
 			return err
 		}
 
 		eb.Clear()
 
-		return ctx.Reply(router.Embed(eb.SuccessTemplate("Feedback message has been sent.").Finalize()))
+		return ctx.Reply(gumi.Embed(eb.SuccessTemplate("Feedback message has been sent.").Finalize()))
 	}
 }
 
-func statsCommand(b *bot.Bot) router.Handler {
-	return func(ctx *router.Context) error {
+func statsCommand(b *bot.Bot) gumi.Handler {
+	return func(ctx *gumi.Context) error {
 		switch ctx.Options.String("section") {
 		case "", "general":
 			return generalStats(b, ctx)
@@ -179,27 +174,15 @@ func statsCommand(b *bot.Bot) router.Handler {
 	}
 }
 
-func generalStats(b *bot.Bot, ctx *router.Context) error {
-	var (
-		s   = ctx.Session
-		mem runtime.MemStats
-	)
+func generalStats(b *bot.Bot, ctx *gumi.Context) error {
+	var mem runtime.MemStats
 	runtime.ReadMemStats(&mem)
 
-	guilds := b.ShardManager.GuildCount()
-	shards := b.ShardManager.ShardCount
+	guilds := ctx.Client.Caches.GuildsLen()
+	channels := ctx.Client.Caches.ChannelsLen()
+	shards := b.ShardCount()
 
-	b.ShardManager.RLock()
-	defer b.ShardManager.RUnlock()
-
-	var channels int
-	for _, shard := range b.ShardManager.Shards {
-		for _, guild := range shard.Session.State.Guilds {
-			channels += len(guild.Channels)
-		}
-	}
-
-	latency := s.HeartbeatLatency().Round(1 * time.Millisecond)
+	latency := b.Latency(ctx.GuildID()).Round(1 * time.Millisecond)
 	uptime := time.Since(b.StartTime).Round(1 * time.Second)
 
 	_, totalArtworks := b.Stats.ArtworkStats()
@@ -216,10 +199,10 @@ func generalStats(b *bot.Bot, ctx *router.Context) error {
 		AddField("Uptime", messages.FormatDuration(uptime), true).
 		AddField("RAM used", fmt.Sprintf("%v MB", mem.Alloc/1024/1024), true)
 
-	return ctx.Reply(router.Embed(eb.Finalize()))
+	return ctx.Reply(gumi.Embed(eb.Finalize()))
 }
 
-func artworkStats(b *bot.Bot, ctx *router.Context) error {
+func artworkStats(b *bot.Bot, ctx *gumi.Context) error {
 	eb := embeds.NewBuilder()
 	eb.Title("Artwork stats")
 
@@ -228,10 +211,10 @@ func artworkStats(b *bot.Bot, ctx *router.Context) error {
 		eb.AddField(item.Name, strconv.FormatInt(item.Count, 10))
 	}
 
-	return ctx.Reply(router.Embed(eb.Finalize()))
+	return ctx.Reply(gumi.Embed(eb.Finalize()))
 }
 
-func commandStats(b *bot.Bot, ctx *router.Context) error {
+func commandStats(b *bot.Bot, ctx *gumi.Context) error {
 	eb := embeds.NewBuilder()
 	eb.Title("Command stats")
 
@@ -240,5 +223,5 @@ func commandStats(b *bot.Bot, ctx *router.Context) error {
 		eb.AddField(item.Name, strconv.FormatInt(item.Count, 10), true)
 	}
 
-	return ctx.Reply(router.Embed(eb.Finalize()))
+	return ctx.Reply(gumi.Embed(eb.Finalize()))
 }

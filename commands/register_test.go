@@ -7,7 +7,7 @@ import (
 	"github.com/VTGare/boe-tea-go/artworks/pixiv"
 	"github.com/VTGare/boe-tea-go/artworks/twitter"
 	"github.com/VTGare/boe-tea-go/bot"
-	"github.com/VTGare/boe-tea-go/router"
+	"github.com/VTGare/gumi/v2"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -20,14 +20,14 @@ func realProviders() []artworks.Provider {
 
 var _ = Describe("RegisterCommands", func() {
 	It("registers every command without validation errors", func() {
-		b := &bot.Bot{Router: router.New(router.Config{}), ArtworkProviders: realProviders()}
+		b := &bot.Bot{Router: gumi.New(gumi.Config{}), ArtworkProviders: realProviders()}
 
 		Expect(func() { RegisterCommands(b) }).NotTo(Panic())
 		Expect(b.Router.Commands()).NotTo(BeEmpty())
 	})
 
 	It("gives every provider a /set toggle under its key and aliases", func() {
-		b := &bot.Bot{Router: router.New(router.Config{}), ArtworkProviders: realProviders()}
+		b := &bot.Bot{Router: gumi.New(gumi.Config{}), ArtworkProviders: realProviders()}
 		RegisterCommands(b)
 
 		for _, p := range b.ArtworkProviders {
@@ -41,7 +41,7 @@ var _ = Describe("RegisterCommands", func() {
 	})
 
 	It("keeps the old prefix names of merged commands", func() {
-		b := &bot.Bot{Router: router.New(router.Config{}), ArtworkProviders: realProviders()}
+		b := &bot.Bot{Router: gumi.New(gumi.Config{}), ArtworkProviders: realProviders()}
 		RegisterCommands(b)
 
 		for _, name := range []string{
@@ -53,13 +53,13 @@ var _ = Describe("RegisterCommands", func() {
 	})
 
 	It("registers only the merged slash commands", func() {
-		b := &bot.Bot{Router: router.New(router.Config{}), ArtworkProviders: realProviders()}
+		b := &bot.Bot{Router: gumi.New(gumi.Config{}), ArtworkProviders: realProviders()}
 		RegisterCommands(b)
 
 		global, _ := b.Router.ApplicationCommands()
 		names := make([]string, 0, len(global))
 		for _, c := range global {
-			names = append(names, c.Name)
+			names = append(names, c.CommandName())
 		}
 
 		Expect(names).To(ContainElements("share", "groups", "bookmarks", "profile", "Find Sauce", "Find Sauce (Private)"))

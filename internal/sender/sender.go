@@ -6,7 +6,8 @@ import (
 	"errors"
 	"time"
 
-	"github.com/bwmarrin/discordgo"
+	"github.com/disgoorg/disgo/discord"
+	"github.com/disgoorg/snowflake/v2"
 )
 
 // ErrSkipped means a send was skipped because the bot lacks channel
@@ -14,47 +15,38 @@ import (
 var ErrSkipped = errors.New("sender: skipped, missing permissions")
 
 // SendPermissions is the permission set for posting artwork.
-const SendPermissions int64 = discordgo.PermissionSendMessages | discordgo.PermissionEmbedLinks
+const SendPermissions = discord.PermissionSendMessages | discord.PermissionEmbedLinks
 
 type Sender interface {
 	// SendComplex sends a message, skipping with ErrSkipped when the
 	// bot lacks the required permissions.
-	SendComplex(guildID, channelID string, message *discordgo.MessageSend) (*discordgo.Message, error)
+	SendComplex(channelID snowflake.ID, message discord.MessageCreate) (*discord.Message, error)
 
 	// SendEmbed sends an embed, skipping with ErrSkipped when the bot
 	// lacks the required permissions.
-	SendEmbed(guildID, channelID string, embed *discordgo.MessageEmbed) (*discordgo.Message, error)
+	SendEmbed(channelID snowflake.ID, embed discord.Embed) (*discord.Message, error)
 
 	// DeleteMessage deletes a message, e.g. a repost in strict mode.
-	DeleteMessage(guildID, channelID, messageID string) error
+	DeleteMessage(channelID, messageID snowflake.ID) error
 
 	// AddReaction adds a bookmark reaction to a message.
-	AddReaction(guildID, channelID, messageID, emoji string) error
-
-	// EditEmbed replaces a message's embeds.
-	EditEmbed(guildID, channelID, messageID string, embed *discordgo.MessageEmbed) (*discordgo.Message, error)
-
-	// RemoveReaction removes one user's reaction.
-	RemoveReaction(guildID, channelID, messageID, emoji, userID string) error
-
-	// RemoveAllReactions clears a message's reactions.
-	RemoveAllReactions(guildID, channelID, messageID string) error
+	AddReaction(channelID, messageID snowflake.ID, emoji string) error
 
 	// ChannelGuildID resolves which guild a channel belongs to.
-	ChannelGuildID(hintGuildID, channelID string) (string, error)
+	ChannelGuildID(channelID snowflake.ID) (snowflake.ID, error)
 
 	// IsMember reports whether a user is in a guild.
-	IsMember(guildID, userID string) (bool, error)
+	IsMember(guildID, userID snowflake.ID) (bool, error)
 
 	// HasChannelPerms reports whether the bot holds permissions in a
 	// channel.
-	HasChannelPerms(guildID, channelID string, permissions int64) (bool, error)
+	HasChannelPerms(guildID, channelID snowflake.ID, permissions discord.Permissions) (bool, error)
 
 	// BotHasGuildPerms reports whether the bot itself holds a guild
 	// permission, used before deleting reposted messages.
-	BotHasGuildPerms(guildID string, permission int64) (bool, error)
+	BotHasGuildPerms(guildID snowflake.ID, permission discord.Permissions) (bool, error)
 
 	// Expire schedules a message for deletion after the given
 	// duration, defaulting to 15 seconds.
-	Expire(message *discordgo.Message, after ...time.Duration)
+	Expire(message *discord.Message, after ...time.Duration)
 }

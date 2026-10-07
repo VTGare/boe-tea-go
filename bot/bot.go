@@ -13,13 +13,13 @@ import (
 	"github.com/VTGare/boe-tea-go/internal/sender"
 	"github.com/VTGare/boe-tea-go/internal/widget"
 	"github.com/VTGare/boe-tea-go/repost"
-	"github.com/VTGare/boe-tea-go/router"
 	"github.com/VTGare/boe-tea-go/stats"
 	"github.com/VTGare/boe-tea-go/store"
+	"github.com/VTGare/gumi/v2"
 	"github.com/VTGare/sengoku"
-	"github.com/bwmarrin/discordgo"
+	disgobot "github.com/disgoorg/disgo/bot"
+	"github.com/disgoorg/snowflake/v2"
 	goCache "github.com/patrickmn/go-cache"
-	"github.com/servusdei2018/shards/v2"
 	"go.uber.org/zap"
 )
 
@@ -28,7 +28,7 @@ type Bot struct {
 	Config    *config.Config
 	Stats     *stats.Stats
 	StartTime time.Time
-	Router    *router.Router
+	Router    *gumi.Router
 	Context   context.Context
 
 	BannedUsers  *ttlcache.Cache
@@ -41,22 +41,19 @@ type Bot struct {
 	Sender           sender.Sender
 	WidgetDispatcher *widget.Dispatcher
 
-	ShardManager *shards.Manager
-	Store        store.Store
+	Client *disgobot.Client
+	Store  store.Store
+
+	listeners []disgobot.EventListener
 }
 
 func New(
 	config *config.Config,
+	client *disgobot.Client,
 	store store.Store,
 	logger *zap.SugaredLogger,
 	rd repost.Detector,
-) (*Bot, error) {
-	mgr, err := shards.New("Bot " + config.Discord.Token)
-	if err != nil {
-		return nil, fmt.Errorf("failed to init a shard manager: %w", err)
-	}
-
-	mgr.RegisterIntent(discordgo.IntentsAllWithoutPrivileged | discordgo.IntentMessageContent)
+) *Bot {
 	banned := ttlcache.NewCache()
 	banned.SetTTL(15 * time.Second)
 
@@ -73,13 +70,13 @@ func New(
 		EmbedCache:       cache.NewEmbedCache(),
 		ArtworkCache:     goCache.New(60*time.Minute, 90*time.Minute),
 		Sengoku:          sg,
-		ShardManager:     mgr,
+		Client:           client,
 		Store:            store,
 		WidgetDispatcher: widget.NewDispatcher(),
-	}, nil
+	}
 }
 
-func (b *Bot) AddRouter(r *router.Router) {
+func (b *Bot) AddRouter(r *gumi.Router) {
 	b.Router = r
 }
 
@@ -87,36 +84,42 @@ func (b *Bot) AddProvider(provider artworks.Provider) {
 	b.ArtworkProviders = append(b.ArtworkProviders, provider)
 }
 
-func (b *Bot) AddHandler(handler any) {
-	b.ShardManager.AddHandler(handler)
+// Listeners are attached in Start.
+func (b *Bot) AddHandler(listener disgobot.EventListener) {
+	b.listeners = append(b.listeners, listener)
 }
 
+// Start blocks until ctx ends. The client has either a shard manager or a
+// single gateway.
 func (b *Bot) Start(ctx context.Context) error {
-	b.ShardManager.AddHandler(b.Router.HandleMessage)
-	b.ShardManager.AddHandler(b.Router.HandleInteraction)
-	b.ShardManager.AddHandler(b.WidgetDispatcher.Handle)
+	b.Client.AddEventListeners(b.Router, disgobot.NewListenerFunc(b.WidgetDispatcher.Handle))
+	b.Client.AddEventListeners(b.listeners...)
 
 	b.StartTime = time.Now()
 	b.Stats = stats.New(b.Router, b.ArtworkProviders)
 	b.Context = ctx
 
-	b.Log.Debug("starting a bot")
-	if err := b.ShardManager.Start(); err != nil {
-		return err
+	// Syncing only needs REST, so commands are ready by the time the
+	// shards connect.
+	if guildID := b.Router.Config().DevGuildID; guildID != 0 {
+		if err := b.Router.ClearCommands(b.Client, guildID); err != nil {
+			b.Log.With("error", err).Error("failed to clear application commands")
+		}
 	}
 
-	if s := b.ShardManager.SessionForDM(); s != nil {
-		if guildID := b.Router.Config().DevGuildID; guildID != "" {
-			if err := b.Router.ClearCommands(s, guildID); err != nil {
-				b.Log.With("error", err).Error("failed to clear application commands")
-			}
-		}
+	if err := b.Router.Sync(b.Client); err != nil {
+		b.Log.With("error", err).Error("failed to sync application commands")
+	}
 
-		if err := b.Router.Sync(s); err != nil {
-			b.Log.With("error", err).Error("failed to sync application commands")
-		}
-	} else {
-		b.Log.Warn("no session available, skipping application command sync")
+	b.Log.Debug("starting a bot")
+
+	open := b.Client.OpenGateway
+	if b.Client.HasShardManager() {
+		open = b.Client.OpenShardManager
+	}
+
+	if err := open(ctx); err != nil {
+		return fmt.Errorf("failed to connect to Discord: %w", err)
 	}
 
 	<-ctx.Done()
@@ -125,7 +128,7 @@ func (b *Bot) Start(ctx context.Context) error {
 
 	b.Store.Close(shutdownCtx)
 	b.RepostDetector.Close()
-	b.ShardManager.Shutdown()
+	b.Client.Close(shutdownCtx)
 
 	return ctx.Err()
 }
@@ -162,4 +165,38 @@ func (b *Bot) Match(url string) (string, artworks.Provider) {
 		}
 	}
 	return "", nil
+}
+
+func (b *Bot) Latency(guildID snowflake.ID) time.Duration {
+	switch {
+	case b.Client.HasShardManager():
+		if shard := b.Client.ShardManager.ShardByGuildID(guildID); shard != nil {
+			return shard.Latency()
+		}
+	case b.Client.HasGateway():
+		return b.Client.Gateway.Latency()
+	}
+
+	return 0
+}
+
+func (b *Bot) ShardCount() int {
+	if !b.Client.HasShardManager() {
+		return 1
+	}
+
+	count := 0
+	for range b.Client.ShardManager.Shards() {
+		count++
+	}
+
+	return count
+}
+
+func (b *Bot) AvatarURL() string {
+	if u, ok := b.Client.Caches.SelfUser(); ok {
+		return u.EffectiveAvatarURL()
+	}
+
+	return ""
 }

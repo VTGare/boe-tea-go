@@ -2,12 +2,12 @@ package commands
 
 import (
 	"github.com/VTGare/boe-tea-go/bot"
-	"github.com/VTGare/boe-tea-go/router"
+	"github.com/VTGare/gumi/v2"
 )
 
 func RegisterCommands(b *bot.Bot) {
 	b.Router.MustRegister(
-		router.HelpCommand(router.HelpConfig{
+		gumi.HelpCommand(gumi.HelpConfig{
 			Name:        "help",
 			Description: "Shows the list of commands or details about one",
 			Category:    "General",
@@ -20,7 +20,7 @@ func RegisterCommands(b *bot.Bot) {
 		}),
 	)
 
-	for _, group := range [][]*router.Command{
+	for _, group := range [][]*gumi.Command{
 		generalGroup(b),
 		settingsGroup(b),
 		userGroup(b),

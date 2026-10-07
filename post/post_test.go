@@ -14,6 +14,7 @@ import (
 	"github.com/VTGare/boe-tea-go/repost"
 	"github.com/VTGare/boe-tea-go/store"
 
+	"github.com/disgoorg/snowflake/v2"
 	goCache "github.com/patrickmn/go-cache"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -251,8 +252,8 @@ type testDeps struct {
 
 func newTestPoster() (*Poster, *testDeps) {
 	deps := &testDeps{
-		guilds:      &stubGuilds{guild: &store.Guild{ID: "guild-1", Posting: store.Posting{Limit: 10}}},
-		users:       &stubUsers{user: &store.User{ID: "author-1"}},
+		guilds:      &stubGuilds{guild: &store.Guild{ID: testGuildID.String(), Posting: store.Posting{Limit: 10}}},
+		users:       &stubUsers{user: &store.User{ID: testAuthorID.String()}},
 		detector:    newFakeDetector(),
 		artCache:    goCache.New(5*time.Minute, 10*time.Minute),
 		fake:        sender.NewFake(),
@@ -299,10 +300,10 @@ func matchProvider(provider artworks.Provider) func(string) (string, artworks.Pr
 
 func newTestRun(urls ...string) Post {
 	return Post{
-		GuildID:    "guild-1",
-		ChannelID:  "channel-1",
-		MessageID:  "event-1",
-		AuthorID:   "author-1",
+		GuildID:    testGuildID,
+		ChannelID:  testChannelID,
+		MessageID:  testMessageID,
+		AuthorID:   testAuthorID,
 		AuthorName: "tester",
 		URLs:       urls,
 		Skip:       SkipFilter{Indices: map[int]struct{}{}},
@@ -318,6 +319,22 @@ func testItems(arts ...artworks.Artwork) []fetchedItem {
 	return items
 }
 
-func crosspostGroup(children ...string) *store.Group {
-	return &store.Group{Name: "g", Parent: "parent", Children: children}
+const (
+	testGuildID   snowflake.ID = 101
+	testChannelID snowflake.ID = 201
+	testMessageID snowflake.ID = 301
+	testAuthorID  snowflake.ID = 401
+
+	crossGuildID snowflake.ID = 102
+	crossChannel snowflake.ID = 202
+	pairChannel  snowflake.ID = 203
+)
+
+func crosspostGroup(children ...snowflake.ID) *store.Group {
+	group := &store.Group{Name: "g", Parent: testChannelID.String()}
+	for _, child := range children {
+		group.Children = append(group.Children, child.String())
+	}
+
+	return group
 }

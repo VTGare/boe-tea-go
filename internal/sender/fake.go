@@ -5,61 +5,41 @@ import (
 	"sync"
 	"time"
 
-	"github.com/bwmarrin/discordgo"
+	"github.com/disgoorg/disgo/discord"
+	"github.com/disgoorg/snowflake/v2"
 )
 
 // SentComplex records one SendComplex call.
 type SentComplex struct {
-	GuildID   string
-	ChannelID string
-	Message   *discordgo.MessageSend
-	Sent      *discordgo.Message
+	ChannelID snowflake.ID
+	Message   discord.MessageCreate
+	Sent      *discord.Message
 }
 
 // SentEmbed records one SendEmbed call.
 type SentEmbed struct {
-	GuildID   string
-	ChannelID string
-	Embed     *discordgo.MessageEmbed
-	Sent      *discordgo.Message
+	ChannelID snowflake.ID
+	Embed     discord.Embed
+	Sent      *discord.Message
 }
 
 // DeletedMessage records one DeleteMessage call.
 type DeletedMessage struct {
-	GuildID   string
-	ChannelID string
-	MessageID string
+	ChannelID snowflake.ID
+	MessageID snowflake.ID
 }
 
 // AddedReaction records one AddReaction call.
 type AddedReaction struct {
-	GuildID   string
-	ChannelID string
-	MessageID string
+	ChannelID snowflake.ID
+	MessageID snowflake.ID
 	Emoji     string
 }
 
 // MemberKey identifies one guild membership.
 type MemberKey struct {
-	GuildID string
-	UserID  string
-}
-
-// EditedEmbed records one EditEmbed call.
-type EditedEmbed struct {
-	GuildID   string
-	ChannelID string
-	MessageID string
-	Embed     *discordgo.MessageEmbed
-}
-
-// RemovedReaction records one RemoveReaction call.
-type RemovedReaction struct {
-	GuildID   string
-	ChannelID string
-	MessageID string
-	Emoji     string
-	UserID    string
+	GuildID snowflake.ID
+	UserID  snowflake.ID
 }
 
 // FakeSender is a Sender for tests. It records every call and answers
@@ -72,10 +52,7 @@ type FakeSender struct {
 	Embeds    []SentEmbed
 	Deleted   []DeletedMessage
 	Reactions []AddedReaction
-	Edited    []EditedEmbed
-	Unreacted []RemovedReaction
-	Cleared   []DeletedMessage
-	Expired   []*discordgo.Message
+	Expired   []*discord.Message
 
 	ChannelPerms    bool
 	ChannelPermsErr error
@@ -84,7 +61,7 @@ type FakeSender struct {
 
 	// ChannelGuilds answers ChannelGuildID lookups. Missing channels
 	// report an error unless ChannelErr is set.
-	ChannelGuilds map[string]string
+	ChannelGuilds map[snowflake.ID]snowflake.ID
 	ChannelErr    error
 
 	// Members answers IsMember lookups. Absent keys report non-members.
@@ -110,17 +87,17 @@ func NewFake() *FakeSender {
 	}
 }
 
-func (f *FakeSender) nextMessage(guildID, channelID string) *discordgo.Message {
+// Sent messages get IDs 1, 2, 3 and so on.
+func (f *FakeSender) nextMessage(channelID snowflake.ID) *discord.Message {
 	f.counter++
 
-	return &discordgo.Message{
-		ID:        fmt.Sprintf("fake-%d", f.counter),
+	return &discord.Message{
+		ID:        snowflake.ID(f.counter),
 		ChannelID: channelID,
-		GuildID:   guildID,
 	}
 }
 
-func (f *FakeSender) SendComplex(guildID, channelID string, message *discordgo.MessageSend) (*discordgo.Message, error) {
+func (f *FakeSender) SendComplex(channelID snowflake.ID, message discord.MessageCreate) (*discord.Message, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
@@ -133,16 +110,15 @@ func (f *FakeSender) SendComplex(guildID, channelID string, message *discordgo.M
 	}
 
 	f.Complex = append(f.Complex, SentComplex{
-		GuildID:   guildID,
 		ChannelID: channelID,
 		Message:   message,
-		Sent:      f.nextMessage(guildID, channelID),
+		Sent:      f.nextMessage(channelID),
 	})
 
 	return f.Complex[len(f.Complex)-1].Sent, nil
 }
 
-func (f *FakeSender) SendEmbed(guildID, channelID string, embed *discordgo.MessageEmbed) (*discordgo.Message, error) {
+func (f *FakeSender) SendEmbed(channelID snowflake.ID, embed discord.Embed) (*discord.Message, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
@@ -155,21 +131,19 @@ func (f *FakeSender) SendEmbed(guildID, channelID string, embed *discordgo.Messa
 	}
 
 	f.Embeds = append(f.Embeds, SentEmbed{
-		GuildID:   guildID,
 		ChannelID: channelID,
 		Embed:     embed,
-		Sent:      f.nextMessage(guildID, channelID),
+		Sent:      f.nextMessage(channelID),
 	})
 
 	return f.Embeds[len(f.Embeds)-1].Sent, nil
 }
 
-func (f *FakeSender) DeleteMessage(guildID, channelID, messageID string) error {
+func (f *FakeSender) DeleteMessage(channelID, messageID snowflake.ID) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
 	f.Deleted = append(f.Deleted, DeletedMessage{
-		GuildID:   guildID,
 		ChannelID: channelID,
 		MessageID: messageID,
 	})
@@ -177,12 +151,11 @@ func (f *FakeSender) DeleteMessage(guildID, channelID, messageID string) error {
 	return f.DeleteErr
 }
 
-func (f *FakeSender) AddReaction(guildID, channelID, messageID, emoji string) error {
+func (f *FakeSender) AddReaction(channelID, messageID snowflake.ID, emoji string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
 	f.Reactions = append(f.Reactions, AddedReaction{
-		GuildID:   guildID,
 		ChannelID: channelID,
 		MessageID: messageID,
 		Emoji:     emoji,
@@ -191,76 +164,30 @@ func (f *FakeSender) AddReaction(guildID, channelID, messageID, emoji string) er
 	return f.ReactErr
 }
 
-func (f *FakeSender) EditEmbed(guildID, channelID, messageID string, embed *discordgo.MessageEmbed) (*discordgo.Message, error) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-
-	if f.SendErr != nil {
-		return nil, f.SendErr
-	}
-
-	f.Edited = append(f.Edited, EditedEmbed{
-		GuildID:   guildID,
-		ChannelID: channelID,
-		MessageID: messageID,
-		Embed:     embed,
-	})
-
-	return f.nextMessage(guildID, channelID), nil
-}
-
-func (f *FakeSender) RemoveReaction(guildID, channelID, messageID, emoji, userID string) error {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-
-	f.Unreacted = append(f.Unreacted, RemovedReaction{
-		GuildID:   guildID,
-		ChannelID: channelID,
-		MessageID: messageID,
-		Emoji:     emoji,
-		UserID:    userID,
-	})
-
-	return f.ReactErr
-}
-
-func (f *FakeSender) RemoveAllReactions(guildID, channelID, messageID string) error {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-
-	f.Cleared = append(f.Cleared, DeletedMessage{
-		GuildID:   guildID,
-		ChannelID: channelID,
-		MessageID: messageID,
-	})
-
-	return f.ReactErr
-}
-
-func (f *FakeSender) HasChannelPerms(_, _ string, _ int64) (bool, error) {
+func (f *FakeSender) HasChannelPerms(_, _ snowflake.ID, _ discord.Permissions) (bool, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
 	return f.ChannelPerms, f.ChannelPermsErr
 }
 
-func (f *FakeSender) ChannelGuildID(_, channelID string) (string, error) {
+func (f *FakeSender) ChannelGuildID(channelID snowflake.ID) (snowflake.ID, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
 	if f.ChannelErr != nil {
-		return "", f.ChannelErr
+		return 0, f.ChannelErr
 	}
 
 	guildID, ok := f.ChannelGuilds[channelID]
 	if !ok {
-		return "", fmt.Errorf("sender: unknown test channel %v", channelID)
+		return 0, fmt.Errorf("sender: unknown test channel %v", channelID)
 	}
 
 	return guildID, nil
 }
 
-func (f *FakeSender) IsMember(guildID, userID string) (bool, error) {
+func (f *FakeSender) IsMember(guildID, userID snowflake.ID) (bool, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
@@ -271,14 +198,14 @@ func (f *FakeSender) IsMember(guildID, userID string) (bool, error) {
 	return f.Members[MemberKey{GuildID: guildID, UserID: userID}], nil
 }
 
-func (f *FakeSender) BotHasGuildPerms(_ string, _ int64) (bool, error) {
+func (f *FakeSender) BotHasGuildPerms(_ snowflake.ID, _ discord.Permissions) (bool, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
 	return f.GuildPerms, f.GuildPermsErr
 }
 
-func (f *FakeSender) Expire(message *discordgo.Message, _ ...time.Duration) {
+func (f *FakeSender) Expire(message *discord.Message, _ ...time.Duration) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
@@ -307,28 +234,4 @@ func (f *FakeSender) ComplexSent() []SentComplex {
 	defer f.mu.Unlock()
 
 	return append([]SentComplex(nil), f.Complex...)
-}
-
-// EmbedsEdited returns a copy of the recorded EditEmbed calls.
-func (f *FakeSender) EmbedsEdited() []EditedEmbed {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-
-	return append([]EditedEmbed(nil), f.Edited...)
-}
-
-// ReactionsRemoved returns a copy of the recorded RemoveReaction calls.
-func (f *FakeSender) ReactionsRemoved() []RemovedReaction {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-
-	return append([]RemovedReaction(nil), f.Unreacted...)
-}
-
-// ReactionsCleared returns a copy of the recorded RemoveAllReactions calls.
-func (f *FakeSender) ReactionsCleared() []DeletedMessage {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-
-	return append([]DeletedMessage(nil), f.Cleared...)
 }

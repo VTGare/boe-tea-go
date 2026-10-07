@@ -204,7 +204,7 @@ var _ = Describe("Live providers", func() {
 		Expect(sent).To(HaveLen(1))
 		cleanupSent(h, sent)
 
-		msg, err := h.session.ChannelMessage(h.cfg.channelID, sent[0].MessageID)
+		msg, err := h.sentMessage(sent[0])
 		Expect(err).NotTo(HaveOccurred())
 		Expect(msg.Embeds).To(HaveLen(1))
 		Expect(msg.Embeds[0].Title).To(Equal(rendered.Title))

@@ -5,22 +5,22 @@ import (
 
 	"github.com/VTGare/boe-tea-go/bot"
 	"github.com/VTGare/boe-tea-go/internal/dgoutils"
-	"github.com/VTGare/boe-tea-go/router"
-	"github.com/VTGare/embeds"
+	"github.com/VTGare/boe-tea-go/internal/embeds"
+	"github.com/VTGare/gumi/v2"
 )
 
-func ownerGroup(b *bot.Bot) []*router.Command {
-	return []*router.Command{
+func ownerGroup(b *bot.Bot) []*gumi.Command {
+	return []*gumi.Command{
 		{
 			Name:        "reply",
 			Category:    "Owner",
 			Description: "Owner's command to reply to feedback",
-			Checks:      []router.Check{router.OwnerOnly},
+			Checks:      []gumi.Check{gumi.OwnerOnly},
 			Hidden:      true,
-			Options: []*router.Option{
-				router.String("user", "User to reply to").Require(),
-				router.String("message", "Reply text").Require().Greedy(),
-				router.Attachment("image", "Image to attach"),
+			Options: []*gumi.Option{
+				gumi.String("user", "User to reply to").Require(),
+				gumi.String("message", "Reply text").Require().Greedy(),
+				gumi.Attachment("image", "Image to attach"),
 			},
 			Examples: []string{"reply 1234567890 Thanks for the feedback!"},
 			Handler:  reply(b),
@@ -28,20 +28,17 @@ func ownerGroup(b *bot.Bot) []*router.Command {
 	}
 }
 
-func reply(b *bot.Bot) router.Handler {
-	return func(ctx *router.Context) error {
-		userID := dgoutils.TrimmerRaw(ctx.Options.String("user"))
-
-		s := b.ShardManager.SessionForDM()
-		ch, err := s.UserChannelCreate(userID)
-		if err != nil {
-			return err
+func reply(b *bot.Bot) gumi.Handler {
+	return func(ctx *gumi.Context) error {
+		userID := dgoutils.ParseID(dgoutils.TrimmerRaw(ctx.Options.String("user")))
+		if userID == 0 {
+			return gumi.Errorf("`%s` isn't a user ID.", ctx.Options.String("user"))
 		}
 
 		eb := embeds.NewBuilder()
 		reply := ctx.Options.String("message")
 
-		eb.Author("Feedback reply", "", ctx.Session.State.User.AvatarURL("")).
+		eb.Author("Feedback reply", "", b.AvatarURL()).
 			Description(reply)
 
 		var imageURL, imageName string
@@ -59,12 +56,11 @@ func reply(b *bot.Bot) router.Handler {
 			eb.Image(imageURL)
 		}
 
-		_, err = s.ChannelMessageSendEmbed(ch.ID, eb.Finalize())
-		if err != nil {
+		if err := dgoutils.SendDM(ctx.Client, userID, eb.Finalize()); err != nil {
 			return err
 		}
 
 		eb.Clear()
-		return ctx.Reply(router.Embed(eb.SuccessTemplate("Reply has been sent.").Finalize()))
+		return ctx.Reply(gumi.Embed(eb.SuccessTemplate("Reply has been sent.").Finalize()))
 	}
 }

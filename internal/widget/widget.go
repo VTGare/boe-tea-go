@@ -9,7 +9,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/bwmarrin/discordgo"
+	"github.com/disgoorg/disgo/discord"
+	"github.com/disgoorg/disgo/events"
+	"github.com/disgoorg/snowflake/v2"
 )
 
 // DefaultTimeout is how long a widget accepts clicks.
@@ -50,8 +52,9 @@ func (a Action) String() string {
 // Widget is a paginated message. Clicks are handled one at a time. Set
 // the callback before Serve, and don't call widget methods from inside it.
 type Widget struct {
-	author   string
-	Pages    []*discordgo.MessageEmbed
+	author snowflake.ID
+	// Nil pages aren't loaded yet. The callback can fill them in.
+	Pages    []*discord.Embed
 	current  int
 	callback func(Action, int) error
 	Timeout  time.Duration
@@ -62,7 +65,7 @@ type Widget struct {
 	once sync.Once
 }
 
-func New(author string, pages []*discordgo.MessageEmbed) *Widget {
+func New(author snowflake.ID, pages []*discord.Embed) *Widget {
 	return &Widget{
 		author:  author,
 		Pages:   pages,
@@ -79,14 +82,14 @@ func (w *Widget) WithCallback(fn func(Action, int) error) {
 
 // Controls renders the button row for the current page, or nil when there
 // is nothing to flip through.
-func (w *Widget) Controls() []discordgo.MessageComponent {
+func (w *Widget) Controls() []discord.LayoutComponent {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
 	return w.controls()
 }
 
-func (w *Widget) controls() []discordgo.MessageComponent {
+func (w *Widget) controls() []discord.LayoutComponent {
 	if len(w.Pages) <= 1 {
 		return nil
 	}
@@ -95,26 +98,19 @@ func (w *Widget) controls() []discordgo.MessageComponent {
 	atFirst := w.current == 0
 	atLast := w.current == last
 
-	return []discordgo.MessageComponent{
-		discordgo.ActionsRow{
-			Components: []discordgo.MessageComponent{
-				w.button(ActionFirstPage, "First", discordgo.SecondaryButton, atFirst),
-				w.button(ActionPreviousPage, "< Back", discordgo.SecondaryButton, atFirst),
-				w.button(ActionStop, "Stop", discordgo.DangerButton, false),
-				w.button(ActionNextPage, "Next >", discordgo.SecondaryButton, atLast),
-				w.button(ActionLastPage, "Last", discordgo.SecondaryButton, atLast),
-			},
-		},
+	return []discord.LayoutComponent{
+		discord.NewActionRow(
+			w.button(ActionFirstPage, "First", discord.ButtonStyleSecondary, atFirst),
+			w.button(ActionPreviousPage, "< Back", discord.ButtonStyleSecondary, atFirst),
+			w.button(ActionStop, "Stop", discord.ButtonStyleDanger, false),
+			w.button(ActionNextPage, "Next >", discord.ButtonStyleSecondary, atLast),
+			w.button(ActionLastPage, "Last", discord.ButtonStyleSecondary, atLast),
+		),
 	}
 }
 
-func (w *Widget) button(action Action, label string, style discordgo.ButtonStyle, disabled bool) discordgo.MessageComponent {
-	return discordgo.Button{
-		Label:    label,
-		Style:    style,
-		Disabled: disabled,
-		CustomID: customID(w.id, action),
-	}
+func (w *Widget) button(action Action, label string, style discord.ButtonStyle, disabled bool) discord.InteractiveComponent {
+	return discord.NewButton(style, label, customID(w.id, action), "", 0).WithDisabled(disabled)
 }
 
 // Serve blocks until the widget stops, times out, or ctx ends.
@@ -161,13 +157,13 @@ func (w *Widget) move(action Action) {
 
 // click applies a button press and always answers the interaction:
 // Discord shows an error for clicks left unanswered.
-func (w *Widget) click(s *discordgo.Session, in *discordgo.Interaction, action Action) {
+func (w *Widget) click(e *events.ComponentInteractionCreate, action Action) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
 	if action == ActionStop {
 		w.finish(nil)
-		respondUpdate(s, in, []*discordgo.MessageEmbed{w.Pages[w.current]}, nil)
+		respondUpdate(e, w.Pages[w.current], []discord.LayoutComponent{})
 
 		return
 	}
@@ -177,31 +173,18 @@ func (w *Widget) click(s *discordgo.Session, in *discordgo.Interaction, action A
 	if w.callback != nil {
 		if err := w.callback(action, w.current); err != nil {
 			w.finish(err)
-			respondEphemeral(s, in, "Something went wrong.")
+			respondEphemeral(e, "Something went wrong.")
 			return
 		}
 	}
 
 	if w.current < 0 || w.current >= len(w.Pages) || w.Pages[w.current] == nil {
-		_ = s.InteractionRespond(in, &discordgo.InteractionResponse{
-			Type: discordgo.InteractionResponseDeferredMessageUpdate,
-		})
+		_ = e.DeferUpdateMessage()
 
 		return
 	}
 
-	respondUpdate(s, in, []*discordgo.MessageEmbed{w.Pages[w.current]}, w.controls())
-}
-
-func (w *Widget) checkUser(i *discordgo.InteractionCreate) bool {
-	var id string
-	if i.Member != nil && i.Member.User != nil {
-		id = i.Member.User.ID
-	} else if i.User != nil {
-		id = i.User.ID
-	}
-
-	return id != "" && id == w.author
+	respondUpdate(e, w.Pages[w.current], w.controls())
 }
 
 // Dispatcher routes button clicks to live widgets. Register its Handle
@@ -217,28 +200,24 @@ func NewDispatcher() *Dispatcher {
 
 // Handle routes one component interaction to its widget, answering with
 // an ephemeral note when the click isn't actionable.
-func (d *Dispatcher) Handle(s *discordgo.Session, i *discordgo.InteractionCreate) {
-	if i == nil || i.Interaction == nil || i.Type != discordgo.InteractionMessageComponent {
-		return
-	}
-
-	wid, action, ok := parseCustomID(i.MessageComponentData().CustomID)
+func (d *Dispatcher) Handle(e *events.ComponentInteractionCreate) {
+	wid, action, ok := parseCustomID(e.Data.CustomID())
 	if !ok {
 		return
 	}
 
 	w, ok := d.lookup(wid)
 	if !ok {
-		respondEphemeral(s, i.Interaction, "This menu has expired.")
+		respondEphemeral(e, "This menu has expired.")
 		return
 	}
 
-	if !w.checkUser(i) {
-		respondEphemeral(s, i.Interaction, "These buttons aren't for you.")
+	if e.User().ID != w.author {
+		respondEphemeral(e, "These buttons aren't for you.")
 		return
 	}
 
-	w.click(s, i.Interaction, action)
+	w.click(e, action)
 }
 
 func (d *Dispatcher) attach(w *Widget) {
@@ -282,23 +261,32 @@ func parseCustomID(id string) (string, Action, bool) {
 	return "", 0, false
 }
 
-func respondUpdate(s *discordgo.Session, in *discordgo.Interaction, embeds []*discordgo.MessageEmbed, components []discordgo.MessageComponent) {
-	_ = s.InteractionRespond(in, &discordgo.InteractionResponse{
-		Type: discordgo.InteractionResponseUpdateMessage,
-		Data: &discordgo.InteractionResponseData{
-			Embeds:     embeds,
-			Components: components,
-		},
-	})
+// An empty components list removes the buttons.
+func respondUpdate(e *events.ComponentInteractionCreate, page *discord.Embed, components []discord.LayoutComponent) {
+	update := discord.MessageUpdate{Components: &components}
+	if page != nil {
+		update.Embeds = &[]discord.Embed{*page}
+	}
+
+	_ = e.UpdateMessage(update)
 }
 
-func respondEphemeral(s *discordgo.Session, in *discordgo.Interaction, content string) {
-	_ = s.InteractionRespond(in, &discordgo.InteractionResponse{
-		Type: discordgo.InteractionResponseChannelMessageWithSource,
-		Data: &discordgo.InteractionResponseData{
-			Content: content,
-			Flags:   discordgo.MessageFlagsEphemeral,
-		},
+// Embeds skips pages that aren't loaded.
+func Embeds(pages []*discord.Embed) []discord.Embed {
+	out := make([]discord.Embed, 0, len(pages))
+	for _, page := range pages {
+		if page != nil {
+			out = append(out, *page)
+		}
+	}
+
+	return out
+}
+
+func respondEphemeral(e *events.ComponentInteractionCreate, content string) {
+	_ = e.CreateMessage(discord.MessageCreate{
+		Content: content,
+		Flags:   discord.MessageFlagEphemeral,
 	})
 }
 

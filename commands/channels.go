@@ -9,29 +9,31 @@ import (
 
 	"github.com/VTGare/boe-tea-go/bot"
 	"github.com/VTGare/boe-tea-go/internal/dgoutils"
-	"github.com/VTGare/boe-tea-go/router"
 	"github.com/VTGare/boe-tea-go/store"
-	"github.com/bwmarrin/discordgo"
+	"github.com/VTGare/gumi/v2"
+	disgobot "github.com/disgoorg/disgo/bot"
+	"github.com/disgoorg/disgo/discord"
+	"github.com/disgoorg/snowflake/v2"
 )
 
 // artChannelTypes are channels Boe Tea can post artwork in.
-var artChannelTypes = []discordgo.ChannelType{discordgo.ChannelTypeGuildText, discordgo.ChannelTypeGuildNews}
+var artChannelTypes = []discord.ChannelType{discord.ChannelTypeGuildText, discord.ChannelTypeGuildNews}
 
 // channelsPerPage is how many channels one /channels list page shows.
 const channelsPerPage = 20
 
-func channelsCommand(b *bot.Bot) *router.Command {
-	manage := []router.Check{router.HasPermissions(discordgo.PermissionManageGuild)}
-	targets := router.String("channels", "Channel mentions or IDs; a category adds all its channels").Require().Greedy()
+func channelsCommand(b *bot.Bot) *gumi.Command {
+	manage := []gumi.Check{gumi.HasPermissions(discord.PermissionManageGuild)}
+	targets := gumi.String("channels", "Channel mentions or IDs; a category adds all its channels").Require().Greedy()
 
-	return &router.Command{
+	return &gumi.Command{
 		Name:        "channels",
 		Category:    "Settings",
 		Aliases:     []string{"artchannels", "artchannel", "ac"},
 		Description: "Lists or changes where Boe Tea posts artwork.",
-		Checks:      []router.Check{router.GuildOnly},
-		Cooldown:    router.NewCooldown(router.CooldownUser, 1, 5*time.Second),
-		Subcommands: []*router.Command{
+		Checks:      []gumi.Check{gumi.GuildOnly},
+		Cooldown:    gumi.NewCooldown(gumi.CooldownUser, 1, 5*time.Second),
+		Subcommands: []*gumi.Command{
 			{
 				Name:        "list",
 				Description: "Shows art channels.",
@@ -42,7 +44,7 @@ func channelsCommand(b *bot.Bot) *router.Command {
 				Name:        "add",
 				Description: "Adds channels or whole categories.",
 				Checks:      manage,
-				Options:     []*router.Option{targets},
+				Options:     []*gumi.Option{targets},
 				Examples:    []string{"channels add #sfw #nsfw"},
 				Handler:     changeChannels(b, true),
 			},
@@ -51,7 +53,7 @@ func channelsCommand(b *bot.Bot) *router.Command {
 				Aliases:     []string{"rm"},
 				Description: "Removes channels or whole categories.",
 				Checks:      manage,
-				Options:     []*router.Option{targets},
+				Options:     []*gumi.Option{targets},
 				Examples:    []string{"channels remove #sfw"},
 				Handler:     changeChannels(b, false),
 			},
@@ -59,27 +61,64 @@ func channelsCommand(b *bot.Bot) *router.Command {
 	}
 }
 
-// guildChannels returns a guild's channels, from the state cache if it can.
-func guildChannels(s *discordgo.Session, guildID string) ([]*discordgo.Channel, error) {
-	if s.State != nil {
-		if g, err := s.State.Guild(guildID); err == nil && len(g.Channels) > 0 {
-			return g.Channels, nil
+// channel holds what art channel commands need, with IDs as the store
+// keeps them.
+type channel struct {
+	ID       string
+	Type     discord.ChannelType
+	ParentID string
+}
+
+// guildChannels returns a guild's channels, from the cache if it can.
+func guildChannels(c *disgobot.Client, guildID snowflake.ID) ([]channel, error) {
+	var found []discord.GuildChannel
+	for ch := range c.Caches.ChannelsForGuild(guildID) {
+		found = append(found, ch)
+	}
+
+	if len(found) == 0 {
+		var err error
+		if found, err = c.Rest.GetGuildChannels(guildID); err != nil {
+			return nil, err
 		}
 	}
 
-	return s.GuildChannels(guildID)
+	channels := make([]channel, 0, len(found))
+	for _, ch := range found {
+		parentID := ""
+		if id := ch.ParentID(); id != nil {
+			parentID = id.String()
+		}
+
+		channels = append(channels, channel{ID: ch.ID().String(), Type: ch.Type(), ParentID: parentID})
+	}
+
+	return channels, nil
+}
+
+func channelByID(c *disgobot.Client, id string) (discord.Channel, error) {
+	channelID, err := snowflake.Parse(id)
+	if err != nil {
+		return nil, err
+	}
+
+	if ch, ok := c.Caches.Channel(channelID); ok {
+		return ch, nil
+	}
+
+	return c.Rest.GetChannel(channelID)
 }
 
 // pickedChannels looks up IDs among the guild's channels. Unknown IDs
 // (deleted channels) become placeholders so they can still be removed.
-func pickedChannels(all []*discordgo.Channel, ids []string) []*discordgo.Channel {
-	picked := make([]*discordgo.Channel, 0, len(ids))
+func pickedChannels(all []channel, ids []string) []channel {
+	picked := make([]channel, 0, len(ids))
 	for _, id := range ids {
-		idx := slices.IndexFunc(all, func(c *discordgo.Channel) bool { return c.ID == id })
+		idx := slices.IndexFunc(all, func(c channel) bool { return c.ID == id })
 		if idx >= 0 {
 			picked = append(picked, all[idx])
 		} else {
-			picked = append(picked, &discordgo.Channel{ID: id, Type: discordgo.ChannelTypeGuildText})
+			picked = append(picked, channel{ID: id, Type: discord.ChannelTypeGuildText})
 		}
 	}
 
@@ -89,16 +128,16 @@ func pickedChannels(all []*discordgo.Channel, ids []string) []*discordgo.Channel
 // expandArtChannels turns picked channels into the IDs to store: a
 // category becomes its text channels, other channel types are dropped,
 // and duplicates are skipped.
-func expandArtChannels(all, picked []*discordgo.Channel) []string {
+func expandArtChannels(all, picked []channel) []string {
 	ids := make([]string, 0, len(picked))
-	add := func(c *discordgo.Channel) {
+	add := func(c channel) {
 		if slices.Contains(artChannelTypes, c.Type) && !slices.Contains(ids, c.ID) {
 			ids = append(ids, c.ID)
 		}
 	}
 
 	for _, p := range picked {
-		if p.Type != discordgo.ChannelTypeGuildCategory {
+		if p.Type != discord.ChannelTypeGuildCategory {
 			add(p)
 			continue
 		}
@@ -113,17 +152,17 @@ func expandArtChannels(all, picked []*discordgo.Channel) []string {
 	return ids
 }
 
-func changeChannels(b *bot.Bot, add bool) router.Handler {
-	return func(ctx *router.Context) error {
+func changeChannels(b *bot.Bot, add bool) gumi.Handler {
+	return func(ctx *gumi.Context) error {
 		reqCtx, cancel := context.WithTimeout(ctx.Context(), 10*time.Second)
 		defer cancel()
 
-		guild, _, err := store.GetOrCreateGuild(reqCtx, b.Store, ctx.GuildID())
+		guild, _, err := store.GetOrCreateGuild(reqCtx, b.Store, ctx.GuildID().String())
 		if err != nil {
 			return err
 		}
 
-		all, err := guildChannels(ctx.Session, guild.ID)
+		all, err := guildChannels(ctx.Client, ctx.GuildID())
 		if err != nil {
 			return err
 		}
@@ -132,11 +171,11 @@ func changeChannels(b *bot.Bot, add bool) router.Handler {
 		ids := make([]string, 0, len(raw))
 		for _, arg := range raw {
 			id := dgoutils.TrimmerRaw(arg)
-			known := slices.ContainsFunc(all, func(c *discordgo.Channel) bool { return c.ID == id })
+			known := slices.ContainsFunc(all, func(c channel) bool { return c.ID == id })
 
 			// Removing a deleted channel by ID is fine; adding one is not.
 			if !known && (add || !slices.Contains(guild.ArtChannels, id)) {
-				return router.Errorf("`%s` isn't a channel in this server.", arg)
+				return gumi.Errorf("`%s` isn't a channel in this server.", arg)
 			}
 
 			ids = append(ids, id)
@@ -144,7 +183,7 @@ func changeChannels(b *bot.Bot, add bool) router.Handler {
 
 		targets := expandArtChannels(all, pickedChannels(all, ids))
 		if len(targets) == 0 {
-			return router.Errorf("Those aren't text channels or categories with text channels.")
+			return gumi.Errorf("Those aren't text channels or categories with text channels.")
 		}
 
 		var changed, skipped []string
@@ -169,7 +208,7 @@ func changeChannels(b *bot.Bot, add bool) router.Handler {
 	}
 }
 
-func channelsChangedEmbed(add bool, changed, skipped []string) *discordgo.MessageEmbed {
+func channelsChangedEmbed(add bool, changed, skipped []string) discord.Embed {
 	verb, already := "Added", "already art channels"
 	if !add {
 		verb, already = "Removed", "weren't art channels"
@@ -183,20 +222,20 @@ func channelsChangedEmbed(add bool, changed, skipped []string) *discordgo.Messag
 		desc += fmt.Sprintf("\n-# %s %s", mentions(skipped), already)
 	}
 
-	return &discordgo.MessageEmbed{Color: successColor, Description: desc}
+	return discord.Embed{Color: successColor, Description: desc}
 }
 
-func listChannels(b *bot.Bot) router.Handler {
-	return func(ctx *router.Context) error {
+func listChannels(b *bot.Bot) gumi.Handler {
+	return func(ctx *gumi.Context) error {
 		reqCtx, cancel := context.WithTimeout(ctx.Context(), 10*time.Second)
 		defer cancel()
 
-		guild, _, err := store.GetOrCreateGuild(reqCtx, b.Store, ctx.GuildID())
+		guild, _, err := store.GetOrCreateGuild(reqCtx, b.Store, ctx.GuildID().String())
 		if err != nil {
 			return err
 		}
 
-		all, err := guildChannels(ctx.Session, guild.ID)
+		all, err := guildChannels(ctx.Client, ctx.GuildID())
 		if err != nil {
 			return err
 		}
@@ -204,7 +243,7 @@ func listChannels(b *bot.Bot) router.Handler {
 		// Channels deleted while the bot was offline never sent a delete event,
 		// so clean them up here.
 		deleted := slices.DeleteFunc(slices.Clone(guild.ArtChannels), func(id string) bool {
-			return slices.ContainsFunc(all, func(c *discordgo.Channel) bool { return c.ID == id })
+			return slices.ContainsFunc(all, func(c channel) bool { return c.ID == id })
 		})
 		if len(deleted) > 0 {
 			if guild, err = b.Store.DeleteArtChannels(reqCtx, guild.ID, deleted); err != nil {
@@ -216,7 +255,7 @@ func listChannels(b *bot.Bot) router.Handler {
 	}
 }
 
-func channelPages(ids []string, cleaned int) []*discordgo.MessageEmbed {
+func channelPages(ids []string, cleaned int) []discord.Embed {
 	title := fmt.Sprintf("Art channels · %d", len(ids))
 	footer := ""
 	if cleaned > 0 {
@@ -224,19 +263,19 @@ func channelPages(ids []string, cleaned int) []*discordgo.MessageEmbed {
 	}
 
 	if len(ids) == 0 {
-		embed := &discordgo.MessageEmbed{
+		embed := discord.Embed{
 			Title:       title,
 			Color:       0x439ef1,
 			Description: "None: Boe Tea posts artwork in every channel.\n-# Add some with `/channels add`",
 		}
 		if footer != "" {
-			embed.Footer = &discordgo.MessageEmbedFooter{Text: footer}
+			embed.Footer = &discord.EmbedFooter{Text: footer}
 		}
 
-		return []*discordgo.MessageEmbed{embed}
+		return []discord.Embed{embed}
 	}
 
-	pages := make([]*discordgo.MessageEmbed, 0, len(ids)/channelsPerPage+1)
+	pages := make([]discord.Embed, 0, len(ids)/channelsPerPage+1)
 	for start := 0; start < len(ids); start += channelsPerPage {
 		page := ids[start:min(start+channelsPerPage, len(ids))]
 
@@ -250,11 +289,11 @@ func channelPages(ids []string, cleaned int) []*discordgo.MessageEmbed {
 			text += " · " + footer
 		}
 
-		pages = append(pages, &discordgo.MessageEmbed{
+		pages = append(pages, discord.Embed{
 			Title:       title,
 			Color:       0x439ef1,
 			Description: "Boe Tea only posts artwork in these channels.\n\n" + strings.Join(lines, "\n"),
-			Footer:      &discordgo.MessageEmbedFooter{Text: text},
+			Footer:      &discord.EmbedFooter{Text: text},
 		})
 	}
 

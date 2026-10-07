@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/bwmarrin/discordgo"
+	"github.com/disgoorg/disgo/discord"
 )
 
 // Config limits how many media payloads are in flight and where they're
@@ -114,7 +114,7 @@ func Remove(path string) {
 
 // RemoveFiles closes and deletes the spooled files backing the given
 // discord files. Files that were not spooled are left alone.
-func RemoveFiles(files []*discordgo.File) {
+func RemoveFiles(files []*discord.File) {
 	for _, file := range files {
 		if file == nil {
 			continue

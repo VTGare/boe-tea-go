@@ -4,7 +4,8 @@ import (
 	"time"
 
 	"github.com/VTGare/boe-tea-go/artworks"
-	"github.com/bwmarrin/discordgo"
+	"github.com/disgoorg/disgo/discord"
+	"github.com/disgoorg/snowflake/v2"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -24,10 +25,10 @@ func testRendered() artworks.Rendered {
 func testOptions() Options {
 	return Options{
 		TagsEnabled: true,
-		Reference: &discordgo.MessageReference{
-			GuildID:   "g",
-			ChannelID: "c",
-			MessageID: "m",
+		Reference: &discord.MessageReference{
+			GuildID:   new(snowflake.ID(1)),
+			ChannelID: new(snowflake.ID(2)),
+			MessageID: new(snowflake.ID(3)),
 		},
 	}
 }
@@ -84,7 +85,7 @@ var _ = Describe("Pages", func() {
 	It("keeps files on the first page", func() {
 		rendered := testRendered()
 		rendered.Images = append(rendered.Images, artworks.RenderedImage{Preview: "https://example.com/2.png"})
-		rendered.Files = []*discordgo.File{{Name: "v.mp4"}}
+		rendered.Files = []*discord.File{{Name: "v.mp4"}}
 
 		bundles := Build([]Input{{ID: "a", Rendered: rendered}}, testOptions())
 
@@ -219,7 +220,7 @@ var _ = Describe("Replies and crossposts", func() {
 		bundles := Build([]Input{{ID: "a", Rendered: rendered}}, testOptions())
 
 		for _, send := range bundles[0].Sends {
-			Expect(send.Reference.MessageID).To(Equal("m"))
+			Expect(*send.MessageReference.MessageID).To(Equal(snowflake.ID(3)))
 			Expect(send.AllowedMentions).NotTo(BeNil())
 			Expect(send.Embeds[0].Author).To(BeNil())
 		}
@@ -235,6 +236,6 @@ var _ = Describe("Replies and crossposts", func() {
 
 		embed := bundles[0].Sends[0].Embeds[0]
 		Expect(embed.Author.Name).To(Equal("posted by tester"))
-		Expect(bundles[0].Sends[0].Reference).To(BeNil())
+		Expect(bundles[0].Sends[0].MessageReference).To(BeNil())
 	})
 })

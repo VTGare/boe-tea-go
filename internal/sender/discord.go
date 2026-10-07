@@ -1,133 +1,54 @@
 package sender
 
 import (
+	"errors"
 	"fmt"
-	"strconv"
-	"sync"
+	"io"
+	"net/http"
 	"time"
 
 	"github.com/VTGare/boe-tea-go/internal/spool"
-	"github.com/bwmarrin/discordgo"
-	"github.com/servusdei2018/shards/v2"
+	"github.com/disgoorg/disgo/bot"
+	"github.com/disgoorg/disgo/discord"
+	"github.com/disgoorg/disgo/rest"
+	"github.com/disgoorg/snowflake/v2"
 	"go.uber.org/zap"
 )
 
-// DiscordSender sends through the shard that owns each guild, so
-// callers pass guild IDs instead of sessions.
-type DiscordSender struct {
-	manager  *shards.Manager
-	fallback *discordgo.Session
-	log      *zap.SugaredLogger
+const (
+	defaultRetries = 3
+	defaultBackoff = 500 * time.Millisecond
+)
 
-	// ready holds each shard's session by shard ID, filled in as shards
-	// become ready. The manager stays locked until every shard has
-	// connected, which takes over a minute at startup, so lookups go here
-	// first to avoid waiting on it.
-	mu         sync.RWMutex
-	ready      map[int]*discordgo.Session
-	shardCount int
+type DiscordSender struct {
+	client *bot.Client
+	log    *zap.SugaredLogger
+
+	retries int
+	backoff time.Duration
 }
 
-func NewDiscordSender(manager *shards.Manager, log *zap.SugaredLogger, fallback *discordgo.Session) *DiscordSender {
+func NewDiscordSender(client *bot.Client, log *zap.SugaredLogger) *DiscordSender {
 	if log == nil {
 		log = zap.NewNop().Sugar()
 	}
 
-	d := &DiscordSender{
-		manager:  manager,
-		fallback: fallback,
-		log:      log,
-		ready:    make(map[int]*discordgo.Session),
+	return &DiscordSender{
+		client:  client,
+		log:     log,
+		retries: defaultRetries,
+		backoff: defaultBackoff,
 	}
-
-	if manager != nil {
-		manager.AddHandler(d.trackShard)
-	}
-
-	return d
 }
 
-// trackShard remembers a shard's session once it's ready.
-func (d *DiscordSender) trackShard(s *discordgo.Session, _ *discordgo.Ready) {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-
-	d.ready[s.ShardID] = s
-	d.shardCount = max(s.ShardCount, 1)
-}
-
-// readyShard returns the session of a ready shard that owns guildID (0
-// for DMs), or nil if that shard isn't ready yet.
-func (d *DiscordSender) readyShard(guildID int64) *discordgo.Session {
-	d.mu.RLock()
-	defer d.mu.RUnlock()
-
-	if d.shardCount == 0 {
-		return nil
-	}
-
-	return d.ready[int((guildID>>22)%int64(d.shardCount))]
-}
-
-func (d *DiscordSender) sessionFor(guildID string) (*discordgo.Session, error) {
-	if guildID == "" {
-		// Only shard 0 receives DMs.
-		if s := d.readyShard(0); s != nil {
-			return s, nil
-		}
-
-		if d.manager != nil {
-			if s := d.manager.SessionForDM(); s != nil {
-				return s, nil
-			}
-		}
-
-		if d.fallback != nil {
-			return d.fallback, nil
-		}
-
-		return nil, fmt.Errorf("no session for DM")
-	}
-
-	id, err := strconv.ParseInt(guildID, 10, 64)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse guild id: %w", err)
-	}
-
-	if s := d.readyShard(id); s != nil {
-		return s, nil
-	}
-
-	if d.manager != nil {
-		if s := d.manager.SessionForGuild(id); s != nil {
-			return s, nil
-		}
-	}
-
-	if d.fallback != nil {
-		return d.fallback, nil
-	}
-
-	return nil, fmt.Errorf("no session for guild")
-}
-
-func (d *DiscordSender) SendComplex(guildID, channelID string, message *discordgo.MessageSend) (*discordgo.Message, error) {
-	if message == nil {
-		return nil, fmt.Errorf("nil message")
-	}
-
-	s, err := d.sessionFor(guildID)
-	if err != nil {
-		return nil, err
-	}
-
+func (d *DiscordSender) SendComplex(channelID snowflake.ID, message discord.MessageCreate) (*discord.Message, error) {
 	required := SendPermissions
 	if len(message.Files) > 0 {
-		required |= discordgo.PermissionAttachFiles
+		required |= discord.PermissionAttachFiles
 	}
 
-	if ok, err := CheckChannelPerms(s, channelID, required); !ok {
-		d.log.With("guild_id", guildID, "channel_id", channelID).Warn("skipping send, missing permissions")
+	if ok, err := d.channelPerms(channelID, required); !ok {
+		d.log.With("channel_id", channelID).Warn("skipping send, missing permissions")
 
 		return nil, ErrSkipped
 	} else if err != nil {
@@ -140,135 +61,78 @@ func (d *DiscordSender) SendComplex(guildID, channelID string, message *discordg
 		defer spool.RemoveFiles(message.Files)
 	}
 
-	msg, err := s.ChannelMessageSendComplex(channelID, message)
-	if err != nil {
-		return nil, fmt.Errorf("failed to send message: %w", err)
-	}
+	var msg *discord.Message
+	err := d.retry(func() error {
+		rewind(message.Files)
 
-	if msg.GuildID == "" {
-		msg.GuildID = guildID
-	}
+		var err error
+		msg, err = d.client.Rest.CreateMessage(channelID, message)
 
-	return msg, nil
-}
-
-func (d *DiscordSender) SendEmbed(guildID, channelID string, embed *discordgo.MessageEmbed) (*discordgo.Message, error) {
-	s, err := d.sessionFor(guildID)
-	if err != nil {
-		return nil, err
-	}
-
-	if ok, err := CheckChannelPerms(s, channelID, SendPermissions); !ok {
-		d.log.With("guild_id", guildID, "channel_id", channelID).Warn("skipping send, missing permissions")
-
-		return nil, ErrSkipped
-	} else if err != nil {
-		d.log.With("error", err).Debug("permission lookup failed, attempting send")
-	}
-
-	msg, err := s.ChannelMessageSendEmbed(channelID, embed)
-	if err != nil {
-		return nil, fmt.Errorf("failed to send message: %w", err)
-	}
-
-	if msg.GuildID == "" {
-		msg.GuildID = guildID
-	}
-
-	return msg, nil
-}
-
-func (d *DiscordSender) DeleteMessage(guildID, channelID, messageID string) error {
-	s, err := d.sessionFor(guildID)
-	if err != nil {
 		return err
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to send message: %w", err)
 	}
 
-	if err := s.ChannelMessageDelete(channelID, messageID); err != nil {
+	return msg, nil
+}
+
+func (d *DiscordSender) SendEmbed(channelID snowflake.ID, embed discord.Embed) (*discord.Message, error) {
+	return d.SendComplex(channelID, discord.MessageCreate{Embeds: []discord.Embed{embed}})
+}
+
+func (d *DiscordSender) DeleteMessage(channelID, messageID snowflake.ID) error {
+	err := d.retry(func() error {
+		return d.client.Rest.DeleteMessage(channelID, messageID)
+	})
+	if err != nil {
 		return fmt.Errorf("failed to delete message: %w", err)
 	}
 
 	return nil
 }
 
-func (d *DiscordSender) AddReaction(guildID, channelID, messageID, emoji string) error {
-	s, err := d.sessionFor(guildID)
+func (d *DiscordSender) AddReaction(channelID, messageID snowflake.ID, emoji string) error {
+	err := d.retry(func() error {
+		return d.client.Rest.AddReaction(channelID, messageID, emoji)
+	})
 	if err != nil {
-		return err
-	}
-
-	if err := s.MessageReactionAdd(channelID, messageID, emoji); err != nil {
 		return fmt.Errorf("failed to add reaction: %w", err)
 	}
 
 	return nil
 }
 
-func (d *DiscordSender) EditEmbed(guildID, channelID, messageID string, embed *discordgo.MessageEmbed) (*discordgo.Message, error) {
-	s, err := d.sessionFor(guildID)
-	if err != nil {
-		return nil, err
+func (d *DiscordSender) ChannelGuildID(channelID snowflake.ID) (snowflake.ID, error) {
+	if ch, ok := d.client.Caches.Channel(channelID); ok {
+		return ch.GuildID(), nil
 	}
 
-	msg, err := s.ChannelMessageEditEmbed(channelID, messageID, embed)
-	if err != nil {
-		return nil, fmt.Errorf("failed to edit message: %w", err)
-	}
+	var channel discord.Channel
+	err := d.retry(func() error {
+		var err error
+		channel, err = d.client.Rest.GetChannel(channelID)
 
-	if msg.GuildID == "" {
-		msg.GuildID = guildID
-	}
-
-	return msg, nil
-}
-
-func (d *DiscordSender) RemoveReaction(guildID, channelID, messageID, emoji, userID string) error {
-	s, err := d.sessionFor(guildID)
-	if err != nil {
 		return err
+	})
+	if err != nil {
+		return 0, fmt.Errorf("failed to get channel: %w", err)
 	}
 
-	if err := s.MessageReactionRemove(channelID, messageID, emoji, userID); err != nil {
-		return fmt.Errorf("failed to remove reaction: %w", err)
+	if ch, ok := channel.(discord.GuildChannel); ok {
+		return ch.GuildID(), nil
 	}
 
-	return nil
+	return 0, nil
 }
 
-func (d *DiscordSender) RemoveAllReactions(guildID, channelID, messageID string) error {
-	s, err := d.sessionFor(guildID)
-	if err != nil {
+func (d *DiscordSender) IsMember(guildID, userID snowflake.ID) (bool, error) {
+	err := d.retry(func() error {
+		_, err := d.client.Rest.GetMember(guildID, userID)
+
 		return err
-	}
-
-	if err := s.MessageReactionsRemoveAll(channelID, messageID); err != nil {
-		return fmt.Errorf("failed to remove reactions: %w", err)
-	}
-
-	return nil
-}
-
-func (d *DiscordSender) ChannelGuildID(hintGuildID, channelID string) (string, error) {
-	s, err := d.sessionFor(hintGuildID)
+	})
 	if err != nil {
-		return "", err
-	}
-
-	channel, err := s.Channel(channelID)
-	if err != nil {
-		return "", fmt.Errorf("failed to get channel: %w", err)
-	}
-
-	return channel.GuildID, nil
-}
-
-func (d *DiscordSender) IsMember(guildID, userID string) (bool, error) {
-	s, err := d.sessionFor(guildID)
-	if err != nil {
-		return false, err
-	}
-
-	if _, err := s.GuildMember(guildID, userID); err != nil {
 		if isNotFound(err) {
 			return false, nil
 		}
@@ -279,49 +143,122 @@ func (d *DiscordSender) IsMember(guildID, userID string) (bool, error) {
 	return true, nil
 }
 
-func (d *DiscordSender) HasChannelPerms(guildID, channelID string, permissions int64) (bool, error) {
+func (d *DiscordSender) HasChannelPerms(guildID, channelID snowflake.ID, permissions discord.Permissions) (bool, error) {
 	// DMs have no guild permissions.
-	if guildID == "" {
+	if guildID == 0 {
 		return true, nil
 	}
 
-	s, err := d.sessionFor(guildID)
-	if err != nil {
-		return true, err
-	}
-
-	return CheckChannelPerms(s, channelID, permissions)
+	return d.channelPerms(channelID, permissions)
 }
 
-func (d *DiscordSender) BotHasGuildPerms(guildID string, permission int64) (bool, error) {
+func (d *DiscordSender) BotHasGuildPerms(guildID snowflake.ID, permission discord.Permissions) (bool, error) {
 	// DMs have no guild permissions.
-	if guildID == "" {
+	if guildID == 0 {
 		return false, nil
 	}
 
-	s, err := d.sessionFor(guildID)
+	member, err := d.self(guildID)
 	if err != nil {
 		return false, err
 	}
 
-	if s.State == nil || s.State.User == nil {
-		return false, fmt.Errorf("discord session not ready")
-	}
-
-	return CheckGuildPerms(s, guildID, s.State.User.ID, permission)
+	return d.client.Caches.MemberPermissions(member).Has(permission), nil
 }
 
-func (d *DiscordSender) Expire(message *discordgo.Message, after ...time.Duration) {
+func (d *DiscordSender) Expire(message *discord.Message, after ...time.Duration) {
 	if message == nil {
 		return
 	}
 
-	s, err := d.sessionFor(message.GuildID)
-	if err != nil {
-		d.log.With("error", err).Warn("failed to resolve session to expire message")
-
-		return
+	wait := 15 * time.Second
+	if len(after) > 0 {
+		wait = after[0]
 	}
 
-	ExpireMessage(d.log, s, message, after...)
+	go func() {
+		time.Sleep(wait)
+
+		if err := d.DeleteMessage(message.ChannelID, message.ID); err != nil {
+			d.log.With(
+				"channel_id", message.ChannelID,
+				"message_id", message.ID,
+				"error", err,
+			).Warn("failed to expire message")
+		}
+	}()
+}
+
+// channelPerms reports whether the bot has the given permissions in a
+// channel. If the lookup fails it returns true along with the error, so
+// the caller can still try to send.
+func (d *DiscordSender) channelPerms(channelID snowflake.ID, permissions discord.Permissions) (bool, error) {
+	ch, ok := d.client.Caches.Channel(channelID)
+	if !ok {
+		return true, fmt.Errorf("channel %v is not cached", channelID)
+	}
+
+	member, ok := d.client.Caches.Member(ch.GuildID(), d.client.ID())
+	if !ok {
+		return true, fmt.Errorf("bot member in guild %v is not cached", ch.GuildID())
+	}
+
+	return d.client.Caches.MemberPermissionsInChannel(ch, member).Has(permissions), nil
+}
+
+func (d *DiscordSender) self(guildID snowflake.ID) (discord.Member, error) {
+	if member, ok := d.client.Caches.Member(guildID, d.client.ID()); ok {
+		return member, nil
+	}
+
+	member, err := d.client.Rest.GetMember(guildID, d.client.ID())
+	if err != nil {
+		return discord.Member{}, fmt.Errorf("failed to get bot member: %w", err)
+	}
+
+	return *member, nil
+}
+
+// retry repeats Discord's 5xx errors, which often pass on a second try.
+// DisGo itself only retries rate limits.
+func (d *DiscordSender) retry(do func() error) error {
+	backoff := d.backoff
+
+	for attempt := 0; ; attempt++ {
+		err := do()
+		if err == nil || attempt >= d.retries || !isServerError(err) {
+			return err
+		}
+
+		time.Sleep(backoff)
+		backoff *= 2
+	}
+}
+
+// A failed attempt may have read files partway, and a retry would upload
+// only what's left.
+func rewind(files []*discord.File) {
+	for _, f := range files {
+		if s, ok := f.Reader.(io.Seeker); ok {
+			_, _ = s.Seek(0, io.SeekStart)
+		}
+	}
+}
+
+func isNotFound(err error) bool {
+	return statusCode(err) == http.StatusNotFound
+}
+
+func isServerError(err error) bool {
+	return statusCode(err) >= http.StatusInternalServerError
+}
+
+// statusCode is the HTTP status of a Discord error, or 0 for other errors.
+func statusCode(err error) int {
+	var restErr *rest.Error
+	if !errors.As(err, &restErr) || restErr.Response == nil {
+		return 0
+	}
+
+	return restErr.Response.StatusCode
 }

@@ -8,7 +8,7 @@ import (
 	"mvdan.cc/xurls/v2"
 
 	"github.com/VTGare/boe-tea-go/store"
-	"github.com/bwmarrin/discordgo"
+	"github.com/disgoorg/disgo/discord"
 )
 
 type Provider interface {
@@ -70,7 +70,7 @@ type Rendered struct {
 	Tags            []string
 	TagLinkTemplate string
 	Fields          []RenderedField
-	Files           []*discordgo.File
+	Files           []*discord.File
 	AIGenerated     bool
 }
 

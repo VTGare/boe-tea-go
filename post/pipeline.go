@@ -4,18 +4,19 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/VTGare/boe-tea-go/artworks"
 	"github.com/VTGare/boe-tea-go/artworks/render"
 	"github.com/VTGare/boe-tea-go/artworks/twitter"
 	"github.com/VTGare/boe-tea-go/internal/cache"
+	"github.com/VTGare/boe-tea-go/internal/dgoutils"
+	"github.com/VTGare/boe-tea-go/internal/embeds"
 	"github.com/VTGare/boe-tea-go/internal/sender"
 	"github.com/VTGare/boe-tea-go/messages"
 	"github.com/VTGare/boe-tea-go/repost"
 	"github.com/VTGare/boe-tea-go/store"
-	"github.com/VTGare/embeds"
-	"github.com/bwmarrin/discordgo"
+	"github.com/disgoorg/disgo/discord"
+	"github.com/disgoorg/snowflake/v2"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -48,13 +49,13 @@ type fetchSlot struct {
 
 // fetch looks up every URL, keeping input order. Reposts are only
 // recorded after a successful fetch.
-func (r *Poster) fetch(ctx context.Context, guild *store.Guild, channelID string, urls []string, opts runOpts) (fetchResults, error) {
+func (r *Poster) fetch(ctx context.Context, guild *store.Guild, channelID snowflake.ID, urls []string, opts runOpts) (fetchResults, error) {
 	log := r.log.With(
 		"guild_id", guild.ID,
 		"channel_id", channelID,
 	)
 
-	if ok, err := r.deps.Sender.HasChannelPerms(guild.ID, channelID, sender.SendPermissions); !ok {
+	if ok, err := r.deps.Sender.HasChannelPerms(dgoutils.ParseID(guild.ID), channelID, sender.SendPermissions); !ok {
 		log.Warn("skipping fetch, missing send permissions")
 
 		return fetchResults{}, nil
@@ -140,7 +141,7 @@ func (r *Poster) match(url string) (string, artworks.Provider) {
 	return r.deps.Match(url)
 }
 
-func (r *Poster) doFetch(ctx context.Context, guild *store.Guild, channelID string, job fetchJob, opts runOpts) fetchSlot {
+func (r *Poster) doFetch(ctx context.Context, guild *store.Guild, channelID snowflake.ID, job fetchJob, opts runOpts) fetchSlot {
 	log := r.log.With(
 		"guild_id", guild.ID,
 		"channel_id", channelID,
@@ -155,7 +156,7 @@ func (r *Poster) doFetch(ctx context.Context, guild *store.Guild, channelID stri
 	needsCreate := false
 
 	if guild.Repost.Mode != store.RepostOff {
-		rep, err := r.deps.Reposts.Find(ctx, channelID, job.id)
+		rep, err := r.deps.Reposts.Find(ctx, channelID.String(), job.id)
 		if err != nil && !errors.Is(err, repost.ErrNotFound) {
 			log.With("error", err).Error("failed to find a repost")
 		}
@@ -211,13 +212,13 @@ func (r *Poster) doFetch(ctx context.Context, guild *store.Guild, channelID stri
 	return slot
 }
 
-func (r *Poster) createRepost(ctx context.Context, guild *store.Guild, channelID string, job fetchJob, messageID string) {
+func (r *Poster) createRepost(ctx context.Context, guild *store.Guild, channelID snowflake.ID, job fetchJob, messageID snowflake.ID) {
 	rep := &repost.Repost{
 		ID:        job.id,
 		URL:       job.url,
 		GuildID:   guild.ID,
-		ChannelID: channelID,
-		MessageID: messageID,
+		ChannelID: channelID.String(),
+		MessageID: messageID.String(),
 	}
 
 	if err := r.deps.Reposts.Create(ctx, rep, guild.Repost.TTL); err != nil {
@@ -256,13 +257,13 @@ func (r *Poster) getOrFetch(provider artworks.Provider, id string) (artworks.Art
 
 type sentPage struct {
 	info     *cache.MessageInfo
-	msg      *discordgo.Message
+	msg      *discord.Message
 	embedURL string
 }
 
 // deliver renders and sends every page. A failed page doesn't stop the
 // rest; all errors are returned together.
-func (r *Poster) deliver(guild *store.Guild, channelID string, items []fetchedItem, run Post, opts runOpts) ([]sentPage, error) {
+func (r *Poster) deliver(guild *store.Guild, channelID snowflake.ID, items []fetchedItem, run Post, opts runOpts) ([]sentPage, error) {
 	artworks := make([]artworks.Artwork, 0, len(items))
 	for _, item := range items {
 		if item.artwork == nil {
@@ -291,7 +292,7 @@ func (r *Poster) deliver(guild *store.Guild, channelID string, items []fetchedIt
 
 	if opts.isCrosspost && len(bundles) > 0 && len(bundles[0].Sends) > 0 {
 		first := bundles[0].Sends[0]
-		if first != nil && len(first.Embeds) > 0 && first.Embeds[0] != nil {
+		if first != nil && len(first.Embeds) > 0 {
 			first.Content = first.Embeds[0].URL + "\n" + first.Content
 		}
 	}
@@ -311,7 +312,7 @@ func (r *Poster) deliver(guild *store.Guild, channelID string, items []fetchedIt
 				continue
 			}
 
-			msg, err := r.deps.Sender.SendComplex(guild.ID, channelID, message)
+			msg, err := r.deps.Sender.SendComplex(channelID, *message)
 			if err != nil {
 				if errors.Is(err, sender.ErrSkipped) {
 					continue
@@ -329,12 +330,12 @@ func (r *Poster) deliver(guild *store.Guild, channelID string, items []fetchedIt
 			}
 
 			var embedURL string
-			if len(message.Embeds) > 0 && message.Embeds[0] != nil {
+			if len(message.Embeds) > 0 {
 				embedURL = message.Embeds[0].URL
 			}
 
 			pages = append(pages, sentPage{
-				info:     &cache.MessageInfo{MessageID: msg.ID, ChannelID: msg.ChannelID, ArtworkID: bundle.ID},
+				info:     &cache.MessageInfo{MessageID: msg.ID.String(), ChannelID: msg.ChannelID.String(), ArtworkID: bundle.ID},
 				msg:      msg,
 				embedURL: embedURL,
 			})
@@ -383,10 +384,13 @@ func renderOptions(guild *store.Guild, run Post, opts runOpts) render.Options {
 		renderOpts.AuthorName = messages.CrosspostBy(run.AuthorName)
 		renderOpts.AuthorIconURL = run.AuthorAvatar
 	} else if !run.IsInteraction {
-		renderOpts.Reference = &discordgo.MessageReference{
-			GuildID:   run.GuildID,
-			ChannelID: run.ChannelID,
-			MessageID: run.MessageID,
+		renderOpts.Reference = &discord.MessageReference{
+			ChannelID: &run.ChannelID,
+			MessageID: &run.MessageID,
+		}
+
+		if run.GuildID != 0 {
+			renderOpts.Reference.GuildID = &run.GuildID
 		}
 	}
 
@@ -418,12 +422,12 @@ func skipFirst(guild *store.Guild, a artworks.Artwork, opts runOpts) bool {
 	return true
 }
 
-func applySkip(sends []*discordgo.MessageSend, skip SkipFilter) []*discordgo.MessageSend {
+func applySkip(sends []*discord.MessageCreate, skip SkipFilter) []*discord.MessageCreate {
 	if skip.Mode == SkipModeNone || len(skip.Indices) == 0 {
 		return sends
 	}
 
-	filtered := make([]*discordgo.MessageSend, 0, len(sends))
+	filtered := make([]*discord.MessageCreate, 0, len(sends))
 
 	switch skip.Mode {
 	case SkipModeExclude:
@@ -477,7 +481,7 @@ func applyLimit(bundles []render.Bundle, limit int) []render.Bundle {
 	filtered := make([]render.Bundle, 0, limit)
 	for _, bundle := range bundles {
 		if len(bundle.Sends) > 0 {
-			filtered = append(filtered, render.Bundle{ID: bundle.ID, Sends: []*discordgo.MessageSend{bundle.Sends[0]}})
+			filtered = append(filtered, render.Bundle{ID: bundle.ID, Sends: []*discord.MessageCreate{bundle.Sends[0]}})
 		}
 	}
 
@@ -497,16 +501,13 @@ func (r *Poster) notifyReposts(guild *store.Guild, run Post, reps []*repost.Repo
 	errs := make([]error, 0)
 
 	if guild.Repost.Mode == store.RepostStrict && !run.IsInteraction {
-		perm, err := r.deps.Sender.BotHasGuildPerms(
-			guild.ID,
-			discordgo.PermissionAdministrator|discordgo.PermissionManageMessages,
-		)
+		perm, err := r.deps.Sender.BotHasGuildPerms(run.GuildID, discord.PermissionManageMessages)
 		if err != nil {
 			log.With("error", err).Warn("failed to check delete message perms")
 		}
 
 		if perm && matched == len(reps) {
-			if err := r.deps.Sender.DeleteMessage(guild.ID, run.ChannelID, run.MessageID); err != nil {
+			if err := r.deps.Sender.DeleteMessage(run.ChannelID, run.MessageID); err != nil {
 				log.With(
 					"channel_id", run.ChannelID,
 					"message_id", run.MessageID,
@@ -537,7 +538,7 @@ func (r *Poster) notifyReposts(guild *store.Guild, run Post, reps []*repost.Repo
 		)
 	}
 
-	if ok, err := r.deps.Sender.HasChannelPerms(guild.ID, run.ChannelID, sender.SendPermissions); !ok {
+	if ok, err := r.deps.Sender.HasChannelPerms(run.GuildID, run.ChannelID, sender.SendPermissions); !ok {
 		log.Warn("skipping repost message, missing send permissions")
 
 		return errors.Join(errs...)
@@ -545,7 +546,7 @@ func (r *Poster) notifyReposts(guild *store.Guild, run Post, reps []*repost.Repo
 		log.With("error", err).Debug("permission lookup failed, attempting send")
 	}
 
-	repostMessage, err := r.deps.Sender.SendEmbed(guild.ID, run.ChannelID, eb.Finalize())
+	repostMessage, err := r.deps.Sender.SendEmbed(run.ChannelID, eb.Finalize())
 	if err != nil {
 		log.With("error", err).Warn("failed to send repost message")
 
@@ -572,7 +573,7 @@ func (r *Poster) finalize(run Post, guild *store.Guild, pages []sentPage, fetche
 	errs := make([]error, 0)
 
 	if guild.Posting.Reactions && !opts.isCommand && !opts.isCrosspost && fetched.originTwitter {
-		if err := r.addBookmarkReactions(run.GuildID, run.ChannelID, run.MessageID); err != nil {
+		if err := r.addBookmarkReactions(run.ChannelID, run.MessageID); err != nil {
 			r.log.With("error", err).Debug("failed to add bookmark reactions")
 
 			errs = append(errs, fmt.Errorf("failed to add bookmark reactions: %w", err))
@@ -596,8 +597,8 @@ func (r *Poster) finalize(run Post, guild *store.Guild, pages []sentPage, fetche
 					continue
 				}
 
-				err := r.addBookmarkReactions(page.msg.GuildID, page.msg.ChannelID, page.msg.ID)
-				if err != nil && !strings.Contains(err.Error(), "403") {
+				err := r.addBookmarkReactions(page.msg.ChannelID, page.msg.ID)
+				if err != nil && !dgoutils.IsForbidden(err) {
 					wrapped := fmt.Errorf("failed to add reactions: %w", err)
 
 					errs = append(errs, &Error{Kind: classify(wrapped), Cause: wrapped})
@@ -609,9 +610,9 @@ func (r *Poster) finalize(run Post, guild *store.Guild, pages []sentPage, fetche
 	return errors.Join(errs...)
 }
 
-func (r *Poster) addBookmarkReactions(guildID, channelID, messageID string) error {
+func (r *Poster) addBookmarkReactions(channelID, messageID snowflake.ID) error {
 	for _, reaction := range []string{"💖", "🤤"} {
-		if err := r.deps.Sender.AddReaction(guildID, channelID, messageID, reaction); err != nil {
+		if err := r.deps.Sender.AddReaction(channelID, messageID, reaction); err != nil {
 			return err
 		}
 	}
@@ -624,14 +625,14 @@ type crossSlot struct {
 	err   error
 }
 
-func (r *Poster) crosspostOne(ctx context.Context, run Post, userID, groupName, channelID string) crossSlot {
+func (r *Poster) crosspostOne(ctx context.Context, run Post, userID snowflake.ID, groupName string, channelID snowflake.ID) crossSlot {
 	log := r.log.With(
 		"user_id", userID,
 		"group", groupName,
 		"channel_id", channelID,
 	)
 
-	guildID, err := r.deps.Sender.ChannelGuildID(run.GuildID, channelID)
+	guildID, err := r.deps.Sender.ChannelGuildID(channelID)
 	if err != nil {
 		log.With("error", err).Info("failed to crosspost")
 
@@ -648,14 +649,14 @@ func (r *Poster) crosspostOne(ctx context.Context, run Post, userID, groupName, 
 	if !member {
 		log.Debug("member left the server, removing crosspost channel")
 
-		if _, err := r.deps.Users.DeleteCrosspostChannel(ctx, userID, groupName, channelID); err != nil {
+		if _, err := r.deps.Users.DeleteCrosspostChannel(ctx, userID.String(), groupName, channelID.String()); err != nil {
 			log.With("error", err).Error("failed to remove a channel from user's group")
 		}
 
 		return crossSlot{}
 	}
 
-	guild, err := r.deps.Guilds.Guild(ctx, guildID)
+	guild, err := r.deps.Guilds.Guild(ctx, dgoutils.IDString(guildID))
 	if err != nil {
 		log.With("error", err).Info("failed to find guild")
 
@@ -672,7 +673,7 @@ func (r *Poster) crosspostOne(ctx context.Context, run Post, userID, groupName, 
 		return crossSlot{}
 	}
 
-	if !guild.PostsIn(channelID) {
+	if !guild.PostsIn(channelID.String()) {
 		return crossSlot{}
 	}
 

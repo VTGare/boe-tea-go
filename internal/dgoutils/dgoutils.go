@@ -2,8 +2,15 @@ package dgoutils
 
 import (
 	"errors"
+	"fmt"
+	"net/http"
 	"strconv"
 	"strings"
+
+	"github.com/disgoorg/disgo/bot"
+	"github.com/disgoorg/disgo/discord"
+	"github.com/disgoorg/disgo/rest"
+	"github.com/disgoorg/snowflake/v2"
 )
 
 var (
@@ -65,4 +72,42 @@ func (r *Range) Map() map[int]struct{} {
 		m[i] = struct{}{}
 	}
 	return m
+}
+
+// IDString formats a Discord ID the way the store keeps it, with "" for
+// none.
+func IDString(id snowflake.ID) string {
+	if id == 0 {
+		return ""
+	}
+
+	return id.String()
+}
+
+// ParseID is 0 for IDs that don't parse.
+func ParseID(s string) snowflake.ID {
+	id, _ := snowflake.Parse(s)
+
+	return id
+}
+
+// IsForbidden reports whether Discord refused a request with 403. DisGo's
+// error text has the JSON error code, not the status.
+func IsForbidden(err error) bool {
+	var restErr *rest.Error
+
+	return errors.As(err, &restErr) && restErr.Response != nil && restErr.Response.StatusCode == http.StatusForbidden
+}
+
+func SendDM(c *bot.Client, userID snowflake.ID, embed discord.Embed) error {
+	ch, err := c.Rest.CreateDMChannel(userID)
+	if err != nil {
+		return fmt.Errorf("failed to create private channel: %w", err)
+	}
+
+	if _, err := c.Rest.CreateMessage(ch.ID(), discord.MessageCreate{Embeds: []discord.Embed{embed}}); err != nil {
+		return fmt.Errorf("failed to send a direct message: %w", err)
+	}
+
+	return nil
 }

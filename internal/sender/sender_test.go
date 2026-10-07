@@ -2,185 +2,290 @@ package sender
 
 import (
 	"errors"
+	"io"
 	"net/http"
 	"strconv"
+	"strings"
+	"sync"
 	"time"
 
-	"github.com/bwmarrin/discordgo"
+	gt "github.com/VTGare/gumi/v2/gumitest"
+	"github.com/disgoorg/disgo/bot"
+	"github.com/disgoorg/disgo/discord"
+	"github.com/disgoorg/snowflake/v2"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/servusdei2018/shards/v2"
-	"go.uber.org/zap"
 )
 
 var errTestBoom = errors.New("boom")
 
-func restError(status int) error {
-	return &discordgo.RESTError{Response: &http.Response{StatusCode: status}}
-}
-
 const (
-	testGuildID   = "g"
-	testChannelID = "c"
-	testBotID     = "bot"
+	testOwnerID snowflake.ID = 4000
+	testRoleID  snowflake.ID = 5000
+	testUserID  snowflake.ID = 6000
 )
 
-func newTestSession(overwrites []*discordgo.PermissionOverwrite) *discordgo.Session {
-	state := discordgo.NewState()
-	state.User = &discordgo.User{ID: testBotID}
-
-	Expect(state.GuildAdd(&discordgo.Guild{
-		ID: testGuildID,
-		Roles: []*discordgo.Role{
-			{ID: testGuildID, Permissions: discordgo.PermissionViewChannel | discordgo.PermissionSendMessages | discordgo.PermissionEmbedLinks},
-		},
-		Members: []*discordgo.Member{
-			{User: &discordgo.User{ID: testBotID}, Roles: []string{testGuildID}},
-		},
-		Channels: []*discordgo.Channel{
-			{ID: testChannelID, GuildID: testGuildID, Type: discordgo.ChannelTypeGuildText, PermissionOverwrites: overwrites},
-		},
-	})).To(Succeed())
-
-	return &discordgo.Session{State: state}
+// discordAPI answers every request with the next queued status, then with
+// 200 once the queue is empty.
+type discordAPI struct {
+	mu       sync.Mutex
+	statuses []int
+	requests []string
 }
 
-var _ = Describe("CheckChannelPerms", func() {
+func (a *discordAPI) RoundTrip(req *http.Request) (*http.Response, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	a.requests = append(a.requests, req.Method+" "+req.URL.Path)
+
+	if req.Body != nil {
+		_, _ = io.Copy(io.Discard, req.Body)
+	}
+
+	status := http.StatusOK
+	if len(a.statuses) > 0 {
+		status, a.statuses = a.statuses[0], a.statuses[1:]
+	}
+
+	body := "{}"
+	if status >= http.StatusBadRequest {
+		body = `{"message": "error", "code": 0}`
+	}
+
+	return &http.Response{
+		StatusCode: status,
+		Status:     http.StatusText(status),
+		Header:     http.Header{"Content-Type": {"application/json"}},
+		Body:       io.NopCloser(strings.NewReader(body)),
+		Request:    req,
+	}, nil
+}
+
+func (a *discordAPI) Requests() []string {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	return append([]string(nil), a.requests...)
+}
+
+// newTestClient caches a guild where @everyone can view, send, embed and attach,
+// and the bot holds only @everyone.
+func newTestClient(overwrites ...map[string]any) *bot.Client {
+	c, _ := gt.NewClient()
+
+	c.Caches.AddGuild(discord.Guild{ID: gt.GuildID, OwnerID: testOwnerID})
+	c.Caches.AddRole(discord.Role{
+		ID:      gt.GuildID,
+		GuildID: gt.GuildID,
+		Permissions: discord.PermissionViewChannel | discord.PermissionSendMessages |
+			discord.PermissionEmbedLinks | discord.PermissionAttachFiles,
+	})
+	c.Caches.AddRole(discord.Role{ID: testRoleID, GuildID: gt.GuildID, Permissions: discord.PermissionManageMessages})
+	c.Caches.AddMember(discord.Member{GuildID: gt.GuildID, User: discord.User{ID: gt.BotID}})
+	c.Caches.AddChannel(gt.GuildChannel(map[string]any{
+		"id":                    gt.ChannelID.String(),
+		"guild_id":              gt.GuildID.String(),
+		"type":                  discord.ChannelTypeGuildText,
+		"permission_overwrites": overwrites,
+	}))
+
+	return c
+}
+
+func denyEveryone(perms discord.Permissions) map[string]any {
+	return map[string]any{"id": gt.GuildID.String(), "type": 0, "allow": "0", "deny": strconv.FormatInt(int64(perms), 10)}
+}
+
+func newTestSender(c *bot.Client) (*DiscordSender, *discordAPI) {
+	api := &discordAPI{}
+	c.Rest.HTTPClient().Transport = api
+
+	d := NewDiscordSender(c, nil)
+	d.backoff = time.Millisecond
+
+	return d, api
+}
+
+var _ = Describe("DiscordSender permissions", func() {
 	It("allows posting with send and embed permissions", func() {
-		ok, err := CheckChannelPerms(newTestSession(nil), testChannelID, SendPermissions)
+		d, _ := newTestSender(newTestClient())
+
+		ok, err := d.HasChannelPerms(gt.GuildID, gt.ChannelID, SendPermissions)
 
 		Expect(err).NotTo(HaveOccurred())
 		Expect(ok).To(BeTrue())
 	})
 
 	It("denies posting when the channel overwrite revokes send", func() {
-		session := newTestSession([]*discordgo.PermissionOverwrite{
-			{ID: testGuildID, Type: discordgo.PermissionOverwriteTypeRole, Deny: discordgo.PermissionSendMessages},
-		})
+		d, _ := newTestSender(newTestClient(denyEveryone(discord.PermissionSendMessages)))
 
-		ok, err := CheckChannelPerms(session, testChannelID, SendPermissions)
-
-		Expect(err).NotTo(HaveOccurred())
-		Expect(ok).To(BeFalse())
-	})
-
-	It("denies file posts without attach permission", func() {
-		session := newTestSession([]*discordgo.PermissionOverwrite{
-			{ID: testGuildID, Type: discordgo.PermissionOverwriteTypeRole, Deny: discordgo.PermissionAttachFiles},
-		})
-
-		ok, err := CheckChannelPerms(session, testChannelID, SendPermissions|discordgo.PermissionAttachFiles)
+		ok, err := d.HasChannelPerms(gt.GuildID, gt.ChannelID, SendPermissions)
 
 		Expect(err).NotTo(HaveOccurred())
 		Expect(ok).To(BeFalse())
 	})
 
 	It("fails open on unknown channels", func() {
-		ok, err := CheckChannelPerms(newTestSession(nil), "missing", SendPermissions)
+		d, _ := newTestSender(newTestClient())
+
+		ok, err := d.HasChannelPerms(gt.GuildID, 1, SendPermissions)
 
 		Expect(err).To(HaveOccurred())
 		Expect(ok).To(BeTrue())
 	})
 
-	It("fails open without a session", func() {
-		ok, err := CheckChannelPerms(nil, testChannelID, SendPermissions)
+	It("allows everything in DMs", func() {
+		d, _ := newTestSender(newTestClient())
 
-		Expect(err).To(HaveOccurred())
-		Expect(ok).To(BeTrue())
-	})
-})
-
-var _ = Describe("CheckGuildPerms", func() {
-	It("grants permissions held by a member role", func() {
-		ok, err := CheckGuildPerms(newTestSession(nil), testGuildID, testBotID, discordgo.PermissionSendMessages)
+		ok, err := d.HasChannelPerms(0, 1, SendPermissions)
 
 		Expect(err).NotTo(HaveOccurred())
 		Expect(ok).To(BeTrue())
 	})
 
-	It("denies permissions the member lacks", func() {
-		ok, err := CheckGuildPerms(newTestSession(nil), testGuildID, testBotID, discordgo.PermissionAdministrator)
+	It("grants guild permissions held by a member role", func() {
+		c := newTestClient()
+		c.Caches.AddMember(discord.Member{GuildID: gt.GuildID, User: discord.User{ID: gt.BotID}, RoleIDs: []snowflake.ID{testRoleID}})
+		d, _ := newTestSender(c)
 
-		Expect(err).NotTo(HaveOccurred())
-		Expect(ok).To(BeFalse())
+		Expect(d.BotHasGuildPerms(gt.GuildID, discord.PermissionManageMessages)).To(BeTrue())
+	})
+
+	It("denies guild permissions the bot lacks", func() {
+		d, _ := newTestSender(newTestClient())
+
+		Expect(d.BotHasGuildPerms(gt.GuildID, discord.PermissionManageMessages)).To(BeFalse())
 	})
 
 	It("grants the guild owner every permission", func() {
-		state := discordgo.NewState()
-		owner := &discordgo.User{ID: "owner"}
-		state.User = owner
+		c := newTestClient()
+		c.Caches.AddGuild(discord.Guild{ID: gt.GuildID, OwnerID: gt.BotID})
+		d, _ := newTestSender(c)
 
-		Expect(state.GuildAdd(&discordgo.Guild{
-			ID:      testGuildID,
-			OwnerID: "owner",
-			Members: []*discordgo.Member{{User: &discordgo.User{ID: "owner"}}},
-		})).To(Succeed())
-
-		ok, err := CheckGuildPerms(&discordgo.Session{State: state}, testGuildID, "owner", discordgo.PermissionAdministrator)
-
-		Expect(err).NotTo(HaveOccurred())
-		Expect(ok).To(BeTrue())
+		Expect(d.BotHasGuildPerms(gt.GuildID, discord.PermissionManageMessages)).To(BeTrue())
 	})
 
-	It("denies guild permissions without a session", func() {
-		ok, err := CheckGuildPerms(nil, testGuildID, testBotID, discordgo.PermissionSendMessages)
+	It("reports no guild permissions in DMs", func() {
+		d, _ := newTestSender(newTestClient())
+
+		Expect(d.BotHasGuildPerms(0, discord.PermissionManageMessages)).To(BeFalse())
+	})
+})
+
+var _ = Describe("DiscordSender sends", func() {
+	It("posts messages the bot is allowed to send", func() {
+		d, api := newTestSender(newTestClient())
+
+		_, err := d.SendEmbed(gt.ChannelID, discord.Embed{Title: "art"})
+
+		Expect(err).NotTo(HaveOccurred())
+		Expect(api.Requests()).To(Equal([]string{"POST /api/v10/channels/3000/messages"}))
+	})
+
+	It("skips sends the bot has no permission for", func() {
+		d, api := newTestSender(newTestClient(denyEveryone(discord.PermissionEmbedLinks)))
+
+		_, err := d.SendEmbed(gt.ChannelID, discord.Embed{Title: "art"})
+
+		Expect(err).To(MatchError(ErrSkipped))
+		Expect(api.Requests()).To(BeEmpty())
+	})
+
+	It("needs attach permission for files", func() {
+		d, _ := newTestSender(newTestClient(denyEveryone(discord.PermissionAttachFiles)))
+
+		_, err := d.SendComplex(gt.ChannelID, discord.MessageCreate{
+			Files: []*discord.File{discord.NewFile("v.mp4", "", strings.NewReader("video"))},
+		})
+
+		Expect(err).To(MatchError(ErrSkipped))
+	})
+
+	It("retries Discord's server errors with the whole file", func() {
+		c := newTestClient()
+		rec := gt.Attach(c)
+		d := NewDiscordSender(c, nil)
+		d.backoff = time.Millisecond
+
+		failing := &discordAPI{statuses: []int{http.StatusBadGateway}}
+		c.Rest.HTTPClient().Transport = roundTrips(failing, rec)
+
+		_, err := d.SendComplex(gt.ChannelID, discord.MessageCreate{
+			Files: []*discord.File{discord.NewFile("v.mp4", "", strings.NewReader("video"))},
+		})
+
+		Expect(err).NotTo(HaveOccurred())
+		Expect(failing.Requests()).To(HaveLen(1))
+		Expect(rec.Requests()).To(HaveLen(1))
+		Expect(rec.Requests()[0].Files).To(HaveKeyWithValue("v.mp4", "video"))
+	})
+
+	It("gives up after a few server errors", func() {
+		d, api := newTestSender(newTestClient())
+		api.statuses = []int{500, 500, 500, 500, 500}
+
+		_, err := d.SendEmbed(gt.ChannelID, discord.Embed{})
 
 		Expect(err).To(HaveOccurred())
-		Expect(ok).To(BeFalse())
+		Expect(api.Requests()).To(HaveLen(4))
+	})
+
+	It("doesn't retry client errors", func() {
+		d, api := newTestSender(newTestClient())
+		api.statuses = []int{http.StatusForbidden}
+
+		Expect(d.DeleteMessage(gt.ChannelID, 1)).NotTo(Succeed())
+		Expect(api.Requests()).To(HaveLen(1))
 	})
 })
 
-var _ = Describe("ExpireMessage", func() {
-	It("ignores nil messages and sessions without blocking", func() {
-		ExpireMessage(zap.NewNop().Sugar(), nil, nil)
-		ExpireMessage(zap.NewNop().Sugar(), newTestSession(nil), nil)
-	})
-})
+var _ = Describe("DiscordSender lookups", func() {
+	It("finds a cached channel's guild without asking Discord", func() {
+		d, api := newTestSender(newTestClient())
 
-var _ = Describe("Missing members", func() {
-	It("matches Discord 404s only", func() {
-		Expect(isNotFound(restError(404))).To(BeTrue())
-		Expect(isNotFound(restError(403))).To(BeFalse())
-		Expect(isNotFound(errTestBoom)).To(BeFalse())
-	})
-})
-
-var _ = Describe("Channel and member lookups", func() {
-	It("answers channel guilds and membership", func() {
-		fake := NewFake()
-		fake.ChannelGuilds = map[string]string{"c": "g"}
-		fake.Members = map[MemberKey]bool{{GuildID: "g", UserID: "u"}: true}
-
-		guildID, err := fake.ChannelGuildID("hint", "c")
-
-		Expect(err).NotTo(HaveOccurred())
-		Expect(guildID).To(Equal("g"))
-
-		member, err := fake.IsMember("g", "u")
-
-		Expect(err).NotTo(HaveOccurred())
-		Expect(member).To(BeTrue())
-
-		member, err = fake.IsMember("g", "stranger")
-
-		Expect(err).NotTo(HaveOccurred())
-		Expect(member).To(BeFalse())
+		Expect(d.ChannelGuildID(gt.ChannelID)).To(Equal(gt.GuildID))
+		Expect(api.Requests()).To(BeEmpty())
 	})
 
-	It("reports unknown channels and surfaces read errors", func() {
-		fake := NewFake()
+	It("reports members that left as non-members", func() {
+		d, api := newTestSender(newTestClient())
+		api.statuses = []int{http.StatusNotFound}
 
-		_, err := fake.ChannelGuildID("hint", "missing")
+		Expect(d.IsMember(gt.GuildID, testUserID)).To(BeFalse())
+	})
+
+	It("surfaces other member lookup errors", func() {
+		d, api := newTestSender(newTestClient())
+		api.statuses = []int{http.StatusForbidden}
+
+		_, err := d.IsMember(gt.GuildID, testUserID)
 
 		Expect(err).To(HaveOccurred())
-
-		fake.MemberErr = errTestBoom
-
-		_, err = fake.IsMember("g", "u")
-
-		Expect(err).To(MatchError(errTestBoom))
 	})
 })
+
+// roundTrips sends each request to first until its queue is used up, then
+// to second.
+func roundTrips(first *discordAPI, second http.RoundTripper) http.RoundTripper {
+	return roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		first.mu.Lock()
+		pending := len(first.statuses) > 0
+		first.mu.Unlock()
+
+		if pending {
+			return first.RoundTrip(req)
+		}
+
+		return second.RoundTrip(req)
+	})
+}
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
+}
 
 var _ = Describe("FakeSender", func() {
 	var fake *FakeSender
@@ -190,24 +295,24 @@ var _ = Describe("FakeSender", func() {
 	})
 
 	It("defaults to allowing every permission check", func() {
-		ok, err := fake.HasChannelPerms("g", "c", SendPermissions)
+		ok, err := fake.HasChannelPerms(1, 2, SendPermissions)
 
 		Expect(err).NotTo(HaveOccurred())
 		Expect(ok).To(BeTrue())
 
-		ok, err = fake.BotHasGuildPerms("g", discordgo.PermissionManageMessages)
+		ok, err = fake.BotHasGuildPerms(1, discord.PermissionManageMessages)
 
 		Expect(err).NotTo(HaveOccurred())
 		Expect(ok).To(BeTrue())
 	})
 
 	It("records sends with incrementing message IDs", func() {
-		first, err := fake.SendComplex("g", "c", &discordgo.MessageSend{Content: "one"})
+		first, err := fake.SendComplex(2, discord.MessageCreate{Content: "one"})
 
 		Expect(err).NotTo(HaveOccurred())
-		Expect(first.ID).NotTo(BeEmpty())
+		Expect(first.ID).NotTo(BeZero())
 
-		second, err := fake.SendEmbed("g", "c", &discordgo.MessageEmbed{Title: "two"})
+		second, err := fake.SendEmbed(2, discord.Embed{Title: "two"})
 
 		Expect(err).NotTo(HaveOccurred())
 		Expect(second.ID).NotTo(Equal(first.ID))
@@ -221,11 +326,11 @@ var _ = Describe("FakeSender", func() {
 	It("skips sends when configured to skip", func() {
 		fake.Skip = true
 
-		_, err := fake.SendComplex("g", "c", &discordgo.MessageSend{})
+		_, err := fake.SendComplex(2, discord.MessageCreate{})
 
 		Expect(err).To(MatchError(ErrSkipped))
 
-		_, err = fake.SendEmbed("g", "c", &discordgo.MessageEmbed{})
+		_, err = fake.SendEmbed(2, discord.Embed{})
 
 		Expect(err).To(MatchError(ErrSkipped))
 		Expect(fake.Complex).To(BeEmpty())
@@ -235,16 +340,16 @@ var _ = Describe("FakeSender", func() {
 	It("surfaces send errors to the caller", func() {
 		fake.SendErr = errTestBoom
 
-		_, err := fake.SendComplex("g", "c", &discordgo.MessageSend{})
+		_, err := fake.SendComplex(2, discord.MessageCreate{})
 
 		Expect(err).To(MatchError(errTestBoom))
 	})
 
 	It("records deletes, reactions, and expired messages", func() {
-		Expect(fake.DeleteMessage("g", "c", "m")).To(Succeed())
-		Expect(fake.AddReaction("g", "c", "m", "💖")).To(Succeed())
+		Expect(fake.DeleteMessage(2, 3)).To(Succeed())
+		Expect(fake.AddReaction(2, 3, "💖")).To(Succeed())
 
-		fake.Expire(&discordgo.Message{ID: "m"})
+		fake.Expire(&discord.Message{ID: 3})
 
 		Expect(fake.Deleted).To(HaveLen(1))
 		Expect(fake.Reactions).To(HaveLen(1))
@@ -252,208 +357,24 @@ var _ = Describe("FakeSender", func() {
 		Expect(fake.Expired).To(HaveLen(1))
 	})
 
-	It("records embed edits and reaction removals", func() {
-		edited, err := fake.EditEmbed("g", "c", "m", &discordgo.MessageEmbed{Title: "two"})
+	It("answers channel guilds and membership", func() {
+		fake.ChannelGuilds = map[snowflake.ID]snowflake.ID{2: 1}
+		fake.Members = map[MemberKey]bool{{GuildID: 1, UserID: testUserID}: true}
 
-		Expect(err).NotTo(HaveOccurred())
-		Expect(edited).NotTo(BeNil())
-		Expect(fake.Edited).To(HaveLen(1))
-		Expect(fake.Edited[0].Embed.Title).To(Equal("two"))
-
-		Expect(fake.RemoveReaction("g", "c", "m", "▶", "u")).To(Succeed())
-		Expect(fake.Unreacted).To(HaveLen(1))
-		Expect(fake.Unreacted[0].UserID).To(Equal("u"))
-
-		Expect(fake.RemoveAllReactions("g", "c", "m")).To(Succeed())
-		Expect(fake.Cleared).To(HaveLen(1))
-	})
-})
-
-var _ = Describe("DiscordSender DM sessions", func() {
-	nopLog := zap.NewNop().Sugar()
-
-	It("resolves empty guild IDs to the fallback session", func() {
-		fallback := &discordgo.Session{}
-		d := NewDiscordSender(nil, nopLog, fallback)
-
-		s, err := d.sessionFor("")
-
-		Expect(err).NotTo(HaveOccurred())
-		Expect(s).To(BeIdenticalTo(fallback))
+		Expect(fake.ChannelGuildID(2)).To(Equal(snowflake.ID(1)))
+		Expect(fake.IsMember(1, testUserID)).To(BeTrue())
+		Expect(fake.IsMember(1, testOwnerID)).To(BeFalse())
 	})
 
-	It("reports no DM session without a manager or fallback", func() {
-		d := NewDiscordSender(nil, nopLog, nil)
-
-		_, err := d.sessionFor("")
-
-		Expect(err).To(MatchError(ContainSubstring("no session for DM")))
-	})
-
-	It("falls back when the manager has no DM shard yet", func() {
-		mgr := &shards.Manager{}
-
-		fallback := &discordgo.Session{}
-		d := NewDiscordSender(mgr, nopLog, fallback)
-
-		s, err := d.sessionFor("")
-
-		Expect(err).NotTo(HaveOccurred())
-		Expect(s).To(BeIdenticalTo(fallback))
-	})
-
-	It("allows DM sends without a permission lookup", func() {
-		d := NewDiscordSender(nil, nopLog, nil)
-
-		ok, err := d.HasChannelPerms("", "dm-channel", SendPermissions)
-
-		Expect(err).NotTo(HaveOccurred())
-		Expect(ok).To(BeTrue())
-	})
-
-	It("reports no guild permissions in DMs", func() {
-		d := NewDiscordSender(nil, nopLog, nil)
-
-		ok, err := d.BotHasGuildPerms("", discordgo.PermissionManageMessages)
-
-		Expect(err).NotTo(HaveOccurred())
-		Expect(ok).To(BeFalse())
-	})
-})
-
-var _ = Describe("DiscordSender", func() {
-	nopLog := zap.NewNop().Sugar()
-
-	It("fails every operation without a session", func() {
-		d := NewDiscordSender(nil, nopLog, nil)
-
-		_, err := d.SendComplex("1", "c", &discordgo.MessageSend{Content: "hi"})
+	It("reports unknown channels and surfaces read errors", func() {
+		_, err := fake.ChannelGuildID(9)
 
 		Expect(err).To(HaveOccurred())
 
-		_, err = d.SendEmbed("1", "c", &discordgo.MessageEmbed{})
+		fake.MemberErr = errTestBoom
 
-		Expect(err).To(HaveOccurred())
-		Expect(d.DeleteMessage("1", "c", "m")).NotTo(Succeed())
-		Expect(d.AddReaction("1", "c", "m", "💖")).NotTo(Succeed())
+		_, err = fake.IsMember(1, testUserID)
 
-		_, err = d.EditEmbed("1", "c", "m", &discordgo.MessageEmbed{})
-
-		Expect(err).To(HaveOccurred())
-		Expect(d.RemoveReaction("1", "c", "m", "▶", "u")).NotTo(Succeed())
-		Expect(d.RemoveAllReactions("1", "c", "m")).NotTo(Succeed())
-	})
-
-	It("fails open on channel permission checks without a session", func() {
-		d := NewDiscordSender(nil, nopLog, nil)
-
-		ok, err := d.HasChannelPerms("1", "c", SendPermissions)
-
-		Expect(err).To(HaveOccurred())
-		Expect(ok).To(BeTrue())
-	})
-
-	It("fails closed on guild permission checks without a session", func() {
-		d := NewDiscordSender(nil, nopLog, nil)
-
-		ok, err := d.BotHasGuildPerms("1", discordgo.PermissionManageMessages)
-
-		Expect(err).To(HaveOccurred())
-		Expect(ok).To(BeFalse())
-	})
-
-	It("skips sends the bot has no permission for", func() {
-		denied := newTestSession([]*discordgo.PermissionOverwrite{
-			{ID: testGuildID, Type: discordgo.PermissionOverwriteTypeRole, Deny: discordgo.PermissionSendMessages},
-		})
-		d := NewDiscordSender(nil, nopLog, denied)
-
-		_, err := d.SendComplex("1", testChannelID, &discordgo.MessageSend{Content: "hi"})
-
-		Expect(err).To(MatchError(ErrSkipped))
-	})
-
-	It("ignores nil expiry messages", func() {
-		d := NewDiscordSender(nil, nopLog, nil)
-		d.Expire(nil)
-	})
-
-	It("fails channel and member lookups without a session", func() {
-		d := NewDiscordSender(nil, nopLog, nil)
-
-		_, err := d.ChannelGuildID("1", "c")
-
-		Expect(err).To(HaveOccurred())
-
-		_, err = d.IsMember("1", "u")
-
-		Expect(err).To(HaveOccurred())
-	})
-})
-
-var _ = Describe("DiscordSender ready shards", func() {
-	nopLog := zap.NewNop().Sugar()
-
-	// Discord routes a guild to shard (id >> 22) % shard count.
-	guildOnShard := func(shard int) string {
-		return strconv.FormatInt(int64(shard)<<22, 10)
-	}
-
-	ready := func(d *DiscordSender, count int) []*discordgo.Session {
-		sessions := make([]*discordgo.Session, count)
-		for i := range sessions {
-			sessions[i] = &discordgo.Session{ShardID: i, ShardCount: count}
-			d.trackShard(sessions[i], &discordgo.Ready{})
-		}
-		return sessions
-	}
-
-	It("routes guilds to the shard that owns them", func() {
-		d := NewDiscordSender(nil, nopLog, nil)
-		sessions := ready(d, 3)
-
-		for shard := range 3 {
-			s, err := d.sessionFor(guildOnShard(shard))
-			Expect(err).NotTo(HaveOccurred())
-			Expect(s).To(BeIdenticalTo(sessions[shard]))
-		}
-	})
-
-	It("sends DMs through shard 0", func() {
-		d := NewDiscordSender(nil, nopLog, nil)
-		sessions := ready(d, 2)
-
-		s, err := d.sessionFor("")
-		Expect(err).NotTo(HaveOccurred())
-		Expect(s).To(BeIdenticalTo(sessions[0]))
-	})
-
-	It("doesn't wait for the manager while the other shards are still starting", func() {
-		// The manager holds its lock until every shard has connected.
-		mgr := &shards.Manager{}
-		d := NewDiscordSender(mgr, nopLog, nil)
-		sessions := ready(d, 2)
-
-		mgr.Lock()
-		defer mgr.Unlock()
-
-		found := make(chan *discordgo.Session, 1)
-		go func() {
-			s, _ := d.sessionFor(guildOnShard(1))
-			found <- s
-		}()
-
-		Eventually(found).WithTimeout(time.Second).Should(Receive(BeIdenticalTo(sessions[1])))
-	})
-
-	It("asks the manager for shards that aren't ready yet", func() {
-		fallback := &discordgo.Session{}
-		d := NewDiscordSender(&shards.Manager{}, nopLog, fallback)
-		ready(d, 2)
-		d.ready = map[int]*discordgo.Session{0: d.ready[0]}
-
-		s, err := d.sessionFor(guildOnShard(1))
-		Expect(err).NotTo(HaveOccurred())
-		Expect(s).To(BeIdenticalTo(fallback))
+		Expect(err).To(MatchError(errTestBoom))
 	})
 })

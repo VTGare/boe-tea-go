@@ -22,13 +22,19 @@ import (
 	"github.com/VTGare/boe-tea-go/internal/sender"
 	"github.com/VTGare/boe-tea-go/internal/spool"
 	"github.com/VTGare/boe-tea-go/repost"
-	"github.com/VTGare/boe-tea-go/router"
-	"github.com/VTGare/boe-tea-go/router/middleware"
 	"github.com/VTGare/boe-tea-go/store"
 	"github.com/VTGare/boe-tea-go/store/mongo"
 	"github.com/VTGare/boe-tea-go/store/postgres"
+	"github.com/VTGare/gumi/v2"
+	"github.com/VTGare/gumi/v2/middleware"
 
-	"github.com/bwmarrin/discordgo"
+	"github.com/disgoorg/disgo"
+	disgobot "github.com/disgoorg/disgo/bot"
+	disgocache "github.com/disgoorg/disgo/cache"
+	"github.com/disgoorg/disgo/discord"
+	"github.com/disgoorg/disgo/gateway"
+	"github.com/disgoorg/disgo/sharding"
+	"github.com/disgoorg/snowflake/v2"
 	"github.com/getsentry/sentry-go"
 	cache "github.com/patrickmn/go-cache"
 	"go.uber.org/zap"
@@ -118,12 +124,23 @@ func main() {
 		repostDetector = repost.NewMemory()
 	}
 
-	b, err := bot.New(cfg, store, log, repostDetector)
+	ownerID, err := configID(cfg.Discord.AuthorID)
+	if err != nil {
+		log.Fatalf("invalid discord.author_id: %v", err)
+	}
+
+	devGuildID, err := configID(cfg.Discord.DevGuildID)
+	if err != nil {
+		log.Fatalf("invalid discord.dev_guild_id: %v", err)
+	}
+
+	client, err := newClient(cfg.Discord.Token, slogger)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	b.Sender = sender.NewDiscordSender(b.ShardManager, log, nil)
+	b := bot.New(cfg, client, store, log, repostDetector)
+	b.Sender = sender.NewDiscordSender(client, log)
 
 	b.AddProvider(twitter.New())
 	b.AddProvider(deviant.New())
@@ -140,19 +157,19 @@ func main() {
 		b.AddProvider(pixiv.New(cfg.Pixiv.ProxyHost))
 	}
 
-	r := router.New(router.Config{
+	r := gumi.New(gumi.Config{
 		PrefixResolver: handlers.PrefixResolver(b),
-		OwnerIDs:       []string{cfg.Discord.AuthorID},
+		OwnerIDs:       []snowflake.ID{ownerID},
 		Fallback:       handlers.OnMessage(b),
 		ErrorHandler:   handlers.OnError(b),
-		AllowedMentions: &discordgo.MessageAllowedMentions{
-			Parse: []discordgo.AllowedMentionType{
-				discordgo.AllowedMentionTypeEveryone,
-				discordgo.AllowedMentionTypeRoles,
-				discordgo.AllowedMentionTypeUsers,
+		AllowedMentions: &discord.AllowedMentions{
+			Parse: []discord.AllowedMentionType{
+				discord.AllowedMentionTypeEveryone,
+				discord.AllowedMentionTypeRoles,
+				discord.AllowedMentionTypeUsers,
 			},
 		},
-		DevGuildID: cfg.Discord.DevGuildID,
+		DevGuildID: devGuildID,
 	})
 
 	r.Use(
@@ -170,4 +187,47 @@ func main() {
 	if err := b.Start(ctx); err != nil {
 		log.Fatal(err)
 	}
+}
+
+// newClient asks Discord for the recommended shard count, so it needs a
+// real token and a connection.
+func newClient(token string, log *slog.Logger) (*disgobot.Client, error) {
+	var (
+		client *disgobot.Client
+		err    error
+	)
+
+	client, err = disgo.New(token,
+		disgobot.WithLogger(log),
+		disgobot.WithShardManagerConfigOpts(
+			sharding.WithAutoScaling(true),
+			sharding.WithGatewayConfigOpts(
+				gateway.WithIntents(gateway.IntentsNonPrivileged, gateway.IntentMessageContent),
+			),
+		),
+		disgobot.WithCacheConfigOpts(
+			disgocache.WithCaches(disgocache.FlagGuilds, disgocache.FlagChannels, disgocache.FlagRoles, disgocache.FlagMembers),
+			// Permission checks only need the bot's own member.
+			disgocache.WithMemberCachePolicy(func(m discord.Member) bool {
+				return m.User.ID == client.ID()
+			}),
+		),
+		// Listeners run on the shard's read loop otherwise, and one slow
+		// handler would stall the whole shard.
+		disgobot.WithEventManagerConfigOpts(disgobot.WithAsyncEventsEnabled()),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create a Discord client: %w", err)
+	}
+
+	return client, nil
+}
+
+// configID is 0 for "", which the config uses for no ID.
+func configID(raw string) (snowflake.ID, error) {
+	if raw == "" {
+		return 0, nil
+	}
+
+	return snowflake.Parse(raw)
 }

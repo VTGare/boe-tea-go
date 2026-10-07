@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/VTGare/boe-tea-go/internal/sender"
-	"github.com/bwmarrin/discordgo"
+	"github.com/disgoorg/disgo/rest"
 )
 
 type Kind int
@@ -49,7 +49,7 @@ func classify(err error) Kind {
 		return KindNoPerms
 	}
 
-	var restErr *discordgo.RESTError
+	var restErr *rest.Error
 	if errors.As(err, &restErr) && restErr.Response != nil {
 		switch restErr.Response.StatusCode {
 		case http.StatusUnauthorized, http.StatusForbidden:

@@ -7,7 +7,7 @@ import (
 
 	"github.com/VTGare/boe-tea-go/bot"
 	"github.com/VTGare/boe-tea-go/store"
-	"github.com/bwmarrin/discordgo"
+	"github.com/disgoorg/disgo/discord"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -142,19 +142,22 @@ var _ = Describe("Settings panel", func() {
 			Expect(len(resp.Components)).To(BeNumerically("<=", 5))
 
 			for _, row := range resp.Components {
-				comps := row.(discordgo.ActionsRow).Components
+				comps := row.(discord.ActionRowComponent).Components
 				Expect(comps).NotTo(BeEmpty())
 				Expect(len(comps)).To(BeNumerically("<=", 5))
 
 				for _, c := range comps {
 					switch c := c.(type) {
-					case discordgo.Button:
+					case discord.ButtonComponent:
 						Expect(c.CustomID).To(HavePrefix("rt:settings:123456789012345678:"))
 						Expect(len(c.CustomID)).To(BeNumerically("<=", 100))
 						Expect(len(c.Label)).To(BeNumerically("<=", 80))
-					case discordgo.SelectMenu:
+					case discord.StringSelectMenuComponent:
 						Expect(comps).To(HaveLen(1))
 						Expect(len(c.Options)).To(BeNumerically("<=", 25))
+						Expect(c.CustomID).To(HavePrefix("rt:settings:"))
+					case discord.ChannelSelectMenuComponent:
+						Expect(comps).To(HaveLen(1))
 						Expect(c.CustomID).To(HavePrefix("rt:settings:"))
 					default:
 						Fail("unexpected component")
@@ -174,15 +177,15 @@ var _ = Describe("Settings panel", func() {
 		g := store.DefaultGuild("g")
 		g.SetProvider("pixiv", false)
 
-		row := view(g).render("sources").Components[0].(discordgo.ActionsRow).Components
-		twitter := row[0].(discordgo.Button)
-		pixiv := row[3].(discordgo.Button)
+		row := view(g).render("sources").Components[0].(discord.ActionRowComponent).Components
+		twitter := row[0].(discord.ButtonComponent)
+		pixiv := row[3].(discord.ButtonComponent)
 
 		Expect(pixiv.Label).To(Equal("Pixiv: Off"))
-		Expect(pixiv.Style).To(Equal(discordgo.SecondaryButton))
+		Expect(pixiv.Style).To(Equal(discord.ButtonStyleSecondary))
 		Expect(pixiv.CustomID).To(HaveSuffix(":toggle:pixiv"))
 		Expect(twitter.Label).To(Equal("Twitter: On"))
-		Expect(twitter.Style).To(Equal(discordgo.SuccessButton))
+		Expect(twitter.Style).To(Equal(discord.ButtonStyleSuccess))
 	})
 
 	It("summarises every section on the home page", func() {
@@ -203,7 +206,7 @@ var _ = Describe("Settings panel", func() {
 	It("marks the current repost choices as selected", func() {
 		resp := view(store.DefaultGuild("g")).render("reposts")
 
-		mode := resp.Components[0].(discordgo.ActionsRow).Components[0].(discordgo.SelectMenu)
+		mode := resp.Components[0].(discord.ActionRowComponent).Components[0].(discord.StringSelectMenuComponent)
 		for _, o := range mode.Options {
 			Expect(o.Default).To(Equal(o.Value == "notify"))
 		}
@@ -211,12 +214,12 @@ var _ = Describe("Settings panel", func() {
 })
 
 var _ = Describe("Art channels", func() {
-	all := []*discordgo.Channel{
-		{ID: "cat", Type: discordgo.ChannelTypeGuildCategory},
-		{ID: "art", Type: discordgo.ChannelTypeGuildText, ParentID: "cat"},
-		{ID: "news", Type: discordgo.ChannelTypeGuildNews, ParentID: "cat"},
-		{ID: "voice", Type: discordgo.ChannelTypeGuildVoice, ParentID: "cat"},
-		{ID: "general", Type: discordgo.ChannelTypeGuildText},
+	all := []channel{
+		{ID: "cat", Type: discord.ChannelTypeGuildCategory},
+		{ID: "art", Type: discord.ChannelTypeGuildText, ParentID: "cat"},
+		{ID: "news", Type: discord.ChannelTypeGuildNews, ParentID: "cat"},
+		{ID: "voice", Type: discord.ChannelTypeGuildVoice, ParentID: "cat"},
+		{ID: "general", Type: discord.ChannelTypeGuildText},
 	}
 
 	It("expands categories, drops unpostable channels and duplicates", func() {
