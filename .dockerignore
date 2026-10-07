@@ -1,0 +1,10 @@
+.git
+.github
+.env*
+config.json
+vendor/
+out/
+docs/
+AGENTS.md
+Dockerfile
+compose.yaml

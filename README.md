@@ -38,7 +38,7 @@ Please use `bt!help` command for documentation. Complete documentation is planne
 
 ### Requirements
 
-- Go (1.21+). Download Golang from <https://golang.org> or by using a package manager (e.g. Chocolatey on Windows, homebrew on Mac or pacman on ArchLinux).
+- Go (1.27+). Download Golang from <https://golang.org> or by using a package manager (e.g. Chocolatey on Windows, homebrew on Mac or pacman on ArchLinux).
 
 ### Locally
 
@@ -80,3 +80,28 @@ Please use `bt!help` command for documentation. Complete documentation is planne
 ```
 
 6. Run the executable file.
+
+### Configuration from the environment
+
+Every setting can also come from a `BOETEA_*` environment variable, which wins over `config.json`. A variable that's set but empty still wins, so `BOETEA_DISCORD_DEV_GUILD_ID=` turns a file's dev guild off. Without a config file, the environment alone is enough.
+
+| Variable | `config.json` |
+|---|---|
+| `BOETEA_CONFIG` | path of the config file, default `config.json` |
+| `BOETEA_DISCORD_TOKEN` | `discord.token` |
+| `BOETEA_DISCORD_AUTHOR_ID` | `discord.author_id` |
+| `BOETEA_DISCORD_DEV_GUILD_ID` | `discord.dev_guild_id` |
+| `BOETEA_STORE_BACKEND` | `store.backend` (`mongo` or `postgres`) |
+| `BOETEA_POSTGRES_DSN` | `store.postgres.dsn` |
+| `BOETEA_MONGO_URI`, `BOETEA_MONGO_DATABASE` | `mongo.uri`, `mongo.default_db` |
+| `BOETEA_REPOST_TYPE`, `BOETEA_REDIS_URI` | `repost.type`, `repost.redis_uri` |
+| `BOETEA_PIXIV_AUTH_TOKEN`, `BOETEA_PIXIV_REFRESH_TOKEN`, `BOETEA_PIXIV_PROXY_HOST` | `pixiv.*` |
+| `BOETEA_SAUCENAO_KEY` | `saucenao` |
+| `BOETEA_SENTRY_DSN` | `sentry` |
+| `BOETEA_MEDIA_MAX_CONCURRENT`, `BOETEA_MEDIA_SPOOL_DIR` | `media.*` |
+| `BOETEA_PPROF_PORT` | `debug.pprof_port` |
+| `BOETEA_QUOTES_FILE` | a JSON array of quotes added to `quotes`, default `quotes.json` |
+
+### Docker
+
+Every push to `master` publishes `ghcr.io/vtgare/boe-tea-go:latest` and `:<commit sha>`. The image has no config file and reads the environment. `compose.yaml` runs it with host networking and reads the variables from `.env`; `BOETEA_IMAGE_TAG` pins a tag.

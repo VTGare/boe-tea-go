@@ -2,10 +2,13 @@ package config
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
 	"math/rand"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	"github.com/VTGare/boe-tea-go/internal/spool"
@@ -103,35 +106,199 @@ type Quote struct {
 	NSFW    bool   `json:"nsfw"`
 }
 
-func FromFile(path string) (*Config, error) {
-	file, err := os.ReadFile(path)
-	if err != nil {
-		exePath, _ := os.Executable()
-		file, err = os.ReadFile(fmt.Sprintf("%s/%s", filepath.Dir(exePath), path))
-		if err != nil {
-			return nil, err
-		}
-	}
-
+// Load reads the config file at path, then applies BOETEA_* environment
+// variables on top of it. A missing file is fine when the environment has
+// everything. Quotes come from the file and from the quotes file.
+func Load(path string) (*Config, error) {
 	var cfg Config
-	err = json.Unmarshal(file, &cfg)
-	if err != nil {
+
+	file, err := readFile(path)
+	switch {
+	case err == nil:
+		if err := json.Unmarshal(file, &cfg); err != nil {
+			return nil, fmt.Errorf("parse %s: %w", path, err)
+		}
+	case !errors.Is(err, fs.ErrNotExist):
 		return nil, err
 	}
 
+	cfg.fillSections()
 	cfg.expandStoreSecrets()
 
-	if len(cfg.Quotes) > 0 {
-		cfg.safeQuotes = make([]*Quote, 0)
+	if err := cfg.applyEnv(); err != nil {
+		return nil, err
+	}
 
-		for _, quote := range cfg.Quotes {
-			if !quote.NSFW {
-				cfg.safeQuotes = append(cfg.safeQuotes, quote)
-			}
-		}
+	quotesPath, explicit := os.LookupEnv("BOETEA_QUOTES_FILE")
+	if !explicit {
+		quotesPath = "quotes.json"
+	}
+
+	if err := cfg.loadQuotes(quotesPath, explicit); err != nil {
+		return nil, err
 	}
 
 	return &cfg, nil
+}
+
+// readFile falls back to the executable's directory for relative paths.
+func readFile(path string) ([]byte, error) {
+	file, err := os.ReadFile(path)
+	if err == nil || filepath.IsAbs(path) {
+		return file, err
+	}
+
+	exePath, exeErr := os.Executable()
+	if exeErr != nil {
+		return nil, err
+	}
+
+	return os.ReadFile(filepath.Join(filepath.Dir(exePath), path))
+}
+
+// fillSections allocates the sections main reads without nil checks.
+func (c *Config) fillSections() {
+	if c.Discord == nil {
+		c.Discord = &Discord{}
+	}
+
+	if c.Repost == nil {
+		c.Repost = &Repost{}
+	}
+
+	if c.Pixiv == nil {
+		c.Pixiv = &Pixiv{}
+	}
+
+	if c.Media == nil {
+		c.Media = &Media{}
+	}
+
+	if c.Debug == nil {
+		c.Debug = &Debug{}
+	}
+}
+
+// applyEnv lets set variables win over the file, even when they're empty,
+// so an empty BOETEA_DISCORD_DEV_GUILD_ID turns a file's dev guild off.
+func (c *Config) applyEnv() error {
+	strs := []struct {
+		key string
+		dst *string
+	}{
+		{"BOETEA_DISCORD_TOKEN", &c.Discord.Token},
+		{"BOETEA_DISCORD_AUTHOR_ID", &c.Discord.AuthorID},
+		{"BOETEA_DISCORD_DEV_GUILD_ID", &c.Discord.DevGuildID},
+		{"BOETEA_REPOST_TYPE", &c.Repost.Type},
+		{"BOETEA_REDIS_URI", &c.Repost.RedisURI},
+		{"BOETEA_PIXIV_AUTH_TOKEN", &c.Pixiv.AuthToken},
+		{"BOETEA_PIXIV_REFRESH_TOKEN", &c.Pixiv.RefreshToken},
+		{"BOETEA_PIXIV_PROXY_HOST", &c.Pixiv.ProxyHost},
+		{"BOETEA_SAUCENAO_KEY", &c.SauceNAO},
+		{"BOETEA_SENTRY_DSN", &c.Sentry},
+		{"BOETEA_MEDIA_SPOOL_DIR", &c.Media.SpoolDir},
+	}
+
+	for _, s := range strs {
+		if v, ok := os.LookupEnv(s.key); ok {
+			*s.dst = v
+		}
+	}
+
+	ints := []struct {
+		key string
+		dst *int
+	}{
+		{"BOETEA_MEDIA_MAX_CONCURRENT", &c.Media.MaxConcurrent},
+		{"BOETEA_PPROF_PORT", &c.Debug.PprofPort},
+	}
+
+	for _, i := range ints {
+		v, ok := os.LookupEnv(i.key)
+		if !ok || v == "" {
+			continue
+		}
+
+		n, err := strconv.Atoi(v)
+		if err != nil {
+			return fmt.Errorf("%s: %w", i.key, err)
+		}
+
+		*i.dst = n
+	}
+
+	if v, ok := os.LookupEnv("BOETEA_STORE_BACKEND"); ok {
+		if c.Store == nil {
+			c.Store = &StoreConfig{}
+		}
+
+		c.Store.Backend = v
+	}
+
+	if v := os.Getenv("BOETEA_POSTGRES_DSN"); v != "" {
+		c.setPostgresDSN(v)
+	}
+
+	// The top-level mongo block wins over store.mongo, so the variables go there.
+	uri, db := os.Getenv("BOETEA_MONGO_URI"), os.Getenv("BOETEA_MONGO_DATABASE")
+	if uri != "" || db != "" {
+		if c.Mongo == nil {
+			c.Mongo = &Mongo{}
+		}
+
+		if uri != "" {
+			c.Mongo.URI = uri
+		}
+
+		if db != "" {
+			c.Mongo.Database = db
+		}
+	}
+
+	return nil
+}
+
+// loadQuotes adds the quotes file's quotes to the config's. A missing file
+// is only an error when BOETEA_QUOTES_FILE names it.
+func (c *Config) loadQuotes(path string, required bool) error {
+	file, err := readFile(path)
+	switch {
+	case err == nil:
+		var quotes []*Quote
+		if err := json.Unmarshal(file, &quotes); err != nil {
+			return fmt.Errorf("parse %s: %w", path, err)
+		}
+
+		c.Quotes = append(c.Quotes, quotes...)
+	case required || !errors.Is(err, fs.ErrNotExist):
+		return err
+	}
+
+	c.filterSafeQuotes()
+
+	return nil
+}
+
+func (c *Config) filterSafeQuotes() {
+	c.safeQuotes = make([]*Quote, 0, len(c.Quotes))
+
+	for _, quote := range c.Quotes {
+		if !quote.NSFW {
+			c.safeQuotes = append(c.safeQuotes, quote)
+		}
+	}
+}
+
+func (c *Config) setPostgresDSN(dsn string) {
+	if c.Store == nil {
+		c.Store = &StoreConfig{}
+	}
+
+	if c.Store.Postgres == nil {
+		c.Store.Postgres = &Postgres{}
+	}
+
+	c.Store.Postgres.DSN = dsn
 }
 
 // expandStoreSecrets expands ${ENV} placeholders in store DSNs and lets
@@ -152,15 +319,7 @@ func (c *Config) expandStoreSecrets() {
 	}
 
 	if dsn := os.Getenv("POSTGRES_DSN"); dsn != "" {
-		if c.Store == nil {
-			c.Store = &StoreConfig{}
-		}
-
-		if c.Store.Postgres == nil {
-			c.Store.Postgres = &Postgres{}
-		}
-
-		c.Store.Postgres.DSN = dsn
+		c.setPostgresDSN(dsn)
 	}
 
 	if uri := os.Getenv("MONGO_URI"); uri != "" && c.Mongo != nil {

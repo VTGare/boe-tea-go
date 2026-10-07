@@ -1,0 +1,8 @@
+services:
+  bot:
+    image: ghcr.io/vtgare/boe-tea-go:${BOETEA_IMAGE_TAG:-latest}
+    restart: unless-stopped
+    env_file: .env
+    # Postgres and Redis listen on the host's loopback.
+    network_mode: host
+    mem_limit: 1.5g

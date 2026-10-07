@@ -79,9 +79,14 @@ func initStore(ctx context.Context, cfg *config.Config) (store.Store, error) {
 }
 
 func main() {
-	cfg, err := config.FromFile("config.json")
+	cfg, err := config.Load(configPath())
 	if err != nil {
-		fmt.Println("Config not found: ", err)
+		fmt.Println("Failed to load the config: ", err)
+		os.Exit(1)
+	}
+
+	if cfg.Discord.Token == "" {
+		fmt.Println("No Discord token. Set BOETEA_DISCORD_TOKEN or discord.token in config.json.")
 		os.Exit(1)
 	}
 
@@ -148,7 +153,7 @@ func main() {
 
 	spool.Configure(cfg.Media.SpoolConfig())
 
-	if cfg.Debug != nil && cfg.Debug.PprofPort > 0 {
+	if cfg.Debug.PprofPort > 0 {
 		diag.Start(ctx, log, cfg.Debug.PprofPort, diag.DefaultDir())
 	}
 
@@ -221,6 +226,14 @@ func newClient(token string, log *slog.Logger) (*disgobot.Client, error) {
 	}
 
 	return client, nil
+}
+
+func configPath() string {
+	if path := os.Getenv("BOETEA_CONFIG"); path != "" {
+		return path
+	}
+
+	return "config.json"
 }
 
 // configID is 0 for "", which the config uses for no ID.
