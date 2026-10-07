@@ -45,18 +45,33 @@ func RegisterHandlers(b *bot.Bot) {
 // handled by the router itself.
 func PrefixResolver(b *bot.Bot) gumi.PrefixResolver {
 	return func(_ *disgobot.Client, guildID, _ snowflake.ID) []string {
-		defaults := []string{"bt!", "bt ", "bt.", "bt?"}
-
 		ctx, cancel := context.WithTimeout(b.Context, 5*time.Second)
 		defer cancel()
 
 		g, _ := b.Store.Guild(ctx, dgoutils.IDString(guildID))
-		if g == nil || g.Prefix == "bt!" {
-			return defaults
-		}
 
-		return []string{g.Prefix}
+		return guildPrefixes(g)
 	}
+}
+
+func guildPrefixes(g *store.Guild) []string {
+	if g == nil || g.Prefix == "bt!" {
+		return []string{"bt!", "bt ", "bt.", "bt?"}
+	}
+
+	return []string{g.Prefix}
+}
+
+// hasPrefix reports whether content starts with one of the guild's prefixes.
+// Users put a prefix before a link to stop the bot from posting it.
+func hasPrefix(g *store.Guild, content string) bool {
+	for _, p := range guildPrefixes(g) {
+		if len(content) >= len(p) && strings.EqualFold(content[:len(p)], p) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // ObserveStats counts every executed command for bt!stats.
@@ -102,7 +117,7 @@ func OnMessage(b *bot.Bot) gumi.FallbackHandler {
 			return
 		}
 
-		if !guild.PostsIn(m.ChannelID.String()) {
+		if !guild.PostsIn(m.ChannelID.String()) || hasPrefix(guild, m.Content) {
 			return
 		}
 

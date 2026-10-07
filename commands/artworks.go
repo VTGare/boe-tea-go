@@ -126,6 +126,17 @@ func artworksGroup(b *bot.Bot) []*gumi.Command {
 			Examples: []string{"crosspostexclude https://pixiv.net/artworks/86341538 #seiso-channel"},
 			Handler:  share(b, post.SkipModeInclude),
 		},
+		{
+			Name:         "ignore",
+			Category:     "Artworks",
+			Description:  "Sends a message without reposting the artwork links in it.",
+			DisableSlash: true,
+			Options: []*gumi.Option{
+				gumi.String("message", "Your message").Greedy(),
+			},
+			Examples: []string{"ignore https://pixiv.net/artworks/86341538 look at this"},
+			Handler:  func(*gumi.Context) error { return nil },
+		},
 	}
 }
 

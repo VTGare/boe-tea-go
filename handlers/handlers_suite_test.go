@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/VTGare/boe-tea-go/bot"
+	"github.com/VTGare/boe-tea-go/store"
 	"github.com/VTGare/gumi/v2"
 	"github.com/VTGare/gumi/v2/middleware"
 	"go.uber.org/zap"
@@ -65,5 +66,25 @@ var _ = Describe("OnError", func() {
 		Expect(func() {
 			OnError(b)(&gumi.Context{}, &gumi.CheckError{Check: "owner_only", Silent: true})
 		}).NotTo(Panic())
+	})
+})
+
+var _ = Describe("hasPrefix", func() {
+	DescribeTable("default prefixes",
+		func(content string, want bool) {
+			Expect(hasPrefix(&store.Guild{Prefix: "bt!"}, content)).To(Equal(want))
+		},
+		Entry("bt with a space", "bt https://x.com/a/status/1", true),
+		Entry("unknown command", "bt!ignore https://x.com/a/status/1", true),
+		Entry("any case", "BT.https://x.com/a/status/1", true),
+		Entry("plain link", "https://x.com/a/status/1", false),
+		Entry("prefix mid-message", "look https://x.com/a/status/1 bt", false),
+	)
+
+	It("only accepts a custom prefix when one is set", func() {
+		g := &store.Guild{Prefix: "!"}
+
+		Expect(hasPrefix(g, "! https://x.com/a/status/1")).To(BeTrue())
+		Expect(hasPrefix(g, "bt https://x.com/a/status/1")).To(BeFalse())
 	})
 })
