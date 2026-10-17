@@ -108,6 +108,14 @@ func memesGroup(b *bot.Bot) []*gumi.Command {
 			Examples:    []string{"kaiki"},
 			Handler:     kaiki(b),
 		},
+		{
+			Name:        "pawns",
+			Category:    "Memes",
+			Description: "Call your pawns",
+			Aliases:     []string{"callmypawns"},
+			Examples:    []string{"pawns"},
+			Handler:     pawns(b),
+		},
 	}
 }
 
@@ -213,5 +221,11 @@ func frenzy(*bot.Bot) gumi.Handler {
 func kaiki(*bot.Bot) gumi.Handler {
 	return func(ctx *gumi.Context) error {
 		return ctx.Reply(gumi.Text("https://imgpx.com/en/3EUv19fdWN78.png"))
+	}
+}
+
+func pawns(*bot.Bot) gumi.Handler {
+	return func(ctx *gumi.Context) error {
+		return ctx.Reply(gumi.Text("🤖 Calling all pawns\n<@296735595865309195> <@322814167515922434> <@266029011258441738> <@125783410462425088>"))
 	}
 }
