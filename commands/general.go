@@ -11,7 +11,9 @@ import (
 	"github.com/VTGare/boe-tea-go/internal/dgoutils"
 	"github.com/VTGare/boe-tea-go/internal/embeds"
 	"github.com/VTGare/boe-tea-go/messages"
+	"github.com/VTGare/boe-tea-go/stats"
 	"github.com/VTGare/gumi/v2"
+	"github.com/disgoorg/disgo/discord"
 )
 
 func generalGroup(b *bot.Bot) []*gumi.Command {
@@ -215,13 +217,23 @@ func artworkStats(b *bot.Bot, ctx *gumi.Context) error {
 }
 
 func commandStats(b *bot.Bot, ctx *gumi.Context) error {
-	eb := embeds.NewBuilder()
-	eb.Title("Command stats")
+	items, _ := b.Stats.CommandStats()
 
-	stats, _ := b.Stats.CommandStats()
-	for _, item := range stats {
-		eb.AddField(item.Name, strconv.FormatInt(item.Count, 10), true)
+	return ctx.Reply(gumi.Embed(commandStatsEmbed(items)))
+}
+
+func commandStatsEmbed(items []stats.Item) discord.Embed {
+	width := 0
+	for _, item := range items {
+		width = max(width, len(item.Name))
 	}
 
-	return ctx.Reply(gumi.Embed(eb.Finalize()))
+	var sb strings.Builder
+	sb.WriteString("```\n")
+	for _, item := range items {
+		fmt.Fprintf(&sb, "%-*s  %d\n", width, item.Name, item.Count)
+	}
+	sb.WriteString("```")
+
+	return embeds.NewBuilder().Title("Command stats").Description(sb.String()).Finalize()
 }
