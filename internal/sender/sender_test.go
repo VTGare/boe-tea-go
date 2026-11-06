@@ -74,7 +74,7 @@ func (a *discordAPI) Requests() []string {
 func newTestClient(overwrites ...map[string]any) *bot.Client {
 	c, _ := gt.NewClient()
 
-	c.Caches.AddGuild(discord.Guild{ID: gt.GuildID, OwnerID: testOwnerID})
+	c.Caches.AddGuild(discord.CacheGuild{Guild: discord.Guild{ID: gt.GuildID, OwnerID: testOwnerID}})
 	c.Caches.AddRole(discord.Role{
 		ID:      gt.GuildID,
 		GuildID: gt.GuildID,
@@ -160,7 +160,7 @@ var _ = Describe("DiscordSender permissions", func() {
 
 	It("grants the guild owner every permission", func() {
 		c := newTestClient()
-		c.Caches.AddGuild(discord.Guild{ID: gt.GuildID, OwnerID: gt.BotID})
+		c.Caches.AddGuild(discord.CacheGuild{Guild: discord.Guild{ID: gt.GuildID, OwnerID: gt.BotID}})
 		d, _ := newTestSender(c)
 
 		Expect(d.BotHasGuildPerms(gt.GuildID, discord.PermissionManageMessages)).To(BeTrue())

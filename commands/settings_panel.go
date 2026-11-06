@@ -179,7 +179,8 @@ func (p *settingsPanel) view(c *disgobot.Client, guild *store.Guild, owner strin
 
 	id := dgoutils.ParseID(guild.ID)
 
-	g, ok := c.Caches.Guild(id)
+	cg, ok := c.Caches.Guild(id)
+	g := cg.Guild
 	if !ok {
 		if rg, err := c.Rest.GetGuild(id, false); err == nil {
 			g, ok = rg.Guild, true

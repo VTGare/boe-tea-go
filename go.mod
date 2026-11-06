@@ -4,9 +4,9 @@ go 1.27.0
 
 require (
 	github.com/ReneKroon/ttlcache v1.7.0
-	github.com/VTGare/gumi/v2 v2.0.1
+	github.com/VTGare/gumi/v2 v2.0.2
 	github.com/VTGare/sengoku v0.1.7
-	github.com/disgoorg/disgo v0.19.6
+	github.com/disgoorg/disgo v0.20.0
 	github.com/disgoorg/snowflake/v2 v2.0.3
 	github.com/everpcpc/pixiv v0.1.2
 	github.com/getsentry/sentry-go v0.49.0
@@ -28,7 +28,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/dghubble/sling v1.4.2 // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
-	github.com/disgoorg/godave v0.1.0 // indirect
+	github.com/disgoorg/godave v0.3.0 // indirect
 	github.com/disgoorg/json/v2 v2.0.0 // indirect
 	github.com/disgoorg/omit v1.0.0 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect
